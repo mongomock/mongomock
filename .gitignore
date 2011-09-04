@@ -18,6 +18,7 @@ pip-log.txt
 # Unit test / coverage reports
 .coverage
 .tox
+.achievements
 
 #### Eclipse
 *.pydevproject
@@ -28,4 +29,9 @@ pip-log.txt
 #### Emacs
 \#*\#
 .#*
-.achievements
+
+#### C/C++
+*.o
+
+#### Haskell
+*.hi
