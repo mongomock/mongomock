@@ -91,6 +91,8 @@ class Collection(object):
         """
         if search_filter is None:
             return True
+        elif isinstance(search_filter, ObjectId):
+            search_filter = {'_id': search_filter}
 
         for key, search_value in search_filter.iteritems():
             document_value = resolve_key_value(key, document)

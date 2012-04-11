@@ -146,6 +146,13 @@ class FindTest(DocumentTest):
         docs = list(self.collection.find({'hat.color.cat': 'red'}))
         assert len(docs) == 0
 
+    def test__find_by_id(self):
+        """Test seaching with just an object id"""
+        obj = self.collection.find_one()
+        obj_id = obj['_id']
+        assert list(self.collection.find(obj_id)) == [obj]
+        assert self.collection.find_one(obj_id) == obj
+
     def test__find_by_regex(self):
         """Test searching with regular expression objects."""
         bob = {'name': 'bob'}
