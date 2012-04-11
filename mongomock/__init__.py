@@ -62,9 +62,17 @@ class Collection(object):
         self._documents[object_id] = dict(data, _id=object_id)
         return object_id
     def update(self, spec, document):
+        """Updates docuemnt(s) in the collection."""
+        if '$set' in document:
+            document = document['$set']
+            clear_first = False
+        else:
+            clear_first = True
+
         for existing_document in self._iter_documents(spec):
             document_id = existing_document['_id']
-            existing_document.clear()
+            if clear_first:
+                existing_document.clear()
             existing_document.update(document)
             existing_document['_id'] = document_id
     def find(self, filter=None):

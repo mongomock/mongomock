@@ -201,3 +201,17 @@ class UpdateTest(DocumentTest):
         self.collection.update(dict(a=self.document['a']), new_document)
         expected_new_document = dict(new_document, _id=self.document_id)
         self.assertEquals(list(self.collection.find()), [expected_new_document])
+    def test__set(self):
+        """Tests calling update with $set members."""
+        bob = {'name': 'bob'}
+        self.collection.insert(bob)
+
+        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'green'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['hat'], 'green')
+
+        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['hat'], 'red')
