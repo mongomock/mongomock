@@ -97,7 +97,7 @@ class Collection(object):
         for key, search_value in search_filter.iteritems():
             document_value = resolve_key_value(key, document)
 
-            if type(search_value) == RE_TYPE and document_value != NOTHING:
+            if isinstance(search_value, RE_TYPE) and document_value != NOTHING:
                 is_match = search_value.match(document_value) is not None
             else:
                 is_match = search_value == document_value
