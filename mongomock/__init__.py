@@ -1,8 +1,11 @@
 from .__version__ import __version__
+import re
 from .object_id import ObjectId
 from sentinels import NOTHING
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
+
+RE_TYPE = type(re.compile(''))
 
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
@@ -83,8 +86,15 @@ class Collection(object):
 
         for key, search_value in search_filter.iteritems():
             document_value = resolve_key_value(key, document)
-            if document_value != search_value:
+
+            if type(search_value) == RE_TYPE and document_value != NOTHING:
+                is_match = search_value.match(document_value) is not None
+            else:
+                is_match = search_value == document_value
+
+            if not is_match:
                 return False
+
         return True
 
 class Cursor(object):

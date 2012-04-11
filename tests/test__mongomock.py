@@ -1,4 +1,5 @@
 import copy
+import re
 from unittest import TestCase
 from mongomock import Connection, Database, Collection, ObjectId
 
@@ -100,6 +101,7 @@ class FindTest(DocumentTest):
             [self.document]
             )
     def test__find_by_dotted_attributes(self):
+        """Test seaching with dot notation."""
         green_bowler = {
                 'name': 'bob',
                 'hat': {
@@ -143,6 +145,26 @@ class FindTest(DocumentTest):
 
         docs = list(self.collection.find({'hat.color.cat': 'red'}))
         assert len(docs) == 0
+
+    def test__find_by_regex(self):
+        """Test searching with regular expression objects."""
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        regex = re.compile('bob|sam')
+        docs = list(self.collection.find({'name': regex}))
+        assert len(docs) == 2
+        assert docs[0]['name'] in ('bob', 'sam')
+        assert docs[1]['name'] in ('bob', 'sam')
+
+        regex = re.compile('bob|notsam')
+        docs = list(self.collection.find({'name': regex}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'bob'
 
 class UpdateTest(DocumentTest):
     def test__update(self):
