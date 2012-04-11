@@ -1,11 +1,19 @@
-from .__version__ import __version__
+import operator
 import re
+
+from .__version__ import __version__
 from .object_id import ObjectId
 from sentinels import NOTHING
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
 RE_TYPE = type(re.compile(''))
+OPERATOR_MAP = {'$ne': operator.ne,
+                '$gt': operator.gt,
+                '$gte': operator.ge,
+                '$lt': operator.lt,
+                '$lte': operator.le}
+
 
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
@@ -57,7 +65,10 @@ class Collection(object):
             return [self._insert(element) for element in data]
         return self._insert(data)
     def _insert(self, data):
-        object_id = ObjectId()
+        if '_id' in data:
+            object_id = data['_id']
+        else:
+            object_id = ObjectId()
         assert object_id not in self._documents
         self._documents[object_id] = dict(data, _id=object_id)
         return object_id
@@ -94,13 +105,20 @@ class Collection(object):
         elif isinstance(search_filter, ObjectId):
             search_filter = {'_id': search_filter}
 
-        for key, search_value in search_filter.iteritems():
+        for key, search in search_filter.iteritems():
             document_value = resolve_key_value(key, document)
+
+            if isinstance(search, dict):
+                operator_string, search_value = search.items()[0]
+                search_operator = OPERATOR_MAP[operator_string]
+            else:
+                search_operator = operator.eq
+                search_value = search
 
             if isinstance(search_value, RE_TYPE) and document_value != NOTHING:
                 is_match = search_value.match(document_value) is not None
             else:
-                is_match = search_value == document_value
+                is_match = search_operator(search_value, document_value)
 
             if not is_match:
                 return False

@@ -55,6 +55,10 @@ class CollectionTest(FakePymongoDatabaseTest):
         data = dict(a=1, b=2, c="data")
         object_id = self.collection.insert(data)
         self.assertIsInstance(object_id, ObjectId)
+
+        data = dict(_id=4, a=1, b=2, c="data")
+        object_id = self.collection.insert(data)
+        self.assertEquals(object_id, 4)
     def test__inserted_document(self):
         data = dict(a=1, b=2)
         data_before_insertion = data.copy()
@@ -172,6 +176,34 @@ class FindTest(DocumentTest):
         docs = list(self.collection.find({'name': regex}))
         assert len(docs) == 1
         assert docs[0]['name'] == 'bob'
+
+    def test__find_operators(self):
+        """Test searching with operators other than equality."""
+        bob = {'_id': 1, 'name': 'bob'}
+        sam = {'_id': 2, 'name': 'sam'}
+        a_goat = {'_id': 3, 'goatness': 'very'}
+
+        self.collection.remove()
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.collection.insert(a_goat)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        docs = list(self.collection.find({'name': {'$ne': 'bob'}}))
+        assert len(docs) == 2
+        assert docs[0]['_id'] in (2, 3)
+        assert docs[1]['_id'] in (2, 3)
+
+        docs = list(self.collection.find({'goatness': {'$ne': 'very'}}))
+        assert len(docs) == 2
+        assert docs[0]['_id'] in (1, 2)
+        assert docs[1]['_id'] in (1, 2)
+
+        docs = list(self.collection.find({'goatness': {'$ne': 'not very'}}))
+        assert len(docs) == 3
+
+        docs = list(self.collection.find({'snakeness': {'$ne': 'very'}}))
+        assert len(docs) == 3
 
 class RemoveTest(DocumentTest):
     """Test the remove method."""
