@@ -166,6 +166,35 @@ class FindTest(DocumentTest):
         assert len(docs) == 1
         assert docs[0]['name'] == 'bob'
 
+class RemoveTest(DocumentTest):
+    """Test the remove method."""
+    def test__remove(self):
+        """Test the remove method."""
+        self.assertEquals(len(list(self.collection.find())), 1)
+        self.collection.remove()
+        self.assertEquals(len(list(self.collection.find())), 0)
+
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.assertEquals(len(list(self.collection.find())), 2)
+
+        self.collection.remove({'name': 'bob'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]['name'], 'sam')
+
+        self.collection.remove({'name': 'notsam'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]['name'], 'sam')
+
+        self.collection.remove({'name': 'sam'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 0)
+
 class UpdateTest(DocumentTest):
     def test__update(self):
         new_document = dict(new_attr=2)

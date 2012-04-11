@@ -96,6 +96,12 @@ class Collection(object):
                 return False
 
         return True
+    def remove(self, search_filter=None):
+        """Remove objects matching search_filter from the collection."""
+        to_delete = list(self.find(filter=search_filter))
+        for doc in to_delete:
+            doc_id = doc['_id']
+            del self._documents[doc_id]
 
 class Cursor(object):
     def __init__(self, dataset):
