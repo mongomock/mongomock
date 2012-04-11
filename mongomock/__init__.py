@@ -4,6 +4,21 @@ from sentinels import NOTHING
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
+def resolve_key_value(key, doc):
+    """Resolve keys to their proper value in a document.
+    Returns the appropriate nested value if the key includes dot notation.
+    """
+    if not doc or not isinstance(doc, dict):
+        return NOTHING
+    else:
+        key_parts = key.split('.')
+        if len(key_parts) == 1:
+            return doc.get(key, NOTHING)
+        else:
+            sub_key = '.'.join(key_parts[1:])
+            sub_doc = doc.get(key_parts[0], {})
+            return resolve_key_value(sub_key, sub_doc)
+
 class Connection(object):
     def __init__(self):
         super(Connection, self).__init__()
@@ -59,11 +74,18 @@ class Collection(object):
             return next(self.find(filter))
         except StopIteration:
             return None
-    def _filter_applies(self, filter, document):
-        if filter is None:
+    def _filter_applies(self, search_filter, document):
+        """Returns a boolean indicating whether @search_filter applies
+        to @document.
+        """
+        if search_filter is None:
             return True
-        return all(filter.get(key, NOTHING) == document.get(key, NOTHING)
-                   for key in filter.keys())
+
+        for key, search_value in search_filter.iteritems():
+            document_value = resolve_key_value(key, document)
+            if document_value != search_value:
+                return False
+        return True
 
 class Cursor(object):
     def __init__(self, dataset):

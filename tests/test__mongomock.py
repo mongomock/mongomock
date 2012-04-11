@@ -99,6 +99,50 @@ class FindTest(DocumentTest):
             list(self.collection.find(dict(_id=self.document['_id']))),
             [self.document]
             )
+    def test__find_by_dotted_attributes(self):
+        green_bowler = {
+                'name': 'bob',
+                'hat': {
+                    'color': 'green',
+                    'type': 'bowler'}}
+        red_bowler = {
+                'name': 'sam',
+                'hat': {
+                    'color': 'red',
+                    'type': 'bowler'}}
+
+        self.collection.insert(green_bowler)
+        self.collection.insert(red_bowler)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        docs = list(self.collection.find({'name': 'sam'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'sam'
+
+        docs = list(self.collection.find({'hat.color': 'green'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'bob'
+
+        docs = list(self.collection.find({'hat.type': 'bowler'}))
+        assert len(docs) == 2
+
+        docs = list(self.collection.find({
+            'hat.color': 'red',
+            'hat.type': 'bowler'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'sam'
+
+        docs = list(self.collection.find({
+            'name': 'bob',
+            'hat.color': 'red',
+            'hat.type': 'bowler'}))
+        assert len(docs) == 0
+
+        docs = list(self.collection.find({'hat': 'a hat'}))
+        assert len(docs) == 0
+
+        docs = list(self.collection.find({'hat.color.cat': 'red'}))
+        assert len(docs) == 0
 
 class UpdateTest(DocumentTest):
     def test__update(self):
