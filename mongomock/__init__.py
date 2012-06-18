@@ -3,10 +3,11 @@ import re
 
 from .__version__ import __version__
 from .object_id import ObjectId
-from sentinels import NOTHING
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
+
+NOTHING = object()
 RE_TYPE = type(re.compile(''))
 OPERATOR_MAP = {'$ne': operator.ne,
                 '$gt': operator.gt,
@@ -115,7 +116,7 @@ class Collection(object):
                 search_operator = operator.eq
                 search_value = search
 
-            if isinstance(search_value, RE_TYPE) and document_value != NOTHING:
+            if isinstance(search_value, RE_TYPE) and document_value is not NOTHING:
                 is_match = search_value.match(document_value) is not None
             else:
                 is_match = search_operator(search_value, document_value)
