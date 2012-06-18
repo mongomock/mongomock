@@ -9,11 +9,31 @@ __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
 NOTHING = object()
 RE_TYPE = type(re.compile(''))
+
+
+
+def _force_list(v):
+    return v if isinstance(v,(list,tuple)) else [v]
+
+def _not_nothing_and(f):
+    "wrap an operator to return False if the first arg is NOTHING"
+    return lambda v,l: v is not NOTHING and f(v,l)
+
+def _all_op(doc_val, search_val):
+    dv = _force_list(doc_val)
+    return all(x in dv for x in search_val)
+
+
 OPERATOR_MAP = {'$ne': operator.ne,
-                '$gt': operator.gt,
-                '$gte': operator.ge,
-                '$lt': operator.lt,
-                '$lte': operator.le}
+                '$gt': _not_nothing_and(operator.gt),
+                '$gte': _not_nothing_and(operator.ge),
+                '$lt': _not_nothing_and(operator.lt),
+                '$lte': _not_nothing_and(operator.le),
+                '$all':_all_op,
+                '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
+                '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
+                '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
+               }
 
 
 def resolve_key_value(key, doc):
@@ -107,24 +127,23 @@ class Collection(object):
             search_filter = {'_id': search_filter}
 
         for key, search in search_filter.iteritems():
-            document_value = resolve_key_value(key, document)
+            doc_val = resolve_key_value(key, document)
 
             if isinstance(search, dict):
-                operator_string, search_value = search.items()[0]
-                search_operator = OPERATOR_MAP[operator_string]
+                is_match = all(
+                    OPERATOR_MAP[operator_string] ( doc_val, search_val )
+                    for operator_string,search_val in search.iteritems()
+                    )
+            elif isinstance(search, RE_TYPE) and isinstance(doc_val,basestring):
+                is_match = search.match(doc_val) is not None
             else:
-                search_operator = operator.eq
-                search_value = search
-
-            if isinstance(search_value, RE_TYPE) and document_value is not NOTHING:
-                is_match = search_value.match(document_value) is not None
-            else:
-                is_match = search_operator(search_value, document_value)
+                is_match = doc_val == search
 
             if not is_match:
                 return False
 
         return True
+
     def remove(self, search_filter=None):
         """Remove objects matching search_filter from the collection."""
         to_delete = list(self.find(filter=search_filter))

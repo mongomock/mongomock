@@ -177,7 +177,7 @@ class FindTest(DocumentTest):
         assert len(docs) == 1
         assert docs[0]['name'] == 'bob'
 
-    def test__find_operators(self):
+    def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}
         sam = {'_id': 2, 'name': 'sam'}
@@ -204,6 +204,36 @@ class FindTest(DocumentTest):
 
         docs = list(self.collection.find({'snakeness': {'$ne': 'very'}}))
         assert len(docs) == 3
+
+    def _assert_find(self, q, res_field, results):
+        res = self.collection.find(q)
+        self.assertEqual(sorted(x[res_field] for x in res),sorted(results))
+
+    def test__find_compare(self):
+        self.collection.insert(dict(noise="longhorn"))
+        for x in xrange(10):
+            self.collection.insert(dict(num=x,sqrd=x*x))
+
+        self._assert_find({'sqrd':{'$lte':4}}, 'num', [0,1,2])
+        self._assert_find({'sqrd':{'$lt':4}}, 'num', [0,1])
+        self._assert_find({'sqrd':{'$gte':64}}, 'num', [8,9])
+        self._assert_find({'sqrd':{'$gte':25,'$lte':36}}, 'num', [5,6])
+
+    def test__find_sets(self):
+        single = 4
+        even = [2,4,6,8]
+        prime = [2,3,5,7]
+
+        self.collection.remove()
+        self.collection.insert(dict(x=single))
+        self.collection.insert(dict(x=even))
+        self.collection.insert(dict(x=prime))
+
+        self._assert_find({'x':{'$in':[7,8]}}, 'x', (prime,even))
+        self._assert_find({'x':{'$in':[4,5]}}, 'x', (single,prime,even))
+        self._assert_find({'x':{'$nin':[2,5]}}, 'x', (single,))
+        self._assert_find({'x':{'$all':[2,5]}}, 'x', (prime,))
+        self._assert_find({'x':{'$all':[7,8]}}, 'x', ())
 
 class RemoveTest(DocumentTest):
     """Test the remove method."""
