@@ -1,8 +1,54 @@
-from .__version__ import __version__
-from .object_id import ObjectId
+import operator
+import re
+
 from sentinels import NOTHING
 
+from .__version__ import __version__
+from .object_id import ObjectId
+
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
+
+
+RE_TYPE = type(re.compile(''))
+
+def _force_list(v):
+    return v if isinstance(v,(list,tuple)) else [v]
+
+def _not_nothing_and(f):
+    "wrap an operator to return False if the first arg is NOTHING"
+    return lambda v,l: v is not NOTHING and f(v,l)
+
+def _all_op(doc_val, search_val):
+    dv = _force_list(doc_val)
+    return all(x in dv for x in search_val)
+
+
+OPERATOR_MAP = {'$ne': operator.ne,
+                '$gt': _not_nothing_and(operator.gt),
+                '$gte': _not_nothing_and(operator.ge),
+                '$lt': _not_nothing_and(operator.lt),
+                '$lte': _not_nothing_and(operator.le),
+                '$all':_all_op,
+                '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
+                '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
+                '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
+               }
+
+
+def resolve_key_value(key, doc):
+    """Resolve keys to their proper value in a document.
+    Returns the appropriate nested value if the key includes dot notation.
+    """
+    if not doc or not isinstance(doc, dict):
+        return NOTHING
+    else:
+        key_parts = key.split('.')
+        if len(key_parts) == 1:
+            return doc.get(key, NOTHING)
+        else:
+            sub_key = '.'.join(key_parts[1:])
+            sub_doc = doc.get(key_parts[0], {})
+            return resolve_key_value(sub_key, sub_doc)
 
 class Connection(object):
     def __init__(self):
@@ -39,14 +85,25 @@ class Collection(object):
             return [self._insert(element) for element in data]
         return self._insert(data)
     def _insert(self, data):
-        object_id = ObjectId()
+        if '_id' in data:
+            object_id = data['_id']
+        else:
+            object_id = ObjectId()
         assert object_id not in self._documents
         self._documents[object_id] = dict(data, _id=object_id)
         return object_id
     def update(self, spec, document):
+        """Updates docuemnt(s) in the collection."""
+        if '$set' in document:
+            document = document['$set']
+            clear_first = False
+        else:
+            clear_first = True
+
         for existing_document in self._iter_documents(spec):
             document_id = existing_document['_id']
-            existing_document.clear()
+            if clear_first:
+                existing_document.clear()
             existing_document.update(document)
             existing_document['_id'] = document_id
     def find(self, filter=None):
@@ -59,11 +116,39 @@ class Collection(object):
             return next(self.find(filter))
         except StopIteration:
             return None
-    def _filter_applies(self, filter, document):
-        if filter is None:
+    def _filter_applies(self, search_filter, document):
+        """Returns a boolean indicating whether @search_filter applies
+        to @document.
+        """
+        if search_filter is None:
             return True
-        return all(filter.get(key, NOTHING) == document.get(key, NOTHING)
-                   for key in filter.keys())
+        elif isinstance(search_filter, ObjectId):
+            search_filter = {'_id': search_filter}
+
+        for key, search in search_filter.iteritems():
+            doc_val = resolve_key_value(key, document)
+
+            if isinstance(search, dict):
+                is_match = all(
+                    OPERATOR_MAP[operator_string] ( doc_val, search_val )
+                    for operator_string,search_val in search.iteritems()
+                    )
+            elif isinstance(search, RE_TYPE) and isinstance(doc_val,basestring):
+                is_match = search.match(doc_val) is not None
+            else:
+                is_match = doc_val == search
+
+            if not is_match:
+                return False
+
+        return True
+
+    def remove(self, search_filter=None):
+        """Remove objects matching search_filter from the collection."""
+        to_delete = list(self.find(filter=search_filter))
+        for doc in to_delete:
+            doc_id = doc['_id']
+            del self._documents[doc_id]
 
 class Cursor(object):
     def __init__(self, dataset):
