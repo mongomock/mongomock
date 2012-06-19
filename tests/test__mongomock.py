@@ -1,7 +1,31 @@
 import copy
+import itertools
 import re
-from unittest import TestCase
+import platform
+if platform.python_version() < '2.7':
+    import unittest2 as unittest
+else:
+    import unittest
 from mongomock import Connection, Database, Collection, ObjectId
+from six.moves import xrange
+
+class TestCase(unittest.TestCase):
+    def assertItemsEqual(self, a, b):
+        # can's use hashing, and this method doesn't exist in Python 3.2...
+        a_items = list(a)
+        mismatch_a_items = set(range(len(a_items)))
+        b_items = list(b)
+        mismatch_b_items = set(range(len(b_items)))
+        for a_index, a_item in enumerate(a_items):
+            for b_index, b_item in enumerate(b_items):
+                if a_item == b_item:
+                    a_items[a_index] = b_items[b_index] = None
+                    mismatch_a_items.discard(a_index)
+                    mismatch_b_items.discard(b_index)
+                    break # to next 'a' item
+        self.assertEquals(mismatch_a_items, set())
+        self.assertEquals(mismatch_b_items, set())
+
 
 class FakePymongoConnectionTest(TestCase):
     def setUp(self):
@@ -72,10 +96,9 @@ class CollectionTest(FakePymongoDatabaseTest):
         original_objects = copy.deepcopy(objects)
         ids = self.collection.insert(objects)
         expected_objects = [dict(obj, _id=id) for id, obj in zip(ids, original_objects)]
-        self.assertEquals(sorted(self.collection.find()), sorted(expected_objects))
+        self.assertItemsEqual(self.collection.find(), expected_objects)
         # make sure objects were not changed in-place
         self.assertEquals(objects, original_objects)
-
 class DocumentTest(FakePymongoDatabaseTest):
     def setUp(self):
         super(DocumentTest, self).setUp()
@@ -207,7 +230,7 @@ class FindTest(DocumentTest):
 
     def _assert_find(self, q, res_field, results):
         res = self.collection.find(q)
-        self.assertEqual(sorted(x[res_field] for x in res),sorted(results))
+        self.assertItemsEqual((x[res_field] for x in res), results)
 
     def test__find_compare(self):
         self.collection.insert(dict(noise="longhorn"))

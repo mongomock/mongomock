@@ -2,6 +2,11 @@ import operator
 import re
 
 from sentinels import NOTHING
+from six import (
+    iteritems,
+    itervalues,
+    string_types,
+    )
 
 from .__version__ import __version__
 from .object_id import ObjectId
@@ -110,7 +115,7 @@ class Collection(object):
         dataset = (document.copy() for document in self._iter_documents(filter))
         return Cursor(dataset)
     def _iter_documents(self, filter=None):
-        return (document for document in self._documents.itervalues() if self._filter_applies(filter, document))
+        return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
     def find_one(self, filter=None):
         try:
             return next(self.find(filter))
@@ -125,15 +130,15 @@ class Collection(object):
         elif isinstance(search_filter, ObjectId):
             search_filter = {'_id': search_filter}
 
-        for key, search in search_filter.iteritems():
+        for key, search in iteritems(search_filter):
             doc_val = resolve_key_value(key, document)
 
             if isinstance(search, dict):
                 is_match = all(
                     OPERATOR_MAP[operator_string] ( doc_val, search_val )
-                    for operator_string,search_val in search.iteritems()
+                    for operator_string,search_val in iteritems(search)
                     )
-            elif isinstance(search, RE_TYPE) and isinstance(doc_val,basestring):
+            elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
                 is_match = search.match(doc_val) is not None
             else:
                 is_match = doc_val == search
@@ -156,5 +161,6 @@ class Cursor(object):
         self._dataset = dataset
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         return next(self._dataset)
+    next = __next__

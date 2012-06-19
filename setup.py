@@ -1,9 +1,14 @@
 import os
 import itertools
+import platform
 from setuptools import setup, find_packages
 
 with open(os.path.join(os.path.dirname(__file__), "mongomock", "__version__.py")) as version_file:
     exec(version_file.read())
+
+install_requires = ["sentinels", "six"]
+if platform.python_version() < '2.7':
+    install_requires.append('unittest2')
 
 setup(name="mongomock",
       classifiers = [
@@ -15,9 +20,7 @@ setup(name="mongomock",
       author_email="vmalloc@gmail.com",
       version=__version__,
       packages=find_packages(exclude=["tests"]),
-      install_requires=[
-          "sentinels",
-      ],
+      install_requires=install_requires,
       scripts=[],
       namespace_packages=[]
       )
