@@ -1,4 +1,5 @@
 import copy
+import re
 from unittest import TestCase
 from mongomock import Connection, Database, Collection, ObjectId
 
@@ -54,6 +55,10 @@ class CollectionTest(FakePymongoDatabaseTest):
         data = dict(a=1, b=2, c="data")
         object_id = self.collection.insert(data)
         self.assertIsInstance(object_id, ObjectId)
+
+        data = dict(_id=4, a=1, b=2, c="data")
+        object_id = self.collection.insert(data)
+        self.assertEquals(object_id, 4)
     def test__inserted_document(self):
         data = dict(a=1, b=2)
         data_before_insertion = data.copy()
@@ -99,6 +104,165 @@ class FindTest(DocumentTest):
             list(self.collection.find(dict(_id=self.document['_id']))),
             [self.document]
             )
+    def test__find_by_dotted_attributes(self):
+        """Test seaching with dot notation."""
+        green_bowler = {
+                'name': 'bob',
+                'hat': {
+                    'color': 'green',
+                    'type': 'bowler'}}
+        red_bowler = {
+                'name': 'sam',
+                'hat': {
+                    'color': 'red',
+                    'type': 'bowler'}}
+
+        self.collection.insert(green_bowler)
+        self.collection.insert(red_bowler)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        docs = list(self.collection.find({'name': 'sam'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'sam'
+
+        docs = list(self.collection.find({'hat.color': 'green'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'bob'
+
+        docs = list(self.collection.find({'hat.type': 'bowler'}))
+        assert len(docs) == 2
+
+        docs = list(self.collection.find({
+            'hat.color': 'red',
+            'hat.type': 'bowler'}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'sam'
+
+        docs = list(self.collection.find({
+            'name': 'bob',
+            'hat.color': 'red',
+            'hat.type': 'bowler'}))
+        assert len(docs) == 0
+
+        docs = list(self.collection.find({'hat': 'a hat'}))
+        assert len(docs) == 0
+
+        docs = list(self.collection.find({'hat.color.cat': 'red'}))
+        assert len(docs) == 0
+
+    def test__find_by_id(self):
+        """Test seaching with just an object id"""
+        obj = self.collection.find_one()
+        obj_id = obj['_id']
+        assert list(self.collection.find(obj_id)) == [obj]
+        assert self.collection.find_one(obj_id) == obj
+
+    def test__find_by_regex(self):
+        """Test searching with regular expression objects."""
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        regex = re.compile('bob|sam')
+        docs = list(self.collection.find({'name': regex}))
+        assert len(docs) == 2
+        assert docs[0]['name'] in ('bob', 'sam')
+        assert docs[1]['name'] in ('bob', 'sam')
+
+        regex = re.compile('bob|notsam')
+        docs = list(self.collection.find({'name': regex}))
+        assert len(docs) == 1
+        assert docs[0]['name'] == 'bob'
+
+    def test__find_notequal(self):
+        """Test searching with operators other than equality."""
+        bob = {'_id': 1, 'name': 'bob'}
+        sam = {'_id': 2, 'name': 'sam'}
+        a_goat = {'_id': 3, 'goatness': 'very'}
+
+        self.collection.remove()
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.collection.insert(a_goat)
+        self.assertEquals(len(list(self.collection.find())), 3)
+
+        docs = list(self.collection.find({'name': {'$ne': 'bob'}}))
+        assert len(docs) == 2
+        assert docs[0]['_id'] in (2, 3)
+        assert docs[1]['_id'] in (2, 3)
+
+        docs = list(self.collection.find({'goatness': {'$ne': 'very'}}))
+        assert len(docs) == 2
+        assert docs[0]['_id'] in (1, 2)
+        assert docs[1]['_id'] in (1, 2)
+
+        docs = list(self.collection.find({'goatness': {'$ne': 'not very'}}))
+        assert len(docs) == 3
+
+        docs = list(self.collection.find({'snakeness': {'$ne': 'very'}}))
+        assert len(docs) == 3
+
+    def _assert_find(self, q, res_field, results):
+        res = self.collection.find(q)
+        self.assertEqual(sorted(x[res_field] for x in res),sorted(results))
+
+    def test__find_compare(self):
+        self.collection.insert(dict(noise="longhorn"))
+        for x in xrange(10):
+            self.collection.insert(dict(num=x,sqrd=x*x))
+
+        self._assert_find({'sqrd':{'$lte':4}}, 'num', [0,1,2])
+        self._assert_find({'sqrd':{'$lt':4}}, 'num', [0,1])
+        self._assert_find({'sqrd':{'$gte':64}}, 'num', [8,9])
+        self._assert_find({'sqrd':{'$gte':25,'$lte':36}}, 'num', [5,6])
+
+    def test__find_sets(self):
+        single = 4
+        even = [2,4,6,8]
+        prime = [2,3,5,7]
+
+        self.collection.remove()
+        self.collection.insert(dict(x=single))
+        self.collection.insert(dict(x=even))
+        self.collection.insert(dict(x=prime))
+
+        self._assert_find({'x':{'$in':[7,8]}}, 'x', (prime,even))
+        self._assert_find({'x':{'$in':[4,5]}}, 'x', (single,prime,even))
+        self._assert_find({'x':{'$nin':[2,5]}}, 'x', (single,))
+        self._assert_find({'x':{'$all':[2,5]}}, 'x', (prime,))
+        self._assert_find({'x':{'$all':[7,8]}}, 'x', ())
+
+class RemoveTest(DocumentTest):
+    """Test the remove method."""
+    def test__remove(self):
+        """Test the remove method."""
+        self.assertEquals(len(list(self.collection.find())), 1)
+        self.collection.remove()
+        self.assertEquals(len(list(self.collection.find())), 0)
+
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+
+        self.collection.insert(bob)
+        self.collection.insert(sam)
+        self.assertEquals(len(list(self.collection.find())), 2)
+
+        self.collection.remove({'name': 'bob'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]['name'], 'sam')
+
+        self.collection.remove({'name': 'notsam'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0]['name'], 'sam')
+
+        self.collection.remove({'name': 'sam'})
+        docs = list(self.collection.find())
+        self.assertEqual(len(docs), 0)
 
 class UpdateTest(DocumentTest):
     def test__update(self):
@@ -106,3 +270,17 @@ class UpdateTest(DocumentTest):
         self.collection.update(dict(a=self.document['a']), new_document)
         expected_new_document = dict(new_document, _id=self.document_id)
         self.assertEquals(list(self.collection.find()), [expected_new_document])
+    def test__set(self):
+        """Tests calling update with $set members."""
+        bob = {'name': 'bob'}
+        self.collection.insert(bob)
+
+        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'green'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['hat'], 'green')
+
+        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['hat'], 'red')

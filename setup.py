@@ -15,9 +15,7 @@ setup(name="mongomock",
       author_email="vmalloc@gmail.com",
       version=__version__,
       packages=find_packages(exclude=["tests"]),
-      install_requires=[
-          "sentinels",
-      ],
+      install_requires=[],
       scripts=[],
       namespace_packages=[]
       )
