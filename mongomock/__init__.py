@@ -56,7 +56,7 @@ def resolve_key_value(key, doc):
             return resolve_key_value(sub_key, sub_doc)
 
 class Connection(object):
-    def __init__(self):
+    def __init__(self, *args):
         super(Connection, self).__init__()
         self._databases = {}
     def __getitem__(self, db_name):
