@@ -1,9 +1,12 @@
 import uuid
 
 class ObjectId(object):
-    def __init__(self):
+    def __init__(self, id=None):
         super(ObjectId, self).__init__()
-        self._id = uuid.uuid1()
+        if id is None:
+            self._id = uuid.uuid1()
+        else:
+            self._id = uuid.UUID(id)
     def __eq__(self, other):
         return isinstance(other, ObjectId) and other._id == self._id
     def __ne__(self, other):
@@ -13,4 +16,4 @@ class ObjectId(object):
     def __repr__(self):
         return 'ObjectId({})'.format(self._id)
     def __str__(self):
-        return self._id
+        return str(self._id)
