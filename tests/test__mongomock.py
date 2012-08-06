@@ -307,3 +307,9 @@ class UpdateTest(DocumentTest):
         doc = self.collection.find_one({'name': 'bob'})
         self.assertEqual(doc['name'], 'bob')
         self.assertEqual(doc['hat'], 'red')
+
+class ObjectIdTest(TestCase):
+    def test__equal_with_same_id(self):
+        obj1 = ObjectId()
+        obj2 = ObjectId(str(obj1))
+        self.assertEqual(obj1, obj2)

@@ -25,6 +25,11 @@ pip-log.txt
 .project
 .metadata
 
+# Intellij project files
+*.iml
+*.ipr
+*.iws
+.idea
 
 #### Emacs
 \#*\#
