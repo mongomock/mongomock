@@ -31,17 +31,17 @@ def _all_op(doc_val, search_val):
     return all(x in dv for x in search_val)
 
 OPERATOR_MAP = {'$ne': operator.ne,
-    '$gt': _not_nothing_and(operator.gt),
-    '$gte': _not_nothing_and(operator.ge),
-    '$lt': _not_nothing_and(operator.lt),
-    '$lte': _not_nothing_and(operator.le),
-    '$all':_all_op,
-    '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
-    '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
-    '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
-    '$regex':lambda dv,sv: re.compile(sv).match(dv),
-    '$where':lambda db,sv: True # ignore this complex filter
-    }
+                '$gt': _not_nothing_and(operator.gt),
+                '$gte': _not_nothing_and(operator.ge),
+                '$lt': _not_nothing_and(operator.lt),
+                '$lte': _not_nothing_and(operator.le),
+                '$all':_all_op,
+                '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
+                '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
+                '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
+                '$regex':lambda dv,sv: re.compile(sv).match(dv),
+                '$where':lambda db,sv: True # ignore this complex filter
+                }
 
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
