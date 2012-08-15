@@ -202,7 +202,7 @@ class Collection(object):
             
             if isinstance(search, dict):
                 is_match = all(
-                               OPERATOR_MAP.has_key(operator_string) and OPERATOR_MAP[operator_string] ( doc_val, search_val )
+                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] ( doc_val, search_val )
                                for operator_string,search_val in iteritems(search)
                                )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
