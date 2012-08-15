@@ -121,21 +121,21 @@ class Collection(object):
         for existing_document in self._iter_documents(spec):
             first = True
             found = True
-            for k,v in document.iteritems():
+            for k,v in iteritems(document):
                 if k=='$set':
                     existing_document.update(v)
                 elif k=='$inc':
-                    for field, value in v.iteritems():
+                    for field, value in iteritems(v):
                         new_value = existing_document.get(field, 0)
                         new_value = new_value + value
                         existing_document[field] = new_value
                 elif k=='$addToSet':
-                    for field, value in v.iteritems():
+                    for field, value in iteritems(v):
                         new_value = set(existing_document.get(field, []))
                         new_value.add(value)
                         existing_document[field] = list(new_value)
                 elif k=='$pull':
-                    for field, value in v.iteritems():
+                    for field, value in iteritems(v):
                         arr = existing_document[field]
                         existing_document[field] = [obj for obj in arr if not obj==value]
                 else:
