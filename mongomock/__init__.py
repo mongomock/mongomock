@@ -119,6 +119,7 @@ class Collection(object):
         """Updates docuemnt(s) in the collection."""
         found = False
         for existing_document in self._iter_documents(spec):
+            first = True
             found = True
             for k,v in document.iteritems():
                 if k=='$set':
@@ -130,15 +131,34 @@ class Collection(object):
                         existing_document[field] = new_value
                 elif k=='$addToSet':
                     for field, value in v.iteritems():
-                        new_value = existing_document.get(field, [])
-                        new_value.append(value)
-                        existing_document[field] = new_value
+                        new_value = set(existing_document.get(field, []))
+                        new_value.add(value)
+                        existing_document[field] = list(new_value)
                 elif k=='$pull':
                     for field, value in v.iteritems():
                         arr = existing_document[field]
                         existing_document[field] = [obj for obj in arr if not obj==value]
                 else:
-                    existing_document[k] = v
+                    if first:
+                        # replace entire document
+                        for key in document.keys():
+                            if key.startswith('$'):
+                                # can't mix modifiers with non-modifiers in update
+                                raise ValueError('field names cannot start with $ [{}]'.format(k))
+                        _id = spec.get('_id',existing_document.get('_id', None))
+                        existing_document.clear()
+                        if _id:
+                            existing_document['_id'] = _id
+                        existing_document.update(document)
+                        if existing_document['_id'] != _id:
+                            # id changed, fix index
+                            del self._documents[_id]
+                            self.insert(existing_document)
+                        break
+                    else:
+                        # can't mix modifiers with non-modifiers in update
+                        raise ValueError('Invalid modifier specified: {}'.format(k))
+                first = False
             if not multi:
                 return
         
