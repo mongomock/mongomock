@@ -99,6 +99,14 @@ class CollectionTest(FakePymongoDatabaseTest):
         self.assertItemsEqual(self.collection.find(), expected_objects)
         # make sure objects were not changed in-place
         self.assertEquals(objects, original_objects)
+    def test__count(self):
+        actual = self.collection.count()
+        self.assertEqual(0, actual)
+        data = dict(a=1, b=2)
+        self.collection.insert(data)
+        actual = self.collection.count()
+        self.assertEqual(1, actual)
+
 class DocumentTest(FakePymongoDatabaseTest):
     def setUp(self):
         super(DocumentTest, self).setUp()
@@ -258,6 +266,19 @@ class FindTest(DocumentTest):
         self._assert_find({'x':{'$all':[2,5]}}, 'x', (prime,))
         self._assert_find({'x':{'$all':[7,8]}}, 'x', ())
 
+    def test__return_only_selected_fields(self):
+        rec = {'name':'Chucky', 'type':'doll', 'model':'v6'}
+        self.collection.insert(rec)
+        result = list(self.collection.find({'name':'Chucky'}, fields=['type']))
+        self.assertEqual('doll', result[0]['type'])
+
+    def test__default_fields_to_id_if_empty(self):
+        rec = {'name':'Chucky', 'type':'doll', 'model':'v6'}
+        rec_id = self.collection.insert(rec)
+        result = list(self.collection.find({'name':'Chucky'}, fields=[]))
+        self.assertEqual(1, len(result[0]))
+        self.assertEqual(rec_id, result[0]['_id'])
+
 class RemoveTest(DocumentTest):
     """Test the remove method."""
     def test__remove(self):
@@ -286,6 +307,12 @@ class RemoveTest(DocumentTest):
         self.collection.remove({'name': 'sam'})
         docs = list(self.collection.find())
         self.assertEqual(len(docs), 0)
+    def test__remove_by_id(self):
+        expected = self.collection.count()
+        bob = {'name': 'bob'}
+        bob_id = self.collection.insert(bob)
+        self.collection.remove(bob_id)
+        self.assertEqual(expected, self.collection.count())
 
 class UpdateTest(DocumentTest):
     def test__update(self):
