@@ -167,7 +167,7 @@ class Collection(object):
                 first = False
             if not multi:
                 return
-                
+
         if not found and upsert:
             self.insert(document)
 
@@ -197,7 +197,7 @@ class Collection(object):
             return next(self.find(filter))
         except StopIteration:
             return None
-        
+
     def find_and_modify(self, query={}, update=None, upsert=False, **kwargs):
         old = self.find_one(query)
         if not old:
@@ -209,7 +209,7 @@ class Collection(object):
         if kwargs.get('new', False):
             return self.find_one({'_id':old['_id']})
         return old
-        
+
     def _filter_applies(self, search_filter, document):
         """Returns a boolean indicating whether @search_filter applies
             to @document.
@@ -218,10 +218,10 @@ class Collection(object):
             return True
         elif isinstance(search_filter, ObjectId):
             search_filter = {'_id': search_filter}
-                                
+
         for key, search in iteritems(search_filter):
             doc_val = resolve_key_value(key, document)
-                                                
+
             if isinstance(search, dict):
                 is_match = all(
                                operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] ( doc_val, search_val )
@@ -233,15 +233,15 @@ class Collection(object):
                 OPERATOR_MAP[key] ( doc_val, search )
             else:
                 is_match = doc_val == search
-                                                
+
             if not is_match:
                 return False
-                                
+
         return True
     def save(self, to_save, manipulate=True, safe=False, **kwargs):
         if not isinstance(to_save, dict):
             raise TypeError("cannot save object of type %s" % type(to_save))
-                                
+
         if "_id" not in to_save:
             return self.insert(to_save)
         else:
