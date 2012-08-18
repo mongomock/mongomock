@@ -4,13 +4,16 @@ import re
 
 from sentinels import NOTHING
 from six import (
-    iteritems,
-    itervalues,
-    string_types,
-    )
+                 iteritems,
+                 itervalues,
+                 string_types,
+                 )
 
 from .__version__ import __version__
-from .object_id import ObjectId
+try:
+    from bson import ObjectId
+except ImportError:
+    from .object_id import ObjectId
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
@@ -42,13 +45,14 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
                 '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
-               }
-
+                '$regex':lambda dv,sv: re.compile(sv).match(dv),
+                '$where':lambda db,sv: True # ignore this complex filter
+                }
 
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
-    Returns the appropriate nested value if the key includes dot notation.
-    """
+        Returns the appropriate nested value if the key includes dot notation.
+        """
     if not doc or not isinstance(doc, dict):
         return NOTHING
     else:
@@ -61,7 +65,7 @@ def resolve_key_value(key, doc):
             return resolve_key_value(sub_key, sub_doc)
 
 class Connection(object):
-    def __init__(self, *args):
+    def __init__(self):
         super(Connection, self).__init__()
         self._databases = {}
     def __getitem__(self, db_name):
@@ -71,6 +75,21 @@ class Connection(object):
         return db
     def __getattr__(self, attr):
         return self[attr]
+    def server_info(self):
+        return {
+            "version" : "2.0.6",
+            "sysInfo" : "Mock",
+            "versionArray" : [
+                              2,
+                              0,
+                              6,
+                              0
+                              ],
+            "bits" : 64,
+            "debug" : False,
+            "maxBsonObjectSize" : 16777216,
+            "ok" : 1
+    }
 
 class Database(object):
     def __init__(self, conn):
@@ -95,27 +114,63 @@ class Collection(object):
             return [self._insert(element) for element in data]
         return self._insert(data)
     def _insert(self, data):
-        if '_id' in data:
-            object_id = data['_id']
-        else:
-            object_id = ObjectId()
+        if not '_id' in data:
+            data['_id'] = ObjectId()
+        object_id = data['_id']
         assert object_id not in self._documents
-        self._documents[object_id] = dict(data, _id=object_id)
+        self._documents[object_id] = dict(data)
         return object_id
-    def update(self, spec, document):
+    def update(self, spec, document, upsert=False, manipulate=False,
+               safe=False, multi=False, _check_keys=False, **kwargs):
         """Updates docuemnt(s) in the collection."""
-        if '$set' in document:
-            document = document['$set']
-            clear_first = False
-        else:
-            clear_first = True
-
+        found = False
         for existing_document in self._iter_documents(spec):
-            document_id = existing_document['_id']
-            if clear_first:
-                existing_document.clear()
-            existing_document.update(document)
-            existing_document['_id'] = document_id
+            first = True
+            found = True
+            for k,v in iteritems(document):
+                if k=='$set':
+                    existing_document.update(v)
+                elif k=='$inc':
+                    for field, value in iteritems(v):
+                        new_value = existing_document.get(field, 0)
+                        new_value = new_value + value
+                        existing_document[field] = new_value
+                elif k=='$addToSet':
+                    for field, value in iteritems(v):
+                        new_value = set(existing_document.get(field, []))
+                        new_value.add(value)
+                        existing_document[field] = list(new_value)
+                elif k=='$pull':
+                    for field, value in iteritems(v):
+                        arr = existing_document[field]
+                        existing_document[field] = [obj for obj in arr if not obj==value]
+                else:
+                    if first:
+                        # replace entire document
+                        for key in document.keys():
+                            if key.startswith('$'):
+                                # can't mix modifiers with non-modifiers in update
+                                raise ValueError('field names cannot start with $ [{}]'.format(k))
+                        _id = spec.get('_id',existing_document.get('_id', None))
+                        existing_document.clear()
+                        if _id:
+                            existing_document['_id'] = _id
+                        existing_document.update(document)
+                        if existing_document['_id'] != _id:
+                            # id changed, fix index
+                            del self._documents[_id]
+                            self.insert(existing_document)
+                        break
+                    else:
+                        # can't mix modifiers with non-modifiers in update
+                        raise ValueError('Invalid modifier specified: {}'.format(k))
+                first = False
+            if not multi:
+                return
+                
+        if not found and upsert:
+            self.insert(document)
+
     def find(self, spec=None, fields=None, filter=None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
@@ -142,33 +197,57 @@ class Collection(object):
             return next(self.find(filter))
         except StopIteration:
             return None
+        
+    def find_and_modify(self, query={}, update=None, upsert=False, **kwargs):
+        old = self.find_one(query)
+        if not old:
+            if upsert:
+                old = {'_id':self.insert(query)}
+            else:
+                return None
+        self.update({'_id':old['_id']}, update)
+        if kwargs.get('new', False):
+            return self.find_one({'_id':old['_id']})
+        return old
+        
     def _filter_applies(self, search_filter, document):
         """Returns a boolean indicating whether @search_filter applies
-        to @document.
-        """
+            to @document.
+            """
         if search_filter is None:
             return True
         elif isinstance(search_filter, ObjectId):
             search_filter = {'_id': search_filter}
-
+                                
         for key, search in iteritems(search_filter):
             doc_val = resolve_key_value(key, document)
-
+                                                
             if isinstance(search, dict):
                 is_match = all(
-                    OPERATOR_MAP[operator_string] ( doc_val, search_val )
-                    for operator_string,search_val in iteritems(search)
-                    )
+                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] ( doc_val, search_val )
+                               for operator_string,search_val in iteritems(search)
+                               )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
                 is_match = search.match(doc_val) is not None
+            elif key in OPERATOR_MAP:
+                OPERATOR_MAP[key] ( doc_val, search )
             else:
                 is_match = doc_val == search
-
+                                                
             if not is_match:
                 return False
-
+                                
         return True
-
+    def save(self, to_save, manipulate=True, safe=False, **kwargs):
+        if not isinstance(to_save, dict):
+            raise TypeError("cannot save object of type %s" % type(to_save))
+                                
+        if "_id" not in to_save:
+            return self.insert(to_save)
+        else:
+            self.update({"_id": to_save["_id"]}, to_save, True,
+                        manipulate, safe, _check_keys=True, **kwargs)
+            return to_save.get("_id", None)
     def remove(self, spec_or_id=None, search_filter=None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
@@ -195,3 +274,10 @@ class Cursor(object):
     def __next__(self):
         return next(self._dataset)
     next = __next__
+    def sort(self, key, order):
+        return self
+    def count(self):
+        arr = [x for x in self._dataset]
+        count = len(arr)
+        self._dataset = iter(arr)
+        return count

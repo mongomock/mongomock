@@ -90,6 +90,7 @@ class CollectionTest(FakePymongoDatabaseTest):
         retrieved = self.collection.find_one(dict(_id=object_id))
         self.assertEquals(retrieved, dict(data, _id=object_id))
         self.assertIsNot(data, retrieved)
+        del data['_id'] # random ids can't be compared
         self.assertEquals(data, data_before_insertion)
     def test__bulk_insert(self):
         objects = [dict(a=2), dict(a=3, b=5), dict(name="bla")]
@@ -97,6 +98,8 @@ class CollectionTest(FakePymongoDatabaseTest):
         ids = self.collection.insert(objects)
         expected_objects = [dict(obj, _id=id) for id, obj in zip(ids, original_objects)]
         self.assertItemsEqual(self.collection.find(), expected_objects)
+        for obj in objects:
+            del obj['_id'] # random ids can't be compared
         # make sure objects were not changed in-place
         self.assertEquals(objects, original_objects)
     def test__count(self):
@@ -111,9 +114,9 @@ class DocumentTest(FakePymongoDatabaseTest):
     def setUp(self):
         super(DocumentTest, self).setUp()
         self.collection = self.db.collection
-        data = dict(a=1, b=2, c="blap")
-        self.document_id = self.collection.insert(dict(a=1, b=2, c="blap"))
-        self.document = dict(data, _id=self.document_id)
+        data = dict(a=1, b=2, c="blap", _id='id')
+        self.document_id = self.collection.insert(data)
+        self.document = data
 
 class FindTest(DocumentTest):
     def test__find_returns_cursors(self):
@@ -132,7 +135,7 @@ class FindTest(DocumentTest):
         self.collection.insert(dict(name="another new"))
         self.assertEquals(len(list(self.collection.find())), 3)
         self.assertEquals(
-            list(self.collection.find(dict(_id=self.document['_id']))),
+            list(self.collection.find(dict(_id=self.document_id))),
             [self.document]
             )
     def test__find_by_dotted_attributes(self):
@@ -184,7 +187,7 @@ class FindTest(DocumentTest):
     def test__find_by_id(self):
         """Test seaching with just an object id"""
         obj = self.collection.find_one()
-        obj_id = obj['_id']
+        obj_id = dict(_id=obj['_id'])
         assert list(self.collection.find(obj_id)) == [obj]
         assert self.collection.find_one(obj_id) == obj
 
@@ -318,8 +321,9 @@ class UpdateTest(DocumentTest):
     def test__update(self):
         new_document = dict(new_attr=2)
         self.collection.update(dict(a=self.document['a']), new_document)
-        expected_new_document = dict(new_document, _id=self.document_id)
-        self.assertEquals(list(self.collection.find()), [expected_new_document])
+        expected_new_document = dict(_id=self.document_id, new_attr=2)
+        objects = list(self.collection.find())
+        self.assertEquals(objects, [expected_new_document])
     def test__set(self):
         """Tests calling update with $set members."""
         bob = {'name': 'bob'}
@@ -334,7 +338,45 @@ class UpdateTest(DocumentTest):
         doc = self.collection.find_one({'name': 'bob'})
         self.assertEqual(doc['name'], 'bob')
         self.assertEqual(doc['hat'], 'red')
-
+    def test__inc(self):
+        bob = {'name': 'bob'}
+        self.collection.insert(bob)
+        
+        self.collection.update({'name':'bob'}, {'$inc': {'count':1}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['count'], 1)
+        
+        self.collection.update({'name':'bob'}, {'$inc': {'count':1}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertEqual(doc['count'], 2)
+    def test__addToSet(self):
+        bob = {'name': 'bob'}
+        self.collection.insert(bob)
+        
+        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'green'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertListEqual(doc['hat'], ['green'])
+        
+        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertListEqual(sorted(doc['hat']), ['green','tall'])    
+        
+        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertListEqual(sorted(doc['hat']), ['green','tall'])
+    def test__pull(self):
+        bob = {'name': 'bob','hat':['green','tall']}
+        self.collection.insert(bob)
+        
+        self.collection.update({'name':'bob'}, {'$pull': {'hat':'green'}})
+        doc = self.collection.find_one({'name': 'bob'})
+        self.assertEqual(doc['name'], 'bob')
+        self.assertListEqual(doc['hat'], ['tall'])
 class ObjectIdTest(TestCase):
     def test__equal_with_same_id(self):
         obj1 = ObjectId()
