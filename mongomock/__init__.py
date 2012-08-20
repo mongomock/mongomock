@@ -1,4 +1,5 @@
 import operator
+import warnings
 import re
 
 from sentinels import NOTHING
@@ -29,6 +30,11 @@ def _not_nothing_and(f):
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
     return all(x in dv for x in search_val)
+
+def _print_deprecation_warning(old_param_name, new_param_name):
+    warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
+                  "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
+                  "compatibility purposes." % old_param_name, new_param_name, DeprecationWarning)
 
 OPERATOR_MAP = {'$ne': operator.ne,
                 '$gt': _not_nothing_and(operator.gt),
@@ -161,13 +167,29 @@ class Collection(object):
                 first = False
             if not multi:
                 return
-        
+
         if not found and upsert:
             self.insert(document)
-    
-    def find(self, filter=None):
-        dataset = (document.copy() for document in self._iter_documents(filter))
+
+    def find(self, spec=None, fields=None, filter=None):
+        if filter is not None:
+            _print_deprecation_warning('filter', 'spec')
+            if spec is None:
+                spec = filter
+        dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
         return Cursor(dataset)
+    def _copy_only_fields(self, doc, fields):
+        """Copy only the specified fields."""
+        if fields is None:
+            return doc.copy()
+        doc_copy = {}
+        if not fields:
+            fields = ["_id"]
+        for key in fields:
+            if key in doc:
+                doc_copy[key] = doc[key]
+        return doc_copy
+
     def _iter_documents(self, filter=None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
     def find_one(self, filter=None):
@@ -175,7 +197,7 @@ class Collection(object):
             return next(self.find(filter))
         except StopIteration:
             return None
-    
+
     def find_and_modify(self, query={}, update=None, upsert=False, **kwargs):
         old = self.find_one(query)
         if not old:
@@ -187,7 +209,7 @@ class Collection(object):
         if kwargs.get('new', False):
             return self.find_one({'_id':old['_id']})
         return old
-    
+
     def _filter_applies(self, search_filter, document):
         """Returns a boolean indicating whether @search_filter applies
             to @document.
@@ -196,10 +218,10 @@ class Collection(object):
             return True
         elif isinstance(search_filter, ObjectId):
             search_filter = {'_id': search_filter}
-        
+
         for key, search in iteritems(search_filter):
             doc_val = resolve_key_value(key, document)
-            
+
             if isinstance(search, dict):
                 is_match = all(
                                operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] ( doc_val, search_val )
@@ -211,27 +233,37 @@ class Collection(object):
                 OPERATOR_MAP[key] ( doc_val, search )
             else:
                 is_match = doc_val == search
-            
+
             if not is_match:
                 return False
-        
+
         return True
     def save(self, to_save, manipulate=True, safe=False, **kwargs):
         if not isinstance(to_save, dict):
             raise TypeError("cannot save object of type %s" % type(to_save))
-        
+
         if "_id" not in to_save:
             return self.insert(to_save)
         else:
             self.update({"_id": to_save["_id"]}, to_save, True,
                         manipulate, safe, _check_keys=True, **kwargs)
             return to_save.get("_id", None)
-    def remove(self, search_filter=None):
-        """Remove objects matching search_filter from the collection."""
-        to_delete = list(self.find(filter=search_filter))
+    def remove(self, spec_or_id=None, search_filter=None):
+        """Remove objects matching spec_or_id from the collection."""
+        if search_filter is not None:
+            _print_deprecation_warning('search_filter', 'spec_or_id')
+        if spec_or_id is None:
+            spec_or_id = search_filter if search_filter else {}
+        if not isinstance(spec_or_id, dict):
+            spec_or_id = {'_id': spec_or_id}
+        to_delete = list(self.find(spec=spec_or_id))
         for doc in to_delete:
             doc_id = doc['_id']
             del self._documents[doc_id]
+
+    def count(self):
+        return len(self._documents)
+
 
 class Cursor(object):
     def __init__(self, dataset):
