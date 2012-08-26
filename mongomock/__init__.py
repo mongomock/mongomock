@@ -130,6 +130,10 @@ class Collection(object):
             for k,v in iteritems(document):
                 if k=='$set':
                     existing_document.update(v)
+                elif k=='$unset':
+                    for field, value in v.iteritems():
+                        if value and existing_document.has_key(field):
+                            del existing_document[field]
                 elif k=='$inc':
                     for field, value in iteritems(v):
                         new_value = existing_document.get(field, 0)
