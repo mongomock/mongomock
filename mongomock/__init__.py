@@ -65,10 +65,10 @@ def resolve_key_value(key, doc):
             return resolve_key_value(sub_key, sub_doc)
 
 class Connection(object):
-    def __init__(self, *args):
+    def __init__(self, host=None, port=None, max_pool_size=10,
+                 network_timeout=None, document_class=dict,
+                 tz_aware=False, _connect=True, **kwargs):
         super(Connection, self).__init__()
-        if len(args) > 0:
-            self._path = args[0]
         self._databases = {}
     def __getitem__(self, db_name):
         db = self._databases.get(db_name, None)
