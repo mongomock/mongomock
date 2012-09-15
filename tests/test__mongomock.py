@@ -26,6 +26,13 @@ class TestCase(unittest.TestCase):
         self.assertEquals(mismatch_a_items, set())
         self.assertEquals(mismatch_b_items, set())
 
+class ConnectionTest(TestCase):
+    def test__can_create_db_without_path(self):
+        conn = Connection()
+        self.assertIsNotNone(conn)
+    def test__can_create_db_without_path(self):
+        conn = Connection('mongodb://localhost')
+        self.assertIsNotNone(conn)
 
 class FakePymongoConnectionTest(TestCase):
     def setUp(self):
