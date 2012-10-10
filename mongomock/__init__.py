@@ -291,10 +291,8 @@ class Cursor(object):
         return next(self._dataset)
     next = __next__
     def sort(self, key, order):
-        def cmp_items(x, y):
-            return cmp(x[key], y[key]) * order
         arr = [x for x in self._dataset]
-        arr = sorted(arr, cmp = cmp_items)
+        arr = sorted(arr, key = lambda x:x[key], reverse = order < 0)
         self._dataset = iter(arr)
         return self
     def count(self):
