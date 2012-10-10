@@ -2,7 +2,6 @@ import copy
 import itertools
 import re
 import platform
-import pymongo
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
@@ -296,21 +295,21 @@ class CursorTest(DocumentTest):
         for i in xrange(30):
             self.collection.insert(dict(index = i))
     def test__skip(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', pymongo.ASCENDING).skip(10)]
+        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).skip(10)]
         self.assertEquals(20, len(res))
         i = 10
         for x in res:
             self.assertEquals(x['index'], i)
             i += 1
     def test__limit(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', pymongo.ASCENDING).limit(10)]
+        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).limit(10)]
         self.assertEquals(10, len(res))
         i = 0
         for x in res:
             self.assertEquals(x['index'], i)
             i += 1
     def test__skip_and_limit(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', pymongo.ASCENDING).skip(10).limit(10)]
+        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).skip(10).limit(10)]
         self.assertEquals(10, len(res))
         i = 10
         for x in res:
