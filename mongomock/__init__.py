@@ -21,11 +21,11 @@ __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 RE_TYPE = type(re.compile(''))
 
 def _force_list(v):
-    return v if isinstance(v,(list,tuple)) else [v]
+    return v if isinstance(v, (list, tuple)) else [v]
 
 def _not_nothing_and(f):
     "wrap an operator to return False if the first arg is NOTHING"
-    return lambda v,l: v is not NOTHING and f(v,l)
+    return lambda v, l: v is not NOTHING and f(v, l)
 
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
@@ -42,11 +42,11 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$lt': _not_nothing_and(operator.lt),
                 '$lte': _not_nothing_and(operator.le),
                 '$all':_all_op,
-                '$in':lambda dv,sv: any(x in sv for x in _force_list(dv)),
-                '$nin':lambda dv,sv: all(x not in sv for x in _force_list(dv)),
-                '$exists':lambda dv,sv: bool(sv)==(dv is not NOTHING),
-                '$regex':lambda dv,sv: re.compile(sv).match(dv),
-                '$where':lambda db,sv: True # ignore this complex filter
+                '$in':lambda dv, sv: any(x in sv for x in _force_list(dv)),
+                '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
+                '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
+                '$regex':lambda dv, sv: re.compile(sv).match(dv),
+                '$where':lambda db, sv: True  # ignore this complex filter
                 }
 
 def resolve_key_value(key, doc):
@@ -65,9 +65,9 @@ def resolve_key_value(key, doc):
             return resolve_key_value(sub_key, sub_doc)
 
 class Connection(object):
-    def __init__(self, host=None, port=None, max_pool_size=10,
-                 network_timeout=None, document_class=dict,
-                 tz_aware=False, _connect=True, **kwargs):
+    def __init__(self, host = None, port = None, max_pool_size = 10,
+                 network_timeout = None, document_class = dict,
+                 tz_aware = False, _connect = True, **kwargs):
         super(Connection, self).__init__()
         self._databases = {}
     def __getitem__(self, db_name):
@@ -122,34 +122,34 @@ class Collection(object):
         assert object_id not in self._documents
         self._documents[object_id] = dict(data)
         return object_id
-    def update(self, spec, document, upsert=False, manipulate=False,
-               safe=False, multi=False, _check_keys=False, **kwargs):
+    def update(self, spec, document, upsert = False, manipulate = False,
+               safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates docuemnt(s) in the collection."""
         found = False
         for existing_document in self._iter_documents(spec):
             first = True
             found = True
-            for k,v in iteritems(document):
-                if k=='$set':
+            for k, v in iteritems(document):
+                if k == '$set':
                     existing_document.update(v)
-                elif k=='$unset':
+                elif k == '$unset':
                     for field, value in v.iteritems():
                         if value and existing_document.has_key(field):
                             del existing_document[field]
-                elif k=='$inc':
+                elif k == '$inc':
                     for field, value in iteritems(v):
                         new_value = existing_document.get(field, 0)
                         new_value = new_value + value
                         existing_document[field] = new_value
-                elif k=='$addToSet':
+                elif k == '$addToSet':
                     for field, value in iteritems(v):
                         new_value = set(existing_document.get(field, []))
                         new_value.add(value)
                         existing_document[field] = list(new_value)
-                elif k=='$pull':
+                elif k == '$pull':
                     for field, value in iteritems(v):
                         arr = existing_document[field]
-                        existing_document[field] = [obj for obj in arr if not obj==value]
+                        existing_document[field] = [obj for obj in arr if not obj == value]
                 else:
                     if first:
                         # replace entire document
@@ -157,7 +157,7 @@ class Collection(object):
                             if key.startswith('$'):
                                 # can't mix modifiers with non-modifiers in update
                                 raise ValueError('field names cannot start with $ [{}]'.format(k))
-                        _id = spec.get('_id',existing_document.get('_id', None))
+                        _id = spec.get('_id', existing_document.get('_id', None))
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
@@ -177,7 +177,7 @@ class Collection(object):
         if not found and upsert:
             self.insert(document)
 
-    def find(self, spec=None, fields=None, filter=None):
+    def find(self, spec = None, fields = None, filter = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -196,15 +196,15 @@ class Collection(object):
                 doc_copy[key] = doc[key]
         return doc_copy
 
-    def _iter_documents(self, filter=None):
+    def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, filter=None):
+    def find_one(self, filter = None):
         try:
             return next(self.find(filter))
         except StopIteration:
             return None
 
-    def find_and_modify(self, query={}, update=None, upsert=False, **kwargs):
+    def find_and_modify(self, query = {}, update = None, upsert = False, **kwargs):
         old = self.find_one(query)
         if not old:
             if upsert:
@@ -230,13 +230,13 @@ class Collection(object):
 
             if isinstance(search, dict):
                 is_match = all(
-                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] ( doc_val, search_val )
-                               for operator_string,search_val in iteritems(search)
+                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val)
+                               for operator_string, search_val in iteritems(search)
                                )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
                 is_match = search.match(doc_val) is not None
             elif key in OPERATOR_MAP:
-                OPERATOR_MAP[key] ( doc_val, search )
+                OPERATOR_MAP[key] (doc_val, search)
             else:
                 is_match = doc_val == search
 
@@ -244,7 +244,7 @@ class Collection(object):
                 return False
 
         return True
-    def save(self, to_save, manipulate=True, safe=False, **kwargs):
+    def save(self, to_save, manipulate = True, safe = False, **kwargs):
         if not isinstance(to_save, dict):
             raise TypeError("cannot save object of type %s" % type(to_save))
 
@@ -252,9 +252,9 @@ class Collection(object):
             return self.insert(to_save)
         else:
             self.update({"_id": to_save["_id"]}, to_save, True,
-                        manipulate, safe, _check_keys=True, **kwargs)
+                        manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
-    def remove(self, spec_or_id=None, search_filter=None):
+    def remove(self, spec_or_id = None, search_filter = None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
             _print_deprecation_warning('search_filter', 'spec_or_id')
@@ -262,7 +262,7 @@ class Collection(object):
             spec_or_id = search_filter if search_filter else {}
         if not isinstance(spec_or_id, dict):
             spec_or_id = {'_id': spec_or_id}
-        to_delete = list(self.find(spec=spec_or_id))
+        to_delete = list(self.find(spec = spec_or_id))
         for doc in to_delete:
             doc_id = doc['_id']
             del self._documents[doc_id]
@@ -275,9 +275,19 @@ class Cursor(object):
     def __init__(self, dataset):
         super(Cursor, self).__init__()
         self._dataset = dataset
+        self._limit = None
+        self._skip = None
     def __iter__(self):
         return self
     def __next__(self):
+        if self._skip:
+            for i in xrange(self._skip):
+                next(self._dataset)
+            self._skip = None
+        if self._limit is not None and self._limit <= 0:
+            raise StopIteration()
+        if self._limit is not None:
+            self._limit -= 1
         return next(self._dataset)
     next = __next__
     def sort(self, key, order):
@@ -287,3 +297,9 @@ class Cursor(object):
         count = len(arr)
         self._dataset = iter(arr)
         return count
+    def skip(self, count):
+        self._skip = count
+        return self
+    def limit(self, count):
+        self._limit = count
+        return self
