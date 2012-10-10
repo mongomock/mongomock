@@ -7,7 +7,6 @@ if platform.python_version() < '2.7':
 else:
     import unittest
 from mongomock import Connection, Database, Collection, ObjectId
-from six.moves import xrange
 
 class TestCase(unittest.TestCase):
     def assertItemsEqual(self, a, b):
@@ -252,7 +251,7 @@ class FindTest(DocumentTest):
 
     def test__find_compare(self):
         self.collection.insert(dict(noise = "longhorn"))
-        for x in xrange(10):
+        for x in range(10):
             self.collection.insert(dict(num = x, sqrd = x * x))
 
         self._assert_find({'sqrd':{'$lte':4}}, 'num', [0, 1, 2])
@@ -292,7 +291,7 @@ class FindTest(DocumentTest):
 class CursorTest(DocumentTest):
     def setUp(self):
         super(CursorTest, self).setUp()
-        for i in xrange(30):
+        for i in range(30):
             self.collection.insert(dict(index = i))
     def test__skip(self):
         res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).skip(10)]

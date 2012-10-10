@@ -281,7 +281,7 @@ class Cursor(object):
         return self
     def __next__(self):
         if self._skip:
-            for i in xrange(self._skip):
+            for i in range(self._skip):
                 next(self._dataset)
             self._skip = None
         if self._limit is not None and self._limit <= 0:
