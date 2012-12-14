@@ -6,39 +6,26 @@ if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
-from mongomock import Connection, Database, Collection, ObjectId
+from mongomock import Database, ObjectId, Collection
+from mongomock import Connection as MongoMockConnection
+from pymongo import Connection as PymongoConnection
+from .multicollection import MultiCollection
 
 class TestCase(unittest.TestCase):
-    def assertItemsEqual(self, a, b):
-        # can's use hashing, and this method doesn't exist in Python 3.2...
-        a_items = list(a)
-        mismatch_a_items = set(range(len(a_items)))
-        b_items = list(b)
-        mismatch_b_items = set(range(len(b_items)))
-        for a_index, a_item in enumerate(a_items):
-            for b_index, b_item in enumerate(b_items):
-                if a_item == b_item:
-                    a_items[a_index] = b_items[b_index] = None
-                    mismatch_a_items.discard(a_index)
-                    mismatch_b_items.discard(b_index)
-                    break  # to next 'a' item
-        self.assertEquals(mismatch_a_items, set())
-        self.assertEquals(mismatch_b_items, set())
+    pass
 
-class ConnectionTest(TestCase):
+class InterfaceTest(TestCase):
     def test__can_create_db_without_path(self):
-        conn = Connection()
+        conn = MongoMockConnection()
         self.assertIsNotNone(conn)
     def test__can_create_db_without_path(self):
-        conn = Connection('mongodb://localhost')
+        conn = MongoMockConnection('mongodb://localhost')
         self.assertIsNotNone(conn)
 
-class FakePymongoConnectionTest(TestCase):
+class DatabaseGettingTest(TestCase):
     def setUp(self):
-        super(FakePymongoConnectionTest, self).setUp()
-        self.conn = Connection()
-
-class DatabaseGettingTest(FakePymongoConnectionTest):
+        super(DatabaseGettingTest, self).setUp()
+        self.conn = MongoMockConnection()
     def test__getting_database_via_getattr(self):
         db1 = self.conn.some_database_here
         db2 = self.conn.some_database_here
@@ -52,18 +39,15 @@ class DatabaseGettingTest(FakePymongoConnectionTest):
         self.assertIs(db1, self.conn.some_database_here)
         self.assertIsInstance(db1, Database)
 
-class FakePymongoDatabaseTest(FakePymongoConnectionTest):
+class CollectionAPITest(TestCase):
     def setUp(self):
-        super(FakePymongoDatabaseTest, self).setUp()
+        super(CollectionAPITest, self).setUp()
+        self.conn = MongoMockConnection()
         self.db = self.conn['somedb']
-
-class FakePymongoDatabaseAPITest(FakePymongoDatabaseTest):
     def test__get_collection_names(self):
         self.db.a
         self.db.b
         self.assertItemsEqual(self.db.collection_names(), ['a', 'b', 'system.indexes'])
-
-class CollectionGettingTest(FakePymongoDatabaseTest):
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here
@@ -76,74 +60,52 @@ class CollectionGettingTest(FakePymongoDatabaseTest):
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db.some_collection_here)
         self.assertIsInstance(col1, Collection)
-
-class CollectionTest(FakePymongoDatabaseTest):
-    def setUp(self):
-        super(CollectionTest, self).setUp()
-        self.collection = self.db.collection
-    def test__inserting(self):
-        data = dict(a = 1, b = 2, c = "data")
-        object_id = self.collection.insert(data)
-        self.assertIsInstance(object_id, ObjectId)
-
-        data = dict(_id = 4, a = 1, b = 2, c = "data")
-        object_id = self.collection.insert(data)
-        self.assertEquals(object_id, 4)
-    def test__inserted_document(self):
-        data = dict(a = 1, b = 2)
-        data_before_insertion = data.copy()
-        object_id = self.collection.insert(data)
-        retrieved = self.collection.find_one(dict(_id = object_id))
-        self.assertEquals(retrieved, dict(data, _id = object_id))
-        self.assertIsNot(data, retrieved)
-        del data['_id']  # random ids can't be compared
-        self.assertEquals(data, data_before_insertion)
-    def test__bulk_insert(self):
-        objects = [dict(a = 2), dict(a = 3, b = 5), dict(name = "bla")]
-        original_objects = copy.deepcopy(objects)
-        ids = self.collection.insert(objects)
-        expected_objects = [dict(obj, _id = id) for id, obj in zip(ids, original_objects)]
-        self.assertItemsEqual(self.collection.find(), expected_objects)
-        for obj in objects:
-            del obj['_id']  # random ids can't be compared
-        # make sure objects were not changed in-place
-        self.assertEquals(objects, original_objects)
-    def test__count(self):
-        actual = self.collection.count()
-        self.assertEqual(0, actual)
-        data = dict(a = 1, b = 2)
-        self.collection.insert(data)
-        actual = self.collection.count()
-        self.assertEqual(1, actual)
-
-class DocumentTest(FakePymongoDatabaseTest):
-    def setUp(self):
-        super(DocumentTest, self).setUp()
-        self.collection = self.db.collection
-        data = dict(a = 1, b = 2, c = "blap", _id = 'id')
-        self.document_id = self.collection.insert(data)
-        self.document = data
-
-class FindTest(DocumentTest):
     def test__find_returns_cursors(self):
-        self.assertNotIsInstance(self.collection.find(), list)
-        self.assertNotIsInstance(self.collection.find(), tuple)
-    def test__find_single_document(self):
-        self.assertEquals(
-            [self.document],
-            list(self.collection.find()),
-            )
-    def test__find_returns_new_object(self):
-        list(self.collection.find())[0]['new_field'] = 20
-        self.test__find_single_document()
+        collection = self.db.collection
+        self.assertEquals(type(collection.find()).__name__, "Cursor")
+        self.assertNotIsInstance(collection.find(), list)
+        self.assertNotIsInstance(collection.find(), tuple)
+
+
+class CollectionComparisonTest(TestCase):
+    """Compares a fake collection with the real mongo collection implementation via cross-comparison"""
+    def setUp(self):
+        super(CollectionComparisonTest, self).setUp()
+        self.fake_conn = MongoMockConnection()
+        self.mongo_conn = PymongoConnection()
+        self.db_name = "mongomock___testing_db"
+        self.collection_name = "mongomock___testing_collection"
+        self.mongo_conn[self.db_name][self.collection_name].remove()
+        self.cmp = MultiCollection({
+            "fake" : self.fake_conn[self.db_name][self.collection_name],
+            "real" : self.mongo_conn[self.db_name][self.collection_name],
+         })
+
+class CollectionTest(CollectionComparisonTest):
+    def test__find_is_empty(self):
+        self.cmp.do.remove()
+        self.cmp.compare.find()
+    def test__inserting(self):
+        self.cmp.do.remove()
+        data = {"a" : 1, "b" : 2, "c" : "data"}
+        self.cmp.do.insert(data)
+        self.cmp.compare.find() # single document, no need to ignore order
+    def test__bulk_insert(self):
+        objs = [{"a" : 2, "b" : {"c" : 3}}, {"c" : 5}, {"d" : 7}]
+        results_dict = self.cmp.do.insert(objs)
+        for results in results_dict.itervalues():
+            self.assertEquals(len(results), len(objs))
+            self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
+        self.cmp.compare_ignore_order.find()
+    def test__count(self):
+        self.cmp.compare.count()
+        self.cmp.do.insert({"a" : 1})
+        self.cmp.compare.count()
     def test__find_by_attributes(self):
-        self.collection.insert(dict(name = "new"))
-        self.collection.insert(dict(name = "another new"))
-        self.assertEquals(len(list(self.collection.find())), 3)
-        self.assertEquals(
-            list(self.collection.find(dict(_id = self.document_id))),
-            [self.document]
-            )
+        id1 = self.cmp.do.insert({"name" : "new"})
+        self.cmp.do.insert({"name" : "another new"})
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare.find({"_id" : id1})
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
@@ -156,260 +118,190 @@ class FindTest(DocumentTest):
                 'hat': {
                     'color': 'red',
                     'type': 'bowler'}}
-
-        self.collection.insert(green_bowler)
-        self.collection.insert(red_bowler)
-        self.assertEquals(len(list(self.collection.find())), 3)
-
-        docs = list(self.collection.find({'name': 'sam'}))
-        assert len(docs) == 1
-        assert docs[0]['name'] == 'sam'
-
-        docs = list(self.collection.find({'hat.color': 'green'}))
-        assert len(docs) == 1
-        assert docs[0]['name'] == 'bob'
-
-        docs = list(self.collection.find({'hat.type': 'bowler'}))
-        assert len(docs) == 2
-
-        docs = list(self.collection.find({
+        self.cmp.do.insert(green_bowler)
+        self.cmp.do.insert(red_bowler)
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.find({"name" : "sam"})
+        self.cmp.compare_ignore_order.find({'hat.color': 'green'})
+        self.cmp.compare_ignore_order.find({'hat.type': 'bowler'})
+        self.cmp.compare.find({
             'hat.color': 'red',
-            'hat.type': 'bowler'}))
-        assert len(docs) == 1
-        assert docs[0]['name'] == 'sam'
-
-        docs = list(self.collection.find({
+            'hat.type': 'bowler'
+        })
+        self.cmp.compare.find({
             'name': 'bob',
             'hat.color': 'red',
-            'hat.type': 'bowler'}))
-        assert len(docs) == 0
-
-        docs = list(self.collection.find({'hat': 'a hat'}))
-        assert len(docs) == 0
-
-        docs = list(self.collection.find({'hat.color.cat': 'red'}))
-        assert len(docs) == 0
-
-    def test__find_by_id(self):
-        """Test seaching with just an object id"""
-        obj = self.collection.find_one()
-        obj_id = dict(_id = obj['_id'])
-        assert list(self.collection.find(obj_id)) == [obj]
-        assert self.collection.find_one(obj_id) == obj
+            'hat.type': 'bowler'
+        })
+        self.cmp.compare.find({'hat': 'a hat'})
+        self.cmp.compare.find({'hat.color.cat': 'red'})
 
     def test__find_by_regex(self):
         """Test searching with regular expression objects."""
         bob = {'name': 'bob'}
         sam = {'name': 'sam'}
-
-        self.collection.insert(bob)
-        self.collection.insert(sam)
-        self.assertEquals(len(list(self.collection.find())), 3)
-
+        self.cmp.do.insert(bob)
+        self.cmp.do.insert(sam)
+        self.cmp.compare_ignore_order.find()
         regex = re.compile('bob|sam')
-        docs = list(self.collection.find({'name': regex}))
-        assert len(docs) == 2
-        assert docs[0]['name'] in ('bob', 'sam')
-        assert docs[1]['name'] in ('bob', 'sam')
-
+        self.cmp.compare_ignore_order.find({"name" : regex})
         regex = re.compile('bob|notsam')
-        docs = list(self.collection.find({'name': regex}))
-        assert len(docs) == 1
-        assert docs[0]['name'] == 'bob'
+        self.cmp.compare_ignore_order.find({"name" : regex})
 
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}
         sam = {'_id': 2, 'name': 'sam'}
         a_goat = {'_id': 3, 'goatness': 'very'}
-
-        self.collection.remove()
-        self.collection.insert(bob)
-        self.collection.insert(sam)
-        self.collection.insert(a_goat)
-        self.assertEquals(len(list(self.collection.find())), 3)
-
-        docs = list(self.collection.find({'name': {'$ne': 'bob'}}))
-        assert len(docs) == 2
-        assert docs[0]['_id'] in (2, 3)
-        assert docs[1]['_id'] in (2, 3)
-
-        docs = list(self.collection.find({'goatness': {'$ne': 'very'}}))
-        assert len(docs) == 2
-        assert docs[0]['_id'] in (1, 2)
-        assert docs[1]['_id'] in (1, 2)
-
-        docs = list(self.collection.find({'goatness': {'$ne': 'not very'}}))
-        assert len(docs) == 3
-
-        docs = list(self.collection.find({'snakeness': {'$ne': 'very'}}))
-        assert len(docs) == 3
-
-    def _assert_find(self, q, res_field, results):
-        res = self.collection.find(q)
-        self.assertItemsEqual((x[res_field] for x in res), results)
+        self.cmp.do.insert([bob, sam, a_goat])
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.find({'name': {'$ne': 'bob'}})
+        self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'very'}})
+        self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'not very'}})
+        self.cmp.compare_ignore_order.find({'snakeness': {'$ne': 'very'}})
 
     def test__find_compare(self):
-        self.collection.insert(dict(noise = "longhorn"))
+        self.cmp.do.insert(dict(noise = "longhorn"))
         for x in range(10):
-            self.collection.insert(dict(num = x, sqrd = x * x))
-
-        self._assert_find({'sqrd':{'$lte':4}}, 'num', [0, 1, 2])
-        self._assert_find({'sqrd':{'$lt':4}}, 'num', [0, 1])
-        self._assert_find({'sqrd':{'$gte':64}}, 'num', [8, 9])
-        self._assert_find({'sqrd':{'$gte':25, '$lte':36}}, 'num', [5, 6])
+            self.cmp.do.insert(dict(num = x, sqrd = x * x))
+        self.cmp.compare_ignore_order.find({'sqrd':{'$lte':4}})
+        self.cmp.compare_ignore_order.find({'sqrd':{'$lt':4}})
+        self.cmp.compare_ignore_order.find({'sqrd':{'$gte':64}})
+        self.cmp.compare_ignore_order.find({'sqrd':{'$gte':25, '$lte':36}})
 
     def test__find_sets(self):
         single = 4
         even = [2, 4, 6, 8]
         prime = [2, 3, 5, 7]
-
-        self.collection.remove()
-        self.collection.insert(dict(x = single))
-        self.collection.insert(dict(x = even))
-        self.collection.insert(dict(x = prime))
-
-        self._assert_find({'x':{'$in':[7, 8]}}, 'x', (prime, even))
-        self._assert_find({'x':{'$in':[4, 5]}}, 'x', (single, prime, even))
-        self._assert_find({'x':{'$nin':[2, 5]}}, 'x', (single,))
-        self._assert_find({'x':{'$all':[2, 5]}}, 'x', (prime,))
-        self._assert_find({'x':{'$all':[7, 8]}}, 'x', ())
+        self.cmp.do.insert([
+            dict(x = single),
+            dict(x = even),
+            dict(x = prime)])
+        self.cmp.compare_ignore_order.find({'x':{'$in':[7, 8]}})
+        self.cmp.compare_ignore_order.find({'x':{'$in':[4, 5]}})
+        self.cmp.compare_ignore_order.find({'x':{'$nin':[2, 5]}})
+        self.cmp.compare_ignore_order.find({'x':{'$all':[2, 5]}})
+        self.cmp.compare_ignore_order.find({'x':{'$all':[7, 8]}})
 
     def test__return_only_selected_fields(self):
-        rec = {'name':'Chucky', 'type':'doll', 'model':'v6'}
-        self.collection.insert(rec)
-        result = list(self.collection.find({'name':'Chucky'}, fields = ['type']))
-        self.assertEqual('doll', result[0]['type'])
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['type'])
 
     def test__default_fields_to_id_if_empty(self):
-        rec = {'name':'Chucky', 'type':'doll', 'model':'v6'}
-        rec_id = self.collection.insert(rec)
-        result = list(self.collection.find({'name':'Chucky'}, fields = []))
-        self.assertEqual(1, len(result[0]))
-        self.assertEqual(rec_id, result[0]['_id'])
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = [])
 
-class CursorTest(DocumentTest):
-    def setUp(self):
-        super(CursorTest, self).setUp()
-        for i in range(30):
-            self.collection.insert(dict(index = i))
-    def test__skip(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).skip(10)]
-        self.assertEquals(20, len(res))
-        i = 10
-        for x in res:
-            self.assertEquals(x['index'], i)
-            i += 1
-    def test__limit(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).limit(10)]
-        self.assertEquals(10, len(res))
-        i = 0
-        for x in res:
-            self.assertEquals(x['index'], i)
-            i += 1
-    def test__skip_and_limit(self):
-        res = [x for x in self.collection.find({'index':{'$exists':True}}).sort('index', 1).skip(10).limit(10)]
-        self.assertEquals(10, len(res))
-        i = 10
-        for x in res:
-            self.assertEquals(x['index'], i)
-            i += 1
-
-class RemoveTest(DocumentTest):
-    """Test the remove method."""
     def test__remove(self):
         """Test the remove method."""
-        self.assertEquals(len(list(self.collection.find())), 1)
-        self.collection.remove()
-        self.assertEquals(len(list(self.collection.find())), 0)
+        self.cmp.do.insert({"value" : 1})
+        self.cmp.compare_ignore_order.find()
+        self.cmp.do.remove()
+        self.cmp.compare.find()
+        self.cmp.do.insert([
+            {'name': 'bob'},
+            {'name': 'sam'},
+        ])
+        self.cmp.compare_ignore_order.find()
+        self.cmp.do.remove({'name': 'bob'})
+        self.cmp.compare_ignore_order.find()
+        self.cmp.do.remove({'name': 'notsam'})
+        self.cmp.compare.find()
+        self.cmp.do.remove({'name': 'sam'})
+        self.cmp.compare.find
 
-        bob = {'name': 'bob'}
-        sam = {'name': 'sam'}
-
-        self.collection.insert(bob)
-        self.collection.insert(sam)
-        self.assertEquals(len(list(self.collection.find())), 2)
-
-        self.collection.remove({'name': 'bob'})
-        docs = list(self.collection.find())
-        self.assertEqual(len(docs), 1)
-        self.assertEqual(docs[0]['name'], 'sam')
-
-        self.collection.remove({'name': 'notsam'})
-        docs = list(self.collection.find())
-        self.assertEqual(len(docs), 1)
-        self.assertEqual(docs[0]['name'], 'sam')
-
-        self.collection.remove({'name': 'sam'})
-        docs = list(self.collection.find())
-        self.assertEqual(len(docs), 0)
-    def test__remove_by_id(self):
-        expected = self.collection.count()
-        bob = {'name': 'bob'}
-        bob_id = self.collection.insert(bob)
-        self.collection.remove(bob_id)
-        self.assertEqual(expected, self.collection.count())
-
-class UpdateTest(DocumentTest):
     def test__update(self):
-        new_document = dict(new_attr = 2)
-        self.collection.update(dict(a = self.document['a']), new_document)
-        expected_new_document = dict(_id = self.document_id, new_attr = 2)
-        objects = list(self.collection.find())
-        self.assertEquals(objects, [expected_new_document])
+        doc = {"a" : 1}
+        self.cmp.do.insert(doc)
+        new_document = {"new_attr" : 2}
+        self.cmp.do.update({"a" : 1}, new_document)
+        self.cmp.compare_ignore_order.find()
+
     def test__set(self):
         """Tests calling update with $set members."""
-        bob = {'name': 'bob'}
-        self.collection.insert(bob)
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'green'}})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
+        self.cmp.compare.find({'name': 'bob'})
 
-        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'green'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertEqual(doc['hat'], 'green')
-
-        self.collection.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertEqual(doc['hat'], 'red')
     def test__inc(self):
-        bob = {'name': 'bob'}
-        self.collection.insert(bob)
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$inc': {'count':1}})
+            self.cmp.compare.find({'name': 'bob'})
 
-        self.collection.update({'name':'bob'}, {'$inc': {'count':1}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertEqual(doc['count'], 1)
-
-        self.collection.update({'name':'bob'}, {'$inc': {'count':1}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertEqual(doc['count'], 2)
     def test__addToSet(self):
-        bob = {'name': 'bob'}
-        self.collection.insert(bob)
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'green'}})
+            self.cmp.compare.find({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
+            self.cmp.compare.find({'name': 'bob'})
 
-        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'green'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertListEqual(doc['hat'], ['green'])
-
-        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertListEqual(sorted(doc['hat']), ['green', 'tall'])
-
-        self.collection.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertListEqual(sorted(doc['hat']), ['green', 'tall'])
     def test__pull(self):
-        bob = {'name': 'bob', 'hat':['green', 'tall']}
-        self.collection.insert(bob)
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat':['green', 'tall']})
+        self.cmp.do.update({'name':'bob'}, {'$pull': {'hat':'green'}})
+        self.cmp.compare.find({'name': 'bob'})
 
-        self.collection.update({'name':'bob'}, {'$pull': {'hat':'green'}})
-        doc = self.collection.find_one({'name': 'bob'})
-        self.assertEqual(doc['name'], 'bob')
-        self.assertListEqual(doc['hat'], ['tall'])
+def _LIMIT(*args):
+    return lambda cursor: cursor.limit(*args)
+
+def _SORT(*args):
+    return lambda cursor: cursor.sort(*args)
+
+def _SKIP(*args):
+    return lambda cursor: cursor.skip(*args)
+
+class SortSkipLimitTest(CollectionComparisonTest):
+    def setUp(self):
+        super(SortSkipLimitTest, self).setUp()
+        self.cmp.do.insert([{"index" : i} for i in range(30)])
+    def test__skip(self):
+        self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
+    def test__limit(self):
+        self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
+    def test__skip_and_limit(self):
+        self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
+
+class InsertedDocumentTest(TestCase):
+    def setUp(self):
+        super(InsertedDocumentTest, self).setUp()
+        self.collection = MongoMockConnection().db.collection
+        self.data = {"a" : 1, "b" : [1, 2, 3], "c" : {"d" : 4}}
+        self.orig_data = copy.deepcopy(self.data)
+        self.object_id = self.collection.insert(self.data)
+    def test__object_is_consistent(self):
+        [object] = self.collection.find()
+        self.assertEquals(object["_id"], self.object_id)
+    def test__find_by_id(self):
+        [object] = self.collection.find({"_id" : self.object_id})
+        self.assertEquals(object, self.data)
+    def test__remove_by_id(self):
+        self.collection.remove(self.object_id)
+        self.assertEqual(0, self.collection.count())
+    def test__inserting_changes_argument(self):
+        #Like pymongo, we should fill the _id in the inserted dict (odd behavior, but we need to stick to it)
+        self.assertEquals(self.data, dict(self.orig_data, _id=self.object_id))
+    def test__data_is_copied(self):
+        [object] = self.collection.find()
+        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+        self.data.pop("a")
+        self.data["b"].append(5)
+        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+        [object] = self.collection.find()
+        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+    def test__find_returns_copied_object(self):
+        [object1] = self.collection.find()
+        [object2] = self.collection.find()
+        self.assertEquals(object1, object2)
+        self.assertIsNot(object1, object2)
+        object1["b"].append("bla")
+        self.assertNotEquals(object1, object2)
+
 class ObjectIdTest(TestCase):
     def test__equal_with_same_id(self):
         obj1 = ObjectId()

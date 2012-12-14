@@ -144,9 +144,9 @@ class Collection(object):
                         existing_document[field] = new_value
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
-                        new_value = set(existing_document.get(field, []))
-                        new_value.add(value)
-                        existing_document[field] = list(new_value)
+                        container = existing_document.setdefault(field, [])
+                        if value not in container:
+                            container.append(value)
                 elif k == '$pull':
                     for field, value in iteritems(v):
                         arr = existing_document[field]
