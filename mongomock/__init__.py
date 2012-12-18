@@ -1,3 +1,4 @@
+import copy
 import operator
 import warnings
 import re
@@ -120,7 +121,7 @@ class Collection(object):
             data['_id'] = ObjectId()
         object_id = data['_id']
         assert object_id not in self._documents
-        self._documents[object_id] = dict(data)
+        self._documents[object_id] = copy.deepcopy(data)
         return object_id
     def update(self, spec, document, upsert = False, manipulate = False,
                safe = False, multi = False, _check_keys = False, **kwargs):
