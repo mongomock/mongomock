@@ -188,7 +188,7 @@ class Collection(object):
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
         if fields is None:
-            return doc.copy()
+            return copy.deepcopy(doc)
         doc_copy = {}
         if not fields:
             fields = ["_id"]
