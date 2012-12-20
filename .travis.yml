@@ -1,9 +1,14 @@
 language: python
 python:
-  - 2.6
-  - 2.7
-  - 3.2
+  - "2.6"
+  - "2.7"
+  - "3.2"
+  - "3.3"
+services:
+  - mongodb
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
-install: python setup.py develop
+install: 
+  - "sudo python setup.py develop"
+  - "sudo pip install pymongo nose"
 # command to run tests, e.g. python setup.py test
 script: nosetests -w tests

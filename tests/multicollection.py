@@ -33,7 +33,7 @@ class ForeachMethod(object):
         results = dict(
             # copying the args and kwargs is important, because pymongo changes the dicts (fits them with the _id)
             (name, self.___apply_decorators(getattr(obj, self.___method_name)(*_deepcopy(args), **_deepcopy(kwargs))))
-            for name, obj in self.___objs.iteritems()
+            for name, obj in self.___objs.items()
         )
         if self.___compare:
             _assert_no_diff(results, ignore_order=self.___ignore_order)
@@ -50,7 +50,7 @@ def _assert_no_diff(results, ignore_order):
         assert not ignore_order
         value_processor = None
     prev_name = prev_value = None
-    for index, (name, value) in enumerate(results.iteritems()):
+    for index, (name, value) in enumerate(results.items()):
         if value_processor is not None:
             value = value_processor(value)
         if index > 0:
@@ -60,7 +60,7 @@ def _assert_no_diff(results, ignore_order):
         prev_value = value
 
 def _result_is_cursor(results):
-    return any(type(result).__name__ == "Cursor" for result in results.itervalues())
+    return any(type(result).__name__ == "Cursor" for result in results.values())
 
 def _expand_cursor(cursor, sort):
     returned = [result.copy() for result in cursor]

@@ -1,10 +1,15 @@
+from platform import python_version
+
 class _NO_VALUE(object):
     pass
 NO_VALUE = _NO_VALUE() # we don't use NOTHING because it might be returned from various APIs
 
 _SUPPORTED_TYPES = set([
-    int, long, float, bool, str, basestring, unicode
+    int, float, bool, str
 ])
+
+if python_version() < "3.0":
+    _SUPPORTED_TYPES.update([long, basestring, unicode])
 
 def diff(a, b, path=None):
     path = _make_path(path)

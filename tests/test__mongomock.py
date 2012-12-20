@@ -47,7 +47,7 @@ class CollectionAPITest(TestCase):
     def test__get_collection_names(self):
         self.db.a
         self.db.b
-        self.assertItemsEqual(self.db.collection_names(), ['a', 'b', 'system.indexes'])
+        self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here
@@ -93,7 +93,7 @@ class CollectionTest(CollectionComparisonTest):
     def test__bulk_insert(self):
         objs = [{"a" : 2, "b" : {"c" : 3}}, {"c" : 5}, {"d" : 7}]
         results_dict = self.cmp.do.insert(objs)
-        for results in results_dict.itervalues():
+        for results in results_dict.values():
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
