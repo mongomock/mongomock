@@ -125,7 +125,7 @@ class Collection(object):
         return object_id
     def update(self, spec, document, upsert = False, manipulate = False,
                safe = False, multi = False, _check_keys = False, **kwargs):
-        """Updates docuemnt(s) in the collection."""
+        """Updates document(s) in the collection."""
         found = False
         for existing_document in self._iter_documents(spec):
             first = True
