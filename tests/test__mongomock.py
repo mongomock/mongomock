@@ -218,6 +218,8 @@ class CollectionTest(CollectionComparisonTest):
 
     def test__set(self):
         """Tests calling update with $set members."""
+        self.cmp.do.update({'_id':42}, {'$set': {'some': 'thing'}}, upsert=True)
+        self.cmp.compare.find({'_id' : 42})
         self.cmp.do.insert({'name': 'bob'})
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'green'}})
         self.cmp.compare.find({'name' : 'bob'})
