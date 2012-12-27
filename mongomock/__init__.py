@@ -176,6 +176,9 @@ class Collection(object):
                 return
 
         if not found and upsert:
+            if '$set' in document.keys():
+                document = document.pop('$set')
+                document.update(spec)
             self.insert(document)
 
     def find(self, spec = None, fields = None, filter = None):
