@@ -202,9 +202,9 @@ class Collection(object):
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, filter = None):
+    def find_one(self, **kwargs):
         try:
-            return next(self.find(filter))
+            return next(self.find(**kwargs))
         except StopIteration:
             return None
 
