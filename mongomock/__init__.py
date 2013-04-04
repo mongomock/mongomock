@@ -181,7 +181,7 @@ class Collection(object):
                 document.update(spec)
             self.insert(document)
 
-    def find(self, spec = None, fields = None, filter = None):
+    def find(self, spec = None, fields = None, filter = None, sort = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -202,9 +202,9 @@ class Collection(object):
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, filter = None):
+    def find_one(self, spec=None, **kwargs):
         try:
-            return next(self.find(filter))
+            return next(self.find(spec, **kwargs))
         except StopIteration:
             return None
 
