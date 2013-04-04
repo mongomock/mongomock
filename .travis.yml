@@ -8,7 +8,7 @@ services:
   - mongodb
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: 
-  - "sudo python setup.py develop"
-  - "sudo pip install pymongo nose"
+  - python setup.py develop
+  - pip install pymongo nose
 # command to run tests, e.g. python setup.py test
 script: nosetests -w tests
