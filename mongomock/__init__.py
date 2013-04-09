@@ -310,3 +310,5 @@ class Cursor(object):
     def limit(self, count):
         self._limit = count
         return self
+    def batch_size(self, count):
+        return self
