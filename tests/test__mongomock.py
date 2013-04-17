@@ -48,6 +48,14 @@ class CollectionAPITest(TestCase):
         self.db.a
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
+    def test__drop_collection(self):
+        self.db.a
+        self.db.b
+        self.db.c
+        self.drop_collection('b')
+        self.drop_collection('b')
+        self.drop_collection(self.db.c)
+        self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here

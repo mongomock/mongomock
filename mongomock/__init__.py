@@ -112,6 +112,20 @@ class Database(object):
         return self[attr]
     def collection_names(self):
         return list(self._collections.keys())
+    def drop_collection(self, name_or_collection):
+        u"""
+        http://api.mongodb.org/python/2.5/api/pymongo/database.html#pymongo.database.Database.drop_collection
+        """
+        try:
+			# FIXME a better way to remove an entry by value ?
+            if isinstance(name_or_collection, Collection):
+                for collection in self._collections.items():
+                    if collection[1] is name_or_collection:
+                        del self._collections[collection[0]]
+            else:
+                del self._collections[name_or_collection]
+        except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
+            pass
 
 class Collection(object):
     def __init__(self, db):
