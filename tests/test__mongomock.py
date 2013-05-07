@@ -182,6 +182,11 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'x':{'$nin':[2, 5]}})
         self.cmp.compare_ignore_order.find({'x':{'$all':[2, 5]}})
         self.cmp.compare_ignore_order.find({'x':{'$all':[7, 8]}})
+        self.cmp.compare_ignore_order.find({'x':2})
+        self.cmp.compare_ignore_order.find({'x':4})
+        self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':2}]})
+        self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':7}]})
+        self.cmp.compare_ignore_order.find({'$and':[{'x':2}, {'x':7}]})
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})

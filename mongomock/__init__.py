@@ -9,6 +9,7 @@ from six import (
                  itervalues,
                  string_types,
                  )
+from collections import Iterable
 
 from .__version__ import __version__
 try:
@@ -49,6 +50,10 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$regex':lambda dv, sv: re.compile(sv).match(dv),
                 '$where':lambda db, sv: True  # ignore this complex filter
                 }
+
+LOGICAL_OPERATOR_MAP = {'$or':lambda c, d, subq: any(c._filter_applies(q, d) for q in subq),
+                        '$and':lambda c, d, subq: all(c._filter_applies(q, d) for q in subq),
+                        }
 
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
@@ -181,7 +186,7 @@ class Collection(object):
                 document.update(spec)
             self.insert(document)
 
-    def find(self, spec = None, fields = None, filter = None, sort = None):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -239,8 +244,10 @@ class Collection(object):
                                )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
                 is_match = search.match(doc_val) is not None
-            elif key in OPERATOR_MAP:
-                OPERATOR_MAP[key] (doc_val, search)
+            elif key in LOGICAL_OPERATOR_MAP:
+                is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
+            elif isinstance(doc_val, Iterable):
+                is_match = search in doc_val
             else:
                 is_match = doc_val == search
 
