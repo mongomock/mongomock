@@ -9,6 +9,7 @@ from six import (
                  itervalues,
                  string_types,
                  )
+from types import ListType
 
 from .__version__ import __version__
 try:
@@ -241,6 +242,8 @@ class Collection(object):
                 is_match = search.match(doc_val) is not None
             elif key in OPERATOR_MAP:
                 OPERATOR_MAP[key] (doc_val, search)
+            elif isinstance(doc_val, ListType):
+                is_match = search in doc_val
             else:
                 is_match = doc_val == search
 
