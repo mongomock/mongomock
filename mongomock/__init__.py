@@ -51,6 +51,10 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$where':lambda db, sv: True  # ignore this complex filter
                 }
 
+LOGICAL_OPERATOR_MAP = {'$or':lambda c, d, subq: any(c._filter_applies(q, d) for q in subq),
+                        '$and':lambda c, d, subq: all(c._filter_applies(q, d) for q in subq),
+                        }
+
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
         Returns the appropriate nested value if the key includes dot notation.
@@ -240,8 +244,8 @@ class Collection(object):
                                )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
                 is_match = search.match(doc_val) is not None
-            elif key in OPERATOR_MAP:
-                OPERATOR_MAP[key] (doc_val, search)
+            elif key in LOGICAL_OPERATOR_MAP:
+                is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
             elif isinstance(doc_val, ListType):
                 is_match = search in doc_val
             else:
