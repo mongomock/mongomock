@@ -9,7 +9,7 @@ from six import (
                  itervalues,
                  string_types,
                  )
-from types import ListType
+from collections import Iterable
 
 from .__version__ import __version__
 try:
@@ -246,7 +246,7 @@ class Collection(object):
                 is_match = search.match(doc_val) is not None
             elif key in LOGICAL_OPERATOR_MAP:
                 is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
-            elif isinstance(doc_val, ListType):
+            elif isinstance(doc_val, Iterable):
                 is_match = search in doc_val
             else:
                 is_match = doc_val == search
