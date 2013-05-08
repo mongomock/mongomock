@@ -52,9 +52,9 @@ class CollectionAPITest(TestCase):
         self.db.a
         self.db.b
         self.db.c
-        self.drop_collection('b')
-        self.drop_collection('b')
-        self.drop_collection(self.db.c)
+        self.db.drop_collection('b')
+        self.db.drop_collection('b')
+        self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
