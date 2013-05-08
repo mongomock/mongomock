@@ -113,9 +113,6 @@ class Database(object):
     def collection_names(self):
         return list(self._collections.keys())
     def drop_collection(self, name_or_collection):
-        u"""
-        http://api.mongodb.org/python/2.5/api/pymongo/database.html#pymongo.database.Database.drop_collection
-        """
         try:
             # FIXME a better way to remove an entry by value ?
             if isinstance(name_or_collection, Collection):
