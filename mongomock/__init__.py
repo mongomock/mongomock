@@ -112,6 +112,17 @@ class Database(object):
         return self[attr]
     def collection_names(self):
         return list(self._collections.keys())
+    def drop_collection(self, name_or_collection):
+        try:
+            # FIXME a better way to remove an entry by value ?
+            if isinstance(name_or_collection, Collection):
+                for collection in self._collections.items():
+                    if collection[1] is name_or_collection:
+                        del self._collections[collection[0]]
+            else:
+                del self._collections[name_or_collection]
+        except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
+            pass
 
 class Collection(object):
     def __init__(self, db):
@@ -207,9 +218,9 @@ class Collection(object):
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, spec=None, **kwargs):
+    def find_one(self, spec_or_id=None, **kwargs):
         try:
-            return next(self.find(spec, **kwargs))
+            return next(self.find(spec_or_id, **kwargs))
         except StopIteration:
             return None
 
