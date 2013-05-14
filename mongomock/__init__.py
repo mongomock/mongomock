@@ -221,17 +221,17 @@ class Collection(object):
             id_value = fields.pop('_id', 1)
 
             #other than the _id field, all fields must be either includes or excludes, this can evaluate to 0
-            if len(set(fields.values())) > 1:
+            if len(set(list(fields.values()))) > 1:
                 raise ValueError('You cannot currently mix including and excluding fields.')
             
             #if we have novalues passed in, make a doc_copy based on the id_value
-            if len(fields.values()) == 0:
+            if len(list(fields.values())) == 0:
                 if id_value == 1:
                     doc_copy = {}
                 else:
                     doc_copy = copy.deepcopy(doc)
             #if 1 was passed in as the field values, include those fields
-            elif  fields.values()[0] == 1:
+            elif  list(fields.values())[0] == 1:
                 doc_copy = {}
                 for key in fields:
                     if key in doc:

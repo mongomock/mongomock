@@ -1,3 +1,10 @@
+#for Python 3 compatibility
+try:
+  unicode = unicode
+except NameError:
+  unicode = str
+  basestring = (str, bytes)
+
 def _fields_list_to_dict(fields):
     """Takes a list of field names and returns a matching dictionary.
 
