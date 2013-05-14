@@ -125,10 +125,22 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare.find_one({"_id" : "id2"}, {"_id":1})
 
     def test__find_by_attributes(self):
-        id1 = self.cmp.do.insert({"name" : "new"})
+        id1 = ObjectId()
+        self.cmp.do.insert({"_id":id1, "name" : "new"})
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"_id" : id1})
+
+
+    def test__find_by_attributes_return_fields(self):
+        id1 = ObjectId()
+        id2 = ObjectId()
+        self.cmp.do.insert({"_id":id1, "name" : "new", "someOtherProp":2})
+        self.cmp.do.insert({"_id":id2, "name" : "another new"})
+        self.cmp.compare_ignore_order.find({},{"_id":1,"someOtherProp":1})
+        self.cmp.compare_ignore_order.find({},{"_id":0,"someOtherProp":0})
+        self.cmp.compare.find({"_id" : id1},{"_id":1,"someOtherProp":1})
+        self.cmp.compare.find({"_id" : id1},{"_id":0,"someOtherProp":0})
         
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""

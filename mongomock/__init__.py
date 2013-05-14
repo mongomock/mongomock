@@ -3,6 +3,7 @@ import operator
 import warnings
 import re
 
+from mongomock import helpers
 from sentinels import NOTHING
 from six import (
                  iteritems,
@@ -207,15 +208,32 @@ class Collection(object):
 
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
+
         if fields is None:
             return copy.deepcopy(doc)
-        doc_copy = {}
-        if not fields:
-            fields = ["_id"]
-        for key in fields:
-            if key in doc:
-                doc_copy[key] = doc[key]
-        return doc_copy
+        else:
+            if not fields:
+                fields = {"_id": 1}
+            if not isinstance(fields, dict):
+                fields = helpers._fields_list_to_dict(fields)
+
+            if len(set(fields.values())) != 1:
+                raise ValueError('You cannot currently mix including and excluding fields.')
+            
+            #if 1 was passed in as the field values, include those fields, otherwise, exclude those fields
+            if fields.values()[0] == 1:
+                doc_copy = {}
+                for key in fields:
+                    if key in doc:
+                        doc_copy[key] = doc[key]
+            else:
+                doc_copy = copy.deepcopy(doc)
+                for key in fields:
+                    if key in doc_copy:
+                        del doc_copy[key]
+
+            return doc_copy
+
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
