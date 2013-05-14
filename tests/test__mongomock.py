@@ -279,16 +279,22 @@ def _SORT(*args):
 def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
-class SortSkipLimitTest(CollectionComparisonTest):
+def _NEXT(*args):
+    return lambda cursor: cursor.next(*args)
+
+class SortSkipLimitNextTest(CollectionComparisonTest):
     def setUp(self):
-        super(SortSkipLimitTest, self).setUp()
-        self.cmp.do.insert([{"index" : i} for i in range(30)])
+        super(SortSkipLimitNextTest, self).setUp()
+        self.cmp.do.insert([{"_id":i, "index" : i} for i in range(30)])
+    def test__sort_next(self):
+        self.cmp.compare(_SORT("index", 1), _NEXT()).find()
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
     def test__limit(self):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
+    
 
 class InsertedDocumentTest(TestCase):
     def setUp(self):
