@@ -217,21 +217,41 @@ class Collection(object):
             if not isinstance(fields, dict):
                 fields = helpers._fields_list_to_dict(fields)
 
-            if len(set(fields.values())) != 1:
+            #we can pass in something like {"_id":0, "field":1}, so pull the id value out and hang on to it until later
+            id_value = fields.pop('_id', 1)
+
+            #other than the _id field, all fields must be either includes or excludes, this can evaluate to 0
+            if len(set(fields.values())) > 1:
                 raise ValueError('You cannot currently mix including and excluding fields.')
             
-            #if 1 was passed in as the field values, include those fields, otherwise, exclude those fields
-            if fields.values()[0] == 1:
+            #if we have novalues passed in, make a doc_copy based on the id_value
+            if len(fields.values()) == 0:
+                if id_value == 1:
+                    doc_copy = {}
+                else:
+                    doc_copy = copy.deepcopy(doc)
+            #if 1 was passed in as the field values, include those fields
+            elif  fields.values()[0] == 1:
                 doc_copy = {}
                 for key in fields:
                     if key in doc:
                         doc_copy[key] = doc[key]
+            #otherwise, exclude the fields passed in
             else:
                 doc_copy = copy.deepcopy(doc)
                 for key in fields:
                     if key in doc_copy:
                         del doc_copy[key]
 
+            #set the _id value if we requested it, otherwise remove it
+            if id_value == 0:
+                if '_id' in doc_copy:
+                    del doc_copy['_id']
+            else:
+                if '_id' in doc:
+                    doc_copy['_id'] = doc['_id']
+
+            fields['_id'] = id_value #put _id back in fields
             return doc_copy
 
 
