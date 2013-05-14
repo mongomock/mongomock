@@ -6,10 +6,12 @@ if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
+from bson.objectid import ObjectId
 from mongomock import Database, ObjectId, Collection
 from mongomock import Connection as MongoMockConnection
 from pymongo import Connection as PymongoConnection
 from .multicollection import MultiCollection
+
 
 class TestCase(unittest.TestCase):
     pass
@@ -105,15 +107,29 @@ class CollectionTest(CollectionComparisonTest):
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
+
+    def test__save(self):
+        self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
+        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True) 
+        self.cmp.compare_ignore_order.find()
+
     def test__count(self):
         self.cmp.compare.count()
         self.cmp.do.insert({"a" : 1})
         self.cmp.compare.count()
+
+    def test__find_one(self):
+        id1 = self.cmp.do.insert({"_id":"id1", "name" : "new"})
+        self.cmp.compare.find_one({"_id" : "id1"})
+        self.cmp.do.insert({"_id":"id2", "name" : "another new"})
+        self.cmp.compare.find_one({"_id" : "id2"}, {"_id":1})
+
     def test__find_by_attributes(self):
         id1 = self.cmp.do.insert({"name" : "new"})
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"_id" : id1})
+        
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
@@ -262,6 +278,14 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.update({'name':'bob'}, {'$pull': {'hat':'green'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__drop(self):
+        data = {'a': 1}
+        self.cmp.do.insert({"name" : "another new"})
+        self.cmp.do.drop()
+        self.cmp.compare.find({})
+        
+
+
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
 
@@ -271,16 +295,22 @@ def _SORT(*args):
 def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
-class SortSkipLimitTest(CollectionComparisonTest):
+def _NEXT(*args):
+    return lambda cursor: cursor.next(*args)
+
+class SortSkipLimitNextTest(CollectionComparisonTest):
     def setUp(self):
-        super(SortSkipLimitTest, self).setUp()
-        self.cmp.do.insert([{"index" : i} for i in range(30)])
+        super(SortSkipLimitNextTest, self).setUp()
+        self.cmp.do.insert([{"_id":i, "index" : i} for i in range(30)])
+    def test__sort_next(self):
+        self.cmp.compare(_SORT("index", 1), _NEXT()).find()
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
     def test__limit(self):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
+    
 
 class InsertedDocumentTest(TestCase):
     def setUp(self):

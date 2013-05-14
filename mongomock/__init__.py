@@ -204,6 +204,7 @@ class Collection(object):
                 spec = filter
         dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
         return Cursor(dataset)
+
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
         if fields is None:
@@ -218,9 +219,10 @@ class Collection(object):
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, spec_or_id=None, **kwargs):
+
+    def find_one(self, spec_or_id=None, *args, **kwargs):
         try:
-            return next(self.find(spec_or_id, **kwargs))
+            return next(self.find(spec_or_id, *args, **kwargs))
         except StopIteration:
             return None
 
@@ -258,7 +260,10 @@ class Collection(object):
             elif key in LOGICAL_OPERATOR_MAP:
                 is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
             elif isinstance(doc_val, Iterable):
-                is_match = search in doc_val
+                if isinstance(search, ObjectId):
+                    is_match = str(search) in doc_val
+                else:
+                    is_match = search in doc_val
             else:
                 is_match = doc_val == search
 
@@ -291,6 +296,11 @@ class Collection(object):
 
     def count(self):
         return len(self._documents)
+
+    def drop(self):
+        del self._documents
+        self._documents = {}
+
 
 
 class Cursor(object):
