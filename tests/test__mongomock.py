@@ -6,10 +6,12 @@ if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
+from bson.objectid import ObjectId
 from mongomock import Database, ObjectId, Collection
 from mongomock import Connection as MongoMockConnection
 from pymongo import Connection as PymongoConnection
 from .multicollection import MultiCollection
+
 
 class TestCase(unittest.TestCase):
     pass
@@ -105,10 +107,17 @@ class CollectionTest(CollectionComparisonTest):
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
+
+    def test__save(self):
+        self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
+        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True) 
+        self.cmp.compare_ignore_order.find()
+
     def test__count(self):
         self.cmp.compare.count()
         self.cmp.do.insert({"a" : 1})
         self.cmp.compare.count()
+
     def test__find_one(self):
         id1 = self.cmp.do.insert({"_id":"id1", "name" : "new"})
         self.cmp.compare.find_one({"_id" : "id1"})

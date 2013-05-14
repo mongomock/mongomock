@@ -260,7 +260,10 @@ class Collection(object):
             elif key in LOGICAL_OPERATOR_MAP:
                 is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
             elif isinstance(doc_val, Iterable):
-                is_match = search in doc_val
+                if isinstance(search, ObjectId):
+                    is_match = str(search) in doc_val
+                else:
+                    is_match = search in doc_val
             else:
                 is_match = doc_val == search
 
