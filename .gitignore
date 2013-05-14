@@ -40,3 +40,6 @@ pip-log.txt
 
 #### Haskell
 *.hi
+
+#### python dev
+venv/
