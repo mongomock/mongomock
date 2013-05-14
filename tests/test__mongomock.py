@@ -109,11 +109,18 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare.count()
         self.cmp.do.insert({"a" : 1})
         self.cmp.compare.count()
+    def test__find_one(self):
+        id1 = self.cmp.do.insert({"_id":"id1", "name" : "new"})
+        self.cmp.compare.find_one({"_id" : "id1"})
+        self.cmp.do.insert({"_id":"id2", "name" : "another new"})
+        self.cmp.compare.find_one({"_id" : "id2"}, {"_id":1})
+
     def test__find_by_attributes(self):
         id1 = self.cmp.do.insert({"name" : "new"})
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"_id" : id1})
+        
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {

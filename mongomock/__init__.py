@@ -204,6 +204,7 @@ class Collection(object):
                 spec = filter
         dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
         return Cursor(dataset)
+
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
         if fields is None:
@@ -218,9 +219,10 @@ class Collection(object):
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
-    def find_one(self, spec_or_id=None, **kwargs):
+
+    def find_one(self, spec_or_id=None, fields=None, **kwargs):
         try:
-            return next(self.find(spec_or_id, **kwargs))
+            return next(self.find(spec=spec_or_id, fields=fields, **kwargs))
         except StopIteration:
             return None
 
