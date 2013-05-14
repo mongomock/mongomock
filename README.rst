@@ -50,3 +50,15 @@ We are left, therefore, with option #3 -- you want something to behave like a mo
          assert stored_obj == obj # by comparing all fields we make sure only votes changed
 
 This code checks *increase_votes* with respect to its functionality, not syntax or algorithm, and therefore is much more robust as a test.
+
+To download, setup and perfom tests, run the following commands on Mac / Linux::
+
+ get clone <repo>
+ cd <reponame>
+ virtualenv venv --distribute
+ source venv/bin/activate
+ pip install nose
+ pip install pymongo
+ python setup.py install
+ nosetests
+
