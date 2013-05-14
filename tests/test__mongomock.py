@@ -262,6 +262,14 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.update({'name':'bob'}, {'$pull': {'hat':'green'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__drop(self):
+        data = {'a': 1}
+        self.cmp.do.insert({"name" : "another new"})
+        self.cmp.do.drop()
+        self.cmp.compare.find({})
+        
+
+
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
 

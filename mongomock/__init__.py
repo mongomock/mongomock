@@ -292,6 +292,11 @@ class Collection(object):
     def count(self):
         return len(self._documents)
 
+    def drop(self):
+        del self._documents
+        self._documents = {}
+
+
 
 class Cursor(object):
     def __init__(self, dataset):
