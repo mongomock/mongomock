@@ -295,15 +295,10 @@ def _SORT(*args):
 def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
-def _NEXT(*args):
-    return lambda cursor: cursor.next(*args)
-
-class SortSkipLimitNextTest(CollectionComparisonTest):
+class SortSkipLimitTest(CollectionComparisonTest):
     def setUp(self):
-        super(SortSkipLimitNextTest, self).setUp()
+        super(SortSkipLimitTest, self).setUp()
         self.cmp.do.insert([{"_id":i, "index" : i} for i in range(30)])
-    def test__sort_next(self):
-        self.cmp.compare(_SORT("index", 1), _NEXT()).find()
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
     def test__limit(self):
