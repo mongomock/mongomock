@@ -65,7 +65,7 @@ def _result_is_cursor(results):
 def _expand_cursor(cursor, sort):
     returned = [result.copy() for result in cursor]
     if sort:
-        returned.sort(key=lambda document: str(document.get("_id")))
+        returned.sort(key=lambda document: str(document.get('_id', str(document))))
     for result in returned:
         result.pop("_id", None)
     return returned
