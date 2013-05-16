@@ -142,7 +142,8 @@ class Collection(object):
         if not '_id' in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
-        assert object_id not in self._documents
+        if object_id in self._documents:
+            raise DuplicateKeyError("Duplicate Key Error", 11000)
         self._documents[object_id] = copy.deepcopy(data)
         return object_id
     def update(self, spec, document, upsert = False, manipulate = False,
