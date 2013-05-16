@@ -4,6 +4,7 @@ import warnings
 import re
 
 from mongomock import helpers
+from pymongo.errors import DuplicateKeyError
 from sentinels import NOTHING
 from six import (
                  iteritems,
