@@ -8,8 +8,15 @@ else:
     import unittest
 from bson.objectid import ObjectId
 from mongomock import Database, ObjectId, Collection
-from mongomock import Connection as MongoMockConnection
-from pymongo import Connection as PymongoConnection
+
+try:
+    #MongoClient introduced in version 2.4
+    from mongomock import MongoClient as MongoMockConnection
+    from pymongo import MongoClient as PymongoConnection
+except:
+    from mongomock import Connection as MongoMockConnection
+    from pymongo import Connection as PymongoConnection
+
 from .multicollection import MultiCollection
 
 

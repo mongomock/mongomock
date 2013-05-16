@@ -100,6 +100,11 @@ class Connection(object):
             "ok" : 1
     }
 
+#Connection is now depricated, it's called MongoClient instead
+class MongoClient(Connection):
+    def stub(self):
+        pass
+
 class Database(object):
     def __init__(self, conn):
         super(Database, self).__init__()
