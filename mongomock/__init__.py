@@ -149,7 +149,7 @@ class Collection(object):
             found = True
             for k, v in iteritems(document):
                 if k == '$set':
-                    existing_document.update(v)
+                    self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
                     for field, value in v.iteritems():
                         if value and existing_document.has_key(field):
@@ -254,6 +254,19 @@ class Collection(object):
             fields['_id'] = id_value #put _id back in fields
             return doc_copy
 
+
+    def _update_document_fields(self, doc, fields, updater):
+        """Implements the $set behavior on an existing document"""
+        for k, v in iteritems(fields):
+            self._update_document_single_field(doc, k, v, updater)
+
+    def _update_document_single_field(self, doc, field_name, field_value, updater):
+        field_name_parts = field_name.split(".")
+        for part in field_name_parts[:-1]:
+            if not isinstance(doc, dict):
+                return # mongodb skips such cases
+            doc = doc.setdefault(part, {})
+        updater(doc, field_name_parts[-1], field_value)
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
@@ -378,3 +391,7 @@ class Cursor(object):
         return self
     def batch_size(self, count):
         return self
+
+def _set_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = value
