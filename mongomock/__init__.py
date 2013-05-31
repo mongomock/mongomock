@@ -155,10 +155,7 @@ class Collection(object):
                         if value and existing_document.has_key(field):
                             del existing_document[field]
                 elif k == '$inc':
-                    for field, value in iteritems(v):
-                        new_value = existing_document.get(field, 0)
-                        new_value = new_value + value
-                        existing_document[field] = new_value
+                    self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         container = existing_document.setdefault(field, [])
@@ -395,3 +392,7 @@ class Cursor(object):
 def _set_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = value
+
+def _inc_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = doc.get(field_name, 0) + value
