@@ -276,6 +276,13 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__set_upsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
+        self.cmp.compare.find()
+        self.cmp.do.update({"name": "alice"}, {"$set": {"age": 1}}, True)
+        self.cmp.compare_ignore_order.find()
+
     def test__set_subdocuments(self):
         """Tests using $set for setting subdocument fields"""
         self.cmp.do.insert({'name': 'bob', 'data1': 1, 'subdocument': {'a': {'b': {'c': 20}}}})

@@ -1,4 +1,5 @@
 import copy
+import itertools
 import operator
 import warnings
 import re
@@ -144,7 +145,12 @@ class Collection(object):
                safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates document(s) in the collection."""
         found = False
-        for existing_document in self._iter_documents(spec):
+        for existing_document in itertools.chain(self._iter_documents(spec), [None]):
+            # the sentinel document means we should do an upsert
+            if existing_document is None:
+                if not upsert:
+                    continue
+                existing_document = self._documents[self._insert(self._discard_operators(spec))]
             first = True
             found = True
             for k, v in iteritems(document):
@@ -189,11 +195,9 @@ class Collection(object):
             if not multi:
                 return
 
-        if not found and upsert:
-            if '$set' in document.keys():
-                document = document.pop('$set')
-                document.update(spec)
-            self.insert(document)
+    def _discard_operators(self, doc):
+        # TODO: this looks a little too naive...
+        return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
     def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True):
         if filter is not None:
@@ -220,7 +224,7 @@ class Collection(object):
             #other than the _id field, all fields must be either includes or excludes, this can evaluate to 0
             if len(set(list(fields.values()))) > 1:
                 raise ValueError('You cannot currently mix including and excluding fields.')
-            
+
             #if we have novalues passed in, make a doc_copy based on the id_value
             if len(list(fields.values())) == 0:
                 if id_value == 1:
