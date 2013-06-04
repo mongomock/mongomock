@@ -63,3 +63,27 @@ To download, setup and perfom tests, run the following commands on Mac / Linux::
  nosetests
 
 
+Important Note About Project Status
+-----------------------------------
+
+MongoDB is complex. This library aims at a reasonably complete mock of MongoDB for testing purposes, not a perfect replica. This means some features (like map/reduce and similar features) are not likely to make it in any time soon.
+
+Also, since many corner cases are encountered along the way, our goal is to try and TDD our way into completeness. This means that every time we encounter a missing or broken (incompatible) feature, we write a test for it and fix it. There are probably lots of such issues hiding around lurking, so feel free to open issues and/or pull requests and help the project out!
+
+Acknowledgements
+----------------
+
+Many thanks go to the following people for helping out:
+
+* Austin W Ellis
+* Corey Downing
+* David Fischer
+* Edward D'Souza
+* Israel Teixeira
+* Jacob Perkins
+* Jeff McGee
+* Joël Franusic
+* Nigel Choi
+* Omer Gertel
+* catty
+* waskew
