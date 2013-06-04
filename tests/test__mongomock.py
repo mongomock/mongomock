@@ -293,6 +293,12 @@ class CollectionTest(CollectionComparisonTest):
             self.cmp.do.update({'name':'bob'}, {'$inc': {'count':1}})
             self.cmp.compare.find({'name': 'bob'})
 
+    def test__inc_upsert(self):
+        self.cmp.do.remove()
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$inc': {'count':1}}, True)
+            self.cmp.compare.find({'name': 'bob'})
+
     def test__inc_subdocument(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'data': {'age': 0}})
