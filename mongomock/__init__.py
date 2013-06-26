@@ -59,7 +59,6 @@ LOGICAL_OPERATOR_MAP = {'$or':lambda c, d, subq: any(c._filter_applies(q, d) for
                         '$and':lambda c, d, subq: all(c._filter_applies(q, d) for q in subq),
                         }
 
-
 def resolve_key_value(key, doc):
     """Resolve keys to their proper value in a document.
         Returns the appropriate nested value if the key includes dot notation.
@@ -75,7 +74,6 @@ def resolve_key_value(key, doc):
             sub_doc = doc.get(key_parts[0], {})
             return resolve_key_value(sub_key, sub_doc)
 
-
 class Connection(object):
     def __init__(self, host = None, port = None, max_pool_size = 10,
                  network_timeout = None, document_class = dict,
@@ -84,13 +82,11 @@ class Connection(object):
         self.host = host
         self.port = port
         self._databases = {}
-
     def __getitem__(self, db_name):
         db = self._databases.get(db_name, None)
         if db is None:
             db = self._databases[db_name] = Database(self, db_name)
         return db
-
     def __getattr__(self, attr):
         return self[attr]
 
@@ -120,7 +116,6 @@ class Connection(object):
             "ok" : 1
     }
 
-
 class Database(object):
     def __init__(self, conn, name):
         super(Database, self).__init__()
@@ -142,7 +137,6 @@ class Database(object):
 
     def collection_names(self):
         return list(self._collections.keys())
-
     def drop_collection(self, name_or_collection):
         try:
             # FIXME a better way to remove an entry by value ?
@@ -154,7 +148,6 @@ class Database(object):
                 del self._collections[name_or_collection]
         except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
             pass
-
 
 class Collection(object):
     def __init__(self, db, name):
@@ -170,7 +163,6 @@ class Collection(object):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
         return self._insert(data)
-
     def _insert(self, data):
         if not '_id' in data:
             data['_id'] = ObjectId()
@@ -178,10 +170,10 @@ class Collection(object):
         assert object_id not in self._documents
         self._documents[object_id] = copy.deepcopy(data)
         return object_id
-
     def update(self, spec, document, upsert = False, manipulate = False,
                safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates document(s) in the collection."""
+        found = False
         for existing_document in itertools.chain(self._iter_documents(spec), [None]):
             # the sentinel document means we should do an upsert
             if existing_document is None:
@@ -189,6 +181,7 @@ class Collection(object):
                     continue
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
             first = True
+            found = True
             for k, v in iteritems(document):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
@@ -245,6 +238,7 @@ class Collection(object):
 
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
+
         if fields is None:
             return copy.deepcopy(doc)
         else:
@@ -289,6 +283,7 @@ class Collection(object):
 
             fields['_id'] = id_value #put _id back in fields
             return doc_copy
+
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
@@ -357,7 +352,6 @@ class Collection(object):
                 return False
 
         return True
-
     def save(self, to_save, manipulate = True, safe = False, **kwargs):
         if not isinstance(to_save, dict):
             raise TypeError("cannot save object of type %s" % type(to_save))
@@ -368,7 +362,6 @@ class Collection(object):
             self.update({"_id": to_save["_id"]}, to_save, True,
                         manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
-
     def remove(self, spec_or_id = None, search_filter = None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
@@ -393,13 +386,13 @@ class Collection(object):
         start_time = time.clock()
         out_collection = None
         reduced_rows = None
-        full_dict = {u'counts': {u'input': 0,
-                                u'reduce':0,
-                                u'emit':0,
-                                u'output':0},
-                     u'timeMillis': 0,
-                     u'ok': 1.0,
-                     u'result': None}
+        full_dict = {'counts': {'input': 0,
+                                'reduce':0,
+                                'emit':0,
+                                'output':0},
+                     'timeMillis': 0,
+                     'ok': 1.0,
+                     'result': None}
         map_ctx = execjs.compile("""
             function doMap(fnc, docList) {
                 var mappedDict = {};
@@ -474,10 +467,8 @@ class Cursor(object):
         self._dataset = dataset
         self._limit = None
         self._skip = None
-
     def __iter__(self):
         return self
-
     def __next__(self):
         if self._skip:
             for i in range(self._skip):
@@ -489,30 +480,24 @@ class Cursor(object):
             self._limit -= 1
         return next(self._dataset)
     next = __next__
-
     def sort(self, key, order):
         arr = [x for x in self._dataset]
         arr = sorted(arr, key = lambda x:x[key], reverse = order < 0)
         self._dataset = iter(arr)
         return self
-
     def count(self):
         arr = [x for x in self._dataset]
         count = len(arr)
         self._dataset = iter(arr)
         return count
-
     def skip(self, count):
         self._skip = count
         return self
-
     def limit(self, count):
         self._limit = count
         return self
-
     def batch_size(self, count):
         return self
-
 
 def _set_updater(doc, field_name, value):
     if isinstance(doc, dict):
