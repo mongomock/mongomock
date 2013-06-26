@@ -6,7 +6,9 @@ if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
+from bson.code import Code
 from bson.objectid import ObjectId
+from bson.son import SON
 from mongomock import Database, ObjectId, Collection
 from mongomock import Connection as MongoMockConnection
 from pymongo import Connection as PymongoConnection
@@ -335,7 +337,75 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.do.drop()
         self.cmp.compare.find({})
-        
+
+
+class CollectionMapReduceTest(TestCase):
+    def setUp(self):
+        self.db = MongoMockConnection().map_reduce_test
+        self.data = [{"x": 1, "tags": ["dog", "cat"]},
+                     {"x": 2, "tags": ["cat"]},
+                     {"x": 3, "tags": ["mouse", "cat", "dog"]},
+                     {"x": 4, "tags": []}]
+        for item in self.data:
+            self.db.things.insert(item)
+        self.map_func = Code("""
+                function() {
+                    this.tags.forEach(function(z) {
+                        emit(z, 1);
+                    });
+                }""")
+        self.reduce_func = Code("""
+                function(key, values) {
+                    var total = 0;
+                    for(var i = 0; i<values.length; i++) {
+                        total += values[i];
+                    }
+                    return total;
+                }""")
+        self.expected_results = [{u'_id': u'mouse', u'value': 1},
+                                 {u'_id': u'dog', u'value': 2},
+                                 {u'_id': u'cat', u'value': 3}]
+
+    def test__map_reduce(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_son(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'results')
+        self.assertEqual(result._Collection__database.name, 'map_reduce_son_test')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_full_response(self):
+        expected_full_response = {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': 5, u'ok': 1.0, u'result': 'myresults'}
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        self.assertEqual(result['result'], expected_full_response['result'])
+        for doc in getattr(self.db, result['result']).find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__inline_map_reduce(self):
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(len(result), 3)
+        for doc in result:
+            self.assertIn(doc, self.expected_results)
+
+    def test__inline_map_reduce_full_response(self):
+        expected_full_response = {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': 5, u'ok': 1.0, u'result': [{u'_id': u'cat', u'value': 3}, {u'_id': u'dog', u'value': 2}, {u'_id': u'mouse', u'value': 1}]}
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func, full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        for doc in result['result']:
+            self.assertIn(doc, self.expected_results)
 
 
 def _LIMIT(*args):
