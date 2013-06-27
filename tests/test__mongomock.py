@@ -362,9 +362,9 @@ class CollectionMapReduceTest(TestCase):
                     }
                     return total;
                 }""")
-        self.expected_results = [{u'_id': u'mouse', u'value': 1},
-                                 {u'_id': u'dog', u'value': 2},
-                                 {u'_id': u'cat', u'value': 3}]
+        self.expected_results = [{'_id': 'mouse', 'value': 1},
+                                 {'_id': 'dog', 'value': 2},
+                                 {'_id': 'cat', 'value': 3}]
 
     def test__map_reduce(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
@@ -384,7 +384,7 @@ class CollectionMapReduceTest(TestCase):
             self.assertIn(doc, self.expected_results)
 
     def test__map_reduce_full_response(self):
-        expected_full_response = {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': 5, u'ok': 1.0, u'result': 'myresults'}
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': 'myresults'}
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', full_response=True)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(result['counts'], expected_full_response['counts'])
@@ -393,9 +393,9 @@ class CollectionMapReduceTest(TestCase):
             self.assertIn(doc, self.expected_results)
 
     def test__map_reduct_with_query(self):
-        expected_results = [{u'_id': u'mouse', u'value': 1},
-                            {u'_id': u'dog', u'value': 2},
-                            {u'_id': u'cat', u'value': 2}]
+        expected_results = [{'_id': 'mouse', 'value': 1},
+                            {'_id': 'dog', 'value': 2},
+                            {'_id': 'cat', 'value': 2}]
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'})
         self.assertTrue(isinstance(result, Collection))
         self.assertEqual(result.name, 'myresults')
@@ -417,7 +417,7 @@ class CollectionMapReduceTest(TestCase):
             self.assertIn(doc, self.expected_results)
 
     def test__inline_map_reduce_full_response(self):
-        expected_full_response = {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': 5, u'ok': 1.0, u'result': [{u'_id': u'cat', u'value': 3}, {u'_id': u'dog', u'value': 2}, {u'_id': u'mouse', u'value': 1}]}
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': [{'_id': 'cat', 'value': 3}, {'_id': 'dog', 'value': 2}, {'_id': 'mouse', 'value': 1}]}
         result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func, full_response=True)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(result['counts'], expected_full_response['counts'])
