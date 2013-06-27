@@ -58,7 +58,6 @@ To download, setup and perfom tests, run the following commands on Mac / Linux::
  virtualenv venv --distribute
  source venv/bin/activate
  pip install nose
- pip install pymongo
  python setup.py install
  nosetests
 
