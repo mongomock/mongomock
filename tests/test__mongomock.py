@@ -392,6 +392,23 @@ class CollectionMapReduceTest(TestCase):
         for doc in getattr(self.db, result['result']).find():
             self.assertIn(doc, self.expected_results)
 
+    def test__map_reduct_with_query(self):
+        expected_results = [{u'_id': u'mouse', u'value': 1},
+                            {u'_id': u'dog', u'value': 2},
+                            {u'_id': u'cat', u'value': 2}]
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'})
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, expected_results)
+
+    def test__map_reduce_with_limit(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 2)
+
     def test__inline_map_reduce(self):
         result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func)
         self.assertTrue(isinstance(result, list))
