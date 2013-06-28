@@ -158,7 +158,7 @@ class Collection(object):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
-                    for field, value in v.iteritems():
+                    for field, value in iteritems(v):
                         if value and existing_document.has_key(field):
                             del existing_document[field]
                 elif k == '$inc':
