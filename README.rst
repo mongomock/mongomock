@@ -77,6 +77,7 @@ Many thanks go to the following people for helping out:
 
 * Austin W Ellis
 * Corey Downing
+* Craig Hobbs
 * David Fischer
 * Edward D'Souza
 * Israel Teixeira
