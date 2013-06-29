@@ -89,5 +89,6 @@ Many thanks go to the following people for helping out:
 * Joël Franusic
 * Nigel Choi
 * Omer Gertel
+* Scott Sexton
 * catty
 * waskew
