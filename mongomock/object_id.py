@@ -14,6 +14,6 @@ class ObjectId(object):
     def __hash__(self):
         return hash(self._id)
     def __repr__(self):
-        return 'ObjectId({})'.format(self._id)
+        return 'ObjectId({0})'.format(self._id)
     def __str__(self):
         return str(self._id)
