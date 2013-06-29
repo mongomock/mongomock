@@ -2,17 +2,28 @@ import copy
 import itertools
 import re
 import platform
+import sys
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
-from bson.code import Code
-from bson.objectid import ObjectId
-from bson.son import SON
-from mongomock import Database, ObjectId, Collection
+from mongomock import Database, Collection
 from mongomock import Connection as MongoMockConnection
-from pymongo import Connection as PymongoConnection
-from .multicollection import MultiCollection
+try:
+    from pymongo import Connection as PymongoConnection
+    from bson.objectid import ObjectId
+    skip_pymongo_tests = False
+except ImportError:
+    from mongomock.object_id import ObjectId
+    skip_pymongo_tests = True
+try:
+    import execjs
+    from bson.code import Code
+    from bson.son import SON
+    skip_map_reduce_tests = False
+except ImportError:
+    skip_map_reduce_tests = True
+from tests.multicollection import MultiCollection
 
 
 class TestCase(unittest.TestCase):
@@ -36,6 +47,8 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(db1, db2)
         self.assertIs(db1, self.conn['some_database_here'])
         self.assertIsInstance(db1, Database)
+        self.assertIs(db1._Database__connection, self.conn)
+        self.assertIs(db2._Database__connection, self.conn)
     def test__getting_database_via_getitem(self):
         db1 = self.conn['some_database_here']
         db2 = self.conn['some_database_here']
@@ -79,8 +92,9 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
 
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
 class CollectionComparisonTest(TestCase):
-    """Compares a fake collection with the real mongo collection implementation via cross-comparison"""
+    """Compares a fake collection with the real mongo collection implementation via cross-comparison."""
     def setUp(self):
         super(CollectionComparisonTest, self).setUp()
         self.fake_conn = MongoMockConnection()
@@ -112,7 +126,7 @@ class CollectionTest(CollectionComparisonTest):
 
     def test__save(self):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
-        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True) 
+        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
 
     def test__count(self):
@@ -152,7 +166,7 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare.find({"_id" : id1},{"_id":0,"someOtherProp":1}) #test mixed _id:0
         self.cmp.compare.find({"_id" : id1},{"someOtherProp":0}) #test no _id, otherProp:0
         self.cmp.compare.find({"_id" : id1},{"someOtherProp":1}) #test no _id, otherProp:1
-        
+
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
@@ -234,6 +248,16 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':2}]})
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':7}]})
         self.cmp.compare_ignore_order.find({'$and':[{'x':2}, {'x':7}]})
+
+    def test__find_sort_list(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(sort = [("a", 1), ("b", -1)])
+        self.cmp.compare.find(sort = [("b", 1), ("a", -1)])
+        self.cmp.compare.find(sort = [("b", 1), ("a", -1), ("c", 1)])
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
@@ -338,7 +362,14 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.compare.find({})
 
+    def test__ensure_index(self):
+        # Does nothing - just make sure it exists and takes the right args
+        self.cmp.do.ensure_index("name")
+        self.cmp.do.ensure_index("hat", cache_for = 100)
+        self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
 
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
+@unittest.skipIf(skip_map_reduce_tests,"execjs not installed")
 class CollectionMapReduceTest(TestCase):
     def setUp(self):
         self.db = MongoMockConnection().map_reduce_test
@@ -444,7 +475,30 @@ class SortSkipLimitTest(CollectionComparisonTest):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
-    
+
+    def test__sort_name(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT("a")).find()
+        self.cmp.compare(_SORT("b")).find()
+
+    def test__sort_list(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT([("a", 1), ("b", -1)])).find()
+        self.cmp.compare(_SORT([("b", 1), ("a", -1)])).find()
+        self.cmp.compare(_SORT([("b", 1), ("a", -1), ("c", 1)])).find()
+
+    def test__close(self):
+        # Does nothing - just make sure it exists and takes the right args
+        self.cmp.do(lambda cursor: cursor.close()).find()
+
 
 class InsertedDocumentTest(TestCase):
     def setUp(self):

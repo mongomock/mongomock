@@ -6,8 +6,19 @@ import time
 import warnings
 from collections import Iterable
 
-import execjs
-from bson import (json_util, ObjectId, RE_TYPE, SON)
+import sys
+
+try:
+    # Optional requirements for providing Map-Reduce functionality
+    import execjs
+    from bson import (json_util, SON)
+except ImportError:
+    pass
+try:
+    from bson import (ObjectId, RE_TYPE)
+except ImportError:
+    from mongomock.object_id import ObjectId
+    RE_TYPE = type(re.compile(''))
 try:
     import simplejson as json
 except ImportError:
@@ -90,7 +101,7 @@ class Connection(object):
     def __getattr__(self, attr):
         return self[attr]
 
-    def __str__(self):
+    def __repr__(self):
         identifier = []
         host = getattr(self,'host','')
         port = getattr(self,'port',None)
@@ -132,7 +143,7 @@ class Database(object):
     def __getattr__(self, attr):
         return self[attr]
 
-    def __str__(self):
+    def __repr__(self):
         return "Database({0}, '{1}')".format(self._Database__connection, self.name)
 
     def collection_names(self):
@@ -156,7 +167,7 @@ class Collection(object):
         self._Collection__database = db
         self._documents = {}
 
-    def __str__(self):
+    def __repr__(self):
         return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
 
     def insert(self, data):
@@ -186,7 +197,7 @@ class Collection(object):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
-                    for field, value in v.iteritems():
+                    for field, value in iteritems(v):
                         if value and existing_document.has_key(field):
                             del existing_document[field]
                 elif k == '$inc':
@@ -234,6 +245,9 @@ class Collection(object):
             if spec is None:
                 spec = filter
         dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
+        if sort:
+            for sortKey, sortDirection in reversed(sort):
+                dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
         return Cursor(dataset)
 
     def _copy_only_fields(self, doc, fields):
@@ -382,7 +396,14 @@ class Collection(object):
         del self._documents
         self._documents = {}
 
+    def ensure_index(self, key_or_list, cache_for=300, **kwargs):
+        pass
+
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=None):
+        try:
+            execjs
+        except NameError as e:
+            raise NameError("{0}. Optional Dependencies: Use 'pip install pyexecjs pymongo' to support Map-Reduce mock.".format(e))
         start_time = time.clock()
         out_collection = None
         reduced_rows = None
@@ -480,10 +501,14 @@ class Cursor(object):
             self._limit -= 1
         return next(self._dataset)
     next = __next__
-    def sort(self, key, order):
-        arr = [x for x in self._dataset]
-        arr = sorted(arr, key = lambda x:x[key], reverse = order < 0)
-        self._dataset = iter(arr)
+    def sort(self, key_or_list, direction = None):
+        if direction is None:
+            direction = 1
+        if isinstance(key_or_list, (tuple, list)):
+            for sortKey, sortDirection in reversed(key_or_list):
+                self._dataset = iter(sorted(self._dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
+        else:
+            self._dataset = iter(sorted(self._dataset, key = lambda x:x[key_or_list], reverse = direction < 0))
         return self
     def count(self):
         arr = [x for x in self._dataset]
@@ -498,6 +523,8 @@ class Cursor(object):
         return self
     def batch_size(self, count):
         return self
+    def close(self):
+        pass
 
 def _set_updater(doc, field_name, value):
     if isinstance(doc, dict):

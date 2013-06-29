@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 with open(os.path.join(os.path.dirname(__file__), "mongomock", "__version__.py")) as version_file:
     exec(version_file.read())
 
-install_requires = ["pymongo", "pyexecjs", "sentinels", "six"]
+install_requires = ["sentinels", "six"]
 if platform.python_version() < '2.7':
     install_requires.append('unittest2')
 

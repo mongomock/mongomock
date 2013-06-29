@@ -9,6 +9,6 @@ services:
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: 
   - python setup.py develop
-  - pip install --use-mirrors nose
+  - pip install --use-mirrors pyexecjs nose pymongo
 # command to run tests, e.g. python setup.py test
 script: nosetests -w tests
