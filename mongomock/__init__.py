@@ -13,7 +13,7 @@ try:
     import execjs
     from bson import (json_util, SON)
 except ImportError:
-    pass
+    execjs = None
 try:
     from bson import (ObjectId, RE_TYPE)
 except ImportError:
@@ -400,10 +400,11 @@ class Collection(object):
         pass
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=None):
-        try:
-            execjs
-        except NameError as e:
-            raise NameError("{0}. Optional Dependencies: Use 'pip install pyexecjs pymongo' to support Map-Reduce mock.".format(e))
+        if execjs is None:
+            raise NotImplementedError(
+                "PyExecJS is required in order to run Map-Reduce. "
+                "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
+            )
         start_time = time.clock()
         out_collection = None
         reduced_rows = None
