@@ -2,15 +2,28 @@ import copy
 import itertools
 import re
 import platform
+import sys
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
-from bson.objectid import ObjectId
-from mongomock import Database, ObjectId, Collection
+from mongomock import Database, Collection
 from mongomock import Connection as MongoMockConnection
-from pymongo import Connection as PymongoConnection
-from .multicollection import MultiCollection
+try:
+    from pymongo import Connection as PymongoConnection
+    from bson.objectid import ObjectId
+    skip_pymongo_tests = False
+except ImportError:
+    from mongomock.object_id import ObjectId
+    skip_pymongo_tests = True
+try:
+    import execjs
+    from bson.code import Code
+    from bson.son import SON
+    skip_map_reduce_tests = False
+except ImportError:
+    skip_map_reduce_tests = True
+from tests.multicollection import MultiCollection
 
 
 class TestCase(unittest.TestCase):
@@ -34,8 +47,8 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(db1, db2)
         self.assertIs(db1, self.conn['some_database_here'])
         self.assertIsInstance(db1, Database)
-        self.assertIs(db1.connection, self.conn)
-        self.assertIs(db2.connection, self.conn)
+        self.assertIs(db1._Database__connection, self.conn)
+        self.assertIs(db2._Database__connection, self.conn)
     def test__getting_database_via_getitem(self):
         db1 = self.conn['some_database_here']
         db2 = self.conn['some_database_here']
@@ -79,8 +92,9 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
 
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
 class CollectionComparisonTest(TestCase):
-    """Compares a fake collection with the real mongo collection implementation via cross-comparison"""
+    """Compares a fake collection with the real mongo collection implementation via cross-comparison."""
     def setUp(self):
         super(CollectionComparisonTest, self).setUp()
         self.fake_conn = MongoMockConnection()
@@ -354,6 +368,92 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.ensure_index("hat", cache_for = 100)
         self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
 
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
+@unittest.skipIf(skip_map_reduce_tests,"execjs not installed")
+class CollectionMapReduceTest(TestCase):
+    def setUp(self):
+        self.db = MongoMockConnection().map_reduce_test
+        self.data = [{"x": 1, "tags": ["dog", "cat"]},
+                     {"x": 2, "tags": ["cat"]},
+                     {"x": 3, "tags": ["mouse", "cat", "dog"]},
+                     {"x": 4, "tags": []}]
+        for item in self.data:
+            self.db.things.insert(item)
+        self.map_func = Code("""
+                function() {
+                    this.tags.forEach(function(z) {
+                        emit(z, 1);
+                    });
+                }""")
+        self.reduce_func = Code("""
+                function(key, values) {
+                    var total = 0;
+                    for(var i = 0; i<values.length; i++) {
+                        total += values[i];
+                    }
+                    return total;
+                }""")
+        self.expected_results = [{'_id': 'mouse', 'value': 1},
+                                 {'_id': 'dog', 'value': 2},
+                                 {'_id': 'cat', 'value': 3}]
+
+    def test__map_reduce(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_son(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'results')
+        self.assertEqual(result._Collection__database.name, 'map_reduce_son_test')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_full_response(self):
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': 'myresults'}
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        self.assertEqual(result['result'], expected_full_response['result'])
+        for doc in getattr(self.db, result['result']).find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduct_with_query(self):
+        expected_results = [{'_id': 'mouse', 'value': 1},
+                            {'_id': 'dog', 'value': 2},
+                            {'_id': 'cat', 'value': 2}]
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'})
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, expected_results)
+
+    def test__map_reduce_with_limit(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 2)
+
+    def test__inline_map_reduce(self):
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(len(result), 3)
+        for doc in result:
+            self.assertIn(doc, self.expected_results)
+
+    def test__inline_map_reduce_full_response(self):
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': [{'_id': 'cat', 'value': 3}, {'_id': 'dog', 'value': 2}, {'_id': 'mouse', 'value': 1}]}
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func, full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        for doc in result['result']:
+            self.assertIn(doc, self.expected_results)
 
 
 def _LIMIT(*args):

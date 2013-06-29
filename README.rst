@@ -39,7 +39,7 @@ This breaks the test, although the end result being tested is just the same. The
 We are left, therefore, with option #3 -- you want something to behave like a mongodb database collection, without being one. This is exactly what this library aims to provide. With mongomock, the test simply becomes::
 
  def test_increase_votes():
-     collection = mongomock.Collection()
+     collection = mongomock.Connection().db.collection
      objects = [dict(votes=1), dict(votes=2), ...]
      for obj in objects:
          obj['_id'] = collection.insert(obj)
@@ -53,12 +53,13 @@ This code checks *increase_votes* with respect to its functionality, not syntax 
 
 To download, setup and perfom tests, run the following commands on Mac / Linux::
 
- get clone <repo>
+ git clone <repo>
  cd <reponame>
  virtualenv venv --distribute
  source venv/bin/activate
  pip install nose
  pip install pymongo
+ pip install pyexecjs
  python setup.py install
  nosetests
 
@@ -66,7 +67,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux::
 Important Note About Project Status
 -----------------------------------
 
-MongoDB is complex. This library aims at a reasonably complete mock of MongoDB for testing purposes, not a perfect replica. This means some features (like map/reduce and similar features) are not likely to make it in any time soon.
+MongoDB is complex. This library aims at a reasonably complete mock of MongoDB for testing purposes, not a perfect replica. This means some features are not likely to make it in any time soon.
 
 Also, since many corner cases are encountered along the way, our goal is to try and TDD our way into completeness. This means that every time we encounter a missing or broken (incompatible) feature, we write a test for it and fix it. There are probably lots of such issues hiding around lurking, so feel free to open issues and/or pull requests and help the project out!
 

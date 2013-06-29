@@ -1,28 +1,41 @@
 import copy
 import itertools
 import operator
-import warnings
 import re
+import time
+import warnings
+from collections import Iterable
 
-from mongomock import helpers
+import sys
+
+try:
+    # Optional requirements for providing Map-Reduce functionality
+    import execjs
+    from bson import (json_util, SON)
+except ImportError:
+    pass
+try:
+    from bson import (ObjectId, RE_TYPE)
+except ImportError:
+    from mongomock.object_id import ObjectId
+    RE_TYPE = type(re.compile(''))
+try:
+    import simplejson as json
+except ImportError:
+    import json
 from sentinels import NOTHING
 from six import (
                  iteritems,
                  itervalues,
                  string_types,
                  )
-from collections import Iterable
 
-from .__version__ import __version__
-try:
-    from bson import ObjectId
-except ImportError:
-    from .object_id import ObjectId
+from mongomock import helpers
+from mongomock.__version__ import __version__
+
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
-
-RE_TYPE = type(re.compile(''))
 
 def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
@@ -77,14 +90,27 @@ class Connection(object):
                  network_timeout = None, document_class = dict,
                  tz_aware = False, _connect = True, **kwargs):
         super(Connection, self).__init__()
+        self.host = host
+        self.port = port
         self._databases = {}
     def __getitem__(self, db_name):
         db = self._databases.get(db_name, None)
         if db is None:
-            db = self._databases[db_name] = Database(self)
+            db = self._databases[db_name] = Database(self, db_name)
         return db
     def __getattr__(self, attr):
         return self[attr]
+
+    def __repr__(self):
+        identifier = []
+        host = getattr(self,'host','')
+        port = getattr(self,'port',None)
+        if host is not None:
+            identifier = ["'{0}'".format(host)]
+            if port is not None:
+                identifier.append(str(port))
+        return "mongomock.Connection({0})".format(', '.join(identifier))
+
     def server_info(self):
         return {
             "version" : "2.0.6",
@@ -102,17 +128,24 @@ class Connection(object):
     }
 
 class Database(object):
-    def __init__(self, conn):
+    def __init__(self, conn, name):
         super(Database, self).__init__()
-        self.connection = conn
-        self._collections = {'system.indexes' : Collection(self)}
-    def __getitem__(self, db_name):
-        db = self._collections.get(db_name, None)
-        if db is None:
-            db = self._collections[db_name] = Collection(self)
-        return db
+        self.name = name
+        self._Database__connection = conn
+        self._collections = {'system.indexes' : Collection(self, 'system.indexes')}
+
+    def __getitem__(self, coll_name):
+        coll = self._collections.get(coll_name, None)
+        if coll is None:
+            coll = self._collections[coll_name] = Collection(self, coll_name)
+        return coll
+
     def __getattr__(self, attr):
         return self[attr]
+
+    def __repr__(self):
+        return "Database({0}, '{1}')".format(self._Database__connection, self.name)
+
     def collection_names(self):
         return list(self._collections.keys())
     def drop_collection(self, name_or_collection):
@@ -128,9 +161,15 @@ class Database(object):
             pass
 
 class Collection(object):
-    def __init__(self, db):
+    def __init__(self, db, name):
         super(Collection, self).__init__()
+        self.name = name
+        self._Collection__database = db
         self._documents = {}
+
+    def __repr__(self):
+        return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
+
     def insert(self, data):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
@@ -359,6 +398,88 @@ class Collection(object):
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         pass
+
+    def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=None):
+        try:
+            execjs
+        except NameError as e:
+            raise NameError("{0}. Optional Dependencies: Use 'pip install pyexecjs pymongo' to support Map-Reduce mock.".format(e))
+        start_time = time.clock()
+        out_collection = None
+        reduced_rows = None
+        full_dict = {'counts': {'input': 0,
+                                'reduce':0,
+                                'emit':0,
+                                'output':0},
+                     'timeMillis': 0,
+                     'ok': 1.0,
+                     'result': None}
+        map_ctx = execjs.compile("""
+            function doMap(fnc, docList) {
+                var mappedDict = {};
+                function emit(key, val) {
+                    if(!mappedDict[key]) {
+                        mappedDict[key] = [];
+                    }
+                    mappedDict[key].push(val);
+                }
+                mapper = eval('('+fnc+')');
+                var mappedList = new Array();
+                for(var i=0; i<docList.length; i++) {
+                    var thisDoc = eval('('+docList[i]+')');
+                    var mappedVal = (mapper).call(thisDoc);
+                }
+                return mappedDict;
+            }
+        """)
+        reduce_ctx = execjs.compile("""
+            function doReduce(fnc, docList) {
+                var reducedList = new Array();
+                reducer = eval('('+fnc+')');
+                for(var key in docList) {
+                    var reducedVal = {'_id': key,
+                            'value': reducer(key, docList[key])};
+                    reducedList.push(reducedVal);
+                }
+                return reducedList;
+            }
+        """)
+        doc_list = [json.dumps(doc, default=json_util.default) for doc in self.find(query)]
+        mapped_rows = map_ctx.call('doMap', map_func, doc_list)
+        reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
+        reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
+        if full_response:
+            full_dict['counts']['input'] = len(doc_list)
+            for key in mapped_rows.keys():
+                emit_count = len(mapped_rows[key])
+                full_dict['counts']['emit'] += emit_count
+                if emit_count > 1:
+                    full_dict['counts']['reduce'] += 1
+            full_dict['counts']['output'] = len(reduced_rows)
+        if isinstance(out, (str, bytes)):
+            out_collection = getattr(self._Collection__database, out)
+            out_collection.insert(reduced_rows)
+            ret_val = out_collection
+            full_dict['result'] = out
+        elif isinstance(out, SON) and out.get('replace') and out.get('db'):
+            # Must be of the format SON([('replace','results'),('db','outdb')])
+            out_db = getattr(self._Collection__database._Database__connection, out['db'])
+            out_collection = getattr(out_db, out['replace'])
+            out_collection.insert(reduced_rows)
+            ret_val = out_collection
+            full_dict['result'] = {'db': out['db'], 'collection': out['replace']}
+        elif isinstance(out, dict) and out.get('inline'):
+            ret_val = reduced_rows
+            full_dict['result'] = reduced_rows
+        else:
+            raise TypeError("'out' must be an instance of string, dict or bson.SON")
+        full_dict['timeMillis'] = int(round((time.clock() - start_time) * 1000))
+        if full_response:
+            ret_val = full_dict
+        return ret_val
+
+    def inline_map_reduce(self, map_func, reduce_func, full_response=False, query=None, limit=None):
+        return self.map_reduce(map_func, reduce_func, {'inline':1}, full_response, query, limit)
 
 
 class Cursor(object):
