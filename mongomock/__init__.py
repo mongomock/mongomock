@@ -146,6 +146,10 @@ class Database(object):
     def __repr__(self):
         return "Database({0}, '{1}')".format(self._Database__connection, self.name)
 
+    @property
+    def connection(self):
+        return self._Database__connection
+
     def collection_names(self):
         return list(self._collections.keys())
     def drop_collection(self, name_or_collection):
