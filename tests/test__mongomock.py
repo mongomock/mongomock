@@ -47,8 +47,8 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(db1, db2)
         self.assertIs(db1, self.conn['some_database_here'])
         self.assertIsInstance(db1, Database)
-        self.assertIs(db1._Database__connection, self.conn)
-        self.assertIs(db2._Database__connection, self.conn)
+        self.assertIs(db1.connection, self.conn) # 'connection' is an attribute of pymongo Database
+        self.assertIs(db2.connection, self.conn)
     def test__getting_database_via_getitem(self):
         db1 = self.conn['some_database_here']
         db2 = self.conn['some_database_here']
