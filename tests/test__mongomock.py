@@ -221,6 +221,15 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'not very'}})
         self.cmp.compare_ignore_order.find({'snakeness': {'$ne': 'very'}})
 
+    def test__find_not(self):
+        bob = {'_id': 1, 'name': 'bob'}
+        sam = {'_id': 2, 'name': 'sam'}
+        self.cmp.do.insert([bob, sam])
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'bob'}}})
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'sam'}}})
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'dan'}}})
+
     def test__find_compare(self):
         self.cmp.do.insert(dict(noise = "longhorn"))
         for x in range(10):
