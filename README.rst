@@ -85,6 +85,7 @@ Many thanks go to the following people for helping out:
 * Edward D'Souza
 * Israel Teixeira
 * Jacob Perkins
+* Jason Sommer
 * Jeff McGee
 * Joël Franusic
 * Nigel Choi
