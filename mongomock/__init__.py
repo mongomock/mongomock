@@ -48,6 +48,9 @@ def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
     return all(x in dv for x in search_val)
 
+def _not_op(c, d, k, s):
+    return not c._filter_applies({k: s}, d)
+
 def _print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
                   "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
@@ -351,7 +354,8 @@ class Collection(object):
 
             if isinstance(search, dict):
                 is_match = all(
-                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val)
+                               operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val) or
+                               operator_string == '$not' and _not_op(self, document, key, search_val)
                                for operator_string, search_val in iteritems(search)
                                )
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
