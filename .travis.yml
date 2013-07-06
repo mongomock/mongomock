@@ -4,11 +4,14 @@ python:
   - "2.7"
   - "3.2"
   - "3.3"
+env:
+  - INSTALL_PYMONGO=true INSTALL_PYEXECJS=true
+  - INSTALL_PYMONGO=false INSTALL_PYEXECJS=false
 services:
   - mongodb
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: 
   - python setup.py develop
-  - pip install --use-mirrors pyexecjs nose pymongo
+  - pip install --use-mirrors nose
 # command to run tests, e.g. python setup.py test
 script: nosetests -w tests

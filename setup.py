@@ -10,6 +10,12 @@ install_requires = ["sentinels", "six"]
 if platform.python_version() < '2.7':
     install_requires.append('unittest2')
 
+if os.environ.get("INSTALL_PYMONGO", "false") == "true":
+    install_requires.append("pymongo")
+if os.environ.get("INSTALL_PYEXECJS", "false") == "true":
+    install_requires.append("pyexecjs")
+
+
 setup(name="mongomock",
       classifiers = [
           "Programming Language :: Python :: 2.7",
