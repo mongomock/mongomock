@@ -12,18 +12,19 @@ from mongomock import Database, Collection
 from mongomock import Connection as MongoMockConnection
 try:
     from pymongo import Connection as PymongoConnection
+    from pymongo import MongoClient as PymongoClient
     from bson.objectid import ObjectId
-    skip_pymongo_tests = False
+    _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId
-    skip_pymongo_tests = True
+    _HAVE_PYMONGO = False
 try:
     import execjs
     from bson.code import Code
     from bson.son import SON
-    skip_map_reduce_tests = False
+    _HAVE_MAP_REDUCE = True
 except ImportError:
-    skip_map_reduce_tests = True
+    _HAVE_MAP_REDUCE = False
 from tests.multicollection import MultiCollection
 
 
@@ -94,7 +95,7 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
 
-@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
+@unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation via cross-comparison."""
     def setUp(self):
@@ -387,8 +388,8 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.ensure_index("hat", cache_for = 100)
         self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
 
-@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
-@unittest.skipIf(skip_map_reduce_tests,"execjs not installed")
+@unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+@unittest.skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
 class CollectionMapReduceTest(TestCase):
     def setUp(self):
         self.db = MongoMockConnection().map_reduce_test
