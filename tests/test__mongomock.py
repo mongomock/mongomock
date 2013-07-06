@@ -1,4 +1,5 @@
 import copy
+import time
 import itertools
 import re
 import platform
@@ -11,6 +12,7 @@ else:
 from mongomock import Database, Collection
 from mongomock import Connection as MongoMockConnection
 try:
+    import pymongo
     from pymongo import Connection as PymongoConnection
     from pymongo import MongoClient as PymongoClient
     from bson.objectid import ObjectId
@@ -101,7 +103,7 @@ class CollectionComparisonTest(TestCase):
     def setUp(self):
         super(CollectionComparisonTest, self).setUp()
         self.fake_conn = MongoMockConnection()
-        self.mongo_conn = PymongoConnection()
+        self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = "mongomock___testing_db"
         self.collection_name = "mongomock___testing_collection"
         self.mongo_conn[self.db_name][self.collection_name].remove()
@@ -109,6 +111,19 @@ class CollectionComparisonTest(TestCase):
             "fake" : self.fake_conn[self.db_name][self.collection_name],
             "real" : self.mongo_conn[self.db_name][self.collection_name],
          })
+
+    def _connect_to_local_mongodb(self, num_retries=3):
+        "Performs retries on connection refused errors (for travis-ci builds)"
+        for retry in range(num_retries):
+            if retry > 0:
+                time.sleep(0.5)
+            try:
+                return PymongoConnection()
+            except pymongo.errors.ConnectionFailure as e:
+                if retry == num_retries - 1:
+                    raise
+                if "connection refused" not in e.message.lower():
+                    raise
 
 class CollectionTest(CollectionComparisonTest):
     def test__find_is_empty(self):
