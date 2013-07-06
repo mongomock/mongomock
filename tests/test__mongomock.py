@@ -9,8 +9,8 @@ if platform.python_version() < '2.7':
 else:
     import unittest
 
-from mongomock import Database, Collection
-from mongomock import Connection as MongoMockConnection
+import mongomock
+from mongomock import Database
 try:
     import pymongo
     from pymongo import Connection as PymongoConnection
@@ -36,16 +36,16 @@ class TestCase(unittest.TestCase):
 
 class InterfaceTest(TestCase):
     def test__can_create_db_without_path(self):
-        conn = MongoMockConnection()
+        conn = mongomock.Connection()
         self.assertIsNotNone(conn)
     def test__can_create_db_without_path(self):
-        conn = MongoMockConnection('mongodb://localhost')
+        conn = mongomock.Connection('mongodb://localhost')
         self.assertIsNotNone(conn)
 
 class DatabaseGettingTest(TestCase):
     def setUp(self):
         super(DatabaseGettingTest, self).setUp()
-        self.conn = MongoMockConnection()
+        self.conn = mongomock.Connection()
     def test__getting_database_via_getattr(self):
         db1 = self.conn.some_database_here
         db2 = self.conn.some_database_here
@@ -64,7 +64,7 @@ class DatabaseGettingTest(TestCase):
 class CollectionAPITest(TestCase):
     def setUp(self):
         super(CollectionAPITest, self).setUp()
-        self.conn = MongoMockConnection()
+        self.conn = mongomock.Connection()
         self.db = self.conn['somedb']
     def test__get_collection_names(self):
         self.db.a
@@ -83,13 +83,13 @@ class CollectionAPITest(TestCase):
         col2 = self.db.some_collection_here
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db['some_collection_here'])
-        self.assertIsInstance(col1, Collection)
+        self.assertIsInstance(col1, mongomock.Collection)
     def test__getting_collection_via_getitem(self):
         col1 = self.db['some_collection_here']
         col2 = self.db['some_collection_here']
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db.some_collection_here)
-        self.assertIsInstance(col1, Collection)
+        self.assertIsInstance(col1, mongomock.Collection)
     def test__find_returns_cursors(self):
         collection = self.db.collection
         self.assertEquals(type(collection.find()).__name__, "Cursor")
@@ -98,34 +98,52 @@ class CollectionAPITest(TestCase):
 
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
-class CollectionComparisonTest(TestCase):
+class _CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation via cross-comparison."""
+
     def setUp(self):
-        super(CollectionComparisonTest, self).setUp()
-        self.fake_conn = MongoMockConnection()
+        super(_CollectionComparisonTest, self).setUp()
+        self.fake_conn = self._get_mongomock_connection_class()()
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = "mongomock___testing_db"
         self.collection_name = "mongomock___testing_collection"
         self.mongo_conn[self.db_name][self.collection_name].remove()
         self.cmp = MultiCollection({
             "fake" : self.fake_conn[self.db_name][self.collection_name],
-            "real" : self.mongo_conn[self.db_name][self.collection_name],
+            "real": self.mongo_conn[self.db_name][self.collection_name],
          })
 
     def _connect_to_local_mongodb(self, num_retries=3):
         "Performs retries on connection refused errors (for travis-ci builds)"
+        connection_class = self._get_real_connection_class()
         for retry in range(num_retries):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoConnection()
+                return connection_class()
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
                 if "connection refused" not in e.message.lower():
                     raise
 
-class CollectionTest(CollectionComparisonTest):
+class _MongoClientMixin(object):
+
+    def _get_real_connection_class(self):
+        return PymongoClient
+
+    def _get_mongomock_connection_class(self):
+        return mongomock.MongoClient
+
+class _PymongoConnectionMixin(object):
+
+    def _get_real_connection_class(self):
+        return PymongoConnection
+
+    def _get_mongomock_connection_class(self):
+        return mongomock.Connection
+
+class _CollectionTest(_CollectionComparisonTest):
     def test__find_is_empty(self):
         self.cmp.do.remove()
         self.cmp.compare.find()
@@ -346,6 +364,8 @@ class CollectionTest(CollectionComparisonTest):
 
     def test__set_subdocuments(self):
         """Tests using $set for setting subdocument fields"""
+        if isinstance(self, _MongoClientMixin):
+            self.skipTest("MongoClient does not allow setting subdocuments on existing non-documents")
         self.cmp.do.insert({'name': 'bob', 'data1': 1, 'subdocument': {'a': {'b': {'c': 20}}}})
         self.cmp.do.update({'name': 'bob'}, {'$set': {'data1.field1': 11}})
         self.cmp.compare.find()
@@ -403,11 +423,17 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.ensure_index("hat", cache_for = 100)
         self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
 
+class MongoClientCollectionTest(_CollectionTest, _MongoClientMixin):
+    pass
+
+class PymongoCollectionTest(_CollectionTest, _PymongoConnectionMixin):
+    pass
+
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @unittest.skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
 class CollectionMapReduceTest(TestCase):
     def setUp(self):
-        self.db = MongoMockConnection().map_reduce_test
+        self.db = mongomock.Connection().map_reduce_test
         self.data = [{"x": 1, "tags": ["dog", "cat"]},
                      {"x": 2, "tags": ["cat"]},
                      {"x": 3, "tags": ["mouse", "cat", "dog"]},
@@ -500,9 +526,9 @@ def _SORT(*args):
 def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
-class SortSkipLimitTest(CollectionComparisonTest):
+class _SortSkipLimitTest(_CollectionComparisonTest):
     def setUp(self):
-        super(SortSkipLimitTest, self).setUp()
+        super(_SortSkipLimitTest, self).setUp()
         self.cmp.do.insert([{"_id":i, "index" : i} for i in range(30)])
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
@@ -534,11 +560,16 @@ class SortSkipLimitTest(CollectionComparisonTest):
         # Does nothing - just make sure it exists and takes the right args
         self.cmp.do(lambda cursor: cursor.close()).find()
 
+class MongoClientSortSkipLimitTest(_SortSkipLimitTest, _MongoClientMixin):
+    pass
+
+class PymongoConnectionSortSkipLimitTest(_SortSkipLimitTest, _PymongoConnectionMixin):
+    pass
 
 class InsertedDocumentTest(TestCase):
     def setUp(self):
         super(InsertedDocumentTest, self).setUp()
-        self.collection = MongoMockConnection().db.collection
+        self.collection = mongomock.Connection().db.collection
         self.data = {"a" : 1, "b" : [1, 2, 3], "c" : {"d" : 4}}
         self.orig_data = copy.deepcopy(self.data)
         self.object_id = self.collection.insert(self.data)
