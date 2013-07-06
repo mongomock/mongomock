@@ -1,7 +1,9 @@
 .. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
 
+
 .. image:: https://pypip.in/d/mongomock/badge.png
         :target: https://crate.io/packages/mongomock
+
 
 .. image:: https://pypip.in/v/mongomock/badge.png
         :target: https://crate.io/packages/mongomock
@@ -97,5 +99,5 @@ Many thanks go to the following people for helping out:
 * Nigel Choi
 * Omer Gertel
 * Scott Sexton
-* catty
-* waskew
+* catty (ca77y _at_ live.com)
+* waskew (waskew _at_ narrativescience.com)
