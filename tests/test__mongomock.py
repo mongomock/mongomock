@@ -270,6 +270,14 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare.find(sort = [("b", 1), ("a", -1)])
         self.cmp.compare.find(sort = [("b", 1), ("a", -1), ("c", 1)])
 
+    def test__find_limit(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(limit=2)
+
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
         self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['type'])

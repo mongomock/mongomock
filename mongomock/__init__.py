@@ -262,7 +262,7 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -271,7 +271,7 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
-        return Cursor(dataset)
+        return Cursor(dataset, limit=limit)
 
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
@@ -508,10 +508,10 @@ class Collection(object):
 
 
 class Cursor(object):
-    def __init__(self, dataset):
+    def __init__(self, dataset, limit = None):
         super(Cursor, self).__init__()
         self._dataset = dataset
-        self._limit = None
+        self._limit = limit
         self._skip = None
     def __iter__(self):
         return self
