@@ -276,7 +276,7 @@ class CollectionTest(CollectionComparisonTest):
                      {"a" : 2, "b" : 2, "c" : "data3"},
                      {"a" : 3, "b" : 1, "c" : "data2"}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(limit=2)
+        self.cmp.compare.find(limit=2, sort = [("a", 1), ("b", -1)])
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
