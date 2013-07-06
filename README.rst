@@ -1,5 +1,11 @@
 .. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
 
+.. image:: https://pypip.in/d/mongomock/badge.png
+        :target: https://crate.io/packages/mongomock
+
+.. image:: https://pypip.in/v/mongomock/badge.png
+        :target: https://crate.io/packages/mongomock
+
 What is this?
 -------------
 Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
