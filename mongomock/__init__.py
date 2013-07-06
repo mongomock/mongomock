@@ -6,6 +6,8 @@ import time
 import warnings
 from collections import Iterable
 
+
+
 import sys
 
 try:
@@ -23,6 +25,13 @@ try:
     import simplejson as json
 except ImportError:
     import json
+
+try:
+    from pymongo.errors import DuplicateKeyError
+    skip_dup_key_error = False
+except:
+    skip_dup_key_error = True
+
 from sentinels import NOTHING
 from six import (
                  iteritems,
@@ -130,6 +139,11 @@ class Connection(object):
             "ok" : 1
     }
 
+#Connection is now depricated, it's called MongoClient instead
+class MongoClient(Connection):
+    def stub(self):
+        pass
+
 class Database(object):
     def __init__(self, conn, name):
         super(Database, self).__init__()
@@ -185,7 +199,9 @@ class Collection(object):
         if not '_id' in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
-        assert object_id not in self._documents
+        if object_id in self._documents:
+            if not skip_dup_key_error:
+                raise DuplicateKeyError("Duplicate Key Error", 11000)
         self._documents[object_id] = copy.deepcopy(data)
         return object_id
     def update(self, spec, document, upsert = False, manipulate = False,
@@ -246,7 +262,7 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -255,7 +271,7 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
-        return Cursor(dataset)
+        return Cursor(dataset, limit=limit)
 
     def _copy_only_fields(self, doc, fields):
         """Copy only the specified fields."""
@@ -492,10 +508,10 @@ class Collection(object):
 
 
 class Cursor(object):
-    def __init__(self, dataset):
+    def __init__(self, dataset, limit = None):
         super(Cursor, self).__init__()
         self._dataset = dataset
-        self._limit = None
+        self._limit = limit
         self._skip = None
     def __iter__(self):
         return self
