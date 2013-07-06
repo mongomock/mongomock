@@ -28,9 +28,9 @@ except ImportError:
 
 try:
     from pymongo.errors import DuplicateKeyError
-    skip_dup_key_error = False
 except:
-    skip_dup_key_error = True
+    class DuplicateKeyError(Exception):
+        pass
 
 from sentinels import NOTHING
 from six import (
@@ -200,8 +200,7 @@ class Collection(object):
             data['_id'] = ObjectId()
         object_id = data['_id']
         if object_id in self._documents:
-            if not skip_dup_key_error:
-                raise DuplicateKeyError("Duplicate Key Error", 11000)
+            raise DuplicateKeyError("Duplicate Key Error", 11000)
         self._documents[object_id] = copy.deepcopy(data)
         return object_id
     def update(self, spec, document, upsert = False, manipulate = False,
