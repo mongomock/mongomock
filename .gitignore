@@ -40,3 +40,4 @@ pip-log.txt
 
 #### Haskell
 *.hi
+flycheck-*

@@ -2,22 +2,30 @@ import copy
 import itertools
 import re
 import platform
+import sys
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
     import unittest
-from bson.objectid import ObjectId
-from mongomock import Database, ObjectId, Collection
 
+from mongomock import Database, Collection
+from mongomock import Connection as MongoMockConnection
 try:
-    #MongoClient introduced in version 2.4
-    from mongomock import MongoClient as MongoMockConnection
-    from pymongo import MongoClient as PymongoConnection
-except:
-    from mongomock import Connection as MongoMockConnection
     from pymongo import Connection as PymongoConnection
+    from bson.objectid import ObjectId
+    skip_pymongo_tests = False
+except ImportError:
+    from mongomock.object_id import ObjectId
+    skip_pymongo_tests = True
+try:
+    import execjs
+    from bson.code import Code
+    from bson.son import SON
+    skip_map_reduce_tests = False
+except ImportError:
+    skip_map_reduce_tests = True
+from tests.multicollection import MultiCollection
 
-from .multicollection import MultiCollection
 
 
 class TestCase(unittest.TestCase):
@@ -41,6 +49,8 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(db1, db2)
         self.assertIs(db1, self.conn['some_database_here'])
         self.assertIsInstance(db1, Database)
+        self.assertIs(db1.connection, self.conn) # 'connection' is an attribute of pymongo Database
+        self.assertIs(db2.connection, self.conn)
     def test__getting_database_via_getitem(self):
         db1 = self.conn['some_database_here']
         db2 = self.conn['some_database_here']
@@ -84,8 +94,9 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
 
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
 class CollectionComparisonTest(TestCase):
-    """Compares a fake collection with the real mongo collection implementation via cross-comparison"""
+    """Compares a fake collection with the real mongo collection implementation via cross-comparison."""
     def setUp(self):
         super(CollectionComparisonTest, self).setUp()
         self.fake_conn = MongoMockConnection()
@@ -117,7 +128,7 @@ class CollectionTest(CollectionComparisonTest):
 
     def test__save(self):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
-        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True) 
+        self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
 
     def test__count(self):
@@ -157,7 +168,7 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare.find({"_id" : id1},{"_id":0,"someOtherProp":1}) #test mixed _id:0
         self.cmp.compare.find({"_id" : id1},{"someOtherProp":0}) #test no _id, otherProp:0
         self.cmp.compare.find({"_id" : id1},{"someOtherProp":1}) #test no _id, otherProp:1
-        
+
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
@@ -212,6 +223,15 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'not very'}})
         self.cmp.compare_ignore_order.find({'snakeness': {'$ne': 'very'}})
 
+    def test__find_not(self):
+        bob = {'_id': 1, 'name': 'bob'}
+        sam = {'_id': 2, 'name': 'sam'}
+        self.cmp.do.insert([bob, sam])
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'bob'}}})
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'sam'}}})
+        self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'dan'}}})
+
     def test__find_compare(self):
         self.cmp.do.insert(dict(noise = "longhorn"))
         for x in range(10):
@@ -239,6 +259,16 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':2}]})
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':7}]})
         self.cmp.compare_ignore_order.find({'$and':[{'x':2}, {'x':7}]})
+
+    def test__find_sort_list(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(sort = [("a", 1), ("b", -1)])
+        self.cmp.compare.find(sort = [("b", 1), ("a", -1)])
+        self.cmp.compare.find(sort = [("b", 1), ("a", -1), ("c", 1)])
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
@@ -283,12 +313,43 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__set_upsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
+        self.cmp.compare.find()
+        self.cmp.do.update({"name": "alice"}, {"$set": {"age": 1}}, True)
+        self.cmp.compare_ignore_order.find()
+
+    def test__set_subdocuments(self):
+        """Tests using $set for setting subdocument fields"""
+        self.cmp.do.insert({'name': 'bob', 'data1': 1, 'subdocument': {'a': {'b': {'c': 20}}}})
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'data1.field1': 11}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'data2.field1': 21}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'subdocument.a.b': 21}})
+        self.cmp.compare.find()
+
     def test__inc(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
         for i in range(3):
             self.cmp.do.update({'name':'bob'}, {'$inc': {'count':1}})
             self.cmp.compare.find({'name': 'bob'})
+
+    def test__inc_upsert(self):
+        self.cmp.do.remove()
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$inc': {'count':1}}, True)
+            self.cmp.compare.find({'name': 'bob'})
+
+    def test__inc_subdocument(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': {'age': 0}})
+        self.cmp.do.update({'name':'bob'}, {'$inc': {'data.age': 1}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name':'bob'}, {'$inc': {'data.age2': 1}})
+        self.cmp.compare.find()
 
     def test__addToSet(self):
         self.cmp.do.remove()
@@ -311,7 +372,99 @@ class CollectionTest(CollectionComparisonTest):
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.do.drop()
         self.cmp.compare.find({})
-        
+
+    def test__ensure_index(self):
+        # Does nothing - just make sure it exists and takes the right args
+        self.cmp.do.ensure_index("name")
+        self.cmp.do.ensure_index("hat", cache_for = 100)
+        self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
+
+@unittest.skipIf(skip_pymongo_tests,"pymongo not installed")
+@unittest.skipIf(skip_map_reduce_tests,"execjs not installed")
+class CollectionMapReduceTest(TestCase):
+    def setUp(self):
+        self.db = MongoMockConnection().map_reduce_test
+        self.data = [{"x": 1, "tags": ["dog", "cat"]},
+                     {"x": 2, "tags": ["cat"]},
+                     {"x": 3, "tags": ["mouse", "cat", "dog"]},
+                     {"x": 4, "tags": []}]
+        for item in self.data:
+            self.db.things.insert(item)
+        self.map_func = Code("""
+                function() {
+                    this.tags.forEach(function(z) {
+                        emit(z, 1);
+                    });
+                }""")
+        self.reduce_func = Code("""
+                function(key, values) {
+                    var total = 0;
+                    for(var i = 0; i<values.length; i++) {
+                        total += values[i];
+                    }
+                    return total;
+                }""")
+        self.expected_results = [{'_id': 'mouse', 'value': 1},
+                                 {'_id': 'dog', 'value': 2},
+                                 {'_id': 'cat', 'value': 3}]
+
+    def test__map_reduce(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_son(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'results')
+        self.assertEqual(result._Collection__database.name, 'map_reduce_son_test')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduce_full_response(self):
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': 'myresults'}
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        self.assertEqual(result['result'], expected_full_response['result'])
+        for doc in getattr(self.db, result['result']).find():
+            self.assertIn(doc, self.expected_results)
+
+    def test__map_reduct_with_query(self):
+        expected_results = [{'_id': 'mouse', 'value': 1},
+                            {'_id': 'dog', 'value': 2},
+                            {'_id': 'cat', 'value': 2}]
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'})
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 3)
+        for doc in result.find():
+            self.assertIn(doc, expected_results)
+
+    def test__map_reduce_with_limit(self):
+        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
+        self.assertTrue(isinstance(result, Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 2)
+
+    def test__inline_map_reduce(self):
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(len(result), 3)
+        for doc in result:
+            self.assertIn(doc, self.expected_results)
+
+    def test__inline_map_reduce_full_response(self):
+        expected_full_response = {'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3}, 'timeMillis': 5, 'ok': 1.0, 'result': [{'_id': 'cat', 'value': 3}, {'_id': 'dog', 'value': 2}, {'_id': 'mouse', 'value': 1}]}
+        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func, full_response=True)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(result['counts'], expected_full_response['counts'])
+        for doc in result['result']:
+            self.assertIn(doc, self.expected_results)
 
 
 def _LIMIT(*args):
@@ -333,7 +486,30 @@ class SortSkipLimitTest(CollectionComparisonTest):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
-    
+
+    def test__sort_name(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT("a")).find()
+        self.cmp.compare(_SORT("b")).find()
+
+    def test__sort_list(self):
+        self.cmp.do.remove()
+        for data in ({"a" : 1, "b" : 3, "c" : "data1"},
+                     {"a" : 2, "b" : 2, "c" : "data3"},
+                     {"a" : 3, "b" : 1, "c" : "data2"}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT([("a", 1), ("b", -1)])).find()
+        self.cmp.compare(_SORT([("b", 1), ("a", -1)])).find()
+        self.cmp.compare(_SORT([("b", 1), ("a", -1), ("c", 1)])).find()
+
+    def test__close(self):
+        # Does nothing - just make sure it exists and takes the right args
+        self.cmp.do(lambda cursor: cursor.close()).find()
+
 
 class InsertedDocumentTest(TestCase):
     def setUp(self):
