@@ -489,7 +489,7 @@ class CollectionMapReduceTest(TestCase):
                             {'_id': 'dog', 'value': 2},
                             {'_id': 'cat', 'value': 2}]
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'})
-        self.assertTrue(isinstance(result, Collection))
+        self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
@@ -497,7 +497,7 @@ class CollectionMapReduceTest(TestCase):
 
     def test__map_reduce_with_limit(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
-        self.assertTrue(isinstance(result, Collection))
+        self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 2)
 
