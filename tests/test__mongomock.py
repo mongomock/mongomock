@@ -460,7 +460,7 @@ class CollectionMapReduceTest(TestCase):
 
     def test__map_reduce(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertTrue(isinstance(result, Collection))
+        self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
@@ -468,7 +468,7 @@ class CollectionMapReduceTest(TestCase):
 
     def test__map_reduce_son(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
-        self.assertTrue(isinstance(result, Collection))
+        self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'results')
         self.assertEqual(result._Collection__database.name, 'map_reduce_son_test')
         self.assertEqual(result.count(), 3)
