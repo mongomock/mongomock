@@ -97,7 +97,6 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
     def test__naming_bug(self):
-        names = ['test1', 'test2']
         self.db['abc'].save({'name':'test1'})
         self.db['abc'].save({'name':'test2'})
         #now searching for 'name':'e' returns test1
