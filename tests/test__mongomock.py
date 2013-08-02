@@ -78,18 +78,21 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
+
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db['some_collection_here'])
         self.assertIsInstance(col1, mongomock.Collection)
+
     def test__getting_collection_via_getitem(self):
         col1 = self.db['some_collection_here']
         col2 = self.db['some_collection_here']
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db.some_collection_here)
         self.assertIsInstance(col1, mongomock.Collection)
+
     def test__find_returns_cursors(self):
         collection = self.db.collection
         self.assertEquals(type(collection.find()).__name__, "Cursor")
@@ -100,7 +103,7 @@ class CollectionAPITest(TestCase):
         self.db['abc'].save({'name':'test1'})
         self.db['abc'].save({'name':'test2'})
         #now searching for 'name':'e' returns test1
-        self.assertTrue( self.db['abc'].find_one({'name':'e'}) == None )
+        self.assertIsNone(self.db['abc'].find_one({'name':'e'}))
 
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")

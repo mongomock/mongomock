@@ -4,10 +4,6 @@ import operator
 import re
 import time
 import warnings
-from collections import Iterable
-
-
-
 import sys
 
 try:
@@ -377,7 +373,7 @@ class Collection(object):
                 is_match = search.match(doc_val) is not None
             elif key in LOGICAL_OPERATOR_MAP:
                 is_match = LOGICAL_OPERATOR_MAP[key] (self, document, search)
-            elif isinstance(doc_val, Iterable):
+            elif isinstance(doc_val, (list, tuple)):
                 if isinstance(search, ObjectId):
                     is_match = str(search) in doc_val
                 else:
