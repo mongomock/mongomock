@@ -96,6 +96,13 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
+    def test__naming_bug(self):
+        names = ['test1', 'test2']
+        self.db['abc'].save({'name':'test1'})
+        self.db['abc'].save({'name':'test2'})
+        #now searching for 'name':'e' returns test1
+        self.assertTrue( self.db['abc'].find_one({'name':'e'}) == None )
+
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
@@ -159,6 +166,7 @@ class _CollectionTest(_CollectionComparisonTest):
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
+
 
     def test__save(self):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
