@@ -99,7 +99,10 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
-    def test__naming_bug(self):
+    def test__string_matching(self):
+        """
+        Make sure strings are not treated as collections on find
+        """
         self.db['abc'].save({'name':'test1'})
         self.db['abc'].save({'name':'test2'})
         #now searching for 'name':'e' returns test1
