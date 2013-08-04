@@ -1,0 +1,43 @@
+#### Python
+*.py[co]
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+develop-eggs
+.installed.cfg
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+.achievements
+
+#### Eclipse
+*.pydevproject
+.project
+.metadata
+
+# Intellij project files
+*.iml
+*.ipr
+*.iws
+.idea
+
+#### Emacs
+\#*\#
+.#*
+
+#### C/C++
+*.o
+
+#### Haskell
+*.hi
+flycheck-*
