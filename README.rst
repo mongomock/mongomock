@@ -1,3 +1,9 @@
+
+.. container::
+
+   .. image:: https://vmalloc.github.io/mongomock/mongomock-small.png
+
+
 .. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
 
 
@@ -7,6 +13,9 @@
 
 .. image:: https://pypip.in/v/mongomock/badge.png
         :target: https://crate.io/packages/mongomock
+
+
+
 
 What is this?
 -------------
