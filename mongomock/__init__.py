@@ -334,6 +334,11 @@ class Collection(object):
         return (document for document in itervalues(self._documents) if self._filter_applies(filter, document))
 
     def find_one(self, spec_or_id=None, *args, **kwargs):
+        # Allow calling find_one with a non-dict argument that gets used as
+        # the id for the query.
+        if not hasattr(spec_or_id, 'iteritems'):
+            spec_or_id = {'_id':spec_or_id}
+
         try:
             return next(self.find(spec_or_id, *args, **kwargs))
         except StopIteration:
