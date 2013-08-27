@@ -95,6 +95,7 @@ Acknowledgements
 
 Many thanks go to the following people for helping out:
 
+* Alec Perkins
 * Austin W Ellis
 * Corey Downing
 * Craig Hobbs
