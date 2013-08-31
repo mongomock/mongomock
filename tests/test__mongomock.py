@@ -324,6 +324,7 @@ class _CollectionTest(_CollectionComparisonTest):
                      {"a" : 3, "b" : 1, "c" : "data2"}):
             self.cmp.do.insert(data)
         self.cmp.compare.find(limit=2, sort = [("a", 1), ("b", -1)])
+        self.cmp.compare.find(limit=0, sort = [("a", 1), ("b", -1)]) #pymongo limit defaults to 0, returning everything
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
