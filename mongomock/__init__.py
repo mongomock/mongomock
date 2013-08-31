@@ -257,7 +257,7 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = None):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -415,15 +415,17 @@ class Collection(object):
         del self._documents
         self._documents = {}
 
-    def ensure_index(self, key_or_list, cache_for=300, **kwargs):
+    def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
         pass
 
-    def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=None):
+    def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
         if execjs is None:
             raise NotImplementedError(
                 "PyExecJS is required in order to run Map-Reduce. "
                 "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
             )
+        if limit == 0:
+            limit = None
         start_time = time.clock()
         out_collection = None
         reduced_rows = None
@@ -498,15 +500,15 @@ class Collection(object):
             ret_val = full_dict
         return ret_val
 
-    def inline_map_reduce(self, map_func, reduce_func, full_response=False, query=None, limit=None):
+    def inline_map_reduce(self, map_func, reduce_func, full_response=False, query=None, limit=0):
         return self.map_reduce(map_func, reduce_func, {'inline':1}, full_response, query, limit)
 
 
 class Cursor(object):
-    def __init__(self, dataset, limit = None):
+    def __init__(self, dataset, limit=0):
         super(Cursor, self).__init__()
         self._dataset = dataset
-        self._limit = limit
+        self._limit = limit if limit != 0 else None #pymongo limit defaults to 0, returning everything
         self._skip = None
     def __iter__(self):
         return self
