@@ -108,6 +108,11 @@ class CollectionAPITest(TestCase):
         #now searching for 'name':'e' returns test1
         self.assertIsNone(self.db['abc'].find_one({'name':'e'}))
 
+    def test__collection_is_indexable(self):
+        self.db['def'].save({'name':'test1'})
+        self.assertTrue(self.db['def'].find({'name':'test1'}).count() > 0)
+        self.assertEquals(self.db['def'].find({'name':'test1'})[0]['name'], 'test1')
+
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
