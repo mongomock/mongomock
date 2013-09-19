@@ -11,8 +11,8 @@ else:
 
 import mongomock
 from mongomock import Database
+
 try:
-    import pymongo
     from pymongo import Connection as PymongoConnection
     from pymongo import MongoClient as PymongoClient
     from bson.objectid import ObjectId
@@ -263,6 +263,16 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({"name" : regex})
         regex = re.compile('bob|notsam')
         self.cmp.compare_ignore_order.find({"name" : regex})
+
+    def test__find_by_elemMatch(self):
+        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
+        self.cmp.do.insert({"field": [{"a": 1, "b": 4}, {"c": 3, "d": 8}]})
+        self.cmp.do.insert({"field": "nonlist"})
+        self.cmp.do.insert({"field": 2})
+
+        self.cmp.compare.find({"field": {"$elemMatch": {"b": 1}}})
+        self.cmp.compare_ignore_order.find({"field": {"$elemMatch": {"a": 1}}})
+        self.cmp.compare.find({"field": {"$elemMatch": {"b": {"$gt": 3}}}})
 
     def test__find_notequal(self):
         """Test searching with operators other than equality."""

@@ -69,6 +69,11 @@ def _not_nothing_and(f):
     "wrap an operator to return False if the first arg is NOTHING"
     return lambda v, l: v is not NOTHING and f(v, l)
 
+def _elem_match_op(doc_val, query):
+    if not isinstance(doc_val, list):
+        return False
+    return any(filter_applies(query, item) for item in doc_val)
+
 def _print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
                   "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
@@ -84,7 +89,8 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
                 '$regex':lambda dv, sv: re.compile(sv).match(dv),
-                '$where':lambda db, sv: True  # ignore this complex filter
+                '$where':lambda db, sv: True,  # ignore this complex filter
+                '$elemMatch': _elem_match_op,
                 }
 
 LOGICAL_OPERATOR_MAP = {'$or':lambda d, subq: any(filter_applies(q, d) for q in subq),
