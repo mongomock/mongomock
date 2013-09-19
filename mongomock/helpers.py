@@ -1,3 +1,12 @@
+import re
+
+try:
+    from bson import (ObjectId, RE_TYPE)
+except ImportError:
+    from mongomock.object_id import ObjectId
+    RE_TYPE = type(re.compile(''))
+
+
 #for Python 3 compatibility
 try:
   unicode = unicode
