@@ -72,7 +72,8 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
                 '$regex':lambda dv, sv: re.compile(sv).match(dv),
-                '$where':lambda db, sv: True  # ignore this complex filter
+                '$where':lambda db, sv: True,  # ignore this complex filter
+                '$elemMatch':lambda db, sv: True  # ignore this complex filter
                 }
 
 LOGICAL_OPERATOR_MAP = {'$or':lambda c, d, subq: any(c._filter_applies(q, d) for q in subq),
