@@ -1,4 +1,5 @@
 import operator
+import warnings
 from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
