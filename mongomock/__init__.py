@@ -1,9 +1,8 @@
 import collections
 import copy
 import itertools
+from pprint import pformat
 import time
-import warnings
-import sys
 from .filtering import filter_applies
 
 try:
@@ -171,8 +170,23 @@ class Collection(object):
                             container.append(value)
                 elif k == '$pull':
                     for field, value in iteritems(v):
-                        arr = existing_document[field]
-                        existing_document[field] = [obj for obj in arr if not obj == value]
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            arr = existing_document[field]
+                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            continue
+                        nested_document = existing_document
+
+                        for index, field in enumerate(nested_field_list):
+                            if field == '$':
+                                # TODO grab the first one for now
+                                nested_document = nested_document[0]
+                                continue
+
+                            if index == len(nested_field_list) - 1:
+                                nested_document[field] = [obj for obj in nested_document[field] if not filter_applies(value, obj)]
+                                continue
+                            nested_document = nested_document[field]
                 else:
                     if first:
                         # replace entire document
