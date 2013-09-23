@@ -4,6 +4,8 @@ import itertools
 import re
 import platform
 import sys
+import pymongo
+
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
