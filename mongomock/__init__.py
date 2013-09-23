@@ -209,12 +209,71 @@ class Collection(object):
                             pull_results = []
                             # and the last subdoc should be an array
                             for obj in doc:
-                                for search_key, search_value in iteritems(value):
-                                    if obj[search_key] != search_value:
+                                for push_key, push_value in iteritems(value):
+                                    if obj[push_key] != push_value:
                                         pull_results.append(obj)
 
                             # cannot write to doc directly as it doesn't save to existing_document
                             parent[nested_field_list[-1]] = pull_results
+                elif k == '$push':
+                    for field, value in iteritems(v):
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            arr = existing_document[field]
+                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            continue
+
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            # current document in view
+                            doc = existing_document
+                            # previous document in view
+                            parent = existing_document
+                            # current spec in view
+                            subspec = spec
+                            # walk down the dictionary
+                            for subfield in nested_field_list:
+                                if subfield == '$':
+                                    # positional element should have the equivalent elemMatch in the query
+                                    subspec = subspec['$elemMatch']
+                                    for item in doc:
+                                        # iterate through
+                                        if filter_applies(subspec, item):
+                                            # found the matching item
+                                            # save the parent
+                                            parent = doc
+                                            # save the item
+                                            doc = item
+                                            break
+                                    continue
+
+                                parent = doc
+                                doc = doc[subfield]
+                                if not subfield in subspec:
+                                    break
+                                subspec = subspec[subfield]
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in parent:
+                                # if the list exists, then use that list
+                                push_results = parent[nested_field_list[-1]]
+
+                            if isinstance(value, dict):
+                                for push_key, push_value in iteritems(value):
+                                    if push_key == '$each':
+                                        # append list to the end of the list
+                                        push_results = push_results + list(push_value)
+                                    else:
+                                        # append the specific value to the list
+                                        push_results.append(push_value)
+                            else:
+                                push_results.append(value)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+
+                            parent[nested_field_list[-1]] = push_results
                 else:
                     if first:
                         # replace entire document
