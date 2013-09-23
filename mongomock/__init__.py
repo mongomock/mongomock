@@ -175,18 +175,46 @@ class Collection(object):
                             arr = existing_document[field]
                             existing_document[field] = [obj for obj in arr if not obj == value]
                             continue
-                        nested_document = existing_document
 
-                        for index, field in enumerate(nested_field_list):
-                            if field == '$':
-                                # TODO grab the first one for now
-                                nested_document = nested_document[0]
-                                continue
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            # current document in view
+                            doc = existing_document
+                            # previous document in view
+                            parent = existing_document
+                            # current spec in view
+                            subspec = spec
+                            # walk down the dictionary
+                            for subfield in nested_field_list:
+                                if subfield == '$':
+                                    # positional element should have the equivalent elemMatch in the query
+                                    subspec = subspec['$elemMatch']
+                                    for item in doc:
+                                        # iterate through
+                                        if filter_applies(subspec, item):
+                                            # found the matching item
+                                            # save the parent
+                                            parent = doc
+                                            # save the item
+                                            doc = item
+                                            break
+                                    continue
 
-                            if index == len(nested_field_list) - 1:
-                                nested_document[field] = [obj for obj in nested_document[field] if not filter_applies(value, obj)]
-                                continue
-                            nested_document = nested_document[field]
+                                subspec = subspec[subfield]
+                                parent = doc
+                                doc = doc[subfield]
+
+                            # value should be a dictionary since we're pulling
+                            pull_results = []
+                            # and the last subdoc should be an array
+                            for obj in doc:
+                                for search_key, search_value in iteritems(value):
+                                    if obj[search_key] != search_value:
+                                        pull_results.append(obj)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+                            parent[nested_field_list[-1]] = pull_results
                 else:
                     if first:
                         # replace entire document
