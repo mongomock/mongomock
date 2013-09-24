@@ -154,6 +154,7 @@ class Collection(object):
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
             first = True
             found = True
+            subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
@@ -162,6 +163,15 @@ class Collection(object):
                         if value and existing_document.has_key(field):
                             del existing_document[field]
                 elif k == '$inc':
+                    positional = False
+                    for key in v.iterkeys():
+                        if '$' in key:
+                            positional = True
+                            break
+
+                    if positional:
+                        subdocument = self._update_document_fields_positional(existing_document, v, spec, _inc_updater, subdocument)
+                        continue
                     self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
@@ -179,42 +189,43 @@ class Collection(object):
                         # nested fields includes a positional element
                         # need to find that element
                         if '$' in nested_field_list:
-                            # current document in view
-                            doc = existing_document
-                            # previous document in view
-                            parent = existing_document
-                            # current spec in view
-                            subspec = spec
-                            # walk down the dictionary
-                            for subfield in nested_field_list:
-                                if subfield == '$':
-                                    # positional element should have the equivalent elemMatch in the query
-                                    subspec = subspec['$elemMatch']
-                                    for item in doc:
-                                        # iterate through
-                                        if filter_applies(subspec, item):
-                                            # found the matching item
-                                            # save the parent
-                                            parent = doc
-                                            # save the item
-                                            doc = item
-                                            break
-                                    continue
+                            if not subdocument:
+                                # current document in view
+                                doc = existing_document
+                                # previous document in view
+                                subdocument = existing_document
+                                # current spec in view
+                                subspec = spec
+                                # walk down the dictionary
+                                for subfield in nested_field_list:
+                                    if subfield == '$':
+                                        # positional element should have the equivalent elemMatch in the query
+                                        subspec = subspec['$elemMatch']
+                                        for item in doc:
+                                            # iterate through
+                                            if filter_applies(subspec, item):
+                                                # found the matching item
+                                                # save the parent
+                                                subdocument = doc
+                                                # save the item
+                                                doc = item
+                                                break
+                                        continue
 
-                                subspec = subspec[subfield]
-                                parent = doc
-                                doc = doc[subfield]
+                                    subspec = subspec[subfield]
+                                    subdocument = doc
+                                    doc = doc[subfield]
 
                             # value should be a dictionary since we're pulling
                             pull_results = []
                             # and the last subdoc should be an array
-                            for obj in doc:
-                                for push_key, push_value in iteritems(value):
-                                    if obj[push_key] != push_value:
+                            for obj in subdocument[nested_field_list[-1]]:
+                                for pull_key, pull_value in iteritems(value):
+                                    if obj[pull_key] != pull_value:
                                         pull_results.append(obj)
 
                             # cannot write to doc directly as it doesn't save to existing_document
-                            parent[nested_field_list[-1]] = pull_results
+                            subdocument[nested_field_list[-1]] = pull_results
                 elif k == '$push':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -226,39 +237,40 @@ class Collection(object):
                         # nested fields includes a positional element
                         # need to find that element
                         if '$' in nested_field_list:
-                            # current document in view
-                            doc = existing_document
-                            # previous document in view
-                            parent = existing_document
-                            # current spec in view
-                            subspec = spec
-                            # walk down the dictionary
-                            for subfield in nested_field_list:
-                                if subfield == '$':
-                                    # positional element should have the equivalent elemMatch in the query
-                                    subspec = subspec['$elemMatch']
-                                    for item in doc:
-                                        # iterate through
-                                        if filter_applies(subspec, item):
-                                            # found the matching item
-                                            # save the parent
-                                            parent = doc
-                                            # save the item
-                                            doc = item
-                                            break
-                                    continue
+                            if not subdocument:
+                                # current document in view
+                                doc = existing_document
+                                # previous document in view
+                                subdocument = existing_document
+                                # current spec in view
+                                subspec = spec
+                                # walk down the dictionary
+                                for subfield in nested_field_list:
+                                    if subfield == '$':
+                                        # positional element should have the equivalent elemMatch in the query
+                                        subspec = subspec['$elemMatch']
+                                        for item in doc:
+                                            # iterate through
+                                            if filter_applies(subspec, item):
+                                                # found the matching item
+                                                # save the parent
+                                                subdocument = doc
+                                                # save the item
+                                                doc = item
+                                                break
+                                        continue
 
-                                parent = doc
-                                doc = doc[subfield]
-                                if not subfield in subspec:
-                                    break
-                                subspec = subspec[subfield]
+                                    subdocument = doc
+                                    doc = doc[subfield]
+                                    if not subfield in subspec:
+                                        break
+                                    subspec = subspec[subfield]
 
                             # we're pushing a list
                             push_results = []
-                            if nested_field_list[-1] in parent:
+                            if nested_field_list[-1] in subdocument:
                                 # if the list exists, then use that list
-                                push_results = parent[nested_field_list[-1]]
+                                push_results = subdocument[nested_field_list[-1]]
 
                             if isinstance(value, dict):
                                 for push_key, push_value in iteritems(value):
@@ -273,7 +285,7 @@ class Collection(object):
 
                             # cannot write to doc directly as it doesn't save to existing_document
 
-                            parent[nested_field_list[-1]] = push_results
+                            subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
                         # replace entire document
@@ -361,11 +373,37 @@ class Collection(object):
             fields['_id'] = id_value #put _id back in fields
             return doc_copy
 
-
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
         for k, v in iteritems(fields):
             self._update_document_single_field(doc, k, v, updater)
+
+    def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
+        """Implements the $set behavior on an existing document"""
+        for k, v in iteritems(fields):
+            if '$' in k:
+                field_name_parts = k.split('.')
+                if not subdocument:
+                    current_doc = doc
+                    subspec = spec
+                    for part in field_name_parts[:-1]:
+                        if part == '$':
+                            subspec = subspec['$elemMatch']
+                            for item in current_doc:
+                                if filter_applies(subspec, item):
+                                    current_doc = item
+                                    break
+                            continue
+
+                        subspec = subspec[part]
+                        current_doc = current_doc[part]
+                    subdocument = current_doc
+                updater(subdocument, field_name_parts[-1], v)
+                continue
+            # otherwise, we handle it the standard way
+            self._update_document_single_field(doc, k, v, updater)
+
+        return subdocument
 
     def _update_document_single_field(self, doc, field_name, field_value, updater):
         field_name_parts = field_name.split(".")
