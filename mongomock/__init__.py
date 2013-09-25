@@ -201,22 +201,37 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
                 spec = filter
-        dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
+        if as_class is None:
+            as_class = dict
+        dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
         return Cursor(dataset, limit=limit)
 
-    def _copy_only_fields(self, doc, fields):
+    def _copy_field(self, obj, container):
+        if isinstance(obj, list):
+            new = []
+            for item in obj:
+                new.append(self._copy_field(item, container))
+        if isinstance(obj, dict):
+            new = container()
+            for key, value in obj.items():
+                new[key] = self._copy_field(value, container)
+            return new
+        else:
+            return copy.copy(obj)
+
+    def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
 
         if fields is None:
-            return copy.deepcopy(doc)
+            return self._copy_field(doc, container)
         else:
             if not fields:
                 fields = {"_id": 1}
@@ -233,18 +248,18 @@ class Collection(object):
             #if we have novalues passed in, make a doc_copy based on the id_value
             if len(list(fields.values())) == 0:
                 if id_value == 1:
-                    doc_copy = {}
+                    doc_copy = container()
                 else:
-                    doc_copy = copy.deepcopy(doc)
+                    doc_copy = self._copy_field(doc, container)
             #if 1 was passed in as the field values, include those fields
             elif  list(fields.values())[0] == 1:
-                doc_copy = {}
+                doc_copy = container()
                 for key in fields:
                     if key in doc:
                         doc_copy[key] = doc[key]
             #otherwise, exclude the fields passed in
             else:
-                doc_copy = copy.deepcopy(doc)
+                doc_copy = self._copy_field(doc, container)
                 for key in fields:
                     if key in doc_copy:
                         del doc_copy[key]
