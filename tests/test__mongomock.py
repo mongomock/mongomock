@@ -66,10 +66,12 @@ class CollectionAPITest(TestCase):
         super(CollectionAPITest, self).setUp()
         self.conn = mongomock.Connection()
         self.db = self.conn['somedb']
+
     def test__get_collection_names(self):
         self.db.a
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
+
     def test__drop_collection(self):
         self.db.a
         self.db.b
@@ -98,6 +100,14 @@ class CollectionAPITest(TestCase):
         self.assertEquals(type(collection.find()).__name__, "Cursor")
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
+
+    def test__find_and_modify_cannot_remove_and_new(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_and_modify({}, remove=True, new=True)
+
+    def test__find_and_modify_cannot_remove_and_update(self):
+        with self.assertRaises(ValueError): # this is also what pymongo raises
+            self.db.collection.find_and_modify({"a": 2}, {"a": 3}, remove=True)
 
     def test__string_matching(self):
         """
@@ -322,6 +332,11 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':2}]})
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':7}]})
         self.cmp.compare_ignore_order.find({'$and':[{'x':2}, {'x':7}]})
+
+    def test__find_and_modify_remove(self):
+        self.cmp.do.insert([{"a": x} for x in range(10)])
+        self.cmp.do.find_and_modify({"a": 2}, remove=True)
+        self.cmp.compare_ignore_order.find()
 
     def test__find_sort_list(self):
         self.cmp.do.remove()

@@ -24,6 +24,12 @@ except:
     class DuplicateKeyError(Exception):
         pass
 
+try:
+    from pymongo.errors import OperationFailure
+except:
+    class OperationFailure(Exception):
+        pass
+
 from six import (
                  iteritems,
                  itervalues,
@@ -289,13 +295,25 @@ class Collection(object):
             return None
 
     def find_and_modify(self, query = {}, update = None, upsert = False, **kwargs):
+        remove = kwargs.get("remove", False)
+        if kwargs.get("new", False) and remove:
+            raise OperationFailure("remove and returnNew can't co-exist") # message from mongodb
+
+        if remove and update is not None:
+            raise ValueError("Can't do both update and remove")
+
         old = self.find_one(query)
         if not old:
             if upsert:
                 old = {'_id':self.insert(query)}
             else:
                 return None
-        self.update({'_id':old['_id']}, update)
+
+        if remove:
+            self.remove({"_id": old["_id"]})
+        else:
+            self.update({'_id':old['_id']}, update)
+
         if kwargs.get('new', False):
             return self.find_one({'_id':old['_id']})
         return old
