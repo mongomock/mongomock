@@ -1,7 +1,7 @@
 
 .. container::
 
-   .. image:: https://vmalloc.github.io/mongomock/mongomock-small.png
+   .. image:: http://vmalloc.github.io/mongomock/mongomock-small.png
 
 
 .. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
