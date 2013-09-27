@@ -343,12 +343,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find(limit=0, sort = [("a", 1), ("b", -1)]) #pymongo limit defaults to 0, returning everything
 
     def test__as_class(self):
-        from collections import OrderedDict
+        class MyDict(dict): pass
 
         self.cmp.do.remove()
         self.cmp.do.insert({"a": 1, "b": {"ba": 3, "bb": 4}})
-        self.cmp.compare.find({}, as_class=OrderedDict)
-        self.cmp.compare.find({"a": 1}, as_class=OrderedDict)
+        self.cmp.compare.find({}, as_class=MyDict)
+        self.cmp.compare.find({"a": 1}, as_class=MyDict)
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
