@@ -427,6 +427,13 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name':'bob'}, {'$inc': {'data.age2': 1}})
         self.cmp.compare.find()
 
+    def test__inc_subdocument_positional(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': [{'age': 0}, {'age': 1}]})
+        self.cmp.do.update({'name': 'bob', 'data': {'$elemMatch': {'age': 0}}},
+            {'$inc': {'data.$.age': 1}})
+        self.cmp.compare.find()
+
     def test__addToSet(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
@@ -434,13 +441,61 @@ class _CollectionTest(_CollectionComparisonTest):
             self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'green'}})
             self.cmp.compare.find({'name': 'bob'})
         for i in range(3):
-            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
+            self.cmp.do.update({'name': 'bob'}, {'$addToSet': {'hat':'tall'}})
             self.cmp.compare.find({'name': 'bob'})
 
     def test__pull(self):
         self.cmp.do.remove()
-        self.cmp.do.insert({'name': 'bob', 'hat':['green', 'tall']})
-        self.cmp.do.update({'name':'bob'}, {'$pull': {'hat':'green'}})
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat': 'green'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pull_nested_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$pull': {'hat.$.sizes': {'size': 'L'}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pull_nested_list(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL']}, {'name': 'cap', 'sizes': ['S', 'L']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$pull': {'hat.$.sizes': 'XL'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': 'wide'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL']}]})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': {'name': 'cap', 'sizes': ['S', 'L']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': {'$each': ['wide', 'blue']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'size': 'M', 'quantity': 6}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_dict_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': [{'size': 'M', 'quantity': 6}, {'size': 'S', 'quantity': 1}]}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_list_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL'], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': ['S', 'L'], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': ['M', 'S']}}})
         self.cmp.compare.find({'name': 'bob'})
 
     def test__drop(self):
