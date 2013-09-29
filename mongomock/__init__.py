@@ -212,17 +212,23 @@ class Collection(object):
                                                 break
                                         continue
 
-                                    subspec = subspec[subfield]
                                     subdocument = doc
                                     doc = doc[subfield]
+                                    if not subfield in subspec:
+                                        break
+                                    subspec = subspec[subfield]
 
                             # value should be a dictionary since we're pulling
                             pull_results = []
                             # and the last subdoc should be an array
                             for obj in subdocument[nested_field_list[-1]]:
-                                for pull_key, pull_value in iteritems(value):
-                                    if obj[pull_key] != pull_value:
-                                        pull_results.append(obj)
+                                if isinstance(obj, dict):
+                                    for pull_key, pull_value in iteritems(value):
+                                        if obj[pull_key] != pull_value:
+                                            pull_results.append(obj)
+                                    continue
+                                if obj != value:
+                                    pull_results.append(obj)
 
                             # cannot write to doc directly as it doesn't save to existing_document
                             subdocument[nested_field_list[-1]] = pull_results
@@ -230,8 +236,14 @@ class Collection(object):
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
                         if len(nested_field_list) == 1:
-                            arr = existing_document[field]
-                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            # document should be a list
+                            # append to it
+                            if isinstance(value, dict):
+                                if '$each' in value:
+                                    # append the list to the field
+                                    existing_document[field] += list(value['$each'])
+                                    continue
+                            existing_document[field].append(value)
                             continue
 
                         # nested fields includes a positional element
@@ -273,18 +285,16 @@ class Collection(object):
                                 push_results = subdocument[nested_field_list[-1]]
 
                             if isinstance(value, dict):
-                                for push_key, push_value in iteritems(value):
-                                    if push_key == '$each':
-                                        # append list to the end of the list
-                                        push_results = push_results + list(push_value)
-                                    else:
-                                        # append the specific value to the list
-                                        push_results.append(push_value)
+                                # check to see if we have the format
+                                # { '$each': [] }
+                                if '$each' in value:
+                                    push_results += list(value['$each'])
+                                else:
+                                    push_results.append(value)
                             else:
                                 push_results.append(value)
 
                             # cannot write to doc directly as it doesn't save to existing_document
-
                             subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
