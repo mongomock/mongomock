@@ -346,7 +346,7 @@ class _CollectionTest(_CollectionComparisonTest):
         class MyDict(dict): pass
 
         self.cmp.do.remove()
-        self.cmp.do.insert({"a": 1, "b": {"ba": 3, "bb": 4}})
+        self.cmp.do.insert({"a": 1, "b": {"ba": 3, "bb": 4, "bc": [ {"bca": 5 } ] }})
         self.cmp.compare.find({}, as_class=MyDict)
         self.cmp.compare.find({"a": 1}, as_class=MyDict)
 
