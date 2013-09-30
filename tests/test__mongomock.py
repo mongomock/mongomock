@@ -413,14 +413,14 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.do.remove({'name': 'notsam'})
         self.cmp.compare.find()
-        self.cmp.do.remove({'name': 'sam'})
+        self.cmp.compare.remove({'name': 'sam'})
         self.cmp.compare.find
 
     def test__update(self):
         doc = {"a" : 1}
         self.cmp.do.insert(doc)
         new_document = {"new_attr" : 2}
-        self.cmp.do.update({"a" : 1}, new_document)
+        self.cmp.compare.update({"a" : 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
     def test__set(self):
