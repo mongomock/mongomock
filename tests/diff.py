@@ -8,14 +8,19 @@ _SUPPORTED_TYPES = set([
     int, float, bool, str
 ])
 
+dict_type = dict
+
 if python_version() < "3.0":
     _SUPPORTED_TYPES.update([long, basestring, unicode])
+else:
+    from collections import Mapping
+    dict_type = Mapping
 
 def diff(a, b, path=None):
     path = _make_path(path)
     if type(a) in (list, tuple):
         return _diff_sequences(a, b, path)
-    if isinstance(a, dict):
+    if isinstance(a, dict_type):
         return _diff_dicts(a, b, path)
     if type(a).__name__ == "ObjectId":
         a = str(a)
@@ -30,6 +35,8 @@ def diff(a, b, path=None):
     return []
 
 def _diff_dicts(a, b, path):
+    if type(a) is not type(b):
+        return [(path[:], type(a), type(b))]
     returned = []
     for key in set(a) | set(b):
         a_value = a.get(key, NO_VALUE)
