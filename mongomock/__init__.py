@@ -1,8 +1,9 @@
 import collections
 import copy
 import itertools
-from pprint import pformat
 import time
+import warnings
+import sys
 from .filtering import filter_applies
 
 try:
