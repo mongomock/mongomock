@@ -143,6 +143,10 @@ class Collection(object):
             raise DuplicateKeyError("Duplicate Key Error", 11000)
         self._documents[object_id] = copy.deepcopy(data)
         return object_id
+
+    def _has_key(self, doc, key):
+        return key in doc
+
     def update(self, spec, document, upsert = False, manipulate = False,
                safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates document(s) in the collection."""
@@ -160,7 +164,7 @@ class Collection(object):
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
                     for field, value in iteritems(v):
-                        if value and existing_document.has_key(field):
+                        if self._has_key(existing_document, field):
                             del existing_document[field]
                 elif k == '$inc':
                     self._update_document_fields(existing_document, v, _inc_updater)

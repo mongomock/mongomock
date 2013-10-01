@@ -393,6 +393,33 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__unset(self):
+        """Tests calling update with $set members."""
+        self.cmp.do.insert({'name': 'bob', 'a': 'aaa'})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 0}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.insert({'name': 'bob', 'a': 'aaa'})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 1}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.insert({'name': 'bob', 'a': 'aaa'})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': ""}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.insert({'name': 'bob', 'a': 'aaa'})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': True}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.insert({'name': 'bob', 'a': 'aaa'})
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
+        self.cmp.compare.find({'name' : 'bob'})
+
     def test__set_upsert(self):
         self.cmp.do.remove()
         self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
