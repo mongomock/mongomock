@@ -90,7 +90,6 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
                 '$regex':lambda dv, sv: re.compile(sv).match(dv),
-                '$where':lambda db, sv: True,  # ignore this complex filter
                 '$elemMatch': _elem_match_op,
                 }
 
