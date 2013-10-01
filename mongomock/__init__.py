@@ -32,7 +32,7 @@ except:
 from six import (
                  iteritems,
                  itervalues,
-                 )
+                 iterkeys)
 
 from mongomock import helpers
 from mongomock.__version__ import __version__
@@ -170,7 +170,7 @@ class Collection(object):
                             del existing_document[field]
                 elif k == '$inc':
                     positional = False
-                    for key in v.iterkeys():
+                    for key in iterkeys(v):
                         if '$' in key:
                             positional = True
                             break
