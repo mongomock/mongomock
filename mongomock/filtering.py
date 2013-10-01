@@ -44,16 +44,31 @@ def resolve_key_value(key, doc):
     Resolve keys to their proper value in a document.
     Returns the appropriate nested value if the key includes dot notation.
     """
-    if not doc or not isinstance(doc, dict):
+    if not doc:
         return NOTHING
-    else:
+
+    if isinstance(doc, list):
         key_parts = key.split('.')
+        try:
+            search_key = int(key_parts[0])
+        except ValueError:
+            return NOTHING
+        sub_doc = doc[search_key]
         if len(key_parts) == 1:
-            return doc.get(key, NOTHING)
-        else:
-            sub_key = '.'.join(key_parts[1:])
-            sub_doc = doc.get(key_parts[0], {})
-            return resolve_key_value(sub_key, sub_doc)
+            return sub_doc
+        sub_key = '.'.join(key_parts[1:])
+        return resolve_key_value(sub_key, sub_doc)
+
+    if not isinstance(doc, dict):
+        return NOTHING
+
+    key_parts = key.split('.')
+    if len(key_parts) == 1:
+        return doc.get(key, NOTHING)
+
+    sub_key = '.'.join(key_parts[1:])
+    sub_doc = doc.get(key_parts[0], {})
+    return resolve_key_value(sub_key, sub_doc)
 
 def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
