@@ -13,6 +13,7 @@ import mongomock
 from mongomock import Database
 
 try:
+    import pymongo
     from pymongo import Connection as PymongoConnection
     from pymongo import MongoClient as PymongoClient
     from bson.objectid import ObjectId
