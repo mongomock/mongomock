@@ -88,6 +88,21 @@ class CollectionAPITest(TestCase):
         self.assertIs(col1, self.db['some_collection_here'])
         self.assertIsInstance(col1, mongomock.Collection)
 
+    def test__save_class_deriving_from_dict(self):
+        # See https://github.com/vmalloc/mongomock/issues/52
+        class Document(dict):
+            def __init__(self, collection):
+                self.collection = collection
+                super(Document, self).__init__()
+                self.save()
+
+            def save(self):
+                self.collection.save(self)
+
+        doc = Document(self.db.collection)
+        self.assertIn("_id", doc)
+        self.assertNotIn("collection", doc)
+
     def test__getting_collection_via_getitem(self):
         col1 = self.db['some_collection_here']
         col2 = self.db['some_collection_here']

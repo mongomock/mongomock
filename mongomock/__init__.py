@@ -141,14 +141,18 @@ class Collection(object):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
         return self._insert(data)
+
     def _insert(self, data):
-        if not '_id' in data:
+        if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
-        self._documents[object_id] = copy.deepcopy(data)
+        self._documents[object_id] = self._internalize_dict(data)
         return object_id
+
+    def _internalize_dict(self, d):
+        return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
 
     def _has_key(self, doc, key):
         return key in doc
