@@ -357,6 +357,14 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find(limit=2, sort = [("a", 1), ("b", -1)])
         self.cmp.compare.find(limit=0, sort = [("a", 1), ("b", -1)]) #pymongo limit defaults to 0, returning everything
 
+    def test__as_class(self):
+        class MyDict(dict): pass
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({"a": 1, "b": {"ba": 3, "bb": 4, "bc": [ {"bca": 5 } ] }})
+        self.cmp.compare.find({}, as_class=MyDict)
+        self.cmp.compare.find({"a": 1}, as_class=MyDict)
+
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
         self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['type'])
@@ -399,6 +407,33 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name' : 'bob'})
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
         self.cmp.compare.find({'name': 'bob'})
+
+    def test__unset(self):
+        """Tests calling update with $set members."""
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 0}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 1}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': ""}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': True}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
+        self.cmp.compare.find({'name' : 'bob'})
 
     def test__set_upsert(self):
         self.cmp.do.remove()
