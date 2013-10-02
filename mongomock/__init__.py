@@ -197,33 +197,7 @@ class Collection(object):
                         # need to find that element
                         if '$' in nested_field_list:
                             if not subdocument:
-                                # current document in view
-                                doc = existing_document
-                                # previous document in view
-                                subdocument = existing_document
-                                # current spec in view
-                                subspec = spec
-                                # walk down the dictionary
-                                for subfield in nested_field_list:
-                                    if subfield == '$':
-                                        # positional element should have the equivalent elemMatch in the query
-                                        subspec = subspec['$elemMatch']
-                                        for item in doc:
-                                            # iterate through
-                                            if filter_applies(subspec, item):
-                                                # found the matching item
-                                                # save the parent
-                                                subdocument = doc
-                                                # save the item
-                                                doc = item
-                                                break
-                                        continue
-
-                                    subdocument = doc
-                                    doc = doc[subfield]
-                                    if not subfield in subspec:
-                                        break
-                                    subspec = subspec[subfield]
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
 
                             # value should be a dictionary since we're pulling
                             pull_results = []
@@ -257,33 +231,7 @@ class Collection(object):
                         # need to find that element
                         if '$' in nested_field_list:
                             if not subdocument:
-                                # current document in view
-                                doc = existing_document
-                                # previous document in view
-                                subdocument = existing_document
-                                # current spec in view
-                                subspec = spec
-                                # walk down the dictionary
-                                for subfield in nested_field_list:
-                                    if subfield == '$':
-                                        # positional element should have the equivalent elemMatch in the query
-                                        subspec = subspec['$elemMatch']
-                                        for item in doc:
-                                            # iterate through
-                                            if filter_applies(subspec, item):
-                                                # found the matching item
-                                                # save the parent
-                                                subdocument = doc
-                                                # save the item
-                                                doc = item
-                                                break
-                                        continue
-
-                                    subdocument = doc
-                                    doc = doc[subfield]
-                                    if not subfield in subspec:
-                                        break
-                                    subspec = subspec[subfield]
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
@@ -326,6 +274,40 @@ class Collection(object):
                 first = False
             if not multi:
                 return
+
+    def _get_subdocument(self, existing_document, spec, nested_field_list):
+        """
+        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter through the items
+        """
+        # current document in view
+        doc = existing_document
+        # previous document in view
+        subdocument = existing_document
+        # current spec in view
+        subspec = spec
+        # walk down the dictionary
+        for subfield in nested_field_list:
+            if subfield == '$':
+                # positional element should have the equivalent elemMatch in the query
+                subspec = subspec['$elemMatch']
+                for item in doc:
+                    # iterate through
+                    if filter_applies(subspec, item):
+                        # found the matching item
+                        # save the parent
+                        subdocument = doc
+                        # save the item
+                        doc = item
+                        break
+                continue
+
+            subdocument = doc
+            doc = doc[subfield]
+            if not subfield in subspec:
+                break
+            subspec = subspec[subfield]
+
+        return subdocument
 
     def _discard_operators(self, doc):
         # TODO: this looks a little too naive...
