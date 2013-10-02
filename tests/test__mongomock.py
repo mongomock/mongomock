@@ -156,7 +156,7 @@ class _CollectionComparisonTest(TestCase):
             "real": self.mongo_conn[self.db_name][self.collection_name],
          })
 
-    def _connect_to_local_mongodb(self, num_retries=3):
+    def _connect_to_local_mongodb(self, num_retries=60):
         "Performs retries on connection refused errors (for travis-ci builds)"
         connection_class = self._get_real_connection_class()
         for retry in range(num_retries):
