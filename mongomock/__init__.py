@@ -277,7 +277,10 @@ class Collection(object):
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
         """
-        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter through the items
+        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter
+        through the items. It will continue to grab nested documents until it can go no further. It will then return the
+        subdocument that was last saved. '$' is the positional operator, so we use the $elemMatch in the spec to find
+        the right subdocument in the array.
         """
         # current document in view
         doc = existing_document
