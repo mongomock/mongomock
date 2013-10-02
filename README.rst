@@ -104,11 +104,13 @@ Many thanks go to the following people for helping out:
 * Craig Hobbs
 * David Fischer
 * Edward D'Souza
+* Eugene Chernyshov
 * Israel Teixeira
 * Jacob Perkins
 * Jason Sommer
 * Jeff McGee
 * Joël Franusic
+* Mike Ho
 * Nigel Choi
 * Omer Gertel
 * Scott Sexton
