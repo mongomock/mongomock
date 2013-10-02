@@ -284,6 +284,14 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({"field": {"$elemMatch": {"a": 1}}})
         self.cmp.compare.find({"field": {"$elemMatch": {"b": {"$gt": 3}}}})
 
+    def test__find_in_array(self):
+        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
+
+        self.cmp.compare.find({"field.0.a": 1})
+        self.cmp.compare.find({"field.0.b": 2})
+        self.cmp.compare.find({"field.1.c": 3})
+        self.cmp.compare.find({"field.1.d": 4})
+
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}
