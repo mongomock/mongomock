@@ -16,7 +16,6 @@
 
 
 
-
 What is this?
 -------------
 Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
