@@ -641,6 +641,13 @@ class Cursor(object):
     def limit(self, count):
         self._limit = count
         return self
+    def distinct(self, key):
+        if not isinstance(key, (basestring,str)):
+            raise TypeError('cursor.distinct key must be basestring (str in python3)')
+        unique = set()
+        unique_add = unique.add
+        return [x[key] for x in iter(self._dataset) if key in x and x[key] not in unique and not unique_add(x[key])]
+
     def batch_size(self, count):
         return self
     def close(self):
@@ -658,3 +665,28 @@ def _set_updater(doc, field_name, value):
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

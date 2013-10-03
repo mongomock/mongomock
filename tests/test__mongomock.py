@@ -140,6 +140,15 @@ class CollectionAPITest(TestCase):
         self.assertTrue(self.db['def'].find({'name':'test1'}).count() > 0)
         self.assertEquals(self.db['def'].find({'name':'test1'})[0]['name'], 'test1')
 
+    def test__cursor_distinct(self):
+        larry_bob = {'name':'larry'}
+        larry = {'name':'larry'}
+        gary = {'name':'gary'}
+        self.db['coll_name'].insert([larry_bob, larry, gary])
+        ret_val = self.db['coll_name'].find().distinct('name')
+        self.assertTrue(isinstance(ret_val,list))
+        self.assertTrue(set(ret_val) == set(['larry','gary']))
+
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
@@ -203,7 +212,6 @@ class _CollectionTest(_CollectionComparisonTest):
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
-
 
     def test__save(self):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
