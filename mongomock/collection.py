@@ -6,6 +6,7 @@ import time
 import warnings
 from .filtering import filter_applies
 from . import ObjectId, OperationFailure
+from .helpers import basestring
 
 try:
     # Optional requirements for providing Map-Reduce functionality
@@ -562,8 +563,17 @@ class Cursor(object):
         return self
     def batch_size(self, count):
         return self
+
     def close(self):
         pass
+
+    def distinct(self, key):
+        if not isinstance(key, basestring):
+            raise TypeError('cursor.distinct key must be a string')
+        unique = set()
+        return [x[key] for x in iter(self._dataset) if key in x and x[key] not in unique and not unique.add(x[key])]
+
+
     def __getitem__(self, index):
         arr = [x for x in self._dataset]
         count = len(arr)

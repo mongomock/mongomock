@@ -10,6 +10,7 @@ except ImportError:
 #for Python 3 compatibility
 try:
   unicode = unicode
+  from __builtin__ import basestring
 except NameError:
   unicode = str
   basestring = (str, bytes)
