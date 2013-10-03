@@ -33,7 +33,7 @@ except:
 from six import (
                  iteritems,
                  itervalues,
-                 )
+                 iterkeys)
 
 from mongomock import helpers
 from mongomock.__version__ import __version__
@@ -169,6 +169,7 @@ class Collection(object):
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
             first = True
             found = True
+            subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
@@ -177,6 +178,15 @@ class Collection(object):
                         if self._has_key(existing_document, field):
                             del existing_document[field]
                 elif k == '$inc':
+                    positional = False
+                    for key in iterkeys(v):
+                        if '$' in key:
+                            positional = True
+                            break
+
+                    if positional:
+                        subdocument = self._update_document_fields_positional(existing_document, v, spec, _inc_updater, subdocument)
+                        continue
                     self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
@@ -185,8 +195,70 @@ class Collection(object):
                             container.append(value)
                 elif k == '$pull':
                     for field, value in iteritems(v):
-                        arr = existing_document[field]
-                        existing_document[field] = [obj for obj in arr if not obj == value]
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            arr = existing_document[field]
+                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            continue
+
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            if not subdocument:
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+
+                            # value should be a dictionary since we're pulling
+                            pull_results = []
+                            # and the last subdoc should be an array
+                            for obj in subdocument[nested_field_list[-1]]:
+                                if isinstance(obj, dict):
+                                    for pull_key, pull_value in iteritems(value):
+                                        if obj[pull_key] != pull_value:
+                                            pull_results.append(obj)
+                                    continue
+                                if obj != value:
+                                    pull_results.append(obj)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = pull_results
+                elif k == '$push':
+                    for field, value in iteritems(v):
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            # document should be a list
+                            # append to it
+                            if isinstance(value, dict):
+                                if '$each' in value:
+                                    # append the list to the field
+                                    existing_document[field] += list(value['$each'])
+                                    continue
+                            existing_document[field].append(value)
+                            continue
+
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            if not subdocument:
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            if isinstance(value, dict):
+                                # check to see if we have the format
+                                # { '$each': [] }
+                                if '$each' in value:
+                                    push_results += list(value['$each'])
+                                else:
+                                    push_results.append(value)
+                            else:
+                                push_results.append(value)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
                         # replace entire document
@@ -210,6 +282,43 @@ class Collection(object):
                 first = False
             if not multi:
                 return
+
+    def _get_subdocument(self, existing_document, spec, nested_field_list):
+        """
+        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter
+        through the items. It will continue to grab nested documents until it can go no further. It will then return the
+        subdocument that was last saved. '$' is the positional operator, so we use the $elemMatch in the spec to find
+        the right subdocument in the array.
+        """
+        # current document in view
+        doc = existing_document
+        # previous document in view
+        subdocument = existing_document
+        # current spec in view
+        subspec = spec
+        # walk down the dictionary
+        for subfield in nested_field_list:
+            if subfield == '$':
+                # positional element should have the equivalent elemMatch in the query
+                subspec = subspec['$elemMatch']
+                for item in doc:
+                    # iterate through
+                    if filter_applies(subspec, item):
+                        # found the matching item
+                        # save the parent
+                        subdocument = doc
+                        # save the item
+                        doc = item
+                        break
+                continue
+
+            subdocument = doc
+            doc = doc[subfield]
+            if not subfield in subspec:
+                break
+            subspec = subspec[subfield]
+
+        return subdocument
 
     def _discard_operators(self, doc):
         # TODO: this looks a little too naive...
@@ -290,17 +399,49 @@ class Collection(object):
             fields['_id'] = id_value #put _id back in fields
             return doc_copy
 
-
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
         for k, v in iteritems(fields):
             self._update_document_single_field(doc, k, v, updater)
 
+    def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
+        """Implements the $set behavior on an existing document"""
+        for k, v in iteritems(fields):
+            if '$' in k:
+                field_name_parts = k.split('.')
+                if not subdocument:
+                    current_doc = doc
+                    subspec = spec
+                    for part in field_name_parts[:-1]:
+                        if part == '$':
+                            subspec = subspec['$elemMatch']
+                            for item in current_doc:
+                                if filter_applies(subspec, item):
+                                    current_doc = item
+                                    break
+                            continue
+
+                        subspec = subspec[part]
+                        current_doc = current_doc[part]
+                    subdocument = current_doc
+                updater(subdocument, field_name_parts[-1], v)
+                continue
+            # otherwise, we handle it the standard way
+            self._update_document_single_field(doc, k, v, updater)
+
+        return subdocument
+
     def _update_document_single_field(self, doc, field_name, field_value, updater):
         field_name_parts = field_name.split(".")
         for part in field_name_parts[:-1]:
-            if not isinstance(doc, dict):
+            if not isinstance(doc, dict) and not isinstance(doc, list):
                 return # mongodb skips such cases
+            if isinstance(doc, list):
+                try:
+                    doc = doc[int(part)]
+                    continue
+                except ValueError:
+                    pass
             doc = doc.setdefault(part, {})
         updater(doc, field_name_parts[-1], field_value)
 
