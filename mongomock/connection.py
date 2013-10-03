@@ -1,6 +1,10 @@
+import itertools
 from .database import Database
 
 class Connection(object):
+
+    _CONNECTION_ID = itertools.count()
+
     def __init__(self, host = None, port = None, max_pool_size = 10,
                  network_timeout = None, document_class = dict,
                  tz_aware = False, _connect = True, **kwargs):
@@ -8,6 +12,8 @@ class Connection(object):
         self.host = host
         self.port = port
         self._databases = {}
+        self._id = next(self._CONNECTION_ID)
+
     def __getitem__(self, db_name):
         db = self._databases.get(db_name, None)
         if db is None:

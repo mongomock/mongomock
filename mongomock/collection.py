@@ -59,12 +59,17 @@ class Collection(object):
                safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates document(s) in the collection."""
         found = False
+        updated_existing = False
+        num_updated = 0
         for existing_document in itertools.chain(self._iter_documents(spec), [None]):
             # the sentinel document means we should do an upsert
             if existing_document is None:
                 if not upsert:
                     continue
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
+            else:
+                updated_existing = True
+            num_updated += 1
             first = True
             found = True
             subdocument = None
@@ -179,7 +184,15 @@ class Collection(object):
                         raise ValueError('Invalid modifier specified: {}'.format(k))
                 first = False
             if not multi:
-                return
+                break
+
+        return {
+            "connectionId": self._Collection__database.connection._id,
+            "err": None,
+            "ok": 1.0,
+            "n": num_updated,
+            "updateExisting": updated_existing,
+        }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
         """
@@ -391,6 +404,7 @@ class Collection(object):
             self.update({"_id": to_save["_id"]}, to_save, True,
                         manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
+
     def remove(self, spec_or_id = None, search_filter = None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
@@ -403,6 +417,13 @@ class Collection(object):
         for doc in to_delete:
             doc_id = doc['_id']
             del self._documents[doc_id]
+
+        return {
+            "connectionId": self._Collection__database.connection._id,
+            "n": len(to_delete),
+            "ok": 1.0,
+            "err": None,
+        }
 
     def count(self):
         return len(self._documents)

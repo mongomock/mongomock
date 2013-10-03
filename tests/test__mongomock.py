@@ -83,6 +83,29 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
 
+    def test__update_retval(self):
+        self.db.col.save({"a": 1})
+        retval = self.db.col.update({"a": 1}, {"b": 2})
+        self.assertIsInstance(retval, dict)
+        self.assertIsInstance(retval["connectionId"], int)
+        self.assertIsNone(retval["err"])
+        self.assertEquals(retval["n"], 1)
+        self.assertTrue(retval["updateExisting"])
+        self.assertEquals(retval["ok"], 1.0)
+
+        self.assertEquals(self.db.col.update({"bla": 1}, {"bla": 2})["n"], 0)
+
+    def test__remove_retval(self):
+        self.db.col.save({"a": 1})
+        retval = self.db.col.remove({"a": 1})
+        self.assertIsInstance(retval, dict)
+        self.assertIsInstance(retval["connectionId"], int)
+        self.assertIsNone(retval["err"])
+        self.assertEquals(retval["n"], 1)
+        self.assertEquals(retval["ok"], 1.0)
+
+        self.assertEquals(self.db.col.remove({"bla": 1})["n"], 0)
+
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here
@@ -413,14 +436,14 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.do.remove({'name': 'notsam'})
         self.cmp.compare.find()
-        self.cmp.compare.remove({'name': 'sam'})
+        self.cmp.do.remove({'name': 'sam'})
         self.cmp.compare.find
 
     def test__update(self):
         doc = {"a" : 1}
         self.cmp.do.insert(doc)
         new_document = {"new_attr" : 2}
-        self.cmp.compare.update({"a" : 1}, new_document)
+        self.cmp.do.update({"a" : 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
     def test__set(self):
