@@ -665,28 +665,3 @@ def _set_updater(doc, field_name, value):
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
