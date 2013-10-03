@@ -1,4 +1,5 @@
 import operator
+import warnings
 from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
@@ -44,16 +45,31 @@ def resolve_key_value(key, doc):
     Resolve keys to their proper value in a document.
     Returns the appropriate nested value if the key includes dot notation.
     """
-    if not doc or not isinstance(doc, dict):
+    if not doc:
         return NOTHING
-    else:
+
+    if isinstance(doc, list):
         key_parts = key.split('.')
+        try:
+            search_key = int(key_parts[0])
+        except ValueError:
+            return NOTHING
+        sub_doc = doc[search_key]
         if len(key_parts) == 1:
-            return doc.get(key, NOTHING)
-        else:
-            sub_key = '.'.join(key_parts[1:])
-            sub_doc = doc.get(key_parts[0], {})
-            return resolve_key_value(sub_key, sub_doc)
+            return sub_doc
+        sub_key = '.'.join(key_parts[1:])
+        return resolve_key_value(sub_key, sub_doc)
+
+    if not isinstance(doc, dict):
+        return NOTHING
+
+    key_parts = key.split('.')
+    if len(key_parts) == 1:
+        return doc.get(key, NOTHING)
+
+    sub_key = '.'.join(key_parts[1:])
+    sub_doc = doc.get(key_parts[0], {})
+    return resolve_key_value(sub_key, sub_doc)
 
 def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
@@ -89,7 +105,6 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
                 '$regex':lambda dv, sv: re.compile(sv).match(dv),
-                '$where':lambda db, sv: True,  # ignore this complex filter
                 '$elemMatch': _elem_match_op,
                 }
 

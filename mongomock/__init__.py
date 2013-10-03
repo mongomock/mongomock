@@ -24,10 +24,16 @@ except:
     class DuplicateKeyError(Exception):
         pass
 
+try:
+    from pymongo.errors import OperationFailure
+except:
+    class OperationFailure(Exception):
+        pass
+
 from six import (
                  iteritems,
                  itervalues,
-                 )
+                 iterkeys)
 
 from mongomock import helpers
 from mongomock.__version__ import __version__
@@ -135,14 +141,22 @@ class Collection(object):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
         return self._insert(data)
+
     def _insert(self, data):
-        if not '_id' in data:
+        if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
-        self._documents[object_id] = copy.deepcopy(data)
+        self._documents[object_id] = self._internalize_dict(data)
         return object_id
+
+    def _internalize_dict(self, d):
+        return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
+
+    def _has_key(self, doc, key):
+        return key in doc
+
     def update(self, spec, document, upsert = False, manipulate = False,
                safe = False, multi = False, _check_keys = False, **kwargs):
         """Updates document(s) in the collection."""
@@ -155,14 +169,24 @@ class Collection(object):
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
             first = True
             found = True
+            subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
                     for field, value in iteritems(v):
-                        if value and existing_document.has_key(field):
+                        if self._has_key(existing_document, field):
                             del existing_document[field]
                 elif k == '$inc':
+                    positional = False
+                    for key in iterkeys(v):
+                        if '$' in key:
+                            positional = True
+                            break
+
+                    if positional:
+                        subdocument = self._update_document_fields_positional(existing_document, v, spec, _inc_updater, subdocument)
+                        continue
                     self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
@@ -171,8 +195,70 @@ class Collection(object):
                             container.append(value)
                 elif k == '$pull':
                     for field, value in iteritems(v):
-                        arr = existing_document[field]
-                        existing_document[field] = [obj for obj in arr if not obj == value]
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            arr = existing_document[field]
+                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            continue
+
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            if not subdocument:
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+
+                            # value should be a dictionary since we're pulling
+                            pull_results = []
+                            # and the last subdoc should be an array
+                            for obj in subdocument[nested_field_list[-1]]:
+                                if isinstance(obj, dict):
+                                    for pull_key, pull_value in iteritems(value):
+                                        if obj[pull_key] != pull_value:
+                                            pull_results.append(obj)
+                                    continue
+                                if obj != value:
+                                    pull_results.append(obj)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = pull_results
+                elif k == '$push':
+                    for field, value in iteritems(v):
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            # document should be a list
+                            # append to it
+                            if isinstance(value, dict):
+                                if '$each' in value:
+                                    # append the list to the field
+                                    existing_document[field] += list(value['$each'])
+                                    continue
+                            existing_document[field].append(value)
+                            continue
+
+                        # nested fields includes a positional element
+                        # need to find that element
+                        if '$' in nested_field_list:
+                            if not subdocument:
+                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            if isinstance(value, dict):
+                                # check to see if we have the format
+                                # { '$each': [] }
+                                if '$each' in value:
+                                    push_results += list(value['$each'])
+                                else:
+                                    push_results.append(value)
+                            else:
+                                push_results.append(value)
+
+                            # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
                         # replace entire document
@@ -197,26 +283,79 @@ class Collection(object):
             if not multi:
                 return
 
+    def _get_subdocument(self, existing_document, spec, nested_field_list):
+        """
+        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter
+        through the items. It will continue to grab nested documents until it can go no further. It will then return the
+        subdocument that was last saved. '$' is the positional operator, so we use the $elemMatch in the spec to find
+        the right subdocument in the array.
+        """
+        # current document in view
+        doc = existing_document
+        # previous document in view
+        subdocument = existing_document
+        # current spec in view
+        subspec = spec
+        # walk down the dictionary
+        for subfield in nested_field_list:
+            if subfield == '$':
+                # positional element should have the equivalent elemMatch in the query
+                subspec = subspec['$elemMatch']
+                for item in doc:
+                    # iterate through
+                    if filter_applies(subspec, item):
+                        # found the matching item
+                        # save the parent
+                        subdocument = doc
+                        # save the item
+                        doc = item
+                        break
+                continue
+
+            subdocument = doc
+            doc = doc[subfield]
+            if not subfield in subspec:
+                break
+            subspec = subspec[subfield]
+
+        return subdocument
+
     def _discard_operators(self, doc):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
                 spec = filter
-        dataset = (self._copy_only_fields(document, fields) for document in self._iter_documents(spec))
+        if as_class is None:
+            as_class = dict
+        dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
         return Cursor(dataset, limit=limit)
 
-    def _copy_only_fields(self, doc, fields):
+    def _copy_field(self, obj, container):
+        if isinstance(obj, list):
+            new = []
+            for item in obj:
+                new.append(self._copy_field(item, container))
+            return new
+        if isinstance(obj, dict):
+            new = container()
+            for key, value in obj.items():
+                new[key] = self._copy_field(value, container)
+            return new
+        else:
+            return copy.copy(obj)
+
+    def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
 
         if fields is None:
-            return copy.deepcopy(doc)
+            return self._copy_field(doc, container)
         else:
             if not fields:
                 fields = {"_id": 1}
@@ -233,18 +372,18 @@ class Collection(object):
             #if we have novalues passed in, make a doc_copy based on the id_value
             if len(list(fields.values())) == 0:
                 if id_value == 1:
-                    doc_copy = {}
+                    doc_copy = container()
                 else:
-                    doc_copy = copy.deepcopy(doc)
+                    doc_copy = self._copy_field(doc, container)
             #if 1 was passed in as the field values, include those fields
             elif  list(fields.values())[0] == 1:
-                doc_copy = {}
+                doc_copy = container()
                 for key in fields:
                     if key in doc:
                         doc_copy[key] = doc[key]
             #otherwise, exclude the fields passed in
             else:
-                doc_copy = copy.deepcopy(doc)
+                doc_copy = self._copy_field(doc, container)
                 for key in fields:
                     if key in doc_copy:
                         del doc_copy[key]
@@ -260,17 +399,49 @@ class Collection(object):
             fields['_id'] = id_value #put _id back in fields
             return doc_copy
 
-
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
         for k, v in iteritems(fields):
             self._update_document_single_field(doc, k, v, updater)
 
+    def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
+        """Implements the $set behavior on an existing document"""
+        for k, v in iteritems(fields):
+            if '$' in k:
+                field_name_parts = k.split('.')
+                if not subdocument:
+                    current_doc = doc
+                    subspec = spec
+                    for part in field_name_parts[:-1]:
+                        if part == '$':
+                            subspec = subspec['$elemMatch']
+                            for item in current_doc:
+                                if filter_applies(subspec, item):
+                                    current_doc = item
+                                    break
+                            continue
+
+                        subspec = subspec[part]
+                        current_doc = current_doc[part]
+                    subdocument = current_doc
+                updater(subdocument, field_name_parts[-1], v)
+                continue
+            # otherwise, we handle it the standard way
+            self._update_document_single_field(doc, k, v, updater)
+
+        return subdocument
+
     def _update_document_single_field(self, doc, field_name, field_value, updater):
         field_name_parts = field_name.split(".")
         for part in field_name_parts[:-1]:
-            if not isinstance(doc, dict):
+            if not isinstance(doc, dict) and not isinstance(doc, list):
                 return # mongodb skips such cases
+            if isinstance(doc, list):
+                try:
+                    doc = doc[int(part)]
+                    continue
+                except ValueError:
+                    pass
             doc = doc.setdefault(part, {})
         updater(doc, field_name_parts[-1], field_value)
 
@@ -289,13 +460,25 @@ class Collection(object):
             return None
 
     def find_and_modify(self, query = {}, update = None, upsert = False, **kwargs):
+        remove = kwargs.get("remove", False)
+        if kwargs.get("new", False) and remove:
+            raise OperationFailure("remove and returnNew can't co-exist") # message from mongodb
+
+        if remove and update is not None:
+            raise ValueError("Can't do both update and remove")
+
         old = self.find_one(query)
         if not old:
             if upsert:
                 old = {'_id':self.insert(query)}
             else:
                 return None
-        self.update({'_id':old['_id']}, update)
+
+        if remove:
+            self.remove({"_id": old["_id"]})
+        else:
+            self.update({'_id':old['_id']}, update)
+
         if kwargs.get('new', False):
             return self.find_one({'_id':old['_id']})
         return old

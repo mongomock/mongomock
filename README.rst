@@ -1,7 +1,7 @@
 
 .. container::
 
-   .. image:: https://vmalloc.github.io/mongomock/mongomock-small.png
+   .. image:: http://vmalloc.github.io/mongomock/mongomock-small.png
 
 
 .. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
@@ -13,7 +13,6 @@
 
 .. image:: https://pypip.in/v/mongomock/badge.png
         :target: https://crate.io/packages/mongomock
-
 
 
 
@@ -83,12 +82,14 @@ To download, setup and perfom tests, run the following commands on Mac / Linux::
  nosetests
 
 
-Important Note About Project Status
------------------------------------
+Important Note About Project Status & Development
+-------------------------------------------------
 
 MongoDB is complex. This library aims at a reasonably complete mock of MongoDB for testing purposes, not a perfect replica. This means some features are not likely to make it in any time soon.
 
 Also, since many corner cases are encountered along the way, our goal is to try and TDD our way into completeness. This means that every time we encounter a missing or broken (incompatible) feature, we write a test for it and fix it. There are probably lots of such issues hiding around lurking, so feel free to open issues and/or pull requests and help the project out!
+
+**NOTE**: We don't include pymongo functionality as "stubs" or "placeholders". Since this library is used to validate production code, it is unacceptable to behave differently than the real pymongo implementation. In such cases it is better to throw `NotImplementedError` than implement a modified version of the original behavior.
 
 Acknowledgements
 ----------------
@@ -102,11 +103,13 @@ Many thanks go to the following people for helping out:
 * Craig Hobbs
 * David Fischer
 * Edward D'Souza
+* Eugene Chernyshov
 * Israel Teixeira
 * Jacob Perkins
 * Jason Sommer
 * Jeff McGee
 * Joël Franusic
+* Mike Ho
 * Nigel Choi
 * Omer Gertel
 * Scott Sexton

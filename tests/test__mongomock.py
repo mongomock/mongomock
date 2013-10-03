@@ -4,6 +4,7 @@ import itertools
 import re
 import platform
 import sys
+
 if platform.python_version() < '2.7':
     import unittest2 as unittest
 else:
@@ -13,6 +14,7 @@ import mongomock
 from mongomock import Database
 
 try:
+    import pymongo
     from pymongo import Connection as PymongoConnection
     from pymongo import MongoClient as PymongoClient
     from bson.objectid import ObjectId
@@ -66,10 +68,12 @@ class CollectionAPITest(TestCase):
         super(CollectionAPITest, self).setUp()
         self.conn = mongomock.Connection()
         self.db = self.conn['somedb']
+
     def test__get_collection_names(self):
         self.db.a
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
+
     def test__drop_collection(self):
         self.db.a
         self.db.b
@@ -86,6 +90,21 @@ class CollectionAPITest(TestCase):
         self.assertIs(col1, self.db['some_collection_here'])
         self.assertIsInstance(col1, mongomock.Collection)
 
+    def test__save_class_deriving_from_dict(self):
+        # See https://github.com/vmalloc/mongomock/issues/52
+        class Document(dict):
+            def __init__(self, collection):
+                self.collection = collection
+                super(Document, self).__init__()
+                self.save()
+
+            def save(self):
+                self.collection.save(self)
+
+        doc = Document(self.db.collection)
+        self.assertIn("_id", doc)
+        self.assertNotIn("collection", doc)
+
     def test__getting_collection_via_getitem(self):
         col1 = self.db['some_collection_here']
         col2 = self.db['some_collection_here']
@@ -98,6 +117,14 @@ class CollectionAPITest(TestCase):
         self.assertEquals(type(collection.find()).__name__, "Cursor")
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
+
+    def test__find_and_modify_cannot_remove_and_new(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_and_modify({}, remove=True, new=True)
+
+    def test__find_and_modify_cannot_remove_and_update(self):
+        with self.assertRaises(ValueError): # this is also what pymongo raises
+            self.db.collection.find_and_modify({"a": 2}, {"a": 3}, remove=True)
 
     def test__string_matching(self):
         """
@@ -130,7 +157,7 @@ class _CollectionComparisonTest(TestCase):
             "real": self.mongo_conn[self.db_name][self.collection_name],
          })
 
-    def _connect_to_local_mongodb(self, num_retries=3):
+    def _connect_to_local_mongodb(self, num_retries=60):
         "Performs retries on connection refused errors (for travis-ci builds)"
         connection_class = self._get_real_connection_class()
         for retry in range(num_retries):
@@ -274,6 +301,14 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({"field": {"$elemMatch": {"a": 1}}})
         self.cmp.compare.find({"field": {"$elemMatch": {"b": {"$gt": 3}}}})
 
+    def test__find_in_array(self):
+        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
+
+        self.cmp.compare.find({"field.0.a": 1})
+        self.cmp.compare.find({"field.0.b": 2})
+        self.cmp.compare.find({"field.1.c": 3})
+        self.cmp.compare.find({"field.1.d": 4})
+
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}
@@ -323,6 +358,11 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$or':[{'x':4}, {'x':7}]})
         self.cmp.compare_ignore_order.find({'$and':[{'x':2}, {'x':7}]})
 
+    def test__find_and_modify_remove(self):
+        self.cmp.do.insert([{"a": x} for x in range(10)])
+        self.cmp.do.find_and_modify({"a": 2}, remove=True)
+        self.cmp.compare_ignore_order.find()
+
     def test__find_sort_list(self):
         self.cmp.do.remove()
         for data in ({"a" : 1, "b" : 3, "c" : "data1"},
@@ -341,6 +381,14 @@ class _CollectionTest(_CollectionComparisonTest):
             self.cmp.do.insert(data)
         self.cmp.compare.find(limit=2, sort = [("a", 1), ("b", -1)])
         self.cmp.compare.find(limit=0, sort = [("a", 1), ("b", -1)]) #pymongo limit defaults to 0, returning everything
+
+    def test__as_class(self):
+        class MyDict(dict): pass
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({"a": 1, "b": {"ba": 3, "bb": 4, "bc": [ {"bca": 5 } ] }})
+        self.cmp.compare.find({}, as_class=MyDict)
+        self.cmp.compare.find({"a": 1}, as_class=MyDict)
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
@@ -385,6 +433,33 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$set': {'hat': 'red'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__unset(self):
+        """Tests calling update with $set members."""
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 0}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 1}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': ""}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': True}})
+        self.cmp.compare.find({'name' : 'bob'})
+
+        self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
+        self.cmp.compare.find({'name' : 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
+        self.cmp.compare.find({'name' : 'bob'})
+
     def test__set_upsert(self):
         self.cmp.do.remove()
         self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
@@ -425,6 +500,13 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name':'bob'}, {'$inc': {'data.age2': 1}})
         self.cmp.compare.find()
 
+    def test__inc_subdocument_positional(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': [{'age': 0}, {'age': 1}]})
+        self.cmp.do.update({'name': 'bob', 'data': {'$elemMatch': {'age': 0}}},
+            {'$inc': {'data.$.age': 1}})
+        self.cmp.compare.find()
+
     def test__addToSet(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
@@ -432,13 +514,61 @@ class _CollectionTest(_CollectionComparisonTest):
             self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'green'}})
             self.cmp.compare.find({'name': 'bob'})
         for i in range(3):
-            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat':'tall'}})
+            self.cmp.do.update({'name': 'bob'}, {'$addToSet': {'hat':'tall'}})
             self.cmp.compare.find({'name': 'bob'})
 
     def test__pull(self):
         self.cmp.do.remove()
-        self.cmp.do.insert({'name': 'bob', 'hat':['green', 'tall']})
-        self.cmp.do.update({'name':'bob'}, {'$pull': {'hat':'green'}})
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat': 'green'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pull_nested_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$pull': {'hat.$.sizes': {'size': 'L'}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pull_nested_list(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL']}, {'name': 'cap', 'sizes': ['S', 'L']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$pull': {'hat.$.sizes': 'XL'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': 'wide'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL']}]})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': {'name': 'cap', 'sizes': ['S', 'L']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': {'$each': ['wide', 'blue']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'size': 'M', 'quantity': 6}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_dict_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': [{'size': 'M', 'quantity': 6}, {'size': 'S', 'quantity': 1}]}}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_nested_list_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': ['L', 'XL'], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': ['S', 'L'], 'colors': ['blue']}]})
+        self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': ['M', 'S']}}})
         self.cmp.compare.find({'name': 'bob'})
 
     def test__drop(self):
