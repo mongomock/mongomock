@@ -38,6 +38,12 @@ from six import (
 from mongomock import helpers
 from mongomock.__version__ import __version__
 
+#for Python 3 compatibility
+try:
+  unicode = unicode
+except NameError:
+  unicode = str
+  basestring = (str, bytes)
 
 __all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
 
@@ -642,7 +648,7 @@ class Cursor(object):
         self._limit = count
         return self
     def distinct(self, key):
-        if not isinstance(key, (basestring,str)):
+        if not isinstance(key, basestring):
             raise TypeError('cursor.distinct key must be basestring (str in python3)')
         unique = set()
         unique_add = unique.add
