@@ -363,6 +363,8 @@ class Collection(object):
     def find_one(self, spec_or_id=None, *args, **kwargs):
         # Allow calling find_one with a non-dict argument that gets used as
         # the id for the query.
+        if spec_or_id is None:
+            spec_or_id = {}
         if not isinstance(spec_or_id, collections.Mapping):
             spec_or_id = {'_id':spec_or_id}
 

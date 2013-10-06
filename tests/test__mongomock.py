@@ -257,6 +257,10 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find_one({"_id" : "id2"}, {"_id":1})
         self.cmp.compare.find_one("id2", {"_id":1})
 
+    def test__find_one_no_args(self):
+        self.cmp.do.insert({"_id": "new_obj", "field": "value"})
+        self.cmp.compare.find_one()
+
     def test__find_by_attributes(self):
         id1 = ObjectId()
         self.cmp.do.insert({"_id":id1, "name" : "new"})
