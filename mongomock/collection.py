@@ -1,5 +1,6 @@
 import collections
 import copy
+import functools
 import itertools
 import json
 import time
@@ -243,11 +244,14 @@ class Collection(object):
                 spec = filter
         if as_class is None:
             as_class = dict
+        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class), limit=limit)
+
+    def _get_dataset(self, spec, sort, fields, as_class):
         dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
-        return Cursor(self, dataset, limit=limit)
+        return dataset
 
     def _copy_field(self, obj, container):
         if isinstance(obj, list):
@@ -525,14 +529,20 @@ class Collection(object):
 
 
 class Cursor(object):
-    def __init__(self, collection, dataset, limit=0):
+    def __init__(self, collection, dataset_factory, limit=0):
         super(Cursor, self).__init__()
         self.collection = collection
-        self._dataset = dataset
+        self._factory = dataset_factory
+        self._dataset = self._factory()
         self._limit = limit if limit != 0 else None #pymongo limit defaults to 0, returning everything
         self._skip = None
+
     def __iter__(self):
         return self
+
+    def clone(self):
+        return Cursor(self.collection, self._factory, self._limit)
+
     def __next__(self):
         if self._skip:
             for i in range(self._skip):

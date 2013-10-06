@@ -86,6 +86,20 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
 
+    def test__cursor_clone(self):
+        self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
+        cursor1 = self.db.collection.find()
+        iterator1 = iter(cursor1)
+        first_item = next(iterator1)
+        cursor2 = cursor1.clone()
+        iterator2 = iter(cursor2)
+        self.assertEquals(next(iterator2), first_item)
+        for item in iterator1:
+            self.assertEquals(item, next(iterator2))
+
+        with self.assertRaises(StopIteration):
+            next(iterator2)
+
     def test__update_retval(self):
         self.db.col.save({"a": 1})
         retval = self.db.col.update({"a": 1}, {"b": 2})
