@@ -74,6 +74,9 @@ class CollectionAPITest(TestCase):
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
 
+    def test__cursor_collection(self):
+        self.assertIs(self.db.a.find().collection, self.db.a)
+
     def test__drop_collection(self):
         self.db.a
         self.db.b

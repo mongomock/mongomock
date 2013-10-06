@@ -247,7 +247,7 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: x[sortKey], reverse = sortDirection < 0))
-        return Cursor(dataset, limit=limit)
+        return Cursor(self, dataset, limit=limit)
 
     def _copy_field(self, obj, container):
         if isinstance(obj, list):
@@ -523,8 +523,9 @@ class Collection(object):
 
 
 class Cursor(object):
-    def __init__(self, dataset, limit=0):
+    def __init__(self, collection, dataset, limit=0):
         super(Cursor, self).__init__()
+        self.collection = collection
         self._dataset = dataset
         self._limit = limit if limit != 0 else None #pymongo limit defaults to 0, returning everything
         self._skip = None
