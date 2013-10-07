@@ -5,7 +5,8 @@ import itertools
 import json
 import time
 import warnings
-from .filtering import filter_applies
+from sentinels import NOTHING
+from .filtering import filter_applies, resolve_key_value
 from . import ObjectId, OperationFailure
 from .helpers import basestring
 
@@ -584,8 +585,11 @@ class Cursor(object):
         if not isinstance(key, basestring):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
-        return [x[key] for x in iter(self._dataset) if key in x and x[key] not in unique and not unique.add(x[key])]
-
+        for x in iter(self._dataset):
+            value = resolve_key_value(key, x)
+            if value == NOTHING: continue
+            unique.add(value)
+        return list(unique)
 
     def __getitem__(self, index):
         arr = [x for x in self._dataset]
