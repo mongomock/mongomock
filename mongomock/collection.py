@@ -528,6 +528,9 @@ class Collection(object):
     def inline_map_reduce(self, map_func, reduce_func, full_response=False, query=None, limit=0):
         return self.map_reduce(map_func, reduce_func, {'inline':1}, full_response, query, limit)
 
+    def distinct(self, key):
+        return self.find().distinct(key)
+
 
 class Cursor(object):
     def __init__(self, collection, dataset_factory, limit=0):
