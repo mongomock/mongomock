@@ -74,6 +74,9 @@ class CollectionAPITest(TestCase):
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
 
+    def test__cursor_collection(self):
+        self.assertIs(self.db.a.find().collection, self.db.a)
+
     def test__drop_collection(self):
         self.db.a
         self.db.b
@@ -82,6 +85,48 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
+
+    def test__distinct_nested_field(self):
+        self.db.collection.insert({'f1': {'f2': 'v'}})
+        cursor = self.db.collection.find()
+        self.assertEquals(cursor.distinct('f1.f2'), ['v'])
+
+    def test__cursor_clone(self):
+        self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
+        cursor1 = self.db.collection.find()
+        iterator1 = iter(cursor1)
+        first_item = next(iterator1)
+        cursor2 = cursor1.clone()
+        iterator2 = iter(cursor2)
+        self.assertEquals(next(iterator2), first_item)
+        for item in iterator1:
+            self.assertEquals(item, next(iterator2))
+
+        with self.assertRaises(StopIteration):
+            next(iterator2)
+
+    def test__update_retval(self):
+        self.db.col.save({"a": 1})
+        retval = self.db.col.update({"a": 1}, {"b": 2})
+        self.assertIsInstance(retval, dict)
+        self.assertIsInstance(retval["connectionId"], int)
+        self.assertIsNone(retval["err"])
+        self.assertEquals(retval["n"], 1)
+        self.assertTrue(retval["updateExisting"])
+        self.assertEquals(retval["ok"], 1.0)
+
+        self.assertEquals(self.db.col.update({"bla": 1}, {"bla": 2})["n"], 0)
+
+    def test__remove_retval(self):
+        self.db.col.save({"a": 1})
+        retval = self.db.col.remove({"a": 1})
+        self.assertIsInstance(retval, dict)
+        self.assertIsInstance(retval["connectionId"], int)
+        self.assertIsNone(retval["err"])
+        self.assertEquals(retval["n"], 1)
+        self.assertEquals(retval["ok"], 1.0)
+
+        self.assertEquals(self.db.col.remove({"bla": 1})["n"], 0)
 
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
@@ -139,6 +184,15 @@ class CollectionAPITest(TestCase):
         self.db['def'].save({'name':'test1'})
         self.assertTrue(self.db['def'].find({'name':'test1'}).count() > 0)
         self.assertEquals(self.db['def'].find({'name':'test1'})[0]['name'], 'test1')
+
+    def test__cursor_distinct(self):
+        larry_bob = {'name':'larry'}
+        larry = {'name':'larry'}
+        gary = {'name':'gary'}
+        self.db['coll_name'].insert([larry_bob, larry, gary])
+        ret_val = self.db['coll_name'].find().distinct('name')
+        self.assertTrue(isinstance(ret_val,list))
+        self.assertTrue(set(ret_val) == set(['larry','gary']))
 
 
 @unittest.skipIf(not _HAVE_PYMONGO,"pymongo not installed")
@@ -221,6 +275,10 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({"_id":"id2", "name" : "another new"})
         self.cmp.compare.find_one({"_id" : "id2"}, {"_id":1})
         self.cmp.compare.find_one("id2", {"_id":1})
+
+    def test__find_one_no_args(self):
+        self.cmp.do.insert({"_id": "new_obj", "field": "value"})
+        self.cmp.compare.find_one()
 
     def test__find_by_attributes(self):
         id1 = ObjectId()
