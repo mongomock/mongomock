@@ -190,11 +190,11 @@ class Collection(object):
                 break
 
         return {
-            "connectionId": self._Collection__database.connection._id,
-            "err": None,
-            "ok": 1.0,
-            "n": num_updated,
-            "updateExisting": updated_existing,
+            u"connectionId": self._Collection__database.connection._id,
+            u"err": None,
+            u"ok": 1.0,
+            u"n": num_updated,
+            u"updatedExisting": updated_existing,
         }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
