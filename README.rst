@@ -114,5 +114,6 @@ Many thanks go to the following people for helping out:
 * Omer Gertel
 * Scott Sexton
 * catty (ca77y _at_ live.com)
+* emosenkis
 * waskew (waskew _at_ narrativescience.com)
 * zcarter
