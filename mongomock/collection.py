@@ -32,6 +32,7 @@ class Collection(object):
     def __init__(self, db, name):
         super(Collection, self).__init__()
         self.name = name
+        self.full_name = "{0}.{1}".format(db.name, name)
         self._Collection__database = db
         self._documents = {}
 

@@ -9,9 +9,16 @@ class CollectionAPITest(TestCase):
 
     def test__get_subcollections(self):
         self.db.a.b
+        self.assertEquals(self.db.a.b.full_name, "somedb.a.b")
+        self.assertEquals(self.db.a.b.name, "a.b")
+
         self.assertEquals(
             set(self.db.collection_names()),
             set(["a.b", "system.indexes", "a"]))
+
+    def test__get_collection_full_name(self):
+        self.assertEquals(self.db.coll.name, "coll")
+        self.assertEquals(self.db.coll.full_name, "somedb.coll")
 
     def test__get_collection_names(self):
         self.db.a
