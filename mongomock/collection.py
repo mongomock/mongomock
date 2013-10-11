@@ -37,6 +37,12 @@ class Collection(object):
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
+    
+    def __getitem__(self, name):
+        return self._Collection__database[self.name + '.' + name]
+    
+    def __getattr__(self, name):
+        return self.__getitem__(name)
 
     def insert(self, data):
         if isinstance(data, list):
