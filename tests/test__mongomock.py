@@ -491,6 +491,18 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': ['M', 'S']}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_to_absent_field(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': 'wide'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_each_to_absent_field(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat': {'$each': ['wide', 'blue']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__drop(self):
         data = {'a': 1}
         self.cmp.do.insert({"name" : "another new"})
