@@ -19,7 +19,7 @@ except ImportError:
 try:
     from bson import (json_util, SON)
 except ImportError:
-    json_utils = SON = None
+    json_util = SON = None
 
 from six import (
                  iteritems,

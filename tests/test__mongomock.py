@@ -1,9 +1,6 @@
 import copy
 import time
-import itertools
 import re
-import platform
-import sys
 
 from .utils import TestCase, skipIf
 
@@ -229,6 +226,10 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({"field.1.c": 3})
         self.cmp.compare.find({"field.1.d": 4})
 
+    def test__find_in_array_auto(self):
+        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
+        self.cmp.compare.find_one({"field.a": 1})
+
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}
@@ -317,6 +318,14 @@ class _CollectionTest(_CollectionComparisonTest):
     def test__default_fields_to_id_if_empty(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
         self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = [])
+
+    def test__do_not_return_objects_without_requested_field(self):
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+	self.cmp.compare.find_one({'name':'Chucky'}, fields = {'surname': True, '_id': False})
+
+    def test__positional_projection_operator(self):
+        self.cmp.do.insert({'item': {'name': 'ball', 'tags': ['a', 'b', 'b', 'a']}})
+        self.cmp.compare.find_one({'item.tags': 'b'}, fields = {'item.tags.$': True, '_id': False})
 
     def test__remove(self):
         """Test the remove method."""
