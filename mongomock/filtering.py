@@ -1,4 +1,5 @@
 import operator
+import re
 import warnings
 from six import iteritems, string_types
 from sentinels import NOTHING
@@ -23,8 +24,8 @@ def filter_applies(search_filter, document):
                 operator_string == '$not' and _not_op(document, key, search_val)
                 for operator_string, search_val in iteritems(search)
             )
-        elif isinstance(search, RE_TYPE) and isinstance(doc_val, string_types):
-            is_match = search.match(doc_val) is not None
+        elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
+            is_match = _regex(doc_val, search)
         elif key in LOGICAL_OPERATOR_MAP:
             is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
         elif isinstance(doc_val, (list, tuple)):
@@ -90,6 +91,9 @@ def _elem_match_op(doc_val, query):
         return False
     return any(filter_applies(query, item) for item in doc_val)
 
+def _regex(doc_val, regex):
+    return any(regex.search(item) for item in _force_list(doc_val))
+
 def _print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
                   "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
@@ -104,7 +108,7 @@ OPERATOR_MAP = {'$ne': operator.ne,
                 '$in':lambda dv, sv: any(x in sv for x in _force_list(dv)),
                 '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
                 '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
-                '$regex':lambda dv, sv: re.compile(sv).match(dv),
+                '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
                 '$elemMatch': _elem_match_op,
                 }
 

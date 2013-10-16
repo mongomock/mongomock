@@ -199,7 +199,7 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'hat': 'a hat'})
         self.cmp.compare.find({'hat.color.cat': 'red'})
 
-    def test__find_by_regex(self):
+    def test__find_by_regex_object(self):
         """Test searching with regular expression objects."""
         bob = {'name': 'bob'}
         sam = {'name': 'sam'}
@@ -210,6 +210,47 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({"name" : regex})
         regex = re.compile('bob|notsam')
         self.cmp.compare_ignore_order.find({"name" : regex})
+
+    def test__find_by_regex_string(self):
+        """Test searching with regular expression string."""
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+        self.cmp.do.insert(bob)
+        self.cmp.do.insert(sam)
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.find({"name": {'$regex': 'bob|sam'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|notsam'}})
+
+    def test__find_in_array_by_regex_object(self):
+        """Test searching inside array with regular expression object."""
+        bob = {'name': 'bob', 'text': ['abcd', 'cde']}
+        sam = {'name': 'sam', 'text': ['bde']}
+        self.cmp.do.insert(bob)
+        self.cmp.do.insert(sam)
+        regex = re.compile('^a')
+        self.cmp.compare_ignore_order.find({"text": regex})
+        regex = re.compile('e$')
+        self.cmp.compare_ignore_order.find({"text": regex})
+        regex = re.compile('bde|cde')
+        self.cmp.compare_ignore_order.find({"text": regex})
+
+    def test__find_in_array_by_regex_string(self):
+        """Test searching inside array with regular expression string"""
+        bob = {'name': 'bob', 'text': ['abcd', 'cde']}
+        sam = {'name': 'sam', 'text': ['bde']}
+        self.cmp.do.insert(bob)
+        self.cmp.do.insert(sam)
+        self.cmp.compare_ignore_order.find({"text": {'$regex': '^a'}})
+        self.cmp.compare_ignore_order.find({"text": {'$regex': 'e$'}})
+        self.cmp.compare_ignore_order.find({"text": {'$regex': 'bcd|cde'}})
+
+    def test__find_by_regex_string_on_absent_field_dont_break(self):
+        """Test searching on absent field with regular expression string dont break"""
+        bob = {'name': 'bob'}
+        sam = {'name': 'sam'}
+        self.cmp.do.insert(bob)
+        self.cmp.do.insert(sam)
+        self.cmp.compare_ignore_order.find({"text": {'$regex': 'bob|sam'}})
 
     def test__find_by_elemMatch(self):
         self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
