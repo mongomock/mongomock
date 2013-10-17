@@ -23,8 +23,17 @@ class Database(object):
     def connection(self):
         return self._Database__connection
 
-    def collection_names(self):
-        return list(self._collections.keys())
+    def collection_names(self, include_system_collections=True):
+        if include_system_collections:
+            return list(self._collections.keys())
+
+        result = []
+        for name in self._collections.keys():
+            if name.startswith("system."): continue
+            result.append(name)
+
+        return result
+
     def drop_collection(self, name_or_collection):
         try:
             # FIXME a better way to remove an entry by value ?
