@@ -22,9 +22,10 @@ except ImportError:
     json_utils = SON = None
 
 from six import (
-                 iteritems,
-                 itervalues,
-                 iterkeys)
+                text_type,
+                iteritems,
+                itervalues,
+                iterkeys)
 from mongomock import helpers
 
 
@@ -199,11 +200,11 @@ class Collection(object):
                 break
 
         return {
-            u"connectionId": self._Collection__database.connection._id,
-            u"err": None,
-            u"ok": 1.0,
-            u"n": num_updated,
-            u"updatedExisting": updated_existing,
+            text_type("connectionId"): self._Collection__database.connection._id,
+            text_type("err"): None,
+            text_type("ok"): 1.0,
+            text_type("n"): num_updated,
+            text_type("updatedExisting"): updated_existing,
         }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):

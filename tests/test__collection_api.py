@@ -1,4 +1,6 @@
 import mongomock
+from six import text_type
+
 from .utils import TestCase
 
 class CollectionAPITest(TestCase):
@@ -24,6 +26,8 @@ class CollectionAPITest(TestCase):
         self.db.a
         self.db.b
         self.assertEquals(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
+        self.assertEquals(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
+        self.assertEquals(set(self.db.collection_names(False)), set(['a', 'b']))
 
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
@@ -60,10 +64,10 @@ class CollectionAPITest(TestCase):
         self.db.col.save({"a": 1})
         retval = self.db.col.update({"a": 1}, {"b": 2})
         self.assertIsInstance(retval, dict)
-        self.assertIsInstance(retval[u"connectionId"], int)
-        self.assertIsNone(retval[u"err"])
-        self.assertEquals(retval[u"n"], 1)
-        self.assertTrue(retval[u"updatedExisting"])
+        self.assertIsInstance(retval[text_type("connectionId")], int)
+        self.assertIsNone(retval[text_type("err")])
+        self.assertEquals(retval[text_type("n")], 1)
+        self.assertTrue(retval[text_type("updatedExisting")])
         self.assertEquals(retval["ok"], 1.0)
 
         self.assertEquals(self.db.col.update({"bla": 1}, {"bla": 2})["n"], 0)
@@ -72,10 +76,10 @@ class CollectionAPITest(TestCase):
         self.db.col.save({"a": 1})
         retval = self.db.col.remove({"a": 1})
         self.assertIsInstance(retval, dict)
-        self.assertIsInstance(retval[u"connectionId"], int)
-        self.assertIsNone(retval[u"err"])
-        self.assertEquals(retval[u"n"], 1)
-        self.assertEquals(retval[u"ok"], 1.0)
+        self.assertIsInstance(retval[text_type("connectionId")], int)
+        self.assertIsNone(retval[text_type("err")])
+        self.assertEquals(retval[text_type("n")], 1)
+        self.assertEquals(retval[text_type("ok")], 1.0)
 
         self.assertEquals(self.db.col.remove({"bla": 1})["n"], 0)
 
