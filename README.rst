@@ -99,6 +99,7 @@ Many thanks go to the following people for helping out:
 * Alec Perkins
 * Austin W Ellis
 * Andrey Ovchinnikov
+* Arthur Hirata
 * Corey Downing
 * Craig Hobbs
 * David Fischer
