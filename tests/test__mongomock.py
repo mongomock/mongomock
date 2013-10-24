@@ -334,6 +334,26 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find(sort = [("b", 1), ("a", -1)])
         self.cmp.compare.find(sort = [("b", 1), ("a", -1), ("c", 1)])
 
+    def test__find_sort_list_nested_doc(self):
+        self.cmp.do.remove()
+        for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
+                     {"root": {"a" : 2, "b" : 2, "c" : "data3"}},
+                     {"root": {"a" : 3, "b" : 1, "c" : "data2"}}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(sort = [("root.a", 1), ("root.b", -1)])
+        self.cmp.compare.find(sort = [("root.b", 1), ("root.a", -1)])
+        self.cmp.compare.find(sort = [("root.b", 1), ("root.a", -1), ("root.c", 1)])
+
+    def test__find_sort_list_nested_list(self):
+        self.cmp.do.remove()
+        for data in ({"root": [{"a" : 1, "b" : 3, "c" : "data1"}]},
+                     {"root": [{"a" : 2, "b" : 2, "c" : "data3"}]},
+                     {"root": [{"a" : 3, "b" : 1, "c" : "data2"}]}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(sort = [("root.0.a", 1), ("root.0.b", -1)])
+        self.cmp.compare.find(sort = [("root.0.b", 1), ("root.0.a", -1)])
+        self.cmp.compare.find(sort = [("root.0.b", 1), ("root.0.a", -1), ("root.0.c", 1)])
+
     def test__find_limit(self):
         self.cmp.do.remove()
         for data in ({"a" : 1, "b" : 3, "c" : "data1"},
@@ -679,6 +699,24 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT("a")).find()
         self.cmp.compare(_SORT("b")).find()
 
+    def test__sort_name_nested_doc(self):
+        self.cmp.do.remove()
+        for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
+                     {"root": {"a" : 2, "b" : 2, "c" : "data3"}},
+                     {"root": {"a" : 3, "b" : 1, "c" : "data2"}}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT("root.a")).find()
+        self.cmp.compare(_SORT("root.b")).find()
+
+    def test__sort_name_nested_list(self):
+        self.cmp.do.remove()
+        for data in ({"root": [{"a" : 1, "b" : 3, "c" : "data1"}]},
+                     {"root": [{"a" : 2, "b" : 2, "c" : "data3"}]},
+                     {"root": [{"a" : 3, "b" : 1, "c" : "data2"}]}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT("root.0.a")).find()
+        self.cmp.compare(_SORT("root.0.b")).find()
+
     def test__sort_list(self):
         self.cmp.do.remove()
         for data in ({"a" : 1, "b" : 3, "c" : "data1"},
@@ -688,6 +726,26 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT([("a", 1), ("b", -1)])).find()
         self.cmp.compare(_SORT([("b", 1), ("a", -1)])).find()
         self.cmp.compare(_SORT([("b", 1), ("a", -1), ("c", 1)])).find()
+
+    def test__sort_list_nested_doc(self):
+        self.cmp.do.remove()
+        for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
+                     {"root": {"a" : 2, "b" : 2, "c" : "data3"}},
+                     {"root": {"a" : 3, "b" : 1, "c" : "data2"}}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT([("root.a", 1), ("root.b", -1)])).find()
+        self.cmp.compare(_SORT([("root.b", 1), ("root.a", -1)])).find()
+        self.cmp.compare(_SORT([("root.b", 1), ("root.a", -1), ("root.c", 1)])).find()
+
+    def test__sort_list_nested_list(self):
+        self.cmp.do.remove()
+        for data in ({"root": [{"a" : 1, "b" : 3, "c" : "data1"}]},
+                     {"root": [{"a" : 2, "b" : 2, "c" : "data3"}]},
+                     {"root": [{"a" : 3, "b" : 1, "c" : "data2"}]}):
+            self.cmp.do.insert(data)
+        self.cmp.compare(_SORT([("root.0.a", 1), ("root.0.b", -1)])).find()
+        self.cmp.compare(_SORT([("root.0.b", 1), ("root.0.a", -1)])).find()
+        self.cmp.compare(_SORT([("root.0.b", 1), ("root.0.a", -1), ("root.0.c", 1)])).find()
 
     def test__close(self):
         # Does nothing - just make sure it exists and takes the right args
