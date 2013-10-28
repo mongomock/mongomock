@@ -7,7 +7,7 @@ import time
 import warnings
 from sentinels import NOTHING
 from .filtering import filter_applies, resolve_key_value
-from . import ObjectId, OperationFailure
+from . import ObjectId, OperationFailure, DuplicateKeyError
 from .helpers import basestring
 
 try:
