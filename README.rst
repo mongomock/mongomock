@@ -114,6 +114,7 @@ Many thanks go to the following people for helping out:
 * Nigel Choi
 * Omer Gertel
 * Scott Sexton
+* Todd Tomkinson 
 * catty (ca77y _at_ live.com)
 * emosenkis
 * waskew (waskew _at_ narrativescience.com)
