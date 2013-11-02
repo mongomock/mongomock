@@ -22,10 +22,11 @@ except ImportError:
     json_utils = SON = None
 
 from six import (
-                text_type,
-                iteritems,
-                itervalues,
-                iterkeys)
+    string_types,
+    text_type,
+    iteritems,
+    itervalues,
+    iterkeys)
 from mongomock import helpers
 
 
@@ -52,6 +53,10 @@ class Collection(object):
         return self._insert(data)
 
     def _insert(self, data):
+
+        if not all(isinstance(k, string_types) for k in data):
+            raise ValueError("Document keys must be strings")
+
         if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']

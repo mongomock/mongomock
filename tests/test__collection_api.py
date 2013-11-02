@@ -112,6 +112,11 @@ class CollectionAPITest(TestCase):
         self.assertIs(col1, self.db.some_collection_here)
         self.assertIsInstance(col1, mongomock.Collection)
 
+    def test__cannot_save_non_string_keys(self):
+        for key in [2, 2.0, True, object()]:
+            with self.assertRaises(ValueError):
+                self.db.col1.save({key: "value"})
+
     def test__find_returns_cursors(self):
         collection = self.db.collection
         self.assertEquals(type(collection.find()).__name__, "Cursor")

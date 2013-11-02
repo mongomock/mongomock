@@ -104,14 +104,17 @@ class _PymongoConnectionMixin(object):
         return mongomock.Connection
 
 class _CollectionTest(_CollectionComparisonTest):
+
     def test__find_is_empty(self):
         self.cmp.do.remove()
         self.cmp.compare.find()
+
     def test__inserting(self):
         self.cmp.do.remove()
         data = {"a" : 1, "b" : 2, "c" : "data"}
         self.cmp.do.insert(data)
         self.cmp.compare.find() # single document, no need to ignore order
+
     def test__bulk_insert(self):
         objs = [{"a" : 2, "b" : {"c" : 3}}, {"c" : 5}, {"d" : 7}]
         results_dict = self.cmp.do.insert(objs)
@@ -119,7 +122,6 @@ class _CollectionTest(_CollectionComparisonTest):
             self.assertEquals(len(results), len(objs))
             self.assertEquals(len(set(results)), len(results), "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
-
 
     def test__save(self):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
