@@ -191,7 +191,7 @@ class Collection(object):
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
-                        existing_document.update(document)
+                        existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             # id changed, fix index
                             del self._documents[_id]

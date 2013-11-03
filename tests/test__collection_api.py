@@ -131,6 +131,16 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(ValueError): # this is also what pymongo raises
             self.db.collection.find_and_modify({"a": 2}, {"a": 3}, remove=True)
 
+    def test__update_interns_lists_and_dicts(self):
+        obj = {}
+        obj_id = self.db.collection.save(obj)
+        d = {}
+        l = []
+        self.db.collection.update({"_id": obj_id}, {"d": d, "l": l})
+        d["a"] = "b"
+        l.append(1)
+        self.assertEquals(list(self.db.collection.find()), [{"_id": obj_id, "d": {}, "l": []}])
+
     def test__string_matching(self):
         """
         Make sure strings are not treated as collections on find
