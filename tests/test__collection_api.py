@@ -164,7 +164,7 @@ class CollectionAPITest(TestCase):
         self.assertTrue(isinstance(ret_val,list))
         self.assertTrue(set(ret_val) == set(['larry','gary']))
     
-    def test__find_with_skip_param(self)
+    def test__find_with_skip_param(self):
         """
         Make sure that find() will take in account skip parametter
         """
