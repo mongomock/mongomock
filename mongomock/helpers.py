@@ -1,4 +1,7 @@
+import sys
 import re
+
+_PY2 = sys.version_info < (3, 0)
 
 try:
     from bson import (ObjectId, RE_TYPE)
@@ -6,6 +9,10 @@ except ImportError:
     from mongomock.object_id import ObjectId
     RE_TYPE = type(re.compile(''))
 
+if _PY2:
+    from __builtin__ import xrange
+else:
+    xrange = range
 
 #for Python 3 compatibility
 try:
@@ -15,6 +22,8 @@ except NameError:
   unicode = str
   basestring = (str, bytes)
 
+
+  
 def _fields_list_to_dict(fields):
     """Takes a list of field names and returns a matching dictionary.
 

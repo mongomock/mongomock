@@ -8,7 +8,7 @@ import warnings
 from sentinels import NOTHING
 from .filtering import filter_applies, resolve_key_value
 from . import ObjectId, OperationFailure, DuplicateKeyError
-from .helpers import basestring
+from .helpers import basestring, xrange
 
 try:
     # Optional requirements for providing Map-Reduce functionality
@@ -253,20 +253,27 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
                 spec = filter
         if as_class is None:
             as_class = dict
-        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class), limit=limit)
+        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class, skip), limit=limit)
 
-    def _get_dataset(self, spec, sort, fields, as_class):
+    def _get_dataset(self, spec, sort, fields, as_class, skip):
         dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: resolve_key_value(sortKey, x), reverse = sortDirection < 0))
+
+        for i in xrange(skip):
+            try:
+                unused = next(dataset)
+            except StopIteration:
+                pass
+
         return dataset
 
     def _copy_field(self, obj, container):

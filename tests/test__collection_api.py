@@ -173,5 +173,5 @@ class CollectionAPITest(TestCase):
         u2 = {'name': 'second'}
         self.db['users'].insert([u1, u2])
         self.assertEquals(self.db['users'].find(skip=1).count(), 1)
-        self.assertEquals(self.db['users'].find(skip=1)[0]['name'], 'second)
+        self.assertEquals(self.db['users'].find(skip=1)[0]['name'], 'second')
         
