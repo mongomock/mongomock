@@ -163,15 +163,14 @@ class CollectionAPITest(TestCase):
         ret_val = self.db['coll_name'].find().distinct('name')
         self.assertTrue(isinstance(ret_val,list))
         self.assertTrue(set(ret_val) == set(['larry','gary']))
-    
+
     def test__find_with_skip_param(self):
         """
         Make sure that find() will take in account skip parametter
         """
-        
+
         u1 = {'name': 'first'}
         u2 = {'name': 'second'}
         self.db['users'].insert([u1, u2])
-        self.assertEquals(self.db['users'].find(skip=1).count(), 1)
-        self.assertEquals(self.db['users'].find(skip=1)[0]['name'], 'second')
-        
+        self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1).count(), 1)
+        self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1)[0]['name'], 'second')
