@@ -117,5 +117,6 @@ Many thanks go to the following people for helping out:
 * Todd Tomkinson 
 * catty (ca77y _at_ live.com)
 * emosenkis
+* hthieu1110
 * waskew (waskew _at_ narrativescience.com)
 * zcarter
