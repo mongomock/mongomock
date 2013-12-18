@@ -253,14 +253,14 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip=0):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
                 spec = filter
         if as_class is None:
             as_class = dict
-        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class), limit=limit)
+        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class), limit=limit, skip=skip)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
@@ -548,13 +548,13 @@ class Collection(object):
 
 
 class Cursor(object):
-    def __init__(self, collection, dataset_factory, limit=0):
+    def __init__(self, collection, dataset_factory, limit=0, skip=0):
         super(Cursor, self).__init__()
         self.collection = collection
         self._factory = dataset_factory
         self._dataset = self._factory()
         self._limit = limit if limit != 0 else None #pymongo limit defaults to 0, returning everything
-        self._skip = None
+        self._skip = skip
 
     def __iter__(self):
         return self
