@@ -42,3 +42,4 @@ pip-log.txt
 *.hi
 flycheck-*
 .DS_Store
+.env
