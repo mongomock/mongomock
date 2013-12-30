@@ -455,7 +455,7 @@ class Collection(object):
             "err": None,
         }
 
-    def count(self):
+    def count(self, with_limit_and_skip = False):
         return len(self._documents)
 
     def drop(self):
