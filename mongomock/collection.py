@@ -6,7 +6,7 @@ import json
 import time
 import warnings
 from sentinels import NOTHING
-from .filtering import filter_applies, resolve_key_value
+from .filtering import filter_applies, iter_key_candidates
 from . import ObjectId, OperationFailure, DuplicateKeyError
 from .helpers import basestring, xrange
 
@@ -266,7 +266,7 @@ class Collection(object):
         dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
-                dataset = iter(sorted(dataset, key = lambda x: resolve_key_value(sortKey, x), reverse = sortDirection < 0))
+                dataset = iter(sorted(dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
 
         for i in xrange(skip):
             try:
@@ -553,6 +553,8 @@ class Collection(object):
     def distinct(self, key):
         return self.find().distinct(key)
 
+def _resolve_key(key, doc):
+    return next(iter(iter_key_candidates(key, doc)), NOTHING)
 
 class Cursor(object):
     def __init__(self, collection, dataset_factory, limit=0):
@@ -585,9 +587,9 @@ class Cursor(object):
             direction = 1
         if isinstance(key_or_list, (tuple, list)):
             for sortKey, sortDirection in reversed(key_or_list):
-                self._dataset = iter(sorted(self._dataset, key = lambda x:resolve_key_value(sortKey, x), reverse = sortDirection < 0))
+                self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
         else:
-            self._dataset = iter(sorted(self._dataset, key = lambda x:resolve_key_value(key_or_list, x), reverse = direction < 0))
+            self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(key_or_list, x), reverse = direction < 0))
         return self
     def count(self):
         arr = [x for x in self._dataset]
@@ -611,7 +613,7 @@ class Cursor(object):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         for x in iter(self._dataset):
-            value = resolve_key_value(key, x)
+            value = _resolve_key(key, x)
             if value == NOTHING: continue
             unique.add(value)
         return list(unique)

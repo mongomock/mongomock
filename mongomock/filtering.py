@@ -16,61 +16,94 @@ def filter_applies(search_filter, document):
         search_filter = {'_id': search_filter}
 
     for key, search in iteritems(search_filter):
-        doc_val = resolve_key_value(key, document)
 
-        if isinstance(search, dict):
-            is_match = all(
-                operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val) or
-                operator_string == '$not' and _not_op(document, key, search_val)
-                for operator_string, search_val in iteritems(search)
-            )
-        elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
-            is_match = _regex(doc_val, search)
-        elif key in LOGICAL_OPERATOR_MAP:
-            is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
-        elif isinstance(doc_val, (list, tuple)):
-            if isinstance(search, ObjectId):
-                is_match = str(search) in doc_val
+        is_match = False
+
+        for doc_val in iter_key_candidates(key, document):
+            if isinstance(search, dict):
+                is_match = all(
+                    operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val) or
+                    operator_string == '$not' and _not_op(document, key, search_val)
+                    for operator_string, search_val in iteritems(search)
+                )
+            elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
+                is_match = _regex(doc_val, search)
+            elif key in LOGICAL_OPERATOR_MAP:
+                is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
+            elif isinstance(doc_val, (list, tuple)):
+                if isinstance(search, ObjectId):
+                    is_match = str(search) in doc_val
+                else:
+                    is_match = search in doc_val
             else:
-                is_match = search in doc_val
-        else:
-            is_match = doc_val == search
+                is_match = doc_val == search
+
+            if is_match:
+                break
 
         if not is_match:
             return False
 
     return True
 
-def resolve_key_value(key, doc):
+def iter_key_candidates(key, doc):
     """
-    Resolve keys to their proper value in a document.
+    Get possible subdocuments or lists that are referred to by the key in question
     Returns the appropriate nested value if the key includes dot notation.
     """
     if not doc:
-        return NOTHING
+        return ()
+
+    if not key:
+        return [doc]
 
     if isinstance(doc, list):
-        key_parts = key.split('.')
-        try:
-            search_key = int(key_parts[0])
-        except ValueError:
-            return NOTHING
-        sub_doc = doc[search_key]
-        if len(key_parts) == 1:
-            return sub_doc
-        sub_key = '.'.join(key_parts[1:])
-        return resolve_key_value(sub_key, sub_doc)
+        return _iter_key_candidates_sublist(key, doc)
 
     if not isinstance(doc, dict):
-        return NOTHING
+        return ()
 
     key_parts = key.split('.')
     if len(key_parts) == 1:
-        return doc.get(key, NOTHING)
+        return [doc.get(key, NOTHING)]
 
     sub_key = '.'.join(key_parts[1:])
     sub_doc = doc.get(key_parts[0], {})
-    return resolve_key_value(sub_key, sub_doc)
+    return iter_key_candidates(sub_key, sub_doc)
+
+def _iter_key_candidates_sublist(key, doc):
+    """
+    :param doc: a list to be searched for candidates for our key
+    :param key: the string key to be matched
+    """
+    key_parts = key.split(".")
+    sub_key = key_parts.pop(0)
+    key_remainder = ".".join(key_parts)
+    try:
+        sub_key_int = int(sub_key)
+    except ValueError:
+        sub_key_int = None
+
+    if sub_key_int is None:
+        # subkey is not an integer...
+
+        return [x
+                for sub_doc in doc
+                if isinstance(sub_doc, dict) and sub_key in sub_doc
+                for x in iter_key_candidates(key_remainder, sub_doc[sub_key])]
+
+    else:
+
+        # subkey is an index
+        if sub_key_int >= len(doc):
+            return () # dead end
+
+        sub_doc = doc[sub_key_int]
+
+        if key_parts:
+            return iter_key_candidates(".".join(key_parts), sub_doc)
+
+        return [sub_doc]
 
 def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
