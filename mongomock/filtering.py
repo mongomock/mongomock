@@ -32,7 +32,7 @@ def filter_applies(search_filter, document):
                 is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
             elif isinstance(doc_val, (list, tuple)):
                 if isinstance(search, ObjectId):
-                    is_match = str(search) in doc_val
+                    is_match = (search in doc_val or str(search) in doc_val)
                 else:
                     is_match = search in doc_val
             else:

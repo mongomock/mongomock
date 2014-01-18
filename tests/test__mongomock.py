@@ -203,7 +203,7 @@ class _CollectionTest(_CollectionComparisonTest):
 
     def test__find_by_objectid_in_list(self):
         #See #79
-        self.cmp.do.insert({'id' : [ObjectId('52d669dcad547f059424f783')]})
+        self.cmp.do.insert({'_id': 'x', 'rel_id' : [ObjectId('52d669dcad547f059424f783')]})
         self.cmp.compare.find({'rel_id':ObjectId('52d669dcad547f059424f783')})
 
     def test__find_subselect_in_list(self):
