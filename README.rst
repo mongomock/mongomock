@@ -115,6 +115,7 @@ Many thanks go to the following people for helping out:
 * Omer Gertel
 * Scott Sexton
 * Todd Tomkinson 
+* baruchoxman
 * catty (ca77y _at_ live.com)
 * emosenkis
 * hthieu1110
