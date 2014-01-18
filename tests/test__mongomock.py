@@ -201,6 +201,10 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'hat': 'a hat'})
         self.cmp.compare.find({'hat.color.cat': 'red'})
 
+    def test__find_by_objectid_in_list(self):
+        self.cmp.do.insert({'id' : [ObjectId('52d669dcad547f059424f783')]})
+        self.cmp.compare.find({'rel_id':ObjectId('52d669dcad547f059424f783')})
+
     def test__find_by_regex_object(self):
         """Test searching with regular expression objects."""
         bob = {'name': 'bob'}
