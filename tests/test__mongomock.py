@@ -667,7 +667,7 @@ class CollectionMapReduceTest(TestCase):
         for doc in getattr(self.db, result['result']).find():
             self.assertIn(doc, self.expected_results)
 
-    def test__map_reduct_with_query(self):
+    def test__map_reduce_with_query(self):
         expected_results = [{'_id': 'mouse', 'value': 1},
                             {'_id': 'dog', 'value': 2},
                             {'_id': 'cat', 'value': 2}]
@@ -699,6 +699,21 @@ class CollectionMapReduceTest(TestCase):
         for doc in result['result']:
             self.assertIn(doc, self.expected_results)
 
+    def test__map_reduce_with_object_id(self):
+        obj1 = ObjectId()
+        obj2 = ObjectId()
+        data = [{"x": 1, "tags": [obj1, obj2]},
+                {"x": 2, "tags": [obj1]}]			
+        for item in data:
+            self.db.things_with_obj.insert(item)
+        expected_results = [{'_id': obj1, 'value': 2},
+                            {'_id': obj2, 'value': 1}]
+        result = self.db.things_with_obj.map_reduce(self.map_func, self.reduce_func, 'myresults')
+        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertEqual(result.name, 'myresults')
+        self.assertEqual(result.count(), 2)
+        for doc in result.find():
+            self.assertIn(doc, expected_results)			
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

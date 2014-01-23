@@ -487,10 +487,16 @@ class Collection(object):
             function doMap(fnc, docList) {
                 var mappedDict = {};
                 function emit(key, val) {
-                    if(!mappedDict[key]) {
-                        mappedDict[key] = [];
+                    if (key['$oid']) {
+                        mapped_key = '$oid' + key['$oid'];
                     }
-                    mappedDict[key].push(val);
+                    else {
+                        mapped_key = key; 
+                    }
+                    if(!mappedDict[mapped_key]) {
+                        mappedDict[mapped_key] = [];
+                    }
+                    mappedDict[mapped_key].push(val);
                 }
                 mapper = eval('('+fnc+')');
                 var mappedList = new Array();
@@ -516,6 +522,9 @@ class Collection(object):
         doc_list = [json.dumps(doc, default=json_util.default) for doc in self.find(query)]
         mapped_rows = map_ctx.call('doMap', map_func, doc_list)
         reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
+        for reduced_row in reduced_rows:
+            if reduced_row['_id'].startswith('$oid'):
+                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])		
         reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
         if full_response:
             full_dict['counts']['input'] = len(doc_list)
