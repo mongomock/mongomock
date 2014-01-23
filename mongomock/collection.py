@@ -527,6 +527,7 @@ class Collection(object):
             full_dict['counts']['output'] = len(reduced_rows)
         if isinstance(out, (str, bytes)):
             out_collection = getattr(self._Collection__database, out)
+            out_collection.drop()
             out_collection.insert(reduced_rows)
             ret_val = out_collection
             full_dict['result'] = out
