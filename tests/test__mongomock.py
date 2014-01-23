@@ -622,15 +622,33 @@ class CollectionMapReduceTest(TestCase):
         self.expected_results = [{'_id': 'mouse', 'value': 1},
                                  {'_id': 'dog', 'value': 2},
                                  {'_id': 'cat', 'value': 3}]
-
+								 
     def test__map_reduce(self):
-        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults')
+        self._check_map_reduce(self.db.things, self.expected_results)
+
+    def test__map_reduce_clean_res_colc(self):
+		#Checks that the result collection is cleaned between calls
+		
+        self._check_map_reduce(self.db.things, self.expected_results)
+
+        more_data = [{"x": 1, "tags": []},
+                     {"x": 2, "tags": []},
+                     {"x": 3, "tags": []},
+                     {"x": 4, "tags": []}]			
+        for item in more_data:
+            self.db.more_things.insert(item)
+        expected_results = []
+
+        self._check_map_reduce(self.db.more_things, expected_results)
+								 
+    def _check_map_reduce(self, colc, expected_results):
+        result = colc.map_reduce(self.map_func, self.reduce_func, 'myresults')
         self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'myresults')
-        self.assertEqual(result.count(), 3)
+        self.assertEqual(result.count(), len(expected_results))
         for doc in result.find():
-            self.assertIn(doc, self.expected_results)
-
+            self.assertIn(doc, expected_results)
+	
     def test__map_reduce_son(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
         self.assertTrue(isinstance(result, mongomock.Collection))
