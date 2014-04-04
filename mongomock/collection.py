@@ -484,7 +484,7 @@ class Collection(object):
         """dummy implementation of pymongo collection.aggregate functionality
         """
         if len(self._aggregate_response_dummies) < 1:
-            raise NotImplementedError('"real" group functionality is not yet implemented in mongomock. You must preset a return \
+            raise NotImplementedError('"real" aggregate functionality is not yet implemented in mongomock. You must preset a return \
                                         value for this collections group funtion calls. Response values are returned in ascending order.\n\
                                         (e.g. collection_name._aggregate_response_dummies = [\n\
                                                                 \t[{"_id":"1","count":1},{"_id":"2","count":1}],\n\
