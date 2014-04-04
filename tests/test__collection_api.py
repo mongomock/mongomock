@@ -123,6 +123,9 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
+    def test__find_slave_okay(self):
+        self.db.collection.find({}, slave_okay=True)
+
     def test__find_and_modify_cannot_remove_and_new(self):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_and_modify({}, remove=True, new=True)
