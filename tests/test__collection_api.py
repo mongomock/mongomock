@@ -191,6 +191,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_dummy_functionality(self):
         """
+        Make sure dummy aggregate responses work, and raise not implemented if people expect real aggregate functionality
         """
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate(['inputs'])
