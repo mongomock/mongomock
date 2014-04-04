@@ -174,3 +174,28 @@ class CollectionAPITest(TestCase):
         self.db['users'].insert([u1, u2])
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1).count(), 1)
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1)[0]['name'], 'second')
+
+    def test__group_dummy_functionality(self):
+        """
+        Make sure dummy group responses work, and raise not implemented if people expect real group functionality
+        """
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.group(['inputs'])
+        dummy_response_1 = {'_id':'1','count':2}
+        dummy_response_2 = {'_id':'1','count':5}
+        self.db.collection._group_response_dummies = [dummy_response_1, dummy_response_2]
+        self.assertTrue(self.db.collection.group('input')['count'] == 2)
+        self.assertTrue(self.db.collection.group(inputs='input')['count'] == 5)
+
+        self._group_response_dummies = []
+
+    def test__aggregate_dummy_functionality(self):
+        """
+        """
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate(['inputs'])
+        dummy_response_1 = {'_id':'1','count':2}
+        dummy_response_2 = {'_id':'1','count':5}
+        self.db.collection._aggregate_response_dummies = [dummy_response_1, dummy_response_2]
+        self.assertTrue(self.db.collection.aggregate('input')['count'] == 2)
+        self.assertTrue(self.db.collection.aggregate(inputs='input')['count'] == 5)
