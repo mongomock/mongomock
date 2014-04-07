@@ -105,6 +105,7 @@ Many thanks go to the following people for helping out:
 * David Fischer
 * Edward D'Souza
 * Eugene Chernyshov
+* Grigoriy Osadchenko
 * Israel Teixeira
 * Jacob Perkins
 * Jason Sommer
