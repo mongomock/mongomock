@@ -47,7 +47,8 @@ class Collection(object):
     def __getattr__(self, name):
         return self.__getitem__(name)
 
-    def insert(self, data):
+    def insert(self, data, manipulate=True,
+               safe=None, check_keys=True, continue_on_error=False, **kwargs):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
         return self._insert(data)
