@@ -117,6 +117,11 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(ValueError):
                 self.db.col1.save({key: "value"})
 
+    def test__insert(self):
+        self.db.collection.insert({'a': 1})
+        self.db.collection.insert([{'a': 2}, {'a': 3}])
+        self.db.collection.insert({'a': 4}, safe=True, check_keys=False, continue_on_error=True)
+
     def test__find_returns_cursors(self):
         collection = self.db.collection
         self.assertEquals(type(collection.find()).__name__, "Cursor")
