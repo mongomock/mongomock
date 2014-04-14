@@ -201,6 +201,20 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'hat': 'a hat'})
         self.cmp.compare.find({'hat.color.cat': 'red'})
 
+    def test__find_empty_array_field(self):
+        #See #90
+        self.cmp.do.insert({'array_field' : []})
+        self.cmp.compare.find({'array_field' : []})
+
+    def test__find_non_empty_array_field(self):
+        #See #90
+        self.cmp.do.insert({'array_field' : [['abc']]})
+        self.cmp.do.insert({'array_field' : ['def']})
+        self.cmp.compare.find({'array_field' : ['abc']})
+        self.cmp.compare.find({'array_field' : [['abc']]})
+        self.cmp.compare.find({'array_field' : 'def'})		
+        self.cmp.compare.find({'array_field' : ['def']})
+		
     def test__find_by_objectid_in_list(self):
         #See #79
         self.cmp.do.insert({'_id': 'x', 'rel_id' : [ObjectId('52d669dcad547f059424f783')]})
