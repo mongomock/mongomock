@@ -172,6 +172,22 @@ class CollectionAPITest(TestCase):
         self.assertTrue(isinstance(ret_val,list))
         self.assertTrue(set(ret_val) == set(['larry','gary']))
 
+    def test__cursor_count_with_limit(self):
+        first = {'name':'first'}
+        second = {'name':'second'}
+        third = {'name':'third'}
+        self.db['coll_name'].insert([first, second, third])
+        count = self.db['coll_name'].find().limit(2).count(with_limit_and_skip=True)
+        self.assertEqual(count, 2)
+
+    def test__cursor_count_with_skip(self):
+        first = {'name':'first'}
+        second = {'name':'second'}
+        third = {'name':'third'}
+        self.db['coll_name'].insert([first, second, third])
+        count = self.db['coll_name'].find().skip(1).count(with_limit_and_skip=True)
+        self.assertEqual(count, 2)
+
     def test__find_with_skip_param(self):
         """
         Make sure that find() will take in account skip parametter
