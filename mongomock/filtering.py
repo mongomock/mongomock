@@ -35,7 +35,7 @@ def filter_applies(search_filter, document):
                 if isinstance(search, ObjectId):
                     is_match |= (str(search) in doc_val)
             else:
-                is_match = doc_val == search
+                is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
 
             if is_match:
                 break
@@ -50,7 +50,7 @@ def iter_key_candidates(key, doc):
     Get possible subdocuments or lists that are referred to by the key in question
     Returns the appropriate nested value if the key includes dot notation.
     """
-    if not doc:
+    if doc is None:
         return ()
 
     if not key:
