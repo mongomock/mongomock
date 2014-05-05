@@ -308,6 +308,16 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'not very'}})
         self.cmp.compare_ignore_order.find({'snakeness': {'$ne': 'very'}})
 
+    def test__find_notequal(self):
+        """Test searching for None."""
+        bob =       {'_id': 1, 'name': 'bob',       'sheepness':{'sometimes':True}}
+        sam =       {'_id': 2, 'name': 'sam',       'sheepness':{'sometimes':True}}
+        a_goat =    {'_id': 3, 'goatness': 'very',  'sheepness':{}}
+        self.cmp.do.insert([bob, sam, a_goat])
+        self.cmp.compare_ignore_order.find({'goatness': None})
+        self.cmp.compare_ignore_order.find({'sheepness.sometimes': None})
+
+
     def test__find_not(self):
         bob = {'_id': 1, 'name': 'bob'}
         sam = {'_id': 2, 'name': 'sam'}
