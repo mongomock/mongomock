@@ -104,6 +104,7 @@ Many thanks go to the following people for helping out:
 * Craig Hobbs
 * David Fischer
 * Edward D'Souza
+* Emily Rosengren
 * Eugene Chernyshov
 * Grigoriy Osadchenko
 * Israel Teixeira
