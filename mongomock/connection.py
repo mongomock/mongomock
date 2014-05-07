@@ -13,6 +13,7 @@ class Connection(object):
         self.port = port
         self._databases = {}
         self._id = next(self._CONNECTION_ID)
+        self.document_class = document_class
 
     def __getitem__(self, db_name):
         db = self._databases.get(db_name, None)
