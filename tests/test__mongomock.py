@@ -739,6 +739,64 @@ class CollectionMapReduceTest(TestCase):
         for doc in result.find():
             self.assertIn(doc, expected_results)			
 
+class CollectionGroupTest(TestCase):
+    def setUp(self):
+        self.db = mongomock.Connection().group_test
+        self.data = [{"a": 1, "count": 4 },
+                     {"a": 1, "count": 2 },
+                     {"a": 1, "count": 4 },
+                     {"a": 2, "count": 3 },
+                     {"a": 2, "count": 1 },
+                     {"a": 1, "count": 5 },
+                     {"a": 4, "count": 4 }]
+        for item in self.data:
+            self.db.things.insert(item)
+        self.key = ["a"]
+        self.initial = {"count":0}
+        self.condition = {"a": {"$lt": 3}}
+        self.reduce_func = Code("""
+                function(cur, result) { result.count += cur.count }
+                """)
+        self.expected_results = [{"a": 1, "count": 15 },
+                                 {"a": 2, "count": 4 }]
+
+    def test__group(self):
+        self._check_group(self.db.things, self.expected_results)
+
+    def _check_group(self, colc, expected_results):
+        result = colc.group(self.key, self.condition, self.initial, self.reduce_func)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(result, expected_results)
+        self.assertEqual(len(result), len(expected_results))
+
+class CollectionAggregateTest(TestCase):
+    def setUp(self):
+        self.db = mongomock.Connection().aggregate_test
+        self.data = [{"a": 1, "count": 4 },
+                     {"a": 1, "count": 2 },
+                     {"a": 1, "count": 4 },
+                     {"a": 2, "count": 3 },
+                     {"a": 2, "count": 1 },
+                     {"a": 1, "count": 5 },
+                     {"a": 4, "count": 4 }]
+        for item in self.data:
+            self.db.things.insert(item)
+        self.pipeline = [{'$group': {'_id': 'a',
+                                     'count': {'$sum': 'count'}}},
+                         {'$match': {'a':{'$lt':3}}},
+                         {'$sort': {'a': -1}},
+                         {'$skip': 1},
+                         {'$limit': 2}]
+        self.expected_results = [{"a": 1, "count": 15}]
+
+    def test__aggregate(self):
+        self._check_aggregate(self.db.things, self.expected_results)
+
+    def _check_aggregate(self, colc, expected_results):
+        result = colc.aggregate(self.pipeline)
+        self.assertEqual(result, expected_results)
+        self.assertEqual(len(result), len(expected_results))
+
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
 
