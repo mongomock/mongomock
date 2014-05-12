@@ -102,6 +102,7 @@ Many thanks go to the following people for helping out:
 * Arthur Hirata
 * Corey Downing
 * Craig Hobbs
+* Daniel Murray
 * David Fischer
 * Edward D'Souza
 * Emily Rosengren
