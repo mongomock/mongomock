@@ -739,6 +739,8 @@ class CollectionMapReduceTest(TestCase):
         for doc in result.find():
             self.assertIn(doc, expected_results)			
 
+@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
 class CollectionGroupTest(TestCase):
     def setUp(self):
         self.db = mongomock.Connection().group_test
@@ -791,6 +793,8 @@ class CollectionGroupTest(TestCase):
 
 
 
+@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
 class CollectionAggregateTest(TestCase):
     def setUp(self):
         self.db = mongomock.Connection().aggregate_test
