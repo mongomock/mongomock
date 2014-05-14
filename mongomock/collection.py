@@ -563,7 +563,7 @@ class Collection(object):
     def distinct(self, key):
         return self.find().distinct(key)
 
-    def group(self, key, condition, initial, reduce_func, finalize=None):
+    def group(self, key, condition, initial, reduce, finalize=None):
         reduce_ctx = execjs.compile("""
             function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
@@ -592,14 +592,14 @@ class Collection(object):
                 doc_dict = {}
                 group_list = ([x for x in group])
                 doc_dict[k] = k2
-                reduced_val = reduce_ctx.call('doReduce', reduce_func, group_list)
+                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
                 doc_dict.update(reduced_val)
                 ret_array.append(doc_dict)
         for doc in ret_array:
             del doc["_id"]
         return ret_array
 
-    def aggregate(self, pipeline):
+    def aggregate(self, pipeline, **kwargs):
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
         for expression in pipeline:
