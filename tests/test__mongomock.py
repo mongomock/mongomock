@@ -742,32 +742,54 @@ class CollectionMapReduceTest(TestCase):
 class CollectionGroupTest(TestCase):
     def setUp(self):
         self.db = mongomock.Connection().group_test
-        self.data = [{"a": 1, "count": 4 },
-                     {"a": 1, "count": 2 },
-                     {"a": 1, "count": 4 },
-                     {"a": 2, "count": 3 },
-                     {"a": 2, "count": 1 },
-                     {"a": 1, "count": 5 },
-                     {"a": 4, "count": 4 }]
+        self.data = [
+                         {"a": 1, "count": 4 },
+                         {"a": 1, "count": 2 },
+                         {"a": 1, "count": 4 },
+                         {"a": 2, "count": 3 },
+                         {"a": 2, "count": 1 },
+                         {"a": 1, "count": 5 },
+                         {"a": 4, "count": 4 },
+                         {"b": 4, "foo": 4 },
+                         {"b": 2, "foo": 3, "name":"theone" },
+                         {"b": 1, "foo": 2 },
+                     ]
         for item in self.data:
             self.db.things.insert(item)
-        self.key = ["a"]
-        self.initial = {"count":0}
-        self.condition = {"a": {"$lt": 3}}
-        self.reduce_func = Code("""
-                function(cur, result) { result.count += cur.count }
-                """)
-        self.expected_results = [{"a": 1, "count": 15 },
-                                 {"a": 2, "count": 4 }]
+        
 
     def test__group(self):
-        self._check_group(self.db.things, self.expected_results)
+        key = ["a"]
+        initial = {"count":0}
+        condition = {"a": {"$lt": 3}}
+        reduce_func = Code("""
+                function(cur, result) { result.count += cur.count }
+                """)
+        expected_results = [{"a": 1, "count": 15 },
+                                 {"a": 2, "count": 4 }]
 
-    def _check_group(self, colc, expected_results):
-        result = colc.group(self.key, self.condition, self.initial, self.reduce_func)
+        result = self.db.things.group(key, condition, initial, reduce_func)
         self.assertTrue(isinstance(result, list))
         self.assertEqual(result, expected_results)
         self.assertEqual(len(result), len(expected_results))
+
+    def test__group(self):
+        
+        reduce_func = Code("""
+                function(cur, result) { result.count += 1 }
+                """)
+        expected_results = [{"b": 1, "count": 1 }]
+
+        result = self.db.things.group(  key = ["b"], 
+                                        condition = {"foo":{"$in":[3,4]}, "name":"theone"},
+                                        initial = {"count": 0}, 
+                                        reduce = reduce_func,
+                                    )
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(result, expected_results)
+        self.assertEqual(len(result), len(expected_results))
+
+
 
 class CollectionAggregateTest(TestCase):
     def setUp(self):
