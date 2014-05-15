@@ -431,7 +431,7 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove({'name': 'notsam'})
         self.cmp.compare.find()
         self.cmp.do.remove({'name': 'sam'})
-        self.cmp.compare.find
+        self.cmp.compare.find()
 
     def test__update(self):
         doc = {"a" : 1}
@@ -601,7 +601,6 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
     def test__drop(self):
-        data = {'a': 1}
         self.cmp.do.insert({"name" : "another new"})
         self.cmp.do.drop()
         self.cmp.compare.find({})
@@ -741,9 +740,10 @@ class CollectionMapReduceTest(TestCase):
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
-class CollectionGroupTest(TestCase):
+class _GroupTest(_CollectionComparisonTest):
     def setUp(self):
-        self.db = mongomock.Connection().group_test
+        _CollectionComparisonTest.setUp(self)
+        self._id1 = ObjectId()
         self.data = [
                          {"a": 1, "count": 4 },
                          {"a": 1, "count": 2 },
@@ -755,12 +755,13 @@ class CollectionGroupTest(TestCase):
                          {"b": 4, "foo": 4 },
                          {"b": 2, "foo": 3, "name":"theone" },
                          {"b": 1, "foo": 2 },
+                         {"b": 1, "foo": self._id1 },
                      ]
         for item in self.data:
-            self.db.things.insert(item)
+            self.cmp.do.insert(item)
         
 
-    def test__group(self):
+    def test__group1(self):
         key = ["a"]
         initial = {"count":0}
         condition = {"a": {"$lt": 3}}
@@ -769,34 +770,38 @@ class CollectionGroupTest(TestCase):
                 """)
         expected_results = [{"a": 1, "count": 15 },
                             {"a": 2, "count": 4 }]
+        self.cmp.compare.group(key, condition, initial, reduce_func)
 
-        result = self.db.things.group(key, condition, initial, reduce_func)
-        self.assertTrue(isinstance(result, list))
-        self.assertEqual(result, expected_results)
-        self.assertEqual(len(result), len(expected_results))
 
-    def test__group(self):
-        
+    def test__group2(self):
         reduce_func = Code("""
                 function(cur, result) { result.count += 1 }
                 """)
-        expected_results = [{"b": 2, "count": 1 }]
-
-        result = self.db.things.group(  key = ["b"], 
+        self.cmp.compare.group(  key = ["b"], 
                                         condition = {"foo":{"$in":[3,4]}, "name":"theone"},
                                         initial = {"count": 0}, 
                                         reduce = reduce_func,
                                     )
-        self.assertTrue(isinstance(result, list))
-        self.assertEqual(result, expected_results)
-        self.assertEqual(len(result), len(expected_results))
 
+    def test__group3(self):
+        reducer=Code("function(obj, result) {result.count+=1 }")
+        conditions = {
+                    'foo':{'$in':[self._id1]},
+                    }
+        self.cmp.compare.group(key=['foo'], condition=conditions, initial={"count": 0}, reduce=reducer)
+
+
+class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
+    pass
+
+class PymongoGroupTest(_GroupTest, _PymongoConnectionMixin):
+    pass
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
-class CollectionAggregateTest(TestCase):
+class _AggregateTest(_CollectionComparisonTest):
     def setUp(self):
-        self.db = mongomock.Connection().aggregate_test
+        _CollectionComparisonTest.setUp(self)
         self.data = [{"a": 1, "count": 4 },
                      {"a": 1, "count": 2 },
                      {"a": 1, "count": 4 },
@@ -805,7 +810,7 @@ class CollectionAggregateTest(TestCase):
                      {"a": 1, "count": 5 },
                      {"a": 4, "count": 4 }]
         for item in self.data:
-            self.db.things.insert(item)
+            self.cmp.do.insert(item)
         self.pipeline = [{'$group': {'_id': 'a',
                                      'count': {'$sum': 'count'}}},
                          {'$match': {'a':{'$lt':3}}},
@@ -815,12 +820,15 @@ class CollectionAggregateTest(TestCase):
         self.expected_results = [{"a": 1, "count": 15}]
 
     def test__aggregate(self):
-        self._check_aggregate(self.db.things, self.expected_results)
+        self.cmp.compare.aggregate(self.pipeline)
 
-    def _check_aggregate(self, colc, expected_results):
-        result = colc.aggregate(self.pipeline)
-        self.assertEqual(result, expected_results)
-        self.assertEqual(len(result), len(expected_results))
+
+class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
+    pass
+
+class PymongoAggregateTest(_AggregateTest, _PymongoConnectionMixin):
+    pass
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
