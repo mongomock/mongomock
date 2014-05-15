@@ -573,7 +573,7 @@ class Collection(object):
                 return docList;
             }
         """)
-
+        reduced_val = []
         doc_list = [doc for doc in self.find(condition)]
         print doc_list
         for doc in doc_list:
