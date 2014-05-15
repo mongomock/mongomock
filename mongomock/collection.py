@@ -565,39 +565,32 @@ class Collection(object):
 
     def group(self, key, condition, initial, reduce, finalize=None):
         reduce_ctx = execjs.compile("""
-            function doReduce(fnc, docList) {
+            function doReduce(fnc, docList, initial) {
                 reducer = eval('('+fnc+')');
-                for(var i=0, l=docList.length; i<l; i++) {
-                    console.log(docList[i], docList[i+1]);
-                    if (!docList[i+1]) {
-                        reducedVal = docList[i];
-                    }
-                    else {
-                        reducedVal = reducer(docList[i], docList[i+1]); 
-                    }
+                for(var i=0, l=docList.length; i<l; i++) {  
+                    reducedVal = reducer(docList[i], docList[i]); 
                 }
-                return reducedVal;
+                return docList;
             }
         """)
 
-        doc_list = [json.loads(json.dumps(doc, default=json_util.default)) for doc in self.find(condition)]
+        doc_list = [doc for doc in self.find(condition)]
+        print doc_list
+        for doc in doc_list:
+            for k in doc.keys():
+                if k not in key:
+                    del doc[k]
+            doc.update(initial)
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
-        ret_array = []
         for k in key:
             if not isinstance(k, basestring):
                 raise TypeError("Keys must be a list of key names, "
                                 "each an instance of %s" % (basestring.__name__,))
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
-                doc_dict = {}
                 group_list = ([x for x in group])
-                doc_dict[k] = k2
-                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
-                doc_dict.update(reduced_val)
-                ret_array.append(doc_dict)
-        for doc in ret_array:
-            del doc["_id"]
-        return ret_array
+                reduced_val = reduce_ctx.call('doReduce', reduce, group_list, initial)
+        return reduced_val
 
     def aggregate(self, pipeline, **kwargs):
         out_collection = [doc for doc in self.find()]

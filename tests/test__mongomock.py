@@ -768,7 +768,7 @@ class CollectionGroupTest(TestCase):
                 function(cur, result) { result.count += cur.count }
                 """)
         expected_results = [{"a": 1, "count": 15 },
-                                 {"a": 2, "count": 4 }]
+                            {"a": 2, "count": 4 }]
 
         result = self.db.things.group(key, condition, initial, reduce_func)
         self.assertTrue(isinstance(result, list))
@@ -780,7 +780,7 @@ class CollectionGroupTest(TestCase):
         reduce_func = Code("""
                 function(cur, result) { result.count += 1 }
                 """)
-        expected_results = [{"b": 1, "count": 1 }]
+        expected_results = [{"b": 2, "count": 1 }]
 
         result = self.db.things.group(  key = ["b"], 
                                         condition = {"foo":{"$in":[3,4]}, "name":"theone"},
@@ -792,9 +792,12 @@ class CollectionGroupTest(TestCase):
         self.assertEqual(len(result), len(expected_results))
 
 
+#<<<<<<< Updated upstream
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
+#=======
+#>>>>>>> Stashed changes
 class CollectionAggregateTest(TestCase):
     def setUp(self):
         self.db = mongomock.Connection().aggregate_test
