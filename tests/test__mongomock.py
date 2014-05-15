@@ -792,12 +792,8 @@ class CollectionGroupTest(TestCase):
         self.assertEqual(len(result), len(expected_results))
 
 
-<<<<<<< Updated upstream
-
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
-=======
->>>>>>> Stashed changes
 class CollectionAggregateTest(TestCase):
     def setUp(self):
         self.db = mongomock.Connection().aggregate_test
