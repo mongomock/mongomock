@@ -565,7 +565,7 @@ class Collection(object):
 
     def group(self, key, condition, initial, reduce, finalize=None):
         reduce_ctx = execjs.compile("""
-            function doReduce(fnc, docList, initial) {
+            function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
                 for(var i=0, l=docList.length; i<l; i++) {  
                     reducedVal = reducer(docList[i], docList[i]); 
@@ -589,7 +589,7 @@ class Collection(object):
                                 "each an instance of %s" % (basestring.__name__,))
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
-                reduced_val = reduce_ctx.call('doReduce', reduce, group_list, initial)
+                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
         return reduced_val
 
     def aggregate(self, pipeline, **kwargs):
