@@ -567,20 +567,37 @@ class Collection(object):
         reduce_ctx = execjs.compile("""
             function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
-                for(var i=0, l=docList.length; i<l; i++) {  
-                    reducedVal = reducer(docList[i], docList[i]); 
+                for(var i=0, l=docList.length; i<l; i++) {
+                    try {
+                        reducedVal = reducer(docList[i-1], docList[i]); 
+                    }
+                    catch (err) {
+                        continue;
+                    }
                 }
-                return docList;
+            return docList[docList.length - 1];
             }
         """)
-        reduced_val = []
+
+        ret_array = []
+        reduced_val = {}
         doc_list = [doc for doc in self.find(condition)]
-        print doc_list
         for doc in doc_list:
-            for k in doc.keys():
-                if k not in key:
+            for k, v in doc.items():
+                if isinstance(v, ObjectId):
+                    print "DGfdafafODNGN"
+                    doc[k] = str(v)
+                if k not in key and k not in reduce:
                     del doc[k]
-            doc.update(initial)
+            for initial_key, initial_value in initial.items():
+                print initial_key, initial_value
+                if initial_key in doc.keys():
+                    pass
+                else:
+                    print "should have gotten into hur"
+                    doc[initial_key] = initial_value
+                    print doc[initial_key]
+        print doc_list
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
@@ -590,7 +607,12 @@ class Collection(object):
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
-        return reduced_val
+                ret_array.append(reduced_val)
+        for doc in ret_array:
+            for k, v in doc.items():
+                if k not in key and k not in initial.keys():
+                    del doc[k]
+        return ret_array
 
     def aggregate(self, pipeline, **kwargs):
         out_collection = [doc for doc in self.find()]

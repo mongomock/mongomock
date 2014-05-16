@@ -784,11 +784,20 @@ class _GroupTest(_CollectionComparisonTest):
                                     )
 
     def test__group3(self):
-        reducer=Code("function(obj, result) {result.count+=1 }")
+        reducer=Code("""
+            function(obj, result) {result.count+=1 }
+            """)
         conditions = {
                     'foo':{'$in':[self._id1]},
                     }
-        self.cmp.compare.group(key=['foo'], condition=conditions, initial={"count": 0}, reduce=reducer)
+        print self.cmp.do.group(key=['foo'], 
+                               condition=conditions, 
+                               initial={"count": 0}, 
+                               reduce=reducer)
+        self.cmp.compare.group(key=['foo'], 
+                               condition=conditions, 
+                               initial={"count": 0}, 
+                               reduce=reducer)
 
 
 class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
@@ -797,37 +806,37 @@ class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
 class PymongoGroupTest(_GroupTest, _PymongoConnectionMixin):
     pass
 
-@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
-@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
-class _AggregateTest(_CollectionComparisonTest):
-    def setUp(self):
-        _CollectionComparisonTest.setUp(self)
-        self.data = [{"a": 1, "count": 4 },
-                     {"a": 1, "count": 2 },
-                     {"a": 1, "count": 4 },
-                     {"a": 2, "count": 3 },
-                     {"a": 2, "count": 1 },
-                     {"a": 1, "count": 5 },
-                     {"a": 4, "count": 4 }]
-        for item in self.data:
-            self.cmp.do.insert(item)
-        self.pipeline = [{'$group': {'_id': 'a',
-                                     'count': {'$sum': 'count'}}},
-                         {'$match': {'a':{'$lt':3}}},
-                         {'$sort': {'a': -1}},
-                         {'$skip': 1},
-                         {'$limit': 2}]
-        self.expected_results = [{"a": 1, "count": 15}]
-
-    def test__aggregate(self):
-        self.cmp.compare.aggregate(self.pipeline)
-
-
-class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
-    pass
-
-class PymongoAggregateTest(_AggregateTest, _PymongoConnectionMixin):
-    pass
+#@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+#@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
+#class _AggregateTest(_CollectionComparisonTest):
+#    def setUp(self):
+#        _CollectionComparisonTest.setUp(self)
+#        self.data = [{"a": 1, "count": 4 },
+#                     {"a": 1, "count": 2 },
+#                     {"a": 1, "count": 4 },
+#                     {"a": 2, "count": 3 },
+#                     {"a": 2, "count": 1 },
+#                     {"a": 1, "count": 5 },
+#                     {"a": 4, "count": 4 }]
+#        for item in self.data:
+#            self.cmp.do.insert(item)
+#        self.pipeline = [{'$group': {'_id': 'a',
+#                                     'count': {'$sum': 'count'}}},
+#                         {'$match': {'a':{'$lt':3}}},
+#                         {'$sort': {'a': -1}},
+#                         {'$skip': 1},
+#                         {'$limit': 2}]
+#        self.expected_results = [{"a": 1, "count": 15}]
+#
+#    def test__aggregate(self):
+#        self.cmp.compare.aggregate(self.pipeline)
+#
+#
+#class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
+#    pass
+#
+#class PymongoAggregateTest(_AggregateTest, _PymongoConnectionMixin):
+#    pass
 
 
 def _LIMIT(*args):
