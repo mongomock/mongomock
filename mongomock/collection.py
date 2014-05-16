@@ -13,7 +13,7 @@ from .helpers import basestring, xrange
 try:
     # Optional requirements for providing Map-Reduce functionality
     import execjs
-except ImportError:
+except ImportError:     
     execjs = None
 
 try:
@@ -610,14 +610,27 @@ class Collection(object):
         return ret_array
 
     def aggregate(self, pipeline, **kwargs):
+        pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
+        group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
+        boolean_operators =        ['$and','$or', '$not']
+        set_operators =            ['$setEquals', '$setIntersection', '$setDifference', '$setUnion', '$setIsSubset', '$anyElementTrue', '$allElementsTrue']
+        compairison_operators =    ['$cmp','$eq','$gt','$gte','$lt','$lte','$ne']
+        aritmetic_operators =      ['$add','$divide','$mod','$multiply','$subtract']
+        string_operators =         ['$concat','$strcasecmp','$substr','$toLower','$toUpper']
+        text_search_operators =    ['$meta']
+        array_operators =          ['$size']
+        projection_operators =     ['$map', '$let', '$literal']
+        date_operators =           ['$dayOfYear','$dayOfMonth','$dayOfWeek','$year','$month','$week','$hour','$minute','$second','$millisecond']
+        conditional_operators =    ['$cond', '$ifNull']
+
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
         for expression in pipeline:
             for k, v in iteritems(expression):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection if filter_applies(v, doc)]
-                if k == '$group':
-                    group_func_keys = expression['$group']['_id']
+                elif k == '$group':
+                    group_func_keys = expression['$group']['_id'][1:]
                     for group_key in reversed(group_func_keys):
                         out_collection = sorted(out_collection, key=lambda x: _resolve_key(group_key, x))
                     for field, value in iteritems(v):
@@ -628,7 +641,7 @@ class Collection(object):
                                         for ret_value, group in itertools.groupby(out_collection, lambda item: item[group_key]):
                                             doc_dict = {}
                                             group_list = ([x for x in group])
-                                            doc_dict[group_key] = ret_value
+                                            doc_dict['_id'] = ret_value
                                             current_val = 0
                                             if func == "$sum":
                                                 for doc in group_list:
@@ -640,21 +653,43 @@ class Collection(object):
                                                     avg = current_val / len(group_list)
                                                 doc_dict[field] = current_val
                                             grouped_collection.append(doc_dict)
+                                else:
+                                    if func in group_operators:
+                                        raise NotImplementedError(
+                                            "Although %s is a valid group operator for the aggregation pipeline, "
+                                            "%s is currently not implemented in Mongomock."
+                                        )
+                                    else:
+                                        raise NotImplementedError(
+                                            "%s is not a valid group operator for the aggregation pipeline. "
+                                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                                            "for a complete list of valid operators."
+                                        )
                     out_collection = grouped_collection
-                if k == '$sort':
+                elif k == '$sort':
                     sort_array = []
                     for x, y in v.items():
                         sort_array.append({x:y})
                     for sort_pair in reversed(sort_array):
                         for sortKey, sortDirection in sort_pair.items():
                             out_collection = sorted(out_collection, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0)
-                if k == '$skip':
+                elif k == '$skip':
                     out_collection = out_collection[v:]
-                if k == '$limit':
+                elif k == '$limit':
                     out_collection = out_collection[:v]
-                if k == '$out':
-                    pass
-        return out_collection
+                else:
+                    if k in pipeline_operators:
+                        raise NotImplementedError(
+                            "Although %s is a valid operator for the aggregation pipeline, "
+                            "%s is currently not implemented in Mongomock."
+                        )
+                    else:
+                        raise NotImplementedError(
+                            "%s is not a valid operator for the aggregation pipeline. "
+                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                            "for a complete list of valid operators."
+                        )
+        return {'ok':1.0, 'result':out_collection}
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)

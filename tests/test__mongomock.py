@@ -768,8 +768,6 @@ class _GroupTest(_CollectionComparisonTest):
         reduce_func = Code("""
                 function(cur, result) { result.count += cur.count }
                 """)
-        expected_results = [{"a": 1, "count": 15 },
-                            {"a": 2, "count": 4 }]
         self.cmp.compare.group(key, condition, initial, reduce_func)
 
 
@@ -802,37 +800,67 @@ class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
 class PymongoGroupTest(_GroupTest, _PymongoConnectionMixin):
     pass
 
-#@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
-#@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
-#class _AggregateTest(_CollectionComparisonTest):
-#    def setUp(self):
-#        _CollectionComparisonTest.setUp(self)
-#        self.data = [{"a": 1, "count": 4 },
-#                     {"a": 1, "count": 2 },
-#                     {"a": 1, "count": 4 },
-#                     {"a": 2, "count": 3 },
-#                     {"a": 2, "count": 1 },
-#                     {"a": 1, "count": 5 },
-#                     {"a": 4, "count": 4 }]
-#        for item in self.data:
-#            self.cmp.do.insert(item)
-#        self.pipeline = [{'$group': {'_id': 'a',
-#                                     'count': {'$sum': 'count'}}},
-#                         {'$match': {'a':{'$lt':3}}},
-#                         {'$sort': {'a': -1}},
-#                         {'$skip': 1},
-#                         {'$limit': 2}]
-#        self.expected_results = [{"a": 1, "count": 15}]
-#
-#    def test__aggregate(self):
-#        self.cmp.compare.aggregate(self.pipeline)
-#
-#
-#class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
-#    pass
-#
-#class PymongoAggregateTest(_AggregateTest, _PymongoConnectionMixin):
-#    pass
+@skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+@skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
+class _AggregateTest(_CollectionComparisonTest):
+    def setUp(self):
+        _CollectionComparisonTest.setUp(self)
+        self.data = [{"_id":ObjectId(), "a": 1, "count": 4 },
+                     {"_id":ObjectId(), "a": 1, "count": 2 },
+                     {"_id":ObjectId(), "a": 1, "count": 4 },
+                     {"_id":ObjectId(), "a": 2, "count": 3 },
+                     {"_id":ObjectId(), "a": 2, "count": 1 },
+                     {"_id":ObjectId(), "a": 1, "count": 5 },
+                     {"_id":ObjectId(), "a": 4, "count": 4 }]
+        for item in self.data:
+            self.cmp.do.insert(item)
+        
+        #self.expected_results = [{"a": 1, "count": 15}]
+
+    def test__aggregate1(self):
+        pipeline = [
+                        {
+                            '$match': {'a':{'$lt':3}}
+                        },
+                        {
+                            '$sort':{'_id':-1}
+                        },
+                    ]
+        self.cmp.compare.aggregate(pipeline)
+    
+    def test__aggregate2(self):
+        pipeline = [
+                        {
+                            '$group': {
+                                        '_id': '$a',
+                                        'count': {'$sum': '$count'}
+                                    }
+                        },
+                        {
+                            '$match': {'a':{'$lt':3}}
+                        },
+                        {
+                            '$sort': {'_id': -1, 'count': 1}
+                        },
+                    ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate3(self):
+        pipeline = [{'$group': {'_id': 'a',
+                                     'count': {'$sum': '$count'}}},
+                         {'$match': {'a':{'$lt':3}}},
+                         {'$sort': {'_id': -1, 'count': 1}},
+                         {'$skip': 1},
+                         {'$limit': 2}]
+        self.cmp.compare.aggregate(pipeline)
+
+
+
+class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
+    pass
+
+class PymongoAggregateTest(_AggregateTest, _PymongoConnectionMixin):
+    pass
 
 
 def _LIMIT(*args):
