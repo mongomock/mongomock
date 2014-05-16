@@ -790,10 +790,6 @@ class _GroupTest(_CollectionComparisonTest):
         conditions = {
                     'foo':{'$in':[self._id1]},
                     }
-        print self.cmp.do.group(key=['foo'], 
-                               condition=conditions, 
-                               initial={"count": 0}, 
-                               reduce=reducer)
         self.cmp.compare.group(key=['foo'], 
                                condition=conditions, 
                                initial={"count": 0}, 
