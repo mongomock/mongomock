@@ -580,7 +580,8 @@ class Collection(object):
         """)
 
         ret_array = []
-        doc_list_no_id = []
+        doc_list_copy = []
+        ret_array_copy = []
         reduced_val = {}
         doc_list = [doc for doc in self.find(condition)]
         for doc in doc_list:
@@ -595,8 +596,8 @@ class Collection(object):
                     pass
                 else:
                     doc_copy[initial_key] = initial[initial_key]
-            doc_list_no_id.append(doc_copy)
-        doc_list = doc_list_no_id
+            doc_list_copy.append(doc_copy)
+        doc_list = doc_list_copy
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
@@ -608,9 +609,12 @@ class Collection(object):
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
                 ret_array.append(reduced_val)
         for doc in ret_array:
-            for k, v in doc.items():
+            doc_copy = copy.deepcopy(doc)
+            for k in doc:
                 if k not in key and k not in initial.keys():
-                    del doc[k]
+                    del doc_copy[k]
+            ret_array_copy.append(doc_copy)
+        ret_array = ret_array_copy
         return ret_array
 
     def aggregate(self, pipeline, **kwargs):
