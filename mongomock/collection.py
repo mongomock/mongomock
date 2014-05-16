@@ -585,19 +585,14 @@ class Collection(object):
         for doc in doc_list:
             for k, v in doc.items():
                 if isinstance(v, ObjectId):
-                    print "DGfdafafODNGN"
                     doc[k] = str(v)
                 if k not in key and k not in reduce:
                     del doc[k]
             for initial_key, initial_value in initial.items():
-                print initial_key, initial_value
                 if initial_key in doc.keys():
                     pass
                 else:
-                    print "should have gotten into hur"
                     doc[initial_key] = initial_value
-                    print doc[initial_key]
-        print doc_list
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
