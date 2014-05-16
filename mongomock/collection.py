@@ -585,16 +585,16 @@ class Collection(object):
         doc_list = [doc for doc in self.find(condition)]
         for doc in doc_list:
             doc_copy = copy.deepcopy(doc)
-            for k, v in doc.items():
-                if isinstance(v, ObjectId):
-                    doc_copy[k] = str(v)
+            for k in doc:
+                if isinstance(doc[k], ObjectId):
+                    doc_copy[k] = str(doc[k])
                 if k not in key and k not in reduce:
                     del doc_copy[k]
-            for initial_key, initial_value in initial.items():
+            for initial_key in initial:
                 if initial_key in doc.keys():
                     pass
                 else:
-                    doc_copy[initial_key] = initial_value
+                    doc_copy[initial_key] = initial[initial_key]
             doc_list_no_id.append(doc_copy)
         doc_list = doc_list_no_id
         for k in key:
