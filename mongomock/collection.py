@@ -13,7 +13,7 @@ from .helpers import basestring, xrange
 try:
     # Optional requirements for providing Map-Reduce functionality
     import execjs
-except ImportError:
+except ImportError:     
     execjs = None
 
 try:
@@ -268,7 +268,6 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
-
         for i in xrange(skip):
             try:
                 unused = next(dataset)
@@ -525,7 +524,7 @@ class Collection(object):
         reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
         for reduced_row in reduced_rows:
             if reduced_row['_id'].startswith('$oid'):
-                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])		
+                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])
         reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
         if full_response:
             full_dict['counts']['input'] = len(doc_list)
@@ -563,6 +562,142 @@ class Collection(object):
 
     def distinct(self, key):
         return self.find().distinct(key)
+
+    def group(self, key, condition, initial, reduce, finalize=None):
+        reduce_ctx = execjs.compile("""
+            function doReduce(fnc, docList) {
+                reducer = eval('('+fnc+')');
+                for(var i=0, l=docList.length; i<l; i++) {
+                    try {
+                        reducedVal = reducer(docList[i-1], docList[i]); 
+                    }
+                    catch (err) {
+                        continue;
+                    }
+                }
+            return docList[docList.length - 1];
+            }
+        """)
+
+        ret_array = []
+        doc_list_copy = []
+        ret_array_copy = []
+        reduced_val = {}
+        doc_list = [doc for doc in self.find(condition)]
+        for doc in doc_list:
+            doc_copy = copy.deepcopy(doc)
+            for k in doc:
+                if isinstance(doc[k], ObjectId):
+                    doc_copy[k] = str(doc[k])
+                if k not in key and k not in reduce:
+                    del doc_copy[k]
+            for initial_key in initial:
+                if initial_key in doc.keys():
+                    pass
+                else:
+                    doc_copy[initial_key] = initial[initial_key]
+            doc_list_copy.append(doc_copy)
+        doc_list = doc_list_copy
+        for k in key:
+            doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
+        for k in key:
+            if not isinstance(k, basestring):
+                raise TypeError("Keys must be a list of key names, "
+                                "each an instance of %s" % (basestring.__name__,))
+            for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
+                group_list = ([x for x in group])
+                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
+                ret_array.append(reduced_val)
+        for doc in ret_array:
+            doc_copy = copy.deepcopy(doc)
+            for k in doc:
+                if k not in key and k not in initial.keys():
+                    del doc_copy[k]
+            ret_array_copy.append(doc_copy)
+        ret_array = ret_array_copy
+        return ret_array
+
+    def aggregate(self, pipeline, **kwargs):
+        pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
+        group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
+        boolean_operators =        ['$and','$or', '$not']
+        set_operators =            ['$setEquals', '$setIntersection', '$setDifference', '$setUnion', '$setIsSubset', '$anyElementTrue', '$allElementsTrue']
+        compairison_operators =    ['$cmp','$eq','$gt','$gte','$lt','$lte','$ne']
+        aritmetic_operators =      ['$add','$divide','$mod','$multiply','$subtract']
+        string_operators =         ['$concat','$strcasecmp','$substr','$toLower','$toUpper']
+        text_search_operators =    ['$meta']
+        array_operators =          ['$size']
+        projection_operators =     ['$map', '$let', '$literal']
+        date_operators =           ['$dayOfYear','$dayOfMonth','$dayOfWeek','$year','$month','$week','$hour','$minute','$second','$millisecond']
+        conditional_operators =    ['$cond', '$ifNull']
+
+        out_collection = [doc for doc in self.find()]
+        grouped_collection = []
+        for expression in pipeline:
+            for k, v in iteritems(expression):
+                if k == '$match':
+                    out_collection = [doc for doc in out_collection if filter_applies(v, doc)]
+                elif k == '$group':
+                    group_func_keys = expression['$group']['_id'][1:]
+                    for group_key in reversed(group_func_keys):
+                        out_collection = sorted(out_collection, key=lambda x: _resolve_key(group_key, x))
+                    for field, value in iteritems(v):
+                        if field != '_id':
+                            for func, key in iteritems(value):
+                                if func == "$sum" or "$avg":
+                                    for group_key in group_func_keys:
+                                        for ret_value, group in itertools.groupby(out_collection, lambda item: item[group_key]):
+                                            doc_dict = {}
+                                            group_list = ([x for x in group])
+                                            doc_dict['_id'] = ret_value
+                                            current_val = 0
+                                            if func == "$sum":
+                                                for doc in group_list:
+                                                    current_val = sum([current_val, doc[field]])
+                                                doc_dict[field] = current_val
+                                            else:
+                                                for doc in group_list:
+                                                    current_val = sum([current_val, doc[field]])
+                                                    avg = current_val / len(group_list)
+                                                doc_dict[field] = current_val
+                                            grouped_collection.append(doc_dict)
+                                else:
+                                    if func in group_operators:
+                                        raise NotImplementedError(
+                                            "Although %s is a valid group operator for the aggregation pipeline, "
+                                            "%s is currently not implemented in Mongomock."
+                                        )
+                                    else:
+                                        raise NotImplementedError(
+                                            "%s is not a valid group operator for the aggregation pipeline. "
+                                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                                            "for a complete list of valid operators."
+                                        )
+                    out_collection = grouped_collection
+                elif k == '$sort':
+                    sort_array = []
+                    for x, y in v.items():
+                        sort_array.append({x:y})
+                    for sort_pair in reversed(sort_array):
+                        for sortKey, sortDirection in sort_pair.items():
+                            out_collection = sorted(out_collection, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0)
+                elif k == '$skip':
+                    out_collection = out_collection[v:]
+                elif k == '$limit':
+                    out_collection = out_collection[:v]
+                else:
+                    if k in pipeline_operators:
+                        raise NotImplementedError(
+                            "Although %s is a valid operator for the aggregation pipeline, "
+                            "%s is currently not implemented in Mongomock."
+                        )
+                    else:
+                        raise NotImplementedError(
+                            "%s is not a valid operator for the aggregation pipeline. "
+                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                            "for a complete list of valid operators."
+                        )
+        return {'ok':1.0, 'result':out_collection}
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
@@ -649,3 +784,8 @@ def _set_updater(doc, field_name, value):
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
+
+def _sum_updater(doc, field_name, current, result):
+    if isinstance(doc, dict):
+        result = current + doc.get[field_name, 0]
+        return result
