@@ -111,6 +111,7 @@ Many thanks go to the following people for helping out:
 * Israel Teixeira
 * Jacob Perkins
 * Jason Sommer
+* Jeff Browning
 * Jeff McGee
 * Joël Franusic
 * Mike Ho
