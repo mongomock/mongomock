@@ -91,6 +91,15 @@ Also, since many corner cases are encountered along the way, our goal is to try 
 
 **NOTE**: We don't include pymongo functionality as "stubs" or "placeholders". Since this library is used to validate production code, it is unacceptable to behave differently than the real pymongo implementation. In such cases it is better to throw `NotImplementedError` than implement a modified version of the original behavior.
 
+Contributing
+------------
+
+When submitting a PR, please make sure that:
+
+1. You include tests for the feature you are adding or bug you are fixing. Preferably, the test should compare against the real MongoDB engine (See `examples in tests <https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108>`_ for reference).
+2. No existing test got deleted or unintentionally castrated
+3. The travis build passes on your PR.
+
 Acknowledgements
 ----------------
 
