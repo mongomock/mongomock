@@ -465,6 +465,12 @@ class Collection(object):
     def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
         pass
 
+    def drop_index(self, index_or_name):
+        pass
+
+    def index_information(self):
+        return {}
+		
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
         if execjs is None:
             raise NotImplementedError(
