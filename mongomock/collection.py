@@ -607,7 +607,7 @@ class Cursor(object):
         else:
             self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(key_or_list, x), reverse = direction < 0))
         return self
-    def count(self):
+    def count(self, with_limit_and_skip = False):
         arr = [x for x in self._dataset]
         count = len(arr)
         self._dataset = iter(arr)
