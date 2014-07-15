@@ -602,6 +602,15 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.ensure_index("hat", cache_for = 100)
         self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
 
+    def test__drop_index(self):
+        # Does nothing - just make sure it exists and takes the right args
+        self.cmp.do.drop_index("name")		
+
+    def test__index_information(self):
+        # Does nothing - just make sure it exists
+        self.cmp.do.index_information()		
+
+		
 class MongoClientCollectionTest(_CollectionTest, _MongoClientMixin):
     pass
 
