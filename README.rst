@@ -109,10 +109,12 @@ Many thanks go to the following people for helping out:
 * Austin W Ellis
 * Andrey Ovchinnikov
 * Arthur Hirata
+* Baruch Oxman
 * Corey Downing
 * Craig Hobbs
 * Daniel Murray
 * David Fischer
+* Dmitriy Kostochko
 * Edward D'Souza
 * Emily Rosengren
 * Eugene Chernyshov
@@ -128,10 +130,9 @@ Many thanks go to the following people for helping out:
 * Omer Gertel
 * Scott Sexton
 * Todd Tomkinson 
-* baruchoxman
+* Zachary Carter
 * catty (ca77y _at_ live.com)
 * emosenkis
 * hthieu1110
 * waskew (waskew _at_ narrativescience.com)
-* zcarter
 
