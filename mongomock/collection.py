@@ -13,7 +13,7 @@ from .helpers import basestring, xrange
 try:
     # Optional requirements for providing Map-Reduce functionality
     import execjs
-except ImportError:     
+except ImportError:
     execjs = None
 
 try:
@@ -156,10 +156,9 @@ class Collection(object):
                                     continue
                             existing_document[field].append(value)
                             continue
-
                         # nested fields includes a positional element
                         # need to find that element
-                        if '$' in nested_field_list:
+                        elif '$' in nested_field_list:
                             if not subdocument:
                                 subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
 
@@ -180,6 +179,25 @@ class Collection(object):
                                 push_results.append(value)
 
                             # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = push_results
+                        # push to array in a nested attribute
+                        else:
+                            # create nested attributes if they do not exist
+                            subdocument = existing_document
+                            for field in nested_field_list[:-1]:
+                                if field not in subdocument:
+                                    subdocument[field] = {}
+
+                                subdocument = subdocument[field]
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            push_results.append(value)
+
                             subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
@@ -470,7 +488,7 @@ class Collection(object):
 
     def index_information(self):
         return {}
-		
+
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
         if execjs is None:
             raise NotImplementedError(
@@ -497,7 +515,7 @@ class Collection(object):
                         mapped_key = '$oid' + key['$oid'];
                     }
                     else {
-                        mapped_key = key; 
+                        mapped_key = key;
                     }
                     if(!mappedDict[mapped_key]) {
                         mappedDict[mapped_key] = [];
@@ -575,7 +593,7 @@ class Collection(object):
                 reducer = eval('('+fnc+')');
                 for(var i=0, l=docList.length; i<l; i++) {
                     try {
-                        reducedVal = reducer(docList[i-1], docList[i]); 
+                        reducedVal = reducer(docList[i-1], docList[i]);
                     }
                     catch (err) {
                         continue;
