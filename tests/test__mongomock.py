@@ -212,9 +212,9 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'array_field' : ['def']})
         self.cmp.compare.find({'array_field' : ['abc']})
         self.cmp.compare.find({'array_field' : [['abc']]})
-        self.cmp.compare.find({'array_field' : 'def'})		
+        self.cmp.compare.find({'array_field' : 'def'})
         self.cmp.compare.find({'array_field' : ['def']})
-		
+
     def test__find_by_objectid_in_list(self):
         #See #79
         self.cmp.do.insert({'_id': 'x', 'rel_id' : [ObjectId('52d669dcad547f059424f783')]})
@@ -588,6 +588,18 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$push': {'hat.$.sizes': {'$each': ['M', 'S']}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_nested_attribute(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'data': {'sizes': ['XL']}}})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat.data.sizes': 'L'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__push_to_absent_nested_attribute(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat.data.sizes': 'L'}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_to_absent_field(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
@@ -613,13 +625,13 @@ class _CollectionTest(_CollectionComparisonTest):
 
     def test__drop_index(self):
         # Does nothing - just make sure it exists and takes the right args
-        self.cmp.do.drop_index("name")		
+        self.cmp.do.drop_index("name")
 
     def test__index_information(self):
         # Does nothing - just make sure it exists
-        self.cmp.do.index_information()		
+        self.cmp.do.index_information()
 
-		
+
 class MongoClientCollectionTest(_CollectionTest, _MongoClientMixin):
     pass
 
@@ -654,25 +666,25 @@ class CollectionMapReduceTest(TestCase):
         self.expected_results = [{'_id': 'mouse', 'value': 1},
                                  {'_id': 'dog', 'value': 2},
                                  {'_id': 'cat', 'value': 3}]
-								 
+
     def test__map_reduce(self):
         self._check_map_reduce(self.db.things, self.expected_results)
 
     def test__map_reduce_clean_res_colc(self):
 		#Checks that the result collection is cleaned between calls
-		
+
         self._check_map_reduce(self.db.things, self.expected_results)
 
         more_data = [{"x": 1, "tags": []},
                      {"x": 2, "tags": []},
                      {"x": 3, "tags": []},
-                     {"x": 4, "tags": []}]			
+                     {"x": 4, "tags": []}]
         for item in more_data:
             self.db.more_things.insert(item)
         expected_results = []
 
         self._check_map_reduce(self.db.more_things, expected_results)
-								 
+
     def _check_map_reduce(self, colc, expected_results):
         result = colc.map_reduce(self.map_func, self.reduce_func, 'myresults')
         self.assertTrue(isinstance(result, mongomock.Collection))
@@ -680,7 +692,7 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.count(), len(expected_results))
         for doc in result.find():
             self.assertIn(doc, expected_results)
-	
+
     def test__map_reduce_son(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
         self.assertTrue(isinstance(result, mongomock.Collection))
@@ -735,7 +747,7 @@ class CollectionMapReduceTest(TestCase):
         obj1 = ObjectId()
         obj2 = ObjectId()
         data = [{"x": 1, "tags": [obj1, obj2]},
-                {"x": 2, "tags": [obj1]}]			
+                {"x": 2, "tags": [obj1]}]
         for item in data:
             self.db.things_with_obj.insert(item)
         expected_results = [{'_id': obj1, 'value': 2},
@@ -745,7 +757,7 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 2)
         for doc in result.find():
-            self.assertIn(doc, expected_results)			
+            self.assertIn(doc, expected_results)
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE,"execjs not installed")
@@ -768,7 +780,7 @@ class _GroupTest(_CollectionComparisonTest):
                      ]
         for item in self.data:
             self.cmp.do.insert(item)
-        
+
 
     def test__group1(self):
         key = ["a"]
@@ -784,9 +796,9 @@ class _GroupTest(_CollectionComparisonTest):
         reduce_func = Code("""
                 function(cur, result) { result.count += 1 }
                 """)
-        self.cmp.compare.group(  key = ["b"], 
+        self.cmp.compare.group(  key = ["b"],
                                         condition = {"foo":{"$in":[3,4]}, "name":"theone"},
-                                        initial = {"count": 0}, 
+                                        initial = {"count": 0},
                                         reduce = reduce_func,
                                     )
 
@@ -797,9 +809,9 @@ class _GroupTest(_CollectionComparisonTest):
         conditions = {
                     'foo':{'$in':[self._id1]},
                     }
-        self.cmp.compare.group(key=['foo'], 
-                               condition=conditions, 
-                               initial={"count": 0}, 
+        self.cmp.compare.group(key=['foo'],
+                               condition=conditions,
+                               initial={"count": 0},
                                reduce=reducer)
 
 
@@ -823,7 +835,7 @@ class _AggregateTest(_CollectionComparisonTest):
                      {"_id":ObjectId(), "a": 4, "count": 4 }]
         for item in self.data:
             self.cmp.do.insert(item)
-        
+
         #self.expected_results = [{"a": 1, "count": 15}]
 
     def test__aggregate1(self):
@@ -836,7 +848,7 @@ class _AggregateTest(_CollectionComparisonTest):
                         },
                     ]
         self.cmp.compare.aggregate(pipeline)
-    
+
     def test__aggregate2(self):
         pipeline = [
                         {
