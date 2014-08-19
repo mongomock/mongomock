@@ -117,8 +117,9 @@ class Collection(object):
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
                         if len(nested_field_list) == 1:
-                            arr = existing_document[field]
-                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            if field in existing_document:
+                                arr = existing_document[field]
+                                existing_document[field] = [obj for obj in arr if not obj == value]
                             continue
 
                         # nested fields includes a positional element
