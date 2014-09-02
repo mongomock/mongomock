@@ -1025,4 +1025,4 @@ class DatabasesNamesTest(TestCase):
     def test__database_names(self):
         self.conn.unit.tests.insert({'foo': 'bar'})
         self.conn.foo.bar.insert({'unit': 'test'})
-        self.assertListEqual(['unit', 'foo'], self.conn.database_names())
+        self.assertListEqual(['foo', 'unit'], self.conn.database_names())
