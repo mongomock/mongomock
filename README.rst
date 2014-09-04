@@ -34,7 +34,7 @@ The above code can be tested in several ways:
 
 Option number 1 is obviously the best approach here, since we are testing against a real mongodb instance. However, a mongodb instance needs to be set up for this, and cleaned before/after the test. You might want to run your tests in continuous integration servers, on your laptop, or other bizarre platforms - which makes the mongodb requirement a liability.
 
-We are left with #2 and #3. Unfortunately they are very high maintenance in real scenarios, since they replicate the series of calls made in the code, violating the DRY rule. Let's see #2 in action - we might right our test like so::
+We are left with #2 and #3. Unfortunately they are very high maintenance in real scenarios, since they replicate the series of calls made in the code, violating the DRY rule. Let's see #2 in action - we might write our test like so::
 
  def test_increase_votes():
      objects = [dict(...), dict(...), ...]
