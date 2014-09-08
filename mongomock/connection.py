@@ -49,6 +49,10 @@ class Connection(object):
             "ok" : 1
     }
 
+    def database_names(self):
+        return list(self._databases.keys())
+
+
 #Connection is now depricated, it's called MongoClient instead
 class MongoClient(Connection):
     def stub(self):

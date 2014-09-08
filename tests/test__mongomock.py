@@ -1016,3 +1016,13 @@ class ObjectIdTest(TestCase):
         obj1 = ObjectId()
         obj2 = ObjectId(str(obj1))
         self.assertEqual(obj1, obj2)
+
+class DatabasesNamesTest(TestCase):
+    def setUp(self):
+        super(DatabasesNamesTest, self).setUp()
+        self.conn = mongomock.Connection()
+
+    def test__database_names(self):
+        self.conn.unit.tests.insert({'foo': 'bar'})
+        self.conn.foo.bar.insert({'unit': 'test'})
+        self.assertListEqual(['foo', 'unit'], self.conn.database_names())
