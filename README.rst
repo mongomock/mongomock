@@ -114,6 +114,7 @@ Many thanks go to the following people for helping out:
 * Craig Hobbs
 * Daniel Murray
 * David Fischer
+* Diego Garcia
 * Dmitriy Kostochko
 * Edward D'Souza
 * Emily Rosengren
