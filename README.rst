@@ -126,6 +126,7 @@ Many thanks go to the following people for helping out:
 * Jeff Browning
 * Jeff McGee
 * Joël Franusic
+* Lyon Zhang
 * Mike Ho
 * Nigel Choi
 * Omer Gertel
