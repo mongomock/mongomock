@@ -46,6 +46,11 @@ class CollectionAPITest(TestCase):
         cursor = self.db.collection.find()
         self.assertEquals(cursor.distinct('f1.f2'), ['v'])
 
+    def test__distinct_array_field(self):
+        self.db.collection.insert([{'f1': ['v1', 'v2', 'v1']}, {'f1': ['v2', 'v3']}])
+        cursor = self.db.collection.find()
+        self.assertEquals(cursor.distinct('f1'), ['v1', 'v2', 'v3'])		
+
     def test__cursor_clone(self):
         self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
         cursor1 = self.db.collection.find()

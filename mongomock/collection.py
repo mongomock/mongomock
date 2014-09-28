@@ -631,7 +631,7 @@ class Cursor(object):
         for x in iter(self._dataset):
             value = _resolve_key(key, x)
             if value == NOTHING: continue
-            unique.add(value)
+            unique.update(value if isinstance(value, (tuple, list)) else [value])
         return list(unique)
 
     def __getitem__(self, index):
