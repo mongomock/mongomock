@@ -6,7 +6,7 @@ from .utils import TestCase
 class CollectionAPITest(TestCase):
     def setUp(self):
         super(CollectionAPITest, self).setUp()
-        self.conn = mongomock.Connection()
+        self.conn = mongomock.MongoClient()
         self.db = self.conn['somedb']
 
     def test__get_subcollections(self):
@@ -128,8 +128,10 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
-    def test__find_slave_okay(self):
+    def test__find_with_special_options(self):
         self.db.collection.find({}, slave_okay=True)
+        self.db.collection.find({}, read_preference=3, secondary_acceptable_latency_ms=15)
+        self.db.collection.find({}, snapshot=True)
 
     def test__find_and_modify_cannot_remove_and_new(self):
         with self.assertRaises(mongomock.OperationFailure):
@@ -182,3 +184,11 @@ class CollectionAPITest(TestCase):
         self.db['users'].insert([u1, u2])
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1).count(), 1)
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1)[0]['name'], 'second')
+
+    def test__start_request(self):
+        with self.conn.start_request():
+            self.db.collection.insert({'a': 1})
+            self.db.collection.update({'a': 1}, {'$set': {'b': 2}})
+            doc = self.db.collection.find_one({'a': 1})
+            self.assertEqual(doc['a'], 1)
+            self.assertEqual(doc['b'], 2)

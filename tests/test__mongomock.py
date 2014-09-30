@@ -455,7 +455,7 @@ class _CollectionTest(_CollectionComparisonTest):
 
     def test__set_upsert(self):
         self.cmp.do.remove()
-        self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
+        self.cmp.do.update({"name": "bob"}, {"$set": {"age": 2}}, True)
         self.cmp.compare.find()
         self.cmp.do.update({"name": "alice"}, {"$set": {"age": 1}}, True)
         self.cmp.compare_ignore_order.find()

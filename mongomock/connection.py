@@ -48,7 +48,22 @@ class Connection(object):
             "ok" : 1
     }
 
+
+class FakeRequest(object):
+    def end(self):
+        self.connection.end_request()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+
+
 #Connection is now depricated, it's called MongoClient instead
 class MongoClient(Connection):
     def stub(self):
         pass
+
+    def start_request(self):
+        return FakeRequest()
