@@ -1,7 +1,18 @@
 import mongomock
 from six import text_type
+import random
+import time
+import copy
 
-from .utils import TestCase
+try:
+    import pymongo
+    from pymongo import ASCENDING, DESCENDING
+    _HAVE_PYMONGO = True
+except ImportError:
+    _HAVE_PYMONGO = False
+
+from .utils import TestCase, skipIf
+
 
 class CollectionAPITest(TestCase):
     def setUp(self):
@@ -203,3 +214,119 @@ class CollectionAPITest(TestCase):
         self.db['users'].insert([u1, u2])
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1).count(), 1)
         self.assertEquals(self.db['users'].find(sort=[("name", 1)], skip=1)[0]['name'], 'second')
+
+    def test__ordered_insert_find(self):
+        """
+        If we insert values 1, 2, 3 and find them, we must see them in orderd aas we inserted them.
+        """
+
+        values = range(20)
+        random.shuffle(values)
+        for val in values:
+            self.db.collection.insert({'_id': val})
+
+        find_cursor = self.db.collection.find({}, slave_okay=True)
+
+        for val in values:
+            in_db_val = find_cursor.next()
+            expected = {'_id': val}
+            self.assertEquals(in_db_val, expected)
+
+    @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+    def test__uniq_idxs_with_ascending_ordering(self):
+        self.db.collection.ensure_index([("value", pymongo.ASCENDING)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+
+    @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+    def test__uniq_idxs_with_descending_ordering(self):
+        self.db.collection.ensure_index([("value", pymongo.DESCENDING)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+
+    def test__uniq_idxs_without_ordering(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+
+    def test__set_with_positional_operator(self):
+        """
+        Real mongodb support positional operator $ for $set operation
+        """
+        base_document = {"int_field": 1,
+                         "list_field": [{"str_field": "a"},
+                                        {"str_field": "b"},
+                                        {"str_field": "c"}]}
+
+        self.db.collection.insert(base_document)
+        self.db.collection.update({"int_field": 1, "list_field.str_field": "b"},
+                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+
+        expected_document = copy.deepcopy(base_document)
+        expected_document["list_field"][1]["marker"] = True
+        self.assertEquals(list(self.db.collection.find()), [expected_document])
+
+        self.db.collection.update({"int_field": 1, "list_field.str_field": "a"},
+                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+
+        self.db.collection.update({"int_field": 1, "list_field.str_field": "c"},
+                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+
+        expected_document["list_field"][0]["marker"] = True
+        expected_document["list_field"][2]["marker"] = True
+        self.assertEquals(list(self.db.collection.find()), [expected_document])
+
+    def test__find_and_modify_with_sort(self):
+        self.db.collection.insert({"time_check": float(time.time())})
+        self.db.collection.insert({"time_check": float(time.time())})
+        self.db.collection.insert({"time_check": float(time.time())})
+
+        start_check_time = float(time.time())
+        self.db.collection.find_and_modify({"time_check": {'$lt': start_check_time}},
+                                           {"$set": {"time_check": float(time.time()),
+                                                     "checked": True}},
+                                           sort=[("time_check", pymongo.ASCENDING)])
+        sorted_records = sorted(list(self.db.collection.find()), key=lambda x: x["time_check"])
+        self.assertEquals(sorted_records[-1]["checked"], True)
+
+        self.db.collection.find_and_modify({"time_check": {'$lt': start_check_time}},
+                                           {"$set": {"time_check": float(time.time()),
+                                                     "checked": True}},
+                                           sort=[("time_check", pymongo.ASCENDING)])
+
+        self.db.collection.find_and_modify({"time_check": {'$lt': start_check_time}},
+                                           {"$set": {"time_check": float(time.time()),
+                                                     "checked": True}},
+                                           sort=[("time_check", pymongo.ASCENDING)])
+
+        expected = filter(lambda x: "checked" in x, list(self.db.collection.find()))
+        self.assertEqual(self.db.collection.find().count(), len(expected))
+        self.assertEqual(list(self.db.collection.find({"checked": True})), list(self.db.collection.find()))
+
+    def test__avoid_change_data_after_set(self):
+        test_data = {"test": ["test_data"]}
+        self.db.collection.insert({"_id": 1})
+        self.db.collection.update({"_id": 1}, {"$set": test_data})
+
+        self.db.collection.update({"_id": 1}, {"$addToSet": {"test": "another_one"}})
+        data_in_db = self.db.collection.find_one({"_id": 1})
+        self.assertNotEqual(data_in_db["test"], test_data["test"])
+        self.assertEqual(len(test_data["test"]), 1)
+        self.assertEqual(len(data_in_db["test"]), 2)
+
+    def test__filter_with_ne(self):
+        self.db.collection.insert({"_id": 1, "test_list": [{"data": "val"}]})
+        data_in_db = self.db.collection.find({"test_list.marker_field": {"$ne": True}})
+        self.assertEqual(list(data_in_db), [{"_id": 1, "test_list": [{"data": "val"}]}])
