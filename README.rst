@@ -130,6 +130,7 @@ Many thanks go to the following people for helping out:
 * Mike Ho
 * Nigel Choi
 * Omer Gertel
+* Omer Katz
 * Scott Sexton
 * Todd Tomkinson 
 * Zachary Carter
