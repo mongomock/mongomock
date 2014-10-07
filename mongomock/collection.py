@@ -406,7 +406,10 @@ class Collection(object):
                         new_spec = {}
                         for el in subspec:
                             if el.startswith(part):
-                                new_spec[".".join(el.split(".")[1:])] = subspec[el]
+                                if len(el.split(".")) > 1:
+                                    new_spec[".".join(el.split(".")[1:])] = subspec[el]
+                                else:
+                                    new_spec = subspec[el]
                         subspec = new_spec
                         current_doc = current_doc[part]
 
