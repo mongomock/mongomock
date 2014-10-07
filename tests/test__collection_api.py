@@ -220,7 +220,7 @@ class CollectionAPITest(TestCase):
         If we insert values 1, 2, 3 and find them, we must see them in orderd aas we inserted them.
         """
 
-        values = range(20)
+        values = list(range(20))
         random.shuffle(values)
         for val in values:
             self.db.collection.insert({'_id': val})
@@ -272,17 +272,17 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert(base_document)
         self.db.collection.update({"int_field": 1, "list_field.str_field": "b"},
-                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+                                  {"$set": {"list_field.$.marker": True}})
 
         expected_document = copy.deepcopy(base_document)
         expected_document["list_field"][1]["marker"] = True
         self.assertEquals(list(self.db.collection.find()), [expected_document])
 
         self.db.collection.update({"int_field": 1, "list_field.str_field": "a"},
-                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+                                  {"$set": {"list_field.$.marker": True}})
 
         self.db.collection.update({"int_field": 1, "list_field.str_field": "c"},
-                                  {"$set": {"list_field.$.marker": True}})["updatedExisting"]
+                                  {"$set": {"list_field.$.marker": True}})
 
         expected_document["list_field"][0]["marker"] = True
         expected_document["list_field"][2]["marker"] = True
@@ -311,7 +311,7 @@ class CollectionAPITest(TestCase):
                                                      "checked": True}},
                                            sort=[("time_check", pymongo.ASCENDING)])
 
-        expected = filter(lambda x: "checked" in x, list(self.db.collection.find()))
+        expected = list(filter(lambda x: "checked" in x, list(self.db.collection.find())))
         self.assertEqual(self.db.collection.find().count(), len(expected))
         self.assertEqual(list(self.db.collection.find({"checked": True})), list(self.db.collection.find()))
 
