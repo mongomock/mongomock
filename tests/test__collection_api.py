@@ -288,6 +288,7 @@ class CollectionAPITest(TestCase):
         expected_document["list_field"][2]["marker"] = True
         self.assertEquals(list(self.db.collection.find()), [expected_document])
 
+    @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
     def test__find_and_modify_with_sort(self):
         self.db.collection.insert({"time_check": float(time.time())})
         self.db.collection.insert({"time_check": float(time.time())})
