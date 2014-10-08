@@ -137,5 +137,6 @@ Many thanks go to the following people for helping out:
 * catty (ca77y _at_ live.com)
 * emosenkis
 * hthieu1110
+* ppetlinskiy
 * waskew (waskew _at_ narrativescience.com)
 
