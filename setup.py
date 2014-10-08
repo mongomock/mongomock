@@ -9,6 +9,7 @@ with open(os.path.join(os.path.dirname(__file__), "mongomock", "__version__.py")
 install_requires = ["sentinels", "six"]
 if platform.python_version() < '2.7':
     install_requires.append('unittest2')
+    install_requires.append('ordereddict')
 
 if os.environ.get("INSTALL_PYMONGO", "false") == "true":
     install_requires.append("pymongo")

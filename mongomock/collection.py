@@ -11,6 +11,11 @@ from . import ObjectId, OperationFailure, DuplicateKeyError
 from .helpers import basestring, xrange
 
 try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
+try:
     # Optional requirements for providing Map-Reduce functionality
     import execjs
 except ImportError:
@@ -36,7 +41,8 @@ class Collection(object):
         self.name = name
         self.full_name = "{0}.{1}".format(db.name, name)
         self._Collection__database = db
-        self._documents = {}
+        self._documents = OrderedDict()
+        self._uniques = []
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
@@ -63,6 +69,15 @@ class Collection(object):
         object_id = data['_id']
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
+        for unique in self._uniques:
+            find_kwargs = {}
+            for key, direction in unique:
+                if key in data:
+                    find_kwargs[key] = data[key]
+            answer = self.find(spec=find_kwargs)
+            if answer.count() > 0:
+                raise DuplicateKeyError("Duplicate Key Error", 11000)
+
         self._documents[object_id] = self._internalize_dict(data)
         return object_id
 
@@ -92,6 +107,15 @@ class Collection(object):
             subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
+                    positional = False
+                    for key in iterkeys(v):
+                        if '$' in key:
+                            positional = True
+                            break
+                    if positional:
+                        subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
+                        continue
+
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
                     for field, value in iteritems(v):
@@ -372,15 +396,23 @@ class Collection(object):
                     subspec = spec
                     for part in field_name_parts[:-1]:
                         if part == '$':
-                            subspec = subspec['$elemMatch']
+                            subspec = subspec.get('$elemMatch', subspec)
                             for item in current_doc:
                                 if filter_applies(subspec, item):
                                     current_doc = item
                                     break
                             continue
 
-                        subspec = subspec[part]
+                        new_spec = {}
+                        for el in subspec:
+                            if el.startswith(part):
+                                if len(el.split(".")) > 1:
+                                    new_spec[".".join(el.split(".")[1:])] = subspec[el]
+                                else:
+                                    new_spec = subspec[el]
+                        subspec = new_spec
                         current_doc = current_doc[part]
+
                     subdocument = current_doc
                 updater(subdocument, field_name_parts[-1], v)
                 continue
@@ -396,7 +428,10 @@ class Collection(object):
                 return # mongodb skips such cases
             if isinstance(doc, list):
                 try:
-                    doc = doc[int(part)]
+                    if part == '$':
+                        doc = doc[0]
+                    else:
+                        doc = doc[int(part)]
                     continue
                 except ValueError:
                     pass
@@ -419,7 +454,7 @@ class Collection(object):
         except StopIteration:
             return None
 
-    def find_and_modify(self, query = {}, update = None, upsert = False, **kwargs):
+    def find_and_modify(self, query = {}, update = None, upsert = False, sort = None, **kwargs):
         remove = kwargs.get("remove", False)
         if kwargs.get("new", False) and remove:
             raise OperationFailure("remove and returnNew can't co-exist") # message from mongodb
@@ -427,7 +462,7 @@ class Collection(object):
         if remove and update is not None:
             raise ValueError("Can't do both update and remove")
 
-        old = self.find_one(query)
+        old = self.find_one(query, sort=sort)
         if not old:
             if upsert:
                 old = {'_id':self.insert(query)}
@@ -482,7 +517,8 @@ class Collection(object):
         self._documents = {}
 
     def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
-        pass
+        if 'unique' in kwargs and kwargs['unique']:
+            self._uniques.append(helpers._index_list(key_or_list))
 
     def drop_index(self, index_or_name):
         pass
@@ -803,6 +839,8 @@ class Cursor(object):
         return arr[index]
 
 def _set_updater(doc, field_name, value):
+    if isinstance(value, (tuple, list)):
+        value = copy.deepcopy(value)
     if isinstance(doc, dict):
         doc[field_name] = value
 

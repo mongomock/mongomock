@@ -5,6 +5,7 @@ from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
 
+
 def filter_applies(search_filter, document):
     """
     This function implements MongoDB's matching strategy over documents in the find() method and other
@@ -18,6 +19,9 @@ def filter_applies(search_filter, document):
     for key, search in iteritems(search_filter):
 
         is_match = False
+
+        if isinstance(search, dict) and '$ne' in search and len(iter_key_candidates(key, document)) == 0:
+            continue
 
         for doc_val in iter_key_candidates(key, document):
             if isinstance(search, dict):
