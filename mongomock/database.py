@@ -1,4 +1,5 @@
 from .collection import Collection
+from . import CollectionInvalid
 
 class Database(object):
     def __init__(self, conn, name):
@@ -45,3 +46,12 @@ class Database(object):
                 del self._collections[name_or_collection]
         except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
             pass
+
+    def create_collection(self, name, **kwargs):
+        if name in self.collection_names():
+            raise CollectionInvalid("collection %s already exists" % name)
+
+        if kwargs:
+            raise NotImplementedError("Special options not supported")
+
+        return self[name]
