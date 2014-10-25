@@ -127,6 +127,7 @@ Many thanks go to the following people for helping out:
 * Jeff McGee
 * Joël Franusic
 * Lyon Zhang
+* Marcin Barczynski
 * Mike Ho
 * Nigel Choi
 * Omer Gertel
@@ -137,6 +138,6 @@ Many thanks go to the following people for helping out:
 * catty (ca77y _at_ live.com)
 * emosenkis
 * hthieu1110
-* ppetlinskiy
+* יppetlinskiy
 * waskew (waskew _at_ narrativescience.com)
 
