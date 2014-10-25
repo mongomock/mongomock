@@ -57,6 +57,34 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection(self.db.c)
         self.assertEquals(set(self.db.collection_names()), set(['a', 'system.indexes']))
 
+        col = self.db.a
+
+        r = col.insert({"aa": "bb"})
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 1)
+
+        self.db.drop_collection("a")
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 0)
+
+        col = self.db.a
+
+        r = col.insert({"aa": "bb"})
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 1)
+
+        self.db.drop_collection(col)
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 0)
+
     def test__distinct_nested_field(self):
         self.db.collection.insert({'f1': {'f2': 'v'}})
         cursor = self.db.collection.find()

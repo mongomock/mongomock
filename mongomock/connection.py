@@ -1,6 +1,7 @@
 import itertools
 from .database import Database
 
+
 class Connection(object):
 
     _CONNECTION_ID = itertools.count()
@@ -20,6 +21,7 @@ class Connection(object):
         if db is None:
             db = self._databases[db_name] = Database(self, db_name)
         return db
+
     def __getattr__(self, attr):
         return self[attr]
 
@@ -52,8 +54,28 @@ class Connection(object):
     def database_names(self):
         return list(self._databases.keys())
 
+    def drop_database(self, name_or_db):
 
-#Connection is now depricated, it's called MongoClient instead
+        def drop_collections_for_db(_db):
+            for col_name in _db.collection_names():
+                _db.drop_collection(col_name)
+
+        if isinstance(name_or_db, Database):
+            databases_keys = list(self._databases.keys())
+            for database_name in databases_keys:
+                tmp_database = self._databases.get(database_name)
+                if tmp_database is name_or_db:
+                    if tmp_database:
+                        drop_collections_for_db(tmp_database)
+                    del self._databases[database_name]
+
+        elif name_or_db in self._databases:
+                db = self._databases[name_or_db]
+                drop_collections_for_db(db)
+                del self._databases[name_or_db]
+
+
+# Connection is now depricated, it's called MongoClient instead
 class MongoClient(Connection):
     def stub(self):
         pass

@@ -39,10 +39,19 @@ class Database(object):
         try:
             # FIXME a better way to remove an entry by value ?
             if isinstance(name_or_collection, Collection):
-                for collection in self._collections.items():
-                    if collection[1] is name_or_collection:
-                        del self._collections[collection[0]]
+                collections_keys = list(self._collections.keys())
+                for collection_name in collections_keys:
+                    tmp_collection = self._collections.get(collection_name)
+                    if tmp_collection is name_or_collection:
+                        if tmp_collection:
+                            tmp_collection.drop()
+                        del self._collections[collection_name]
             else:
+                if name_or_collection in self._collections:
+                    collection = self._collections.get(name_or_collection)
+                    if collection:
+                        collection.drop()
+
                 del self._collections[name_or_collection]
         except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
             pass
