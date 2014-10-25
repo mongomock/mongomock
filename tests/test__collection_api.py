@@ -40,6 +40,11 @@ class CollectionAPITest(TestCase):
         self.assertEquals(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
         self.assertEquals(set(self.db.collection_names(False)), set(['a', 'b']))
 
+    def test__create_collection(self):
+        coll = self.db.create_collection("c")
+        self.assertIs(self.db.c, coll)
+        self.assertRaises(mongomock.CollectionInvalid, self.db.create_collection, 'c')
+
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
 
