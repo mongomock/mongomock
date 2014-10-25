@@ -1,6 +1,7 @@
 import itertools
 from .database import Database
 
+
 class Connection(object):
 
     _CONNECTION_ID = itertools.count()
@@ -20,6 +21,7 @@ class Connection(object):
         if db is None:
             db = self._databases[db_name] = Database(self, db_name)
         return db
+
     def __getattr__(self, attr):
         return self[attr]
 
