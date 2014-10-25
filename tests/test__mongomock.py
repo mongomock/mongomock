@@ -56,6 +56,40 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(db1, self.conn.some_database_here)
         self.assertIsInstance(db1, Database)
 
+    def test__drop_database(self):
+
+        db = self.conn.a
+
+        col = db.a
+
+        r = col.insert({"aa": "bb"})
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 1)
+
+        self.conn.drop_database("a")
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 0)
+
+        db = self.conn.a
+
+        col = db.a
+
+        r = col.insert({"aa": "bb"})
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 1)
+
+        self.conn.drop_database(db)
+
+        qr = col.find({"_id": r})
+
+        self.assertEqual(qr.count(), 0)
+
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
