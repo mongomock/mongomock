@@ -185,6 +185,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"_id" : id1})
 
+    def test__find_by_document(self):
+        self.cmp.do.insert({"name" : "new", "doc": {"key", "val"}})
+        self.cmp.do.insert({"name" : "another new"})
+        self.cmp.compare_ignore_order.find()
+        self.cmp.compare.find({"doc": {"key": "val"}})
+
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
         id2 = ObjectId()

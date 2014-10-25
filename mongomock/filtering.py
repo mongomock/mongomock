@@ -29,7 +29,7 @@ def filter_applies(search_filter, document):
                     operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val) or
                     operator_string == '$not' and _not_op(document, key, search_val)
                     for operator_string, search_val in iteritems(search)
-                )
+                ) or doc_val == search
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
             elif key in LOGICAL_OPERATOR_MAP:
