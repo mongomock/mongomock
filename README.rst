@@ -139,5 +139,6 @@ Many thanks go to the following people for helping out:
 * emosenkis
 * hthieu1110
 * יppetlinskiy
+* tipok
 * waskew (waskew _at_ narrativescience.com)
 
