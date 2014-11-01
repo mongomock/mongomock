@@ -90,6 +90,8 @@ class DatabaseGettingTest(TestCase):
 
         self.assertEqual(qr.count(), 0)
 
+    def test__alive(self):
+        self.assertTrue(self.conn.alive())
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):

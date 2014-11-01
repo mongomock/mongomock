@@ -74,6 +74,14 @@ class Connection(object):
                 drop_collections_for_db(db)
                 del self._databases[name_or_db]
 
+    def alive(self):
+        """The original MongoConnection.alive method checks the
+        status of the server.
+
+        In our case as we mock the actual server, we should always return True.
+        """
+        return True
+
 
 # Connection is now depricated, it's called MongoClient instead
 class MongoClient(Connection):
