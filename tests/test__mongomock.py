@@ -100,11 +100,12 @@ class DatabaseGettingTest(TestCase):
 
         colA = db.a
 
-        r = colA.insert({"_id": "a", "aa": "bb"})
+        to_insert = {"_id": "a", "aa": "bb"}
+        r = colA.insert(to_insert)
 
         a = db.dereference(DBRef("a", "a", db.name))
 
-        self.assertEquals(r, a)
+        self.assertEquals(to_insert, a)
 
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
