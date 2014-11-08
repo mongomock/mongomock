@@ -102,7 +102,7 @@ class DatabaseGettingTest(TestCase):
 
         r = colA.insert({"_id": "a", "aa": "bb"})
 
-        a = db.dereference(DBRef("a", "a"))
+        a = db.dereference(DBRef("a", "a", db))
 
         self.assertEquals(r, a)
 
