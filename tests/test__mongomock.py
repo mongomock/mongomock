@@ -37,6 +37,7 @@ class InterfaceTest(TestCase):
         conn = mongomock.Connection('mongodb://localhost')
         self.assertIsNotNone(conn)
 
+
 class DatabaseGettingTest(TestCase):
     def setUp(self):
         super(DatabaseGettingTest, self).setUp()
@@ -92,6 +93,7 @@ class DatabaseGettingTest(TestCase):
 
     def test__alive(self):
         self.assertTrue(self.conn.alive())
+
     def test__dereference(self):
 
         db = self.conn.a
@@ -103,11 +105,6 @@ class DatabaseGettingTest(TestCase):
         a = db.dereference(DBRef("a", "a"))
 
         self.assertEquals(r, a)
-
-
-
-
-
 
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
