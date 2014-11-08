@@ -70,7 +70,7 @@ class Database(object):
 
         if not dbref.collection or not dbref.id:
             raise TypeError("cannot dereference a %s" % type(dbref))
-        if dbref.database is not None and dbref.database != self.__name:
+        if dbref.database is not None and dbref.database != self.name:
             raise ValueError("trying to dereference a DBRef that points to "
                              "another database (%r not %r)" % (dbref.database,
                                                                self.__name))
