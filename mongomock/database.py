@@ -1,6 +1,7 @@
 from .collection import Collection
 from . import CollectionInvalid
 
+
 class Database(object):
     def __init__(self, conn, name):
         super(Database, self).__init__()
@@ -64,3 +65,13 @@ class Database(object):
             raise NotImplementedError("Special options not supported")
 
         return self[name]
+
+    def dereference(self, dbref):
+
+        if not dbref.collection or not dbref.id:
+            raise TypeError("cannot dereference a %s" % type(dbref))
+        if dbref.database is not None and dbref.database != self.name:
+            raise ValueError("trying to dereference a DBRef that points to "
+                             "another database (%r not %r)" % (dbref.database,
+                                                               self.__name))
+        return self[dbref.collection].find_one({"_id": dbref.id})

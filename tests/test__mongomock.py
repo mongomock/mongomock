@@ -5,7 +5,7 @@ import re
 import platform
 import sys
 
-from .utils import TestCase, skipIf
+from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
@@ -36,6 +36,7 @@ class InterfaceTest(TestCase):
     def test__can_create_db_without_path(self):
         conn = mongomock.Connection('mongodb://localhost')
         self.assertIsNotNone(conn)
+
 
 class DatabaseGettingTest(TestCase):
     def setUp(self):
@@ -92,6 +93,20 @@ class DatabaseGettingTest(TestCase):
 
     def test__alive(self):
         self.assertTrue(self.conn.alive())
+
+    def test__dereference(self):
+
+        db = self.conn.a
+
+        colA = db.a
+
+        to_insert = {"_id": "a", "aa": "bb"}
+        r = colA.insert(to_insert)
+
+        a = db.dereference(DBRef("a", "a", db.name))
+
+        self.assertEquals(to_insert, a)
+
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
