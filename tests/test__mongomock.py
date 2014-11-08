@@ -5,7 +5,7 @@ import re
 import platform
 import sys
 
-from .utils import TestCase, skipIf
+from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
@@ -92,6 +92,23 @@ class DatabaseGettingTest(TestCase):
 
     def test__alive(self):
         self.assertTrue(self.conn.alive())
+    def test__dereference(self):
+
+        db = self.conn.a
+
+        colA = db.a
+
+        r = colA.insert({"_id": "a", "aa": "bb"})
+
+        a = db.dereference(DBRef("a", "a"))
+
+        self.assertEquals(r, a)
+
+
+
+
+
+
 
 @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
 class _CollectionComparisonTest(TestCase):
