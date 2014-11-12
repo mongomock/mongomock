@@ -490,6 +490,9 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove({'name': 'sam'})
         self.cmp.compare.find()
 
+        # accepts write_concern arg
+        self.cmp.do.remove(write_concern={'w': 1})
+
     def test__update(self):
         doc = {"a" : 1}
         self.cmp.do.insert(doc)
