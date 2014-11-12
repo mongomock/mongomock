@@ -489,7 +489,7 @@ class Collection(object):
                         manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
 
-    def remove(self, spec_or_id = None, search_filter = None):
+    def remove(self, spec_or_id = None, search_filter = None, write_concern=None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
             _print_deprecation_warning('search_filter', 'spec_or_id')
