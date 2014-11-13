@@ -602,6 +602,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat': 'green'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__pull_query(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'size': 5}, {'size': 10}]})
+        self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat': {'size': {'$gt': 6}}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__pull_nested_dict(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': [{'name': 'derby', 'sizes': [{'size': 'L', 'quantity': 3}, {'size': 'XL', 'quantity': 4}], 'colors': ['green', 'blue']}, {'name': 'cap', 'sizes': [{'size': 'S', 'quantity': 10}, {'size': 'L', 'quantity': 5}], 'colors': ['blue']}]})
