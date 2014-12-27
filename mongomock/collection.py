@@ -628,6 +628,11 @@ class Collection(object):
         return self.find().distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
+        if execjs is None:
+            raise NotImplementedError(
+                "PyExecJS is required in order to use group. "
+                "Use 'pip install pyexecjs pymongo' to support group mock."
+            )
         reduce_ctx = execjs.compile("""
             function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
@@ -749,6 +754,12 @@ class Collection(object):
                     out_collection = out_collection[v:]
                 elif k == '$limit':
                     out_collection = out_collection[:v]
+                elif k == '$unwind':
+                    #field doesn't exist: skip
+                    #field isn't a list: error
+                    #field is an empty list: skip
+                    if not isinstance(array_name, list):
+                        raise TypeError('$unwind must specify a list')
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
