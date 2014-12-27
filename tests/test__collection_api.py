@@ -364,4 +364,3 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({"_id": 1, "test_list": [{"data": "val"}]})
         data_in_db = self.db.collection.find({"test_list.marker_field": {"$ne": True}})
         self.assertEqual(list(data_in_db), [{"_id": 1, "test_list": [{"data": "val"}]}])
-

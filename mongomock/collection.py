@@ -526,36 +526,8 @@ class Collection(object):
     def drop_index(self, index_or_name):
         pass
 
-<<<<<<< HEAD
-    def group(self, *args, **kwargs):
-        """dummy implementation of pymongo collection.group functionality
-        """
-        if len(self._group_response_dummies) < 1:
-            raise NotImplementedError('"real" group functionality is not yet implemented in mongomock. You must preset a return \
-                                        value for this collections group funtion calls. Response values are returned in ascending order.\n\
-                                        (e.g. collection_name._group_response_dummies = [\n\
-                                                                \t[{"_id":"1","count":1},{"_id":"2","count":1}],\n\
-                                                                \t[{"_id":"1"]\n\
-                                                                ]')
-        else:
-            return self._group_response_dummies.pop(0)
-
-    def aggregate(self, *args, **kwargs):
-        """dummy implementation of pymongo collection.aggregate functionality
-        """
-        if len(self._aggregate_response_dummies) < 1:
-            raise NotImplementedError('"real" aggregate functionality is not yet implemented in mongomock. You must preset a return \
-                                        value for this collections group funtion calls. Response values are returned in ascending order.\n\
-                                        (e.g. collection_name._aggregate_response_dummies = [\n\
-                                                                \t[{"_id":"1","count":1},{"_id":"2","count":1}],\n\
-                                                                \t[{"_id":"1"]\n\
-                                                                ]')
-        else:
-            return self._aggregate_response_dummies.pop(0)
-=======
     def index_information(self):
         return {}
->>>>>>> upstream/master
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
         if execjs is None:
