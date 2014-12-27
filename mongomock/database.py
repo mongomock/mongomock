@@ -1,4 +1,6 @@
 from .collection import Collection
+from . import CollectionInvalid
+
 
 class Database(object):
     def __init__(self, conn, name):
@@ -38,10 +40,38 @@ class Database(object):
         try:
             # FIXME a better way to remove an entry by value ?
             if isinstance(name_or_collection, Collection):
-                for collection in self._collections.items():
-                    if collection[1] is name_or_collection:
-                        del self._collections[collection[0]]
+                collections_keys = list(self._collections.keys())
+                for collection_name in collections_keys:
+                    tmp_collection = self._collections.get(collection_name)
+                    if tmp_collection is name_or_collection:
+                        if tmp_collection:
+                            tmp_collection.drop()
+                        del self._collections[collection_name]
             else:
+                if name_or_collection in self._collections:
+                    collection = self._collections.get(name_or_collection)
+                    if collection:
+                        collection.drop()
+
                 del self._collections[name_or_collection]
         except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
             pass
+
+    def create_collection(self, name, **kwargs):
+        if name in self.collection_names():
+            raise CollectionInvalid("collection %s already exists" % name)
+
+        if kwargs:
+            raise NotImplementedError("Special options not supported")
+
+        return self[name]
+
+    def dereference(self, dbref):
+
+        if not dbref.collection or not dbref.id:
+            raise TypeError("cannot dereference a %s" % type(dbref))
+        if dbref.database is not None and dbref.database != self.name:
+            raise ValueError("trying to dereference a DBRef that points to "
+                             "another database (%r not %r)" % (dbref.database,
+                                                               self.__name))
+        return self[dbref.collection].find_one({"_id": dbref.id})

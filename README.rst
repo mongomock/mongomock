@@ -34,7 +34,7 @@ The above code can be tested in several ways:
 
 Option number 1 is obviously the best approach here, since we are testing against a real mongodb instance. However, a mongodb instance needs to be set up for this, and cleaned before/after the test. You might want to run your tests in continuous integration servers, on your laptop, or other bizarre platforms - which makes the mongodb requirement a liability.
 
-We are left with #2 and #3. Unfortunately they are very high maintenance in real scenarios, since they replicate the series of calls made in the code, violating the DRY rule. Let's see #2 in action - we might right our test like so::
+We are left with #2 and #3. Unfortunately they are very high maintenance in real scenarios, since they replicate the series of calls made in the code, violating the DRY rule. Let's see #2 in action - we might write our test like so::
 
  def test_increase_votes():
      objects = [dict(...), dict(...), ...]
@@ -91,6 +91,15 @@ Also, since many corner cases are encountered along the way, our goal is to try 
 
 **NOTE**: We don't include pymongo functionality as "stubs" or "placeholders". Since this library is used to validate production code, it is unacceptable to behave differently than the real pymongo implementation. In such cases it is better to throw `NotImplementedError` than implement a modified version of the original behavior.
 
+Contributing
+------------
+
+When submitting a PR, please make sure that:
+
+1. You include tests for the feature you are adding or bug you are fixing. Preferably, the test should compare against the real MongoDB engine (See `examples in tests <https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108>`_ for reference).
+2. No existing test got deleted or unintentionally castrated
+3. The travis build passes on your PR.
+
 Acknowledgements
 ----------------
 
@@ -100,24 +109,38 @@ Many thanks go to the following people for helping out:
 * Austin W Ellis
 * Andrey Ovchinnikov
 * Arthur Hirata
+* Baruch Oxman
 * Corey Downing
 * Craig Hobbs
+* Daniel Murray
 * David Fischer
+* Diego Garcia
+* Dmitriy Kostochko
 * Edward D'Souza
+* Emily Rosengren
 * Eugene Chernyshov
+* Grigoriy Osadchenko
 * Israel Teixeira
 * Jacob Perkins
 * Jason Sommer
+* Jeff Browning
 * Jeff McGee
 * Joël Franusic
+* Krzysztof Płocharz
+* Lyon Zhang
+* Marcin Barczynski
 * Mike Ho
 * Nigel Choi
 * Omer Gertel
+* Omer Katz
 * Scott Sexton
 * Todd Tomkinson 
-* baruchoxman
+* Zachary Carter
 * catty (ca77y _at_ live.com)
 * emosenkis
 * hthieu1110
+* יppetlinskiy
+* pacud
+* tipok
 * waskew (waskew _at_ narrativescience.com)
-* zcarter
+

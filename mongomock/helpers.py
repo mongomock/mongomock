@@ -23,6 +23,23 @@ except NameError:
   basestring = (str, bytes)
 
 
+ASCENDING = 1
+
+
+def _index_list(key_or_list, direction=None):
+    """Helper to generate a list of (key, direction) pairs.
+       Takes such a list, or a single key, or a single key and direction.
+    """
+    if direction is not None:
+        return [(key_or_list, direction)]
+    else:
+        if isinstance(key_or_list, basestring):
+            return [(key_or_list, ASCENDING)]
+        elif not isinstance(key_or_list, (list, tuple)):
+            raise TypeError("if no direction is specified, "
+                            "key_or_list must be an instance of list")
+    return key_or_list
+
   
 def _fields_list_to_dict(fields):
     """Takes a list of field names and returns a matching dictionary.

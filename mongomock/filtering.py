@@ -5,6 +5,7 @@ from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
 
+
 def filter_applies(search_filter, document):
     """
     This function implements MongoDB's matching strategy over documents in the find() method and other
@@ -19,24 +20,26 @@ def filter_applies(search_filter, document):
 
         is_match = False
 
+        if isinstance(search, dict) and '$ne' in search and len(iter_key_candidates(key, document)) == 0:
+            continue
+
         for doc_val in iter_key_candidates(key, document):
             if isinstance(search, dict):
                 is_match = all(
                     operator_string in OPERATOR_MAP and OPERATOR_MAP[operator_string] (doc_val, search_val) or
                     operator_string == '$not' and _not_op(document, key, search_val)
                     for operator_string, search_val in iteritems(search)
-                )
+                ) or doc_val == search
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
             elif key in LOGICAL_OPERATOR_MAP:
                 is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
             elif isinstance(doc_val, (list, tuple)):
+                is_match = (search in doc_val or search == doc_val)
                 if isinstance(search, ObjectId):
-                    is_match = (search in doc_val or str(search) in doc_val)
-                else:
-                    is_match = search in doc_val
+                    is_match |= (str(search) in doc_val)
             else:
-                is_match = doc_val == search
+                is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
 
             if is_match:
                 break
@@ -51,7 +54,7 @@ def iter_key_candidates(key, doc):
     Get possible subdocuments or lists that are referred to by the key in question
     Returns the appropriate nested value if the key includes dot notation.
     """
-    if not doc:
+    if doc is None:
         return ()
 
     if not key:

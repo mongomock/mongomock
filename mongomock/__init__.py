@@ -18,6 +18,12 @@ except:
     class OperationFailure(Exception):
         pass
 
+try:
+    from pymongo.errors import CollectionInvalid
+except:
+    class CollectionInvalid(Exception):
+        pass
+
 from mongomock.__version__ import __version__
 
 

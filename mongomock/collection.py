@@ -11,6 +11,11 @@ from . import ObjectId, OperationFailure, DuplicateKeyError
 from .helpers import basestring, xrange
 
 try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
+try:
     # Optional requirements for providing Map-Reduce functionality
     import execjs
 except ImportError:
@@ -36,9 +41,8 @@ class Collection(object):
         self.name = name
         self.full_name = "{0}.{1}".format(db.name, name)
         self._Collection__database = db
-        self._documents = {}
-        self._group_response_dummies = []
-        self._aggregate_response_dummies = []
+        self._documents = OrderedDict()
+        self._uniques = []
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
@@ -49,7 +53,8 @@ class Collection(object):
     def __getattr__(self, name):
         return self.__getitem__(name)
 
-    def insert(self, data):
+    def insert(self, data, manipulate=True,
+               safe=None, check_keys=True, continue_on_error=False, **kwargs):
         if isinstance(data, list):
             return [self._insert(element) for element in data]
         return self._insert(data)
@@ -64,6 +69,15 @@ class Collection(object):
         object_id = data['_id']
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
+        for unique in self._uniques:
+            find_kwargs = {}
+            for key, direction in unique:
+                if key in data:
+                    find_kwargs[key] = data[key]
+            answer = self.find(spec=find_kwargs)
+            if answer.count() > 0:
+                raise DuplicateKeyError("Duplicate Key Error", 11000)
+
         self._documents[object_id] = self._internalize_dict(data)
         return object_id
 
@@ -93,6 +107,15 @@ class Collection(object):
             subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
+                    positional = False
+                    for key in iterkeys(v):
+                        if '$' in key:
+                            positional = True
+                            break
+                    if positional:
+                        subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
+                        continue
+
                     self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$unset':
                     for field, value in iteritems(v):
@@ -118,8 +141,12 @@ class Collection(object):
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
                         if len(nested_field_list) == 1:
-                            arr = existing_document[field]
-                            existing_document[field] = [obj for obj in arr if not obj == value]
+                            if field in existing_document:
+                                arr = existing_document[field]
+                                if isinstance(value, dict):
+                                    existing_document[field] = [obj for obj in arr if not filter_applies(value, obj)]
+                                else:
+                                    existing_document[field] = [obj for obj in arr if not value == obj]
                             continue
 
                         # nested fields includes a positional element
@@ -157,10 +184,9 @@ class Collection(object):
                                     continue
                             existing_document[field].append(value)
                             continue
-
                         # nested fields includes a positional element
                         # need to find that element
-                        if '$' in nested_field_list:
+                        elif '$' in nested_field_list:
                             if not subdocument:
                                 subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
 
@@ -181,6 +207,25 @@ class Collection(object):
                                 push_results.append(value)
 
                             # cannot write to doc directly as it doesn't save to existing_document
+                            subdocument[nested_field_list[-1]] = push_results
+                        # push to array in a nested attribute
+                        else:
+                            # create nested attributes if they do not exist
+                            subdocument = existing_document
+                            for field in nested_field_list[:-1]:
+                                if field not in subdocument:
+                                    subdocument[field] = {}
+
+                                subdocument = subdocument[field]
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            push_results.append(value)
+
                             subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
@@ -255,7 +300,7 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0, slave_okay=False):
         if filter is not None:
             _print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -269,7 +314,6 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
-
         for i in xrange(skip):
             try:
                 unused = next(dataset)
@@ -355,15 +399,23 @@ class Collection(object):
                     subspec = spec
                     for part in field_name_parts[:-1]:
                         if part == '$':
-                            subspec = subspec['$elemMatch']
+                            subspec = subspec.get('$elemMatch', subspec)
                             for item in current_doc:
                                 if filter_applies(subspec, item):
                                     current_doc = item
                                     break
                             continue
 
-                        subspec = subspec[part]
+                        new_spec = {}
+                        for el in subspec:
+                            if el.startswith(part):
+                                if len(el.split(".")) > 1:
+                                    new_spec[".".join(el.split(".")[1:])] = subspec[el]
+                                else:
+                                    new_spec = subspec[el]
+                        subspec = new_spec
                         current_doc = current_doc[part]
+
                     subdocument = current_doc
                 updater(subdocument, field_name_parts[-1], v)
                 continue
@@ -379,7 +431,10 @@ class Collection(object):
                 return # mongodb skips such cases
             if isinstance(doc, list):
                 try:
-                    doc = doc[int(part)]
+                    if part == '$':
+                        doc = doc[0]
+                    else:
+                        doc = doc[int(part)]
                     continue
                 except ValueError:
                     pass
@@ -402,7 +457,7 @@ class Collection(object):
         except StopIteration:
             return None
 
-    def find_and_modify(self, query = {}, update = None, upsert = False, **kwargs):
+    def find_and_modify(self, query = {}, update = None, upsert = False, sort = None, **kwargs):
         remove = kwargs.get("remove", False)
         if kwargs.get("new", False) and remove:
             raise OperationFailure("remove and returnNew can't co-exist") # message from mongodb
@@ -410,7 +465,7 @@ class Collection(object):
         if remove and update is not None:
             raise ValueError("Can't do both update and remove")
 
-        old = self.find_one(query)
+        old = self.find_one(query, sort=sort)
         if not old:
             if upsert:
                 old = {'_id':self.insert(query)}
@@ -465,8 +520,13 @@ class Collection(object):
         self._documents = {}
 
     def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
+        if 'unique' in kwargs and kwargs['unique']:
+            self._uniques.append(helpers._index_list(key_or_list))
+
+    def drop_index(self, index_or_name):
         pass
 
+<<<<<<< HEAD
     def group(self, *args, **kwargs):
         """dummy implementation of pymongo collection.group functionality
         """
@@ -492,6 +552,10 @@ class Collection(object):
                                                                 ]')
         else:
             return self._aggregate_response_dummies.pop(0)
+=======
+    def index_information(self):
+        return {}
+>>>>>>> upstream/master
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
         if execjs is None:
@@ -519,7 +583,7 @@ class Collection(object):
                         mapped_key = '$oid' + key['$oid'];
                     }
                     else {
-                        mapped_key = key; 
+                        mapped_key = key;
                     }
                     if(!mappedDict[mapped_key]) {
                         mappedDict[mapped_key] = [];
@@ -552,7 +616,7 @@ class Collection(object):
         reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
         for reduced_row in reduced_rows:
             if reduced_row['_id'].startswith('$oid'):
-                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])		
+                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])
         reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
         if full_response:
             full_dict['counts']['input'] = len(doc_list)
@@ -590,6 +654,142 @@ class Collection(object):
 
     def distinct(self, key):
         return self.find().distinct(key)
+
+    def group(self, key, condition, initial, reduce, finalize=None):
+        reduce_ctx = execjs.compile("""
+            function doReduce(fnc, docList) {
+                reducer = eval('('+fnc+')');
+                for(var i=0, l=docList.length; i<l; i++) {
+                    try {
+                        reducedVal = reducer(docList[i-1], docList[i]);
+                    }
+                    catch (err) {
+                        continue;
+                    }
+                }
+            return docList[docList.length - 1];
+            }
+        """)
+
+        ret_array = []
+        doc_list_copy = []
+        ret_array_copy = []
+        reduced_val = {}
+        doc_list = [doc for doc in self.find(condition)]
+        for doc in doc_list:
+            doc_copy = copy.deepcopy(doc)
+            for k in doc:
+                if isinstance(doc[k], ObjectId):
+                    doc_copy[k] = str(doc[k])
+                if k not in key and k not in reduce:
+                    del doc_copy[k]
+            for initial_key in initial:
+                if initial_key in doc.keys():
+                    pass
+                else:
+                    doc_copy[initial_key] = initial[initial_key]
+            doc_list_copy.append(doc_copy)
+        doc_list = doc_list_copy
+        for k in key:
+            doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
+        for k in key:
+            if not isinstance(k, basestring):
+                raise TypeError("Keys must be a list of key names, "
+                                "each an instance of %s" % (basestring.__name__,))
+            for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
+                group_list = ([x for x in group])
+                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
+                ret_array.append(reduced_val)
+        for doc in ret_array:
+            doc_copy = copy.deepcopy(doc)
+            for k in doc:
+                if k not in key and k not in initial.keys():
+                    del doc_copy[k]
+            ret_array_copy.append(doc_copy)
+        ret_array = ret_array_copy
+        return ret_array
+
+    def aggregate(self, pipeline, **kwargs):
+        pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
+        group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
+        boolean_operators =        ['$and','$or', '$not']
+        set_operators =            ['$setEquals', '$setIntersection', '$setDifference', '$setUnion', '$setIsSubset', '$anyElementTrue', '$allElementsTrue']
+        compairison_operators =    ['$cmp','$eq','$gt','$gte','$lt','$lte','$ne']
+        aritmetic_operators =      ['$add','$divide','$mod','$multiply','$subtract']
+        string_operators =         ['$concat','$strcasecmp','$substr','$toLower','$toUpper']
+        text_search_operators =    ['$meta']
+        array_operators =          ['$size']
+        projection_operators =     ['$map', '$let', '$literal']
+        date_operators =           ['$dayOfYear','$dayOfMonth','$dayOfWeek','$year','$month','$week','$hour','$minute','$second','$millisecond']
+        conditional_operators =    ['$cond', '$ifNull']
+
+        out_collection = [doc for doc in self.find()]
+        grouped_collection = []
+        for expression in pipeline:
+            for k, v in iteritems(expression):
+                if k == '$match':
+                    out_collection = [doc for doc in out_collection if filter_applies(v, doc)]
+                elif k == '$group':
+                    group_func_keys = expression['$group']['_id'][1:]
+                    for group_key in reversed(group_func_keys):
+                        out_collection = sorted(out_collection, key=lambda x: _resolve_key(group_key, x))
+                    for field, value in iteritems(v):
+                        if field != '_id':
+                            for func, key in iteritems(value):
+                                if func == "$sum" or "$avg":
+                                    for group_key in group_func_keys:
+                                        for ret_value, group in itertools.groupby(out_collection, lambda item: item[group_key]):
+                                            doc_dict = {}
+                                            group_list = ([x for x in group])
+                                            doc_dict['_id'] = ret_value
+                                            current_val = 0
+                                            if func == "$sum":
+                                                for doc in group_list:
+                                                    current_val = sum([current_val, doc[field]])
+                                                doc_dict[field] = current_val
+                                            else:
+                                                for doc in group_list:
+                                                    current_val = sum([current_val, doc[field]])
+                                                    avg = current_val / len(group_list)
+                                                doc_dict[field] = current_val
+                                            grouped_collection.append(doc_dict)
+                                else:
+                                    if func in group_operators:
+                                        raise NotImplementedError(
+                                            "Although %s is a valid group operator for the aggregation pipeline, "
+                                            "%s is currently not implemented in Mongomock."
+                                        )
+                                    else:
+                                        raise NotImplementedError(
+                                            "%s is not a valid group operator for the aggregation pipeline. "
+                                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                                            "for a complete list of valid operators."
+                                        )
+                    out_collection = grouped_collection
+                elif k == '$sort':
+                    sort_array = []
+                    for x, y in v.items():
+                        sort_array.append({x:y})
+                    for sort_pair in reversed(sort_array):
+                        for sortKey, sortDirection in sort_pair.items():
+                            out_collection = sorted(out_collection, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0)
+                elif k == '$skip':
+                    out_collection = out_collection[v:]
+                elif k == '$limit':
+                    out_collection = out_collection[:v]
+                else:
+                    if k in pipeline_operators:
+                        raise NotImplementedError(
+                            "Although %s is a valid operator for the aggregation pipeline, "
+                            "%s is currently not implemented in Mongomock."
+                        )
+                    else:
+                        raise NotImplementedError(
+                            "%s is not a valid operator for the aggregation pipeline. "
+                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
+                            "for a complete list of valid operators."
+                        )
+        return {'ok':1.0, 'result':out_collection}
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
@@ -629,11 +829,18 @@ class Cursor(object):
         else:
             self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(key_or_list, x), reverse = direction < 0))
         return self
-    def count(self):
+
+    def count(self, with_limit_and_skip=False):
         arr = [x for x in self._dataset]
         count = len(arr)
+        if with_limit_and_skip:
+            if self._skip:
+                count -= self._skip
+            if self._limit and count > self._limit:
+                count = self._limit
         self._dataset = iter(arr)
         return count
+
     def skip(self, count):
         self._skip = count
         return self
@@ -653,7 +860,7 @@ class Cursor(object):
         for x in iter(self._dataset):
             value = _resolve_key(key, x)
             if value == NOTHING: continue
-            unique.add(value)
+            unique.update(value if isinstance(value, (tuple, list)) else [value])
         return list(unique)
 
     def __getitem__(self, index):
@@ -663,9 +870,16 @@ class Cursor(object):
         return arr[index]
 
 def _set_updater(doc, field_name, value):
+    if isinstance(value, (tuple, list)):
+        value = copy.deepcopy(value)
     if isinstance(doc, dict):
         doc[field_name] = value
 
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
+
+def _sum_updater(doc, field_name, current, result):
+    if isinstance(doc, dict):
+        result = current + doc.get[field_name, 0]
+        return result
