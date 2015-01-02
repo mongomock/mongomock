@@ -755,7 +755,7 @@ class Collection(object):
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
-                    if not isinstance(v, unicode) and v[0] != '$':
+                    if not isinstance(v, basestring) and v[0] != '$':
                         raise ValueError("$unwind failed: exception: field path references must be prefixed with a '$' ('%s'"%str(v))
                     if len(v.split('.')) > 1:
                         raise NotImplementedError('Mongmock does not currently support nested field paths in the $unwind implementation. ("%s"'%v)
