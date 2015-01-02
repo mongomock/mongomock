@@ -894,13 +894,13 @@ class PymongoGroupTest(_GroupTest, _PymongoConnectionMixin):
 class _AggregateTest(_CollectionComparisonTest):
     def setUp(self):
         _CollectionComparisonTest.setUp(self)
-        self.data = [{"_id":ObjectId(), "a": 1, "count": 4 },
-                     {"_id":ObjectId(), "a": 1, "count": 2 },
-                     {"_id":ObjectId(), "a": 1, "count": 4 },
-                     {"_id":ObjectId(), "a": 2, "count": 3 },
-                     {"_id":ObjectId(), "a": 2, "count": 1 },
-                     {"_id":ObjectId(), "a": 1, "count": 5 },
-                     {"_id":ObjectId(), "a": 4, "count": 4 }]
+        self.data = [{"_id":ObjectId(), "a": 1, "count": 4, "swallows":['European swallow'] },
+                     {"_id":ObjectId(), "a": 1, "count": 2, "swallows":['African swallow'] },
+                     {"_id":ObjectId(), "a": 1, "count": 4, "swallows":['European swallow'] },
+                     {"_id":ObjectId(), "a": 2, "count": 3, "swallows":['African swallow', 'European swallow'] },
+                     {"_id":ObjectId(), "a": 2, "count": 1, "swallows":[] },
+                     {"_id":ObjectId(), "a": 1, "count": 5, "swallows":['African swallow', 'European swallow'] },
+                     {"_id":ObjectId(), "a": 4, "count": 4, "swallows":['unladen swallow'] }]
         for item in self.data:
             self.cmp.do.insert(item)
 
@@ -941,6 +941,12 @@ class _AggregateTest(_CollectionComparisonTest):
                          {'$sort': {'_id': -1, 'count': 1}},
                          {'$skip': 1},
                          {'$limit': 2}]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate4(self):
+        pipeline = [{'$unwind': '$swallows'}
+                    , {'$sort': {'count':-1, 'swallows': -1}}
+                    ]
         self.cmp.compare.aggregate(pipeline)
 
 

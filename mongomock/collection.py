@@ -628,6 +628,11 @@ class Collection(object):
         return self.find().distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
+        if execjs is None:
+            raise NotImplementedError(
+                "PyExecJS is required in order to use group. "
+                "Use 'pip install pyexecjs pymongo' to support group mock."
+            )
         reduce_ctx = execjs.compile("""
             function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
@@ -680,7 +685,7 @@ class Collection(object):
             ret_array_copy.append(doc_copy)
         ret_array = ret_array_copy
         return ret_array
-
+ 
     def aggregate(self, pipeline, **kwargs):
         pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
         group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
@@ -749,6 +754,22 @@ class Collection(object):
                     out_collection = out_collection[v:]
                 elif k == '$limit':
                     out_collection = out_collection[:v]
+                elif k == '$unwind':
+                    if not isinstance(v, basestring) and v[0] != '$':
+                        raise ValueError("$unwind failed: exception: field path references must be prefixed with a '$' ('%s'"%str(v))
+                    if len(v.split('.')) > 1:
+                        raise NotImplementedError('Mongmock does not currently support nested field paths in the $unwind implementation. ("%s"'%v)
+                    unwound_collection = []
+                    for doc in out_collection:
+                        array_value = doc.get(v[1:])
+                        if array_value in (None, []):
+                            continue
+                        elif not isinstance(array_value, list):
+                            raise TypeError('$unwind must specify an array field, field: "%s", value found: %s'%(str(v),str(array_value)))
+                        for field_item in array_value:
+                            unwound_collection.append(copy.deepcopy(doc))
+                            unwound_collection[-1][v[1:]] = field_item
+                    out_collection = unwound_collection
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
