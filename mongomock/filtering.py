@@ -130,11 +130,6 @@ def _elem_match_op(doc_val, query):
 def _regex(doc_val, regex):
     return any(regex.search(item) for item in _force_list(doc_val))
 
-def _print_deprecation_warning(old_param_name, new_param_name):
-    warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
-                  "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
-                  "compatibility purposes." % old_param_name, new_param_name, DeprecationWarning)
-
 OPERATOR_MAP = {'$ne': operator.ne,
                 '$gt': _not_nothing_and(operator.gt),
                 '$gte': _not_nothing_and(operator.ge),

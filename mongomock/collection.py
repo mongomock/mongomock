@@ -8,7 +8,7 @@ import warnings
 from sentinels import NOTHING
 from .filtering import filter_applies, iter_key_candidates
 from . import ObjectId, OperationFailure, DuplicateKeyError
-from .helpers import basestring, xrange
+from .helpers import basestring, xrange, print_deprecation_warning
 
 try:
     from collections import OrderedDict
@@ -302,7 +302,7 @@ class Collection(object):
 
     def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0, slave_okay=False):
         if filter is not None:
-            _print_deprecation_warning('filter', 'spec')
+            print_deprecation_warning('filter', 'spec')
             if spec is None:
                 spec = filter
         if as_class is None:
@@ -495,7 +495,7 @@ class Collection(object):
     def remove(self, spec_or_id = None, search_filter = None):
         """Remove objects matching spec_or_id from the collection."""
         if search_filter is not None:
-            _print_deprecation_warning('search_filter', 'spec_or_id')
+            print_deprecation_warning('search_filter', 'spec_or_id')
         if spec_or_id is None:
             spec_or_id = search_filter if search_filter else {}
         if not isinstance(spec_or_id, dict):
