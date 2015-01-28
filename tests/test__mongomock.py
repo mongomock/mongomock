@@ -581,6 +581,56 @@ class _CollectionTest(_CollectionComparisonTest):
             {'$inc': {'data.$.age': 1}})
         self.cmp.compare.find()
 
+    def test__setOnInsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'age': 1}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'ann'}, {'$setOnInsert': {'age': 1}})
+        self.cmp.compare.find()
+
+    def test__setOnInsert_upsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'age': 1}}, True)
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'ann'}, {'$setOnInsert': {'age': 1}}, True)
+        self.cmp.compare.find()
+
+    def test__setOnInsert_subdocument(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': {'age': 0}})
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'data.age': 1}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'data.age1': 1}})
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'ann'}, {'$setOnInsert': {'data.age': 1}})
+        self.cmp.compare.find()
+
+    def test__setOnInsert_subdocument_upsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': {'age': 0}})
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'data.age': 1}}, True)
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'bob'}, {'$setOnInsert': {'data.age1': 1}}, True)
+        self.cmp.compare.find()
+        self.cmp.do.update({'name': 'ann'}, {'$setOnInsert': {'data.age': 1}}, True)
+        self.cmp.compare.find()
+
+    def test__inc_subdocument_positional(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': [{'age': 0}, {'age': 1}]})
+        self.cmp.do.update({'name': 'bob', 'data': {'$elemMatch': {'age': 0}}},
+            {'$setOnInsert': {'data.$.age': 1}})
+        self.cmp.compare.find()
+
+    def test__inc_subdocument_positional_upsert(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'data': [{'age': 0}, {'age': 1}]})
+        self.cmp.do.update({'name': 'bob', 'data': {'$elemMatch': {'age': 0}}},
+            {'$setOnInsert': {'data.$.age': 1}}, True)
+        self.cmp.compare.find()
+
     def test__addToSet(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
