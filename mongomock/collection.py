@@ -94,11 +94,14 @@ class Collection(object):
         updated_existing = False
         num_updated = 0
         for existing_document in itertools.chain(self._iter_documents(spec), [None]):
+            # we need was_insert for the setOnInsert update operation
+            was_insert = False
             # the sentinel document means we should do an upsert
             if existing_document is None:
                 if not upsert:
                     continue
                 existing_document = self._documents[self._insert(self._discard_operators(spec))]
+                was_insert = True
             else:
                 updated_existing = True
             num_updated += 1
@@ -117,6 +120,16 @@ class Collection(object):
                         continue
 
                     self._update_document_fields(existing_document, v, _set_updater)
+                elif k == '$setOnInsert':
+                    if not was_insert:
+                        continue
+                    positional = any('$' in key for key in iterkeys(v))
+                    if positional:
+                        # we use _set_updater
+                        subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
+                    else:
+                        self._update_document_fields(existing_document, v, _set_updater)                 
+
                 elif k == '$unset':
                     for field, value in iteritems(v):
                         if self._has_key(existing_document, field):
@@ -685,7 +698,7 @@ class Collection(object):
             ret_array_copy.append(doc_copy)
         ret_array = ret_array_copy
         return ret_array
- 
+
     def aggregate(self, pipeline, **kwargs):
         pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
         group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
