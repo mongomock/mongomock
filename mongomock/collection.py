@@ -8,7 +8,7 @@ import warnings
 from sentinels import NOTHING
 from .filtering import filter_applies, iter_key_candidates
 from . import ObjectId, OperationFailure, DuplicateKeyError
-from .helpers import basestring, xrange, print_deprecation_warning
+from .helpers import basestring, xrange, print_deprecation_warning, hashdict
 
 try:
     from collections import OrderedDict
@@ -67,6 +67,8 @@ class Collection(object):
         if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
+        if type(object_id) == dict:
+            object_id = hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
         for unique in self._uniques:
@@ -79,7 +81,7 @@ class Collection(object):
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
 
         self._documents[object_id] = self._internalize_dict(data)
-        return object_id
+        return data['_id']
 
     def _internalize_dict(self, d):
         return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
@@ -128,7 +130,7 @@ class Collection(object):
                         # we use _set_updater
                         subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
                     else:
-                        self._update_document_fields(existing_document, v, _set_updater)                 
+                        self._update_document_fields(existing_document, v, _set_updater)
 
                 elif k == '$unset':
                     for field, value in iteritems(v):

@@ -1,9 +1,9 @@
 import sys
 
 if sys.version_info < (2, 7):
-    from unittest2 import TestCase, skipIf
+    from unittest2 import TestCase, skipIf, expectedFailure
 else:
-    from unittest import TestCase, skipIf
+    from unittest import TestCase, skipIf, expectedFailure
 
 
 class DBRef(object):

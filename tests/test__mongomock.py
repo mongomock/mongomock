@@ -5,7 +5,7 @@ import re
 import platform
 import sys
 
-from .utils import TestCase, skipIf, DBRef
+from .utils import TestCase, skipIf, DBRef, expectedFailure
 
 import mongomock
 from mongomock import Database
@@ -178,6 +178,17 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({"_id" : "b"}) #add an item with a non ObjectId _id first.
         self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
+
+    def test__insert_object_id_as_dict(self):
+        self.cmp.do.remove()
+        _id = self.cmp.do.insert({'_id': {'A': 1}, 'a': 1})
+        self.assertEqual(_id['fake'], {'A': 1})
+        self.assertEqual(type(_id['fake']), type(_id['real']))
+        self.assertEqual(_id['fake'], _id['real'])
+        self.cmp.compare.find()  # single document, no need to ignore order
+        self.cmp.compare.find({'id': {'A': 1}})
+        self.cmp.compare.find({'id': _id['fake']})
+        self.cmp.compare.find({'id': _id['real']})
 
     def test__count(self):
         self.cmp.compare.count()
@@ -534,6 +545,7 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
         self.cmp.compare.find({'name' : 'bob'})
 
+    @expectedFailure
     def test__set_upsert(self):
         self.cmp.do.remove()
         self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
