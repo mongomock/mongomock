@@ -5,7 +5,7 @@ import re
 import platform
 import sys
 
-from .utils import TestCase, skipIf, DBRef, expectedFailure
+from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
@@ -545,7 +545,6 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
         self.cmp.compare.find({'name' : 'bob'})
 
-    @expectedFailure
     def test__set_upsert(self):
         self.cmp.do.remove()
         self.cmp.do.update({"name": "bob"}, {"$set": {}}, True)
