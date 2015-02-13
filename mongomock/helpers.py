@@ -49,6 +49,20 @@ def _index_list(key_or_list, direction=None):
     return key_or_list
 
 
+def _gen_deep_hashdict(tup):
+    """
+    Recursively replace dicts in a tuple with hashdicts
+    """
+    first = tup[0]
+    rest = tup[1:]
+    if type(first) == dict:
+        first = hashdict(first)
+    if rest:
+        return tuple([first, _gen_deep_hashdict(rest)])
+    else:
+        return first
+
+
 class hashdict(dict):
     """
     hashable dict implementation, suitable for use as a key into
@@ -72,7 +86,7 @@ class hashdict(dict):
 
     """
     def __key(self):
-        return tuple(sorted(self.items()))
+        return frozenset(_gen_deep_hashdict(item) for item in self.items())
 
     def __repr__(self):
         return "{0}({1})".format(

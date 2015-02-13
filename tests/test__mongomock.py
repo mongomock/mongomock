@@ -189,6 +189,7 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'id': {'A': 1}})
         self.cmp.compare.find({'id': _id['fake']})
         self.cmp.compare.find({'id': _id['real']})
+        self.cmp.do.insert({'_id': {'A': {'sub': {'subsub': 3}}}, 'a': 1})
 
     def test__count(self):
         self.cmp.compare.count()
