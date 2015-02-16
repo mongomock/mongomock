@@ -1,6 +1,7 @@
 import re
 import sys
 import warnings
+from six import (iteritems)
 
 
 def print_deprecation_warning(old_param_name, new_param_name):
@@ -73,7 +74,7 @@ class hashdict(dict):
     """
     def __key(self):
         return frozenset((k, hashdict(v) if type(v) == dict else v)
-                         for k, v in self.iteritems())
+                         for k, v in iteritems(self))
 
     def __repr__(self):
         return "{0}({1})".format(
