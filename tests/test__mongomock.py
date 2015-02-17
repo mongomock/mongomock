@@ -179,17 +179,49 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
 
+    def test__update_object_id_as_dict(self):
+        if isinstance(self, _MongoClientMixin):
+            self.skipTest("MongoClient does not allow changing _id on existing docs")
+        self.cmp.do.remove()
+
+        # update with top-level dictionary
+        doc_ids = [
+            {'A': 1},
+            {'A': [1, 2, 3]},
+            {'A': {'sub': {'subsub': 3}}}
+        ]
+        for doc_id in doc_ids:
+            _id = self.cmp.do.insert({'_id': doc_id, 'a': 1})
+            _id = self.cmp.do.update({'_id': doc_id}, {'_id': 1, 'b': 2})
+
+            self.cmp.do.remove({'_id': 1})
+
     def test__insert_object_id_as_dict(self):
         self.cmp.do.remove()
-        _id = self.cmp.do.insert({'_id': {'A': 1}, 'a': 1})
-        self.assertEqual(_id['fake'], {'A': 1})
-        self.assertEqual(type(_id['fake']), type(_id['real']))
-        self.assertEqual(_id['fake'], _id['real'])
-        self.cmp.compare.find()  # single document, no need to ignore order
-        self.cmp.compare.find({'id': {'A': 1}})
-        self.cmp.compare.find({'id': _id['fake']})
-        self.cmp.compare.find({'id': _id['real']})
-        self.cmp.do.insert({'_id': {'A': {'sub': {'subsub': 3}}}, 'a': 1})
+
+        doc_ids = [
+            # simple top-level dictionary
+            {'A': 1},
+            # dict with value as list
+            {'A': [1, 2, 3]},
+            # dict with value as dict
+            {'A': {'sub': {'subsub': 3}}}
+        ]
+        for doc_id in doc_ids:
+            _id = self.cmp.do.insert({'_id': doc_id, 'a': 1})
+
+            self.assertEqual(_id['fake'], _id['real'])
+            self.assertEqual(_id['fake'], doc_id)
+            self.assertEqual(_id['real'], doc_id)
+            self.assertEqual(type(_id['fake']), type(_id['real']))
+
+            self.cmp.compare.find({'_id': doc_id})
+
+            docs = self.cmp.compare.find_one({'_id': doc_id})
+            self.assertEqual(docs['fake']['_id'], doc_id)
+            self.assertEqual(docs['real']['_id'], doc_id)
+
+            self.cmp.do.remove({'_id': doc_id})
 
     def test__count(self):
         self.cmp.compare.count()

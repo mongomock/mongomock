@@ -256,6 +256,8 @@ class Collection(object):
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             # id changed, fix index
+                            if type(_id) == dict:
+                                _id = hashdict(_id)
                             del self._documents[_id]
                             self.insert(existing_document)
                         break
@@ -518,6 +520,8 @@ class Collection(object):
         to_delete = list(self.find(spec = spec_or_id))
         for doc in to_delete:
             doc_id = doc['_id']
+            if type(doc_id) == dict:
+                doc_id = hashdict(doc_id)
             del self._documents[doc_id]
 
         return {

@@ -73,7 +73,10 @@ class hashdict(dict):
 
     """
     def __key(self):
-        return frozenset((k, hashdict(v) if type(v) == dict else v)
+        return frozenset((k,
+                          hashdict(v) if type(v) == dict else
+                          tuple(v) if type(v) == list else
+                          v)
                          for k, v in iteritems(self))
 
     def __repr__(self):
