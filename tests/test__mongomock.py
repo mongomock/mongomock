@@ -179,23 +179,6 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
 
-    def test__update_object_id_as_dict(self):
-        if isinstance(self, _MongoClientMixin):
-            self.skipTest("MongoClient does not allow changing _id on existing docs")
-        self.cmp.do.remove()
-
-        # update with top-level dictionary
-        doc_ids = [
-            {'A': 1},
-            {'A': [1, 2, 3]},
-            {'A': {'sub': {'subsub': 3}}}
-        ]
-        for doc_id in doc_ids:
-            _id = self.cmp.do.insert({'_id': doc_id, 'a': 1})
-            _id = self.cmp.do.update({'_id': doc_id}, {'_id': 1, 'b': 2})
-
-            self.cmp.do.remove({'_id': 1})
-
     def test__insert_object_id_as_dict(self):
         self.cmp.do.remove()
 

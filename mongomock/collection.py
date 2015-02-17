@@ -255,11 +255,9 @@ class Collection(object):
                             existing_document['_id'] = _id
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
-                            # id changed, fix index
-                            if type(_id) == dict:
-                                _id = hashdict(_id)
-                            del self._documents[_id]
-                            self.insert(existing_document)
+                            raise OperationFailure(
+                                "The _id field cannot be changed from {0} to {1}".format(
+                                    existing_document['_id'], _id))
                         break
                     else:
                         # can't mix modifiers with non-modifiers in update

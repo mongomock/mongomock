@@ -93,7 +93,7 @@ class CollectionAPITest(TestCase):
     def test__distinct_array_field(self):
         self.db.collection.insert([{'f1': ['v1', 'v2', 'v1']}, {'f1': ['v2', 'v3']}])
         cursor = self.db.collection.find()
-        self.assertEquals(set(cursor.distinct('f1')), set(['v1', 'v2', 'v3']))		
+        self.assertEquals(set(cursor.distinct('f1')), set(['v1', 'v2', 'v3']))
 
     def test__cursor_clone(self):
         self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
@@ -197,6 +197,11 @@ class CollectionAPITest(TestCase):
         d["a"] = "b"
         l.append(1)
         self.assertEquals(list(self.db.collection.find()), [{"_id": obj_id, "d": {}, "l": []}])
+
+    def test__update_cannot_change__id(self):
+        self.db.collection.insert({'_id': 1, 'a': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.update({'_id': 1}, {'_id': 2, 'b': 2})
 
     def test__string_matching(self):
         """
