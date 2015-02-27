@@ -128,6 +128,7 @@ Many thanks go to the following people for helping out:
 * Joël Franusic
 * Krzysztof Płocharz
 * Lyon Zhang
+* Marc Prewitt
 * Marcin Barczynski
 * Mike Ho
 * Nigel Choi
