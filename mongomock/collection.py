@@ -855,7 +855,7 @@ class Cursor(object):
         self._skip = count
         return self
     def limit(self, count):
-        self._limit = count
+        self._limit = count if count != 0 else None
         return self
     def batch_size(self, count):
         return self
