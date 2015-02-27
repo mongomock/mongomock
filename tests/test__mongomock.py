@@ -179,6 +179,33 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.save({"_id":ObjectId(), "someProp":1}, safe=True)
         self.cmp.compare_ignore_order.find()
 
+    def test__insert_object_id_as_dict(self):
+        self.cmp.do.remove()
+
+        doc_ids = [
+            # simple top-level dictionary
+            {'A': 1},
+            # dict with value as list
+            {'A': [1, 2, 3]},
+            # dict with value as dict
+            {'A': {'sub': {'subsub': 3}}}
+        ]
+        for doc_id in doc_ids:
+            _id = self.cmp.do.insert({'_id': doc_id, 'a': 1})
+
+            self.assertEqual(_id['fake'], _id['real'])
+            self.assertEqual(_id['fake'], doc_id)
+            self.assertEqual(_id['real'], doc_id)
+            self.assertEqual(type(_id['fake']), type(_id['real']))
+
+            self.cmp.compare.find({'_id': doc_id})
+
+            docs = self.cmp.compare.find_one({'_id': doc_id})
+            self.assertEqual(docs['fake']['_id'], doc_id)
+            self.assertEqual(docs['real']['_id'], doc_id)
+
+            self.cmp.do.remove({'_id': doc_id})
+
     def test__count(self):
         self.cmp.compare.count()
         self.cmp.do.insert({"a" : 1})
