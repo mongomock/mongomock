@@ -228,6 +228,8 @@ class CollectionAPITest(TestCase):
         self.db['coll_name'].insert([first, second, third])
         count = self.db['coll_name'].find().limit(2).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
+        count = self.db['coll_name'].find().limit(0).count(with_limit_and_skip=True)
+        self.assertEqual(count, 3)
 
     def test__cursor_count_with_skip(self):
         first = {'name':'first'}
