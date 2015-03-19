@@ -43,3 +43,6 @@ pip-log.txt
 flycheck-*
 .DS_Store
 .env
+
+### vim
+.ropeproject/
