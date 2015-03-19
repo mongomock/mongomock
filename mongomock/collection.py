@@ -442,8 +442,6 @@ class Collection(object):
     def _update_document_single_field(self, doc, field_name, field_value, updater):
         field_name_parts = field_name.split(".")
         for part in field_name_parts[:-1]:
-            if not isinstance(doc, dict) and not isinstance(doc, list):
-                return # mongodb skips such cases
             if isinstance(doc, list):
                 try:
                     if part == '$':
@@ -453,8 +451,18 @@ class Collection(object):
                     continue
                 except ValueError:
                     pass
-            doc = doc.setdefault(part, {})
-        updater(doc, field_name_parts[-1], field_value)
+            elif isinstance(doc, dict):
+                doc = doc.setdefault(part, {})
+            else:
+                return
+        field_name = field_name_parts[-1]
+        if isinstance(doc, list):
+            try:
+                doc[int(field_name)] = field_value
+            except:
+                pass
+        else:
+            updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter = None):
         return (document for document in itervalues(self._documents) if filter_applies(filter, document))
