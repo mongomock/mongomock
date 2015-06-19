@@ -739,6 +739,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$push': {'hat.data.sizes': 'L'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_nested_attribute_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {}})
+        self.cmp.do.update({'name': 'bob'}, {'$push': {'hat.first': {'$each': ['a', 'b']}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_to_absent_nested_attribute(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})

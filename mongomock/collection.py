@@ -239,7 +239,10 @@ class Collection(object):
                                 # if the list exists, then use that list
                                 push_results = subdocument[nested_field_list[-1]]
 
-                            push_results.append(value)
+                            if isinstance(value, dict) and '$each' in value:
+                                push_results += list(value['$each'])
+                            else:
+                                push_results.append(value)
 
                             subdocument[nested_field_list[-1]] = push_results
                 else:
