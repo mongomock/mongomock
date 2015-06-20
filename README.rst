@@ -130,6 +130,7 @@ Many thanks go to the following people for helping out:
 * Lyon Zhang
 * Marc Prewitt
 * Marcin Barczynski
+* Marian Galik
 * Martin Domke
 * Michał Albrycht
 * Mike Ho
