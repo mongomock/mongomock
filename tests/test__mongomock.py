@@ -252,6 +252,31 @@ class _CollectionTest(_CollectionComparisonTest):
         # test no _id, otherProp:1
         self.cmp.compare.find({"_id": id1}, {"someOtherProp": 1})
 
+    def test__find_by_attributes_return_fields_elemMatch(self):
+        id = ObjectId()
+        self.cmp.do.insert({
+            '_id': id,
+            'owns': [
+                {'type': 'hat', 'color': 'black'},
+                {'type': 'hat', 'color': 'green'},
+                {'type': 't-shirt', 'color': 'black', 'size': 'small'},
+                {'type': 't-shirt', 'color': 'black'},
+                {'type': 't-shirt', 'color': 'white'}
+            ],
+            'hat': 'red'
+        })
+        elem = {'$elemMatch': {'type': 't-shirt', 'color': 'black'}}
+        # test filtering on array field only
+        self.cmp.compare.find({'_id': id}, {'owns': elem})
+        # test filtering on array field with inclusion
+        self.cmp.compare.find({'_id': id}, {'owns': elem, 'hat': 1})
+        # test filtering on array field with exclusion
+        self.cmp.compare.find({'_id': id}, {'owns': elem, 'hat': 0})
+        # test filtering on non array field
+        self.cmp.compare.find({'_id': id}, {'hat': elem})
+        # test no match
+        self.cmp.compare.find({'_id': id}, {'owns': {'$elemMatch': {'type': 'cap'}}})
+
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
