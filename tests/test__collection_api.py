@@ -132,6 +132,13 @@ class CollectionAPITest(TestCase):
 
         self.assertEquals(self.db.col.remove({"bla": 1})["n"], 0)
 
+    def test__remove_write_concern(self):
+        self.db.col.remove({"a": 1}, w=None, wtimeout=None, j=None, fsync=None)
+
+    def test__remove_bad_write_concern(self):
+        with self.assertRaises(TypeError):
+            self.db.col.remove({"a": 1}, bad_kwarg=1)
+
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here

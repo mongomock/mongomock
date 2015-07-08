@@ -27,9 +27,10 @@ except:
 from mongomock.__version__ import __version__
 
 
-__all__ = ['Connection', 'Database', 'Collection', 'ObjectId']
+__all__ = ['Connection', 'Database', 'Collection', 'ObjectId', 'WriteConcern']
 
 
+from .write_concern import WriteConcern
 from .connection import Connection, MongoClient
 from .database import Database
 from .collection import Collection

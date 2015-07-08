@@ -7,7 +7,7 @@ import time
 import warnings
 from sentinels import NOTHING
 from .filtering import filter_applies, iter_key_candidates
-from . import ObjectId, OperationFailure, DuplicateKeyError
+from . import ObjectId, OperationFailure, DuplicateKeyError, WriteConcern
 from .helpers import basestring, xrange, print_deprecation_warning, hashdict
 
 try:
@@ -318,7 +318,7 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0, slave_okay=False):
+    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0, slave_okay=False, no_cursor_timeout=False):
         if filter is not None:
             print_deprecation_warning('filter', 'spec')
             if spec is None:
@@ -518,8 +518,10 @@ class Collection(object):
                         manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
 
-    def remove(self, spec_or_id = None, search_filter = None):
+    def remove(self, spec_or_id = None, search_filter = None, **write_concern_kwargs):
         """Remove objects matching spec_or_id from the collection."""
+        if write_concern_kwargs:
+            write_concern = WriteConcern(**write_concern_kwargs)
         if search_filter is not None:
             print_deprecation_warning('search_filter', 'spec_or_id')
         if spec_or_id is None:
