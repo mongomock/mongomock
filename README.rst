@@ -106,6 +106,7 @@ Acknowledgements
 Many thanks go to the following people for helping out:
 
 * Alec Perkins
+* Alexandre Viau
 * Austin W Ellis
 * Andrey Ovchinnikov
 * Arthur Hirata
