@@ -1,5 +1,6 @@
 from unittest import TestCase
 from mongomock.helpers import hashdict
+from mongomock.helpers import print_deprecation_warning
 
 
 class HashdictTest(TestCase):
@@ -18,3 +19,8 @@ class HashdictTest(TestCase):
         _id = hashdict({hashdict({'a': '3'}): {'foo': 2}})
         h[_id] = 'foo'
         self.assertEqual(h[_id], 'foo')
+
+class TestDeprecationWarning(TestCase):
+    def test__deprecation_warning(self):
+        # ensure this doesn't throw an exception
+        print_deprecation_warning('aaa', 'bbb')

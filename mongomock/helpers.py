@@ -7,7 +7,7 @@ from six import (iteritems)
 def print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
                   "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
-                  "compatibility purposes." % old_param_name, new_param_name, DeprecationWarning)
+                  "compatibility purposes." % (old_param_name, new_param_name), DeprecationWarning)
 
 
 _PY2 = sys.version_info < (3, 0)
