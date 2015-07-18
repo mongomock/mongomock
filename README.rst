@@ -139,6 +139,7 @@ Many thanks go to the following people for helping out:
 * Omer Gertel
 * Omer Katz
 * Papp Győző
+* Paul Glass
 * Scott Sexton
 * Todd Tomkinson 
 * Zachary Carter
