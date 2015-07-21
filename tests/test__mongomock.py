@@ -668,6 +668,26 @@ class _CollectionTest(_CollectionComparisonTest):
             self.cmp.do.update({'name': 'bob'}, {'$addToSet': {'hat':'tall'}})
             self.cmp.compare.find({'name': 'bob'})
 
+    def test__addToSet_nested(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat.color':'green'}})
+            self.cmp.compare.find({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name': 'bob'}, {'$addToSet': {'hat.color':'tall'}})
+            self.cmp.compare.find({'name': 'bob'})
+
+    def test__addToSet_each(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'hat': {'$each' : ['green', 'yellow']}}})
+            self.cmp.compare.find({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name':'bob'}, {'$addToSet': {'shirt.color': {'$each' : ['green', 'yellow']}}})
+            self.cmp.compare.find({'name': 'bob'})
+
     def test__pull(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
@@ -697,6 +717,33 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'hat': {'$elemMatch': {'name': 'derby'}}}, {'$pull': {'hat.$.sizes': 'XL'}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__pullAll(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$pullAll': {'hat': ['green']}})
+        self.cmp.compare.find({'name': 'bob'})
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        self.cmp.do.update({'name': 'bob'}, {'$pullAll': {'hat': ['green', 'blue']}})
+        self.cmp.compare.find({'name': 'bob'})
+		
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall', 'blue']})
+        self.cmp.do.update({'name': 'bob'}, {'$pullAll': {'hat': ['green']}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pullAll_nested_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'properties' : {'sizes': ['M', 'L', 'XL']}}})
+        self.cmp.do.update({'name': 'bob'}, {'$pullAll': {'hat.properties.sizes': ['M']}})
+        self.cmp.compare.find({'name': 'bob'})
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'properties' : {'sizes': ['M', 'L', 'XL']}}})
+        self.cmp.do.update({'name': 'bob'}, {'$pullAll': {'hat.properties.sizes': ['M', 'L']}})
+        self.cmp.compare.find({'name': 'bob'})
+		
     def test__push(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
