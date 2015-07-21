@@ -123,6 +123,7 @@ Many thanks go to the following people for helping out:
 * Grigoriy Osadchenko
 * Israel Teixeira
 * Jacob Perkins
+* Jason Burchfield
 * Jason Sommer
 * Jeff Browning
 * Jeff McGee
