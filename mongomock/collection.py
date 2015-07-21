@@ -184,6 +184,24 @@ class Collection(object):
 
                             # cannot write to doc directly as it doesn't save to existing_document
                             subdocument[nested_field_list[-1]] = pull_results
+                elif k == '$pullAll':
+                    for field, value in iteritems(v):
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            if field in existing_document:
+                                arr = existing_document[field]
+                                existing_document[field] = [obj for obj in arr if obj not in value]
+                            continue
+                        else:							
+                            subdocument = existing_document
+                            for nested_field in nested_field_list[:-1]:
+                                if nested_field not in subdocument:
+                                    break
+                                subdocument = subdocument[nested_field]
+
+                            if nested_field_list[-1] in subdocument:
+                                arr = subdocument[nested_field_list[-1]]
+                                subdocument[nested_field_list[-1]] = [obj for obj in arr if obj not in value]
                 elif k == '$push':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
