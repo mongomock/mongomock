@@ -149,9 +149,43 @@ class Collection(object):
                     self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
-                        container = existing_document.setdefault(field, [])
-                        if value not in container:
-                            container.append(value)
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            if field not in existing_document:
+                                existing_document[field] = []
+                            # document should be a list
+                            # append to it
+                            if isinstance(value, dict):
+                                if '$each' in value:
+                                    # append the list to the field
+                                    existing_document[field] += [obj for obj in list(value['$each']) 
+                                                                 if obj not in existing_document[field]]
+                                    continue
+                            if value not in existing_document[field]:
+                                existing_document[field].append(value)
+                            continue
+                        # push to array in a nested attribute
+                        else:
+                            # create nested attributes if they do not exist
+                            subdocument = existing_document
+                            for field in nested_field_list[:-1]:
+                                if field not in subdocument:
+                                    subdocument[field] = {}
+
+                                subdocument = subdocument[field]
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            if isinstance(value, dict) and '$each' in value:
+                                push_results += [obj for obj in list(value['$each']) if obj not in push_results]
+                            elif value not in push_results:
+                                push_results.append(value)
+
+                            subdocument[nested_field_list[-1]] = push_results
                 elif k == '$pull':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
