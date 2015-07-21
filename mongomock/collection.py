@@ -550,9 +550,12 @@ class Collection(object):
         self._documents = {}
 
     def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
+        self.create_index(key_or_list, cache_for, **kwargs)
+
+    def create_index(self, key_or_list, cache_for = 300, **kwargs):
         if 'unique' in kwargs and kwargs['unique']:
             self._uniques.append(helpers._index_list(key_or_list))
-
+            
     def drop_index(self, index_or_name):
         pass
 
