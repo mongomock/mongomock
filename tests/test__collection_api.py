@@ -279,9 +279,19 @@ class CollectionAPITest(TestCase):
             expected = {'_id': val}
             self.assertEquals(in_db_val, expected)
 
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__create_uniq_idxs_with_ascending_ordering(self):
+        self.db.collection.create_index([("value", pymongo.ASCENDING)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+        
     @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
-    def test__uniq_idxs_with_ascending_ordering(self):
-        self.db.collection.ensure_index([("value", pymongo.ASCENDING)], unique=True)
+    def test__create_uniq_idxs_with_descending_ordering(self):
+        self.db.collection.create_index([("value", pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
@@ -289,8 +299,27 @@ class CollectionAPITest(TestCase):
 
         self.assertEquals(self.db.collection.find({}).count(), 1)
 
+    def test__create_uniq_idxs_without_ordering(self):
+        self.db.collection.create_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+        
     @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
-    def test__uniq_idxs_with_descending_ordering(self):
+    def test__ensure_uniq_idxs_with_ascending_ordering(self):
+        self.db.collection.ensure_index([("value", pymongo.ASCENDING)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1})
+
+        self.assertEquals(self.db.collection.find({}).count(), 1)
+        
+    @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
+    def test__ensure_uniq_idxs_with_descending_ordering(self):
         self.db.collection.ensure_index([("value", pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
@@ -299,7 +328,7 @@ class CollectionAPITest(TestCase):
 
         self.assertEquals(self.db.collection.find({}).count(), 1)
 
-    def test__uniq_idxs_without_ordering(self):
+    def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.ensure_index([("value", 1)], unique=True)
 
         self.db.collection.insert({"value": 1})
@@ -402,3 +431,4 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({"_id": 1, "test_list": [{"data": "val"}]})
         data_in_db = self.db.collection.find({"test_list.marker_field": {"$ne": True}})
         self.assertEqual(list(data_in_db), [{"_id": 1, "test_list": [{"data": "val"}]}])
+        
