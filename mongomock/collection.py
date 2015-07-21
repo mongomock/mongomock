@@ -434,15 +434,35 @@ class Collection(object):
             elif  list(fields.values())[0] == 1:
                 doc_copy = container()
                 for key in fields:
-                    if key in doc:
-                        doc_copy[key] = doc[key]
+                    key_parts = key.split('.')
+                    subdocument = doc
+                    subdocument_copy = doc_copy
+                    full_key_path_found = True
+                    for key_part in key_parts[:-1]:
+                        if key_part not in subdocument:
+                            full_key_path_found = False
+                            break
+                        subdocument = subdocument[key_part]							
+                        subdocument_copy = doc_copy.setdefault(key_part, {})
+                    if not full_key_path_found or key_parts[-1] not in subdocument:
+                        continue
+                    subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
             #otherwise, exclude the fields passed in
             else:
                 doc_copy = self._copy_field(doc, container)
                 for key in fields:
-                    if key in doc_copy:
-                        del doc_copy[key]
-
+                    key_parts = key.split('.')
+                    subdocument_copy = doc_copy
+                    full_key_path_found = True
+                    for key_part in key_parts[:-1]:
+                        if key_part not in subdocument_copy:
+                            full_key_path_found = False
+                            break
+                        subdocument_copy = subdocument_copy[key_part]
+                    if not full_key_path_found or key_parts[-1] not in subdocument_copy:
+                        continue
+                    del subdocument_copy[key_parts[-1]]
+  
             #set the _id value if we requested it, otherwise remove it
             if id_value == 0:
                 if '_id' in doc_copy:

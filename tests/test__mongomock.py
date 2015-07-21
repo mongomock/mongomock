@@ -495,6 +495,46 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
         self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['type'])
 
+    def test__return_only_selected_fields_no_id(self):
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'type' : 1, '_id' : 0})
+		
+    def test__return_only_selected_fields_nested_field_found(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['properties.type'])
+
+    def test__return_only_selected_fields_nested_field_not_found(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = ['properties.color'])
+		
+    def test__return_only_selected_fields_nested_field_found_no_id(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'properties.type' : 1, '_id' : 0})
+
+    def test__return_only_selected_fields_nested_field_not_found_no_id(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'properties.color' : 1, '_id' : 0})
+
+    def test__exclude_selected_fields(self):
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'type' : 0})
+
+    def test__exclude_selected_fields_including_id(self):
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'type' : 0, '_id' : 0})
+
+    def test__exclude_all_fields_including_id(self):
+        self.cmp.do.insert({'name':'Chucky', 'type':'doll'})
+        self.cmp.compare.find({'name':'Chucky'}, fields = {'type' : 0, '_id' : 0, 'name' : 0})
+		
+    def test__exclude_selected_nested_fields(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'properties.type' : 0})
+
+    def test__exclude_all_selected_nested_fields(self):
+        self.cmp.do.insert({'name':'Chucky', 'properties' : {'type':'doll', 'model':'v6'}})
+        self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = {'properties.type' : 0, 'properties.model' : 0})
+		
     def test__default_fields_to_id_if_empty(self):
         self.cmp.do.insert({'name':'Chucky', 'type':'doll', 'model':'v6'})
         self.cmp.compare_ignore_order.find({'name':'Chucky'}, fields = [])
