@@ -20,7 +20,9 @@ def filter_applies(search_filter, document):
 
         is_match = False
 
-        if isinstance(search, dict) and '$ne' in search and len(iter_key_candidates(key, document)) == 0:
+        if (isinstance(search, dict) and 
+                ('$ne' in search or search == {'$exists' : False}) 
+                and len(iter_key_candidates(key, document)) == 0):
             continue
 
         for doc_val in iter_key_candidates(key, document):
