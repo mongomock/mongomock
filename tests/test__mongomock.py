@@ -379,6 +379,13 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({"field.0.b": 2})
         self.cmp.compare.find({"field.1.c": 3})
         self.cmp.compare.find({"field.1.d": 4})
+        self.cmp.compare.find({"field.0": {"$exists" : True}})
+        self.cmp.compare.find({"field.0": {"$exists" : False}})		
+        self.cmp.compare.find({"field.0.a": {"$exists" : True}})
+        self.cmp.compare.find({"field.0.a": {"$exists" : False}})
+        self.cmp.compare.find({"field.1.a": {"$exists" : True}})
+        self.cmp.compare.find({"field.1.a": {"$exists" : False}})
+        self.cmp.compare.find({"field.0.a": {"$exists" : True}, "field.1.a": {"$exists" : False}})
 
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
