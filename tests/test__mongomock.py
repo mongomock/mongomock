@@ -461,6 +461,15 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find(sort = [("b", 1), ("a", -1)])
         self.cmp.compare.find(sort = [("b", 1), ("a", -1), ("c", 1)])
 
+    def test__find_sort_list_empty_order(self):
+        self.cmp.do.remove()
+        for data in ({"a": 1},
+                     {"a": 2, "b": -2},
+                     {"a": 3, "b": 4}):
+            self.cmp.do.insert(data)
+        self.cmp.compare.find(sort=[("b", 1)])
+        self.cmp.compare.find(sort=[("b", -1)])
+
     def test__find_sort_list_nested_doc(self):
         self.cmp.do.remove()
         for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
