@@ -142,6 +142,7 @@ Many thanks go to the following people for helping out:
 * Papp Győző
 * Paul Glass
 * Scott Sexton
+* Taras Boiko
 * Todd Tomkinson 
 * Zachary Carter
 * catty (ca77y _at_ live.com)
