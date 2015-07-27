@@ -383,7 +383,7 @@ class Collection(object):
         dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
-                dataset = iter(sorted(dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
+                dataset = iter(sorted(dataset, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0))
         for i in xrange(skip):
             try:
                 unused = next(dataset)
@@ -854,7 +854,7 @@ class Collection(object):
                         sort_array.append({x:y})
                     for sort_pair in reversed(sort_array):
                         for sortKey, sortDirection in sort_pair.items():
-                            out_collection = sorted(out_collection, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0)
+                            out_collection = sorted(out_collection, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0)
                 elif k == '$skip':
                     out_collection = out_collection[v:]
                 elif k == '$limit':
@@ -892,6 +892,14 @@ class Collection(object):
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
 
+def _resolve_sort_key(key, doc):
+    value = _resolve_key(key, doc)
+    # see http://docs.mongodb.org/manual/reference/method/cursor.sort/#ascending-descending-sort
+    if value is NOTHING:
+        return 0, value
+
+    return 1, value
+
 class Cursor(object):
     def __init__(self, collection, dataset_factory, limit=0):
         super(Cursor, self).__init__()
@@ -923,9 +931,9 @@ class Cursor(object):
             direction = 1
         if isinstance(key_or_list, (tuple, list)):
             for sortKey, sortDirection in reversed(key_or_list):
-                self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(sortKey, x), reverse = sortDirection < 0))
+                self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0))
         else:
-            self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_key(key_or_list, x), reverse = direction < 0))
+            self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_sort_key(key_or_list, x), reverse = direction < 0))
         return self
 
     def count(self, with_limit_and_skip=False):
