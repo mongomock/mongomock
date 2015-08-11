@@ -963,11 +963,17 @@ class Cursor(object):
         if not isinstance(key, basestring):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
+        unique_dict_vals = []
         for x in iter(self._dataset):
             value = _resolve_key(key, x)
             if value == NOTHING: continue
-            unique.update(value if isinstance(value, (tuple, list)) else [value])
-        return list(unique)
+            if isinstance(value, dict):
+                if any(dict_val == value for dict_val in unique_dict_vals):
+                    continue
+                unique_dict_vals.append(value)
+            else:
+                unique.update(value if isinstance(value, (tuple, list)) else [value])
+        return list(unique) + unique_dict_vals
 
     def __getitem__(self, index):
         arr = [x for x in self._dataset]

@@ -95,6 +95,11 @@ class CollectionAPITest(TestCase):
         cursor = self.db.collection.find()
         self.assertEquals(set(cursor.distinct('f1')), set(['v1', 'v2', 'v3']))
 
+    def test__distinct_document_field(self):
+        self.db.collection.insert({'f1': {'f2' : 'v2', 'f3' : 'v3'}})
+        cursor = self.db.collection.find()
+        self.assertEquals(cursor.distinct('f1'), [{'f2' : 'v2', 'f3' : 'v3'}])
+		
     def test__cursor_clone(self):
         self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
         cursor1 = self.db.collection.find()
