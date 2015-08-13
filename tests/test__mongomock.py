@@ -580,6 +580,15 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$set': {'subdocument.a.b': 21}})
         self.cmp.compare.find()
 
+    def test__set_subdocuments_positional(self):
+        self.cmp.do.insert({'name': 'bob', 'subdocs': [
+            {'id': 1, 'name': 'foo'},
+            {'id': 2, 'name': 'bar'}
+        ]})
+        self.cmp.do.update({'name': 'bob', 'subdocs.id': 2},
+                           {'$set': {'subdocs.$': {'id': 3, 'name': 'baz'}}})
+        self.cmp.compare.find()
+
     def test__inc(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
