@@ -483,6 +483,7 @@ class Collection(object):
         """Implements the $set behavior on an existing document"""
         for k, v in iteritems(fields):
             if '$' in k:
+
                 field_name_parts = k.split('.')
                 if not subdocument:
                     current_doc = doc
@@ -507,6 +508,14 @@ class Collection(object):
                         current_doc = current_doc[part]
 
                     subdocument = current_doc
+                    if (field_name_parts[-1] == '$' and
+                            isinstance(subdocument, list)):
+                        for i, doc in enumerate(subdocument):
+                            if filter_applies(subspec, doc):
+                                subdocument[i] = v
+                                break
+                        continue
+
                 updater(subdocument, field_name_parts[-1], v)
                 continue
             # otherwise, we handle it the standard way

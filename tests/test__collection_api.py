@@ -393,6 +393,25 @@ class CollectionAPITest(TestCase):
 
         self.assertEquals(list(self.db.collection.find()), [expected_document])
 
+    def test__set_replace_subdocument_positional_operator(self):
+        base_document = {
+            "int_field": 1,
+            "list_field": [
+                {"str_field": "a"},
+                {"str_field": "b", "int_field": 1},
+                {"str_field": "c"}
+            ]}
+        new_subdoc = {"str_field": "x"}
+        self.db.collection.insert(base_document)
+        self.db.collection.update(
+            {"int_field": 1, "list_field.str_field": "b"},
+            {"$set": {"list_field.$": new_subdoc}})
+
+        expected_document = copy.deepcopy(base_document)
+        expected_document["list_field"][1] = new_subdoc
+
+        self.assertEquals(list(self.db.collection.find()), [expected_document])
+
     @skipIf(not _HAVE_PYMONGO,"pymongo not installed")
     def test__find_and_modify_with_sort(self):
         self.db.collection.insert({"time_check": float(time.time())})
