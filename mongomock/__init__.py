@@ -1,37 +1,52 @@
-import sys
-
 from .helpers import ObjectId
+
 try:
-    import simplejson as json
+    from pymongo.errors import PyMongoError
 except ImportError:
-    import json
+    class PyMongoError(Exception):
+        pass
 
 try:
     from pymongo.errors import DuplicateKeyError
-except:
-    class DuplicateKeyError(Exception):
+except ImportError:
+    class DuplicateKeyError(PyMongoError):
         pass
 
 try:
     from pymongo.errors import OperationFailure
-except:
-    class OperationFailure(Exception):
+except ImportError:
+    class OperationFailure(PyMongoError):
         pass
 
 try:
     from pymongo.errors import CollectionInvalid
-except:
-    class CollectionInvalid(Exception):
+except ImportError:
+    class CollectionInvalid(PyMongoError):
+        pass
+
+try:
+    from pymongo.errors import InvalidOperation
+except ImportError:
+    class InvalidOperation(PyMongoError):
         pass
 
 from mongomock.__version__ import __version__
 
 
-__all__ = ['Connection', 'Database', 'Collection', 'ObjectId', 'WriteConcern']
+__all__ = [
+    '__version__',
+    'Database',
+    'DuplicateKeyError',
+    'Collection',
+    'CollectionInvalid',
+    'MongoClient',
+    'ObjectId',
+    'OperationFailure',
+    'WriteConcern'
+]
 
 
 from .write_concern import WriteConcern
-from .connection import Connection, MongoClient
+from .mongo_client import MongoClient
 from .database import Database
 from .collection import Collection
-

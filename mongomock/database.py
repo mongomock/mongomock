@@ -3,27 +3,25 @@ from . import CollectionInvalid
 
 
 class Database(object):
-    def __init__(self, conn, name):
-        super(Database, self).__init__()
+
+    def __init__(self, client, name):
         self.name = name
-        self._Database__connection = conn
-        self._collections = {'system.indexes' : Collection(self, 'system.indexes')}
+        self._client = client
+        self._collections = {
+            'system.indexes': Collection(self, 'system.indexes')}
 
     def __getitem__(self, coll_name):
-        coll = self._collections.get(coll_name, None)
-        if coll is None:
-            coll = self._collections[coll_name] = Collection(self, coll_name)
-        return coll
+        return self.get_collection(coll_name)
 
     def __getattr__(self, attr):
         return self[attr]
 
     def __repr__(self):
-        return "Database({0}, '{1}')".format(self._Database__connection, self.name)
+        return "Database({0}, '{1}')".format(self._client, self.name)
 
     @property
-    def connection(self):
-        return self._Database__connection
+    def client(self):
+        return self._client
 
     def collection_names(self, include_system_collections=True):
         if include_system_collections:
@@ -31,10 +29,18 @@ class Database(object):
 
         result = []
         for name in self._collections.keys():
-            if name.startswith("system."): continue
+            if name.startswith("system."):
+                continue
             result.append(name)
 
         return result
+
+    def get_collection(self, name, codec_options=None, read_preference=None,
+                       write_concern=None):
+        collection = self._collections.get(name)
+        if collection is None:
+            collection = self._collections[name] = Collection(self, name)
+        return collection
 
     def drop_collection(self, name_or_collection):
         try:
@@ -54,7 +60,9 @@ class Database(object):
                         collection.drop()
 
                 del self._collections[name_or_collection]
-        except:  # EAFP paradigm (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
+        # EAFP paradigm
+        # (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
+        except:
             pass
 
     def create_collection(self, name, **kwargs):
