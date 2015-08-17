@@ -5,61 +5,126 @@ import itertools
 import json
 import time
 import warnings
-from sentinels import NOTHING
-from .filtering import filter_applies, iter_key_candidates
-from . import ObjectId, OperationFailure, DuplicateKeyError, WriteConcern
-from .helpers import basestring, xrange, print_deprecation_warning, hashdict
-
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
 
 try:
-    # Optional requirements for providing Map-Reduce functionality
+    from bson import json_util, SON
+except ImportError:
+    json_utils = SON = None
+try:
     import execjs
 except ImportError:
     execjs = None
 
 try:
-    from bson import (json_util, SON)
+    from pymongo import ReturnDocument
 except ImportError:
-    json_utils = SON = None
+    class ReturnDocument(object):
+        BEFORE = False
+        AFTER = True
 
-from six import (
-    string_types,
-    text_type,
-    iteritems,
-    itervalues,
-    iterkeys)
+from sentinels import NOTHING
+from six import string_types
+from six import text_type
+from six import iteritems
+from six import itervalues
+from six import iterkeys
+
+from mongomock import DuplicateKeyError
 from mongomock import helpers
+from mongomock import ObjectId
+from mongomock import OperationFailure
+from mongomock.command_cursor import CommandCursor
+from mongomock.filtering import filter_applies
+from mongomock.filtering import iter_key_candidates
+from mongomock.helpers import basestring
+from mongomock.helpers import hashdict
+from mongomock.helpers import xrange
+from mongomock.results import DeleteResult
+from mongomock.results import InsertOneResult
+from mongomock.results import InsertManyResult
+from mongomock.results import UpdateResult
+from mongomock.write_concern import WriteConcern
+
+
+def validate_is_mapping(option, value):
+    if not isinstance(value, collections.Mapping):
+        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
+                        'other type that inherits from '
+                        'collections.Mapping' % (option,))
+
+
+def validate_is_mutable_mapping(option, value):
+    if not isinstance(value, collections.MutableMapping):
+        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
+                        'other type that inherits from '
+                        'collections.MutableMapping' % (option,))
+
+
+def validate_ok_for_replace(replacement):
+    validate_is_mapping('replacement', replacement)
+    if replacement:
+        first = next(iter(replacement))
+        if first.startswith('$'):
+            raise ValueError('replacement can not include $ operators')
+
+
+def validate_ok_for_update(update):
+    validate_is_mapping('update', update)
+    if not update:
+        raise ValueError('update only works with $ operators')
+    first = next(iter(update))
+    if not first.startswith('$'):
+        raise ValueError('update only works with $ operators')
+
+
+def validate_write_concern_params(**params):
+    if params:
+        WriteConcern(**params)
 
 
 class Collection(object):
+
     def __init__(self, db, name):
-        super(Collection, self).__init__()
         self.name = name
         self.full_name = "{0}.{1}".format(db.name, name)
-        self._Collection__database = db
+        self._database = db
         self._documents = OrderedDict()
         self._uniques = []
 
     def __repr__(self):
-        return "Collection({0}, '{1}')".format(self._Collection__database, self.name)
+        return "Collection({0}, '{1}')".format(self._database, self.name)
 
     def __getitem__(self, name):
-        return self._Collection__database[self.name + '.' + name]
+        return self._database[self.name + '.' + name]
 
     def __getattr__(self, name):
         return self.__getitem__(name)
 
-    def insert(self, data, manipulate=True,
-               safe=None, check_keys=True, continue_on_error=False, **kwargs):
-        if isinstance(data, list):
-            return [self._insert(element) for element in data]
+    def insert(self, data, manipulate=True, check_keys=True,
+               continue_on_error=False, **kwargs):
+        warnings.warn("insert is deprecated. Use insert_one or insert_many "
+                      "instead.", DeprecationWarning, stacklevel=2)
+        validate_write_concern_params(**kwargs)
         return self._insert(data)
 
+    def insert_one(self, document):
+        validate_is_mutable_mapping('document', document)
+        return InsertOneResult(self._insert(document), acknowledged=True)
+
+    def insert_many(self, documents, ordered=True):
+        if not isinstance(documents, collections.Iterable) or not documents:
+            raise TypeError('documents must be a non-empty list')
+        for document in documents:
+            validate_is_mutable_mapping('document', document)
+        return InsertManyResult(self._insert(documents), acknowledged=True)
+
     def _insert(self, data):
+        if isinstance(data, list):
+            return [self._insert(item) for item in data]
 
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError("Document keys must be strings")
@@ -67,7 +132,7 @@ class Collection(object):
         if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
-        if type(object_id) == dict:
+        if isinstance(object_id, dict):
             object_id = hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
@@ -76,7 +141,7 @@ class Collection(object):
             for key, direction in unique:
                 if key in data:
                     find_kwargs[key] = data[key]
-            answer = self.find(spec=find_kwargs)
+            answer = self.find(find_kwargs)
             if answer.count() > 0:
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
 
@@ -89,11 +154,37 @@ class Collection(object):
     def _has_key(self, doc, key):
         return key in doc
 
-    def update(self, spec, document, upsert = False, manipulate = False,
-               safe = False, multi = False, _check_keys = False, **kwargs):
-        """Updates document(s) in the collection."""
+    def update_one(self, criteria, update, upsert=False):
+        validate_ok_for_update(update)
+        return UpdateResult(self._update(criteria, update, upsert=upsert),
+                            acknowledged=True)
+
+    def update_many(self, criteria, update, upsert=False):
+        validate_ok_for_update(update)
+        return UpdateResult(self._update(criteria, update, upsert=upsert,
+                                         multi=True),
+                            acknowledged=True)
+
+    def replace_one(self, criteria, replacement, upsert=False):
+        validate_ok_for_replace(replacement)
+        return UpdateResult(self._update(criteria, replacement, upsert=upsert),
+                            acknowledged=True)
+
+    def update(self, spec, document, upsert=False, manipulate=False,
+               multi=False, check_keys=False, **kwargs):
+        warnings.warn("update is deprecated. Use replace_one, update_one or "
+                      "update_many instead.", DeprecationWarning, stacklevel=2)
+        return self._update(spec, document, upsert, manipulate, multi,
+                            check_keys, **kwargs)
+
+    def _update(self, spec, document, upsert=False, manipulate=False,
+                multi=False, check_keys=False, **kwargs):
+        validate_is_mapping('spec', spec)
+        validate_is_mapping('document', document)
+
         found = False
         updated_existing = False
+        upserted_id = None
         num_updated = 0
         for existing_document in itertools.chain(self._iter_documents(spec), [None]):
             # we need was_insert for the setOnInsert update operation
@@ -102,7 +193,8 @@ class Collection(object):
             if existing_document is None:
                 if not upsert:
                     continue
-                existing_document = self._documents[self._insert(self._discard_operators(spec))]
+                upserted_id = self._insert(self._discard_operators(spec))
+                existing_document = self._documents[upserted_id]
                 was_insert = True
             else:
                 updated_existing = True
@@ -118,7 +210,8 @@ class Collection(object):
                             positional = True
                             break
                     if positional:
-                        subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
+                        subdocument = self._update_document_fields_positional(
+                            existing_document, v, spec, _set_updater, subdocument)
                         continue
 
                     self._update_document_fields(existing_document, v, _set_updater)
@@ -128,7 +221,8 @@ class Collection(object):
                     positional = any('$' in key for key in iterkeys(v))
                     if positional:
                         # we use _set_updater
-                        subdocument = self._update_document_fields_positional(existing_document,v, spec, _set_updater, subdocument)
+                        subdocument = self._update_document_fields_positional(
+                            existing_document, v, spec, _set_updater, subdocument)
                     else:
                         self._update_document_fields(existing_document, v, _set_updater)
 
@@ -144,7 +238,8 @@ class Collection(object):
                             break
 
                     if positional:
-                        subdocument = self._update_document_fields_positional(existing_document, v, spec, _inc_updater, subdocument)
+                        subdocument = self._update_document_fields_positional(
+                            existing_document, v, spec, _inc_updater, subdocument)
                         continue
                     self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
@@ -153,13 +248,13 @@ class Collection(object):
                         if len(nested_field_list) == 1:
                             if field not in existing_document:
                                 existing_document[field] = []
-                            # document should be a list
-                            # append to it
+                            # document should be a list append to it
                             if isinstance(value, dict):
                                 if '$each' in value:
                                     # append the list to the field
-                                    existing_document[field] += [obj for obj in list(value['$each']) 
-                                                                 if obj not in existing_document[field]]
+                                    existing_document[field] += [
+                                        obj for obj in list(value['$each'])
+                                        if obj not in existing_document[field]]
                                     continue
                             if value not in existing_document[field]:
                                 existing_document[field].append(value)
@@ -178,10 +273,13 @@ class Collection(object):
                             push_results = []
                             if nested_field_list[-1] in subdocument:
                                 # if the list exists, then use that list
-                                push_results = subdocument[nested_field_list[-1]]
+                                push_results = subdocument[
+                                    nested_field_list[-1]]
 
                             if isinstance(value, dict) and '$each' in value:
-                                push_results += [obj for obj in list(value['$each']) if obj not in push_results]
+                                push_results += [
+                                    obj for obj in list(value['$each'])
+                                    if obj not in push_results]
                             elif value not in push_results:
                                 push_results.append(value)
 
@@ -193,16 +291,20 @@ class Collection(object):
                             if field in existing_document:
                                 arr = existing_document[field]
                                 if isinstance(value, dict):
-                                    existing_document[field] = [obj for obj in arr if not filter_applies(value, obj)]
+                                    existing_document[field] = [
+                                        obj for obj in arr
+                                        if not filter_applies(value, obj)]
                                 else:
-                                    existing_document[field] = [obj for obj in arr if not value == obj]
+                                    existing_document[field] = [
+                                        obj for obj in arr if not value == obj]
                             continue
 
                         # nested fields includes a positional element
                         # need to find that element
                         if '$' in nested_field_list:
                             if not subdocument:
-                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+                                subdocument = self._get_subdocument(
+                                    existing_document, spec, nested_field_list)
 
                             # value should be a dictionary since we're pulling
                             pull_results = []
@@ -216,7 +318,8 @@ class Collection(object):
                                 if obj != value:
                                     pull_results.append(obj)
 
-                            # cannot write to doc directly as it doesn't save to existing_document
+                            # cannot write to doc directly as it doesn't save to
+                            # existing_document
                             subdocument[nested_field_list[-1]] = pull_results
                 elif k == '$pullAll':
                     for field, value in iteritems(v):
@@ -224,9 +327,10 @@ class Collection(object):
                         if len(nested_field_list) == 1:
                             if field in existing_document:
                                 arr = existing_document[field]
-                                existing_document[field] = [obj for obj in arr if obj not in value]
+                                existing_document[field] = [
+                                    obj for obj in arr if obj not in value]
                             continue
-                        else:							
+                        else:
                             subdocument = existing_document
                             for nested_field in nested_field_list[:-1]:
                                 if nested_field not in subdocument:
@@ -235,7 +339,8 @@ class Collection(object):
 
                             if nested_field_list[-1] in subdocument:
                                 arr = subdocument[nested_field_list[-1]]
-                                subdocument[nested_field_list[-1]] = [obj for obj in arr if obj not in value]
+                                subdocument[nested_field_list[-1]] = [
+                                    obj for obj in arr if obj not in value]
                 elif k == '$push':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -255,7 +360,8 @@ class Collection(object):
                         # need to find that element
                         elif '$' in nested_field_list:
                             if not subdocument:
-                                subdocument = self._get_subdocument(existing_document, spec, nested_field_list)
+                                subdocument = self._get_subdocument(
+                                    existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
@@ -273,7 +379,8 @@ class Collection(object):
                             else:
                                 push_results.append(value)
 
-                            # cannot write to doc directly as it doesn't save to existing_document
+                            # cannot write to doc directly as it doesn't save to
+                            # existing_document
                             subdocument[nested_field_list[-1]] = push_results
                         # push to array in a nested attribute
                         else:
@@ -282,7 +389,6 @@ class Collection(object):
                             for field in nested_field_list[:-1]:
                                 if field not in subdocument:
                                     subdocument[field] = {}
-
                                 subdocument = subdocument[field]
 
                             # we're pushing a list
@@ -302,30 +408,35 @@ class Collection(object):
                         # replace entire document
                         for key in document.keys():
                             if key.startswith('$'):
-                                # can't mix modifiers with non-modifiers in update
+                                # can't mix modifiers with non-modifiers in
+                                # update
                                 raise ValueError('field names cannot start with $ [{}]'.format(k))
-                        _id = spec.get('_id', existing_document.get('_id', None))
+                        _id = spec.get('_id', existing_document.get('_id'))
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
-                        existing_document.update(self._internalize_dict(document))
+                        existing_document.update(
+                            self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
-                                "The _id field cannot be changed from {0} to {1}".format(
-                                    existing_document['_id'], _id))
+                                "The _id field cannot be changed from {0} to {1}"
+                                .format(existing_document['_id'], _id))
                         break
                     else:
                         # can't mix modifiers with non-modifiers in update
-                        raise ValueError('Invalid modifier specified: {}'.format(k))
+                        raise ValueError(
+                            'Invalid modifier specified: {}'.format(k))
                 first = False
             if not multi:
                 break
 
         return {
-            text_type("connectionId"): self._Collection__database.connection._id,
+            text_type("connectionId"): self._database.client._id,
             text_type("err"): None,
-            text_type("ok"): 1.0,
             text_type("n"): num_updated,
+            text_type("nModified"): num_updated if updated_existing else 0,
+            text_type("ok"): 1,
+            text_type("upserted"): upserted_id,
             text_type("updatedExisting"): updated_existing,
         }
 
@@ -345,13 +456,13 @@ class Collection(object):
         # walk down the dictionary
         for subfield in nested_field_list:
             if subfield == '$':
-                # positional element should have the equivalent elemMatch in the query
+                # positional element should have the equivalent elemMatch in the
+                # query
                 subspec = subspec['$elemMatch']
                 for item in doc:
                     # iterate through
                     if filter_applies(subspec, item):
-                        # found the matching item
-                        # save the parent
+                        # found the matching item save the parent
                         subdocument = doc
                         # save the item
                         doc = item
@@ -370,23 +481,28 @@ class Collection(object):
         # TODO: this looks a little too naive...
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
-    def find(self, spec = None, fields = None, filter = None, sort = None, timeout = True, limit = 0, snapshot = False, as_class = None, skip = 0, slave_okay=False, no_cursor_timeout=False):
-        if filter is not None:
-            print_deprecation_warning('filter', 'spec')
-            if spec is None:
-                spec = filter
-        if as_class is None:
-            as_class = dict
-        return Cursor(self, functools.partial(self._get_dataset, spec, sort, fields, as_class, skip), limit=limit)
+    def find(self, filter=None, projection=None, skip=0, limit=0,
+             no_cursor_timeout=False, cursor_type=None, sort=None,
+             allow_partial_results=False, oplog_replay=False, modifiers=None,
+             batch_size=0, manipulate=True):
+        spec = filter
+        if spec is None:
+            spec = {}
+        validate_is_mapping('filter', spec)
+        return Cursor(self, functools.partial(
+            self._get_dataset, spec, sort, projection, dict, skip), limit=limit)
 
     def _get_dataset(self, spec, sort, fields, as_class, skip):
-        dataset = (self._copy_only_fields(document, fields, as_class) for document in self._iter_documents(spec))
+        dataset = (self._copy_only_fields(document, fields, as_class)
+                   for document in self._iter_documents(spec))
         if sort:
             for sortKey, sortDirection in reversed(sort):
-                dataset = iter(sorted(dataset, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0))
+                dataset = iter(sorted(
+                    dataset, key=lambda x: _resolve_sort_key(sortKey, x),
+                    reverse=sortDirection < 0))
         for i in xrange(skip):
             try:
-                unused = next(dataset)
+                next(dataset)
             except StopIteration:
                 pass
 
@@ -417,21 +533,25 @@ class Collection(object):
             if not isinstance(fields, dict):
                 fields = helpers._fields_list_to_dict(fields)
 
-            #we can pass in something like {"_id":0, "field":1}, so pull the id value out and hang on to it until later
+            # we can pass in something like {"_id":0, "field":1}, so pull the id
+            # value out and hang on to it until later
             id_value = fields.pop('_id', 1)
 
-            #other than the _id field, all fields must be either includes or excludes, this can evaluate to 0
+            # other than the _id field, all fields must be either includes or
+            # excludes, this can evaluate to 0
             if len(set(list(fields.values()))) > 1:
-                raise ValueError('You cannot currently mix including and excluding fields.')
+                raise ValueError(
+                    'You cannot currently mix including and excluding fields.')
 
-            #if we have novalues passed in, make a doc_copy based on the id_value
+            # if we have novalues passed in, make a doc_copy based on the
+            # id_value
             if len(list(fields.values())) == 0:
                 if id_value == 1:
                     doc_copy = container()
                 else:
                     doc_copy = self._copy_field(doc, container)
-            #if 1 was passed in as the field values, include those fields
-            elif  list(fields.values())[0] == 1:
+            # if 1 was passed in as the field values, include those fields
+            elif list(fields.values())[0] == 1:
                 doc_copy = container()
                 for key in fields:
                     key_parts = key.split('.')
@@ -442,12 +562,12 @@ class Collection(object):
                         if key_part not in subdocument:
                             full_key_path_found = False
                             break
-                        subdocument = subdocument[key_part]							
+                        subdocument = subdocument[key_part]
                         subdocument_copy = doc_copy.setdefault(key_part, {})
                     if not full_key_path_found or key_parts[-1] not in subdocument:
                         continue
                     subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
-            #otherwise, exclude the fields passed in
+            # otherwise, exclude the fields passed in
             else:
                 doc_copy = self._copy_field(doc, container)
                 for key in fields:
@@ -462,16 +582,15 @@ class Collection(object):
                     if not full_key_path_found or key_parts[-1] not in subdocument_copy:
                         continue
                     del subdocument_copy[key_parts[-1]]
-  
-            #set the _id value if we requested it, otherwise remove it
+
+            # set the _id value if we requested it, otherwise remove it
             if id_value == 0:
-                if '_id' in doc_copy:
-                    del doc_copy['_id']
+                doc_copy.pop('_id', None)
             else:
                 if '_id' in doc:
                     doc_copy['_id'] = doc['_id']
 
-            fields['_id'] = id_value #put _id back in fields
+            fields['_id'] = id_value  # put _id back in fields
             return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
@@ -479,7 +598,8 @@ class Collection(object):
         for k, v in iteritems(fields):
             self._update_document_single_field(doc, k, v, updater)
 
-    def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
+    def _update_document_fields_positional(self, doc, fields, spec, updater,
+                                           subdocument=None):
         """Implements the $set behavior on an existing document"""
         for k, v in iteritems(fields):
             if '$' in k:
@@ -501,7 +621,8 @@ class Collection(object):
                         for el in subspec:
                             if el.startswith(part):
                                 if len(el.split(".")) > 1:
-                                    new_spec[".".join(el.split(".")[1:])] = subspec[el]
+                                    new_spec[".".join(
+                                        el.split(".")[1:])] = subspec[el]
                                 else:
                                     new_spec = subspec[el]
                         subspec = new_spec
@@ -548,8 +669,9 @@ class Collection(object):
         else:
             updater(doc, field_name, field_value)
 
-    def _iter_documents(self, filter = None):
-        return (document for document in itervalues(self._documents) if filter_applies(filter, document))
+    def _iter_documents(self, filter=None):
+        return (document for document in itervalues(self._documents)
+                if filter_applies(filter, document))
 
     def find_one(self, spec_or_id=None, *args, **kwargs):
         # Allow calling find_one with a non-dict argument that gets used as
@@ -557,93 +679,143 @@ class Collection(object):
         if spec_or_id is None:
             spec_or_id = {}
         if not isinstance(spec_or_id, collections.Mapping):
-            spec_or_id = {'_id':spec_or_id}
+            spec_or_id = {'_id': spec_or_id}
 
         try:
             return next(self.find(spec_or_id, *args, **kwargs))
         except StopIteration:
             return None
 
-    def find_and_modify(self, query = {}, update = None, upsert = False, sort = None, **kwargs):
+    def find_one_and_delete(self, filter, projection=None, sort=None, **kwargs):
+        kwargs['remove'] = True
+        validate_is_mapping('filter', filter)
+        return self._find_and_modify(filter, projection, sort=sort, **kwargs)
+
+    def find_one_and_replace(self, filter, replacement,
+                             projection=None, sort=None, upsert=False,
+                             return_document=ReturnDocument.BEFORE, **kwargs):
+        validate_is_mapping('filter', filter)
+        validate_ok_for_replace(replacement)
+        return self._find_and_modify(filter, projection, replacement, upsert,
+                                     sort, return_document, **kwargs)
+
+    def find_one_and_update(self, filter, update,
+                            projection=None, sort=None, upsert=False,
+                            return_document=ReturnDocument.BEFORE, **kwargs):
+        validate_is_mapping('filter', filter)
+        validate_ok_for_update(update)
+        return self._find_and_modify(filter, projection, update, upsert,
+                                     sort, return_document, **kwargs)
+
+    def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
+                        full_response=False, manipulate=False, **kwargs):
+        warnings.warn("find_and_modify is deprecated, use find_one_and_delete"
+                      ", find_one_and_replace, or find_one_and_update instead",
+                      DeprecationWarning, stacklevel=2)
+        return self._find_and_modify(query, update=update, upsert=upsert,
+                                     sort=sort, **kwargs)
+
+    def _find_and_modify(self, query, projection=None, update=None,
+                         upsert=False, sort=None,
+                         return_document=ReturnDocument.BEFORE, **kwargs):
         remove = kwargs.get("remove", False)
         if kwargs.get("new", False) and remove:
-            raise OperationFailure("remove and returnNew can't co-exist") # message from mongodb
+            # message from mongodb
+            raise OperationFailure("remove and returnNew can't co-exist")
 
-        if remove and update is not None:
+        if not (remove or update):
+            raise ValueError("Must either update or remove")
+
+        if remove and update:
             raise ValueError("Can't do both update and remove")
 
-        old = self.find_one(query, sort=sort)
-        if not old:
-            if upsert:
-                old = {'_id':self.insert(query)}
-            else:
-                return None
+        old = self.find_one(query, projection=projection, sort=sort)
+        if not old and not upsert:
+            return
+
+        if old and '_id' in old:
+            query = {'_id': old['_id']}
 
         if remove:
-            self.remove({"_id": old["_id"]})
+            self.delete_one(query)
         else:
-            self.update({'_id':old['_id']}, update)
+            self._update(query, update, upsert)
 
-        if kwargs.get('new', False):
-            return self.find_one({'_id':old['_id']})
+        if return_document is ReturnDocument.AFTER or kwargs.get('new'):
+            return self.find_one(query, projection)
         return old
 
-    def save(self, to_save, manipulate = True, safe = False, **kwargs):
-        if not isinstance(to_save, dict):
-            raise TypeError("cannot save object of type %s" % type(to_save))
+    def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
+        warnings.warn("save is deprecated. Use insert_one or replace_one "
+                      "instead", DeprecationWarning, stacklevel=2)
+        validate_is_mutable_mapping("to_save", to_save)
+        validate_write_concern_params(**kwargs)
 
         if "_id" not in to_save:
             return self.insert(to_save)
         else:
-            self.update({"_id": to_save["_id"]}, to_save, True,
-                        manipulate, safe, _check_keys = True, **kwargs)
+            self._update({"_id": to_save["_id"]}, to_save, True,
+                         manipulate, check_keys=True, **kwargs)
             return to_save.get("_id", None)
 
-    def remove(self, spec_or_id = None, search_filter = None, **write_concern_kwargs):
-        """Remove objects matching spec_or_id from the collection."""
-        if write_concern_kwargs:
-            write_concern = WriteConcern(**write_concern_kwargs)
-        if search_filter is not None:
-            print_deprecation_warning('search_filter', 'spec_or_id')
-        if spec_or_id is None:
-            spec_or_id = search_filter if search_filter else {}
-        if not isinstance(spec_or_id, dict):
-            spec_or_id = {'_id': spec_or_id}
-        to_delete = list(self.find(spec = spec_or_id))
+    def delete_one(self, filter):
+        validate_is_mapping('filter', filter)
+        return DeleteResult(self._delete(filter), True)
+
+    def delete_many(self, filter):
+        validate_is_mapping('filter', filter)
+        return DeleteResult(self._delete(filter, multi=True), True)
+
+    def _delete(self, filter, multi=False):
+        if filter is None:
+            filter = {}
+        if not isinstance(filter, collections.Mapping):
+            filter = {'_id': filter}
+        to_delete = list(self.find(filter))
         for doc in to_delete:
             doc_id = doc['_id']
-            if type(doc_id) == dict:
+            if isinstance(doc_id, dict):
                 doc_id = hashdict(doc_id)
             del self._documents[doc_id]
 
         return {
-            "connectionId": self._Collection__database.connection._id,
+            "connectionId": self._database.client._id,
             "n": len(to_delete),
             "ok": 1.0,
             "err": None,
         }
 
-    def count(self):
-        return len(self._documents)
+    def remove(self, spec_or_id=None, multi=True, **kwargs):
+        warnings.warn("remove is deprecated. Use delete_one or delete_many "
+                      "instead.", DeprecationWarning, stacklevel=2)
+        validate_write_concern_params(**kwargs)
+        return self._delete(spec_or_id, multi=True)
+
+    def count(self, filter=None, **kwargs):
+        if filter is None:
+            return len(self._documents)
+        else:
+            return self.find(filter).count()
 
     def drop(self):
         del self._documents
         self._documents = {}
 
-    def ensure_index(self, key_or_list, cache_for = 300, **kwargs):
+    def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)
 
-    def create_index(self, key_or_list, cache_for = 300, **kwargs):
+    def create_index(self, key_or_list, cache_for=300, **kwargs):
         if 'unique' in kwargs and kwargs['unique']:
             self._uniques.append(helpers._index_list(key_or_list))
-            
+
     def drop_index(self, index_or_name):
         pass
 
     def index_information(self):
         return {}
 
-    def map_reduce(self, map_func, reduce_func, out, full_response=False, query=None, limit=0):
+    def map_reduce(self, map_func, reduce_func, out, full_response=False,
+                   query=None, limit=0):
         if execjs is None:
             raise NotImplementedError(
                 "PyExecJS is required in order to run Map-Reduce. "
@@ -654,13 +826,15 @@ class Collection(object):
         start_time = time.clock()
         out_collection = None
         reduced_rows = None
-        full_dict = {'counts': {'input': 0,
-                                'reduce':0,
-                                'emit':0,
-                                'output':0},
-                     'timeMillis': 0,
-                     'ok': 1.0,
-                     'result': None}
+        full_dict = {
+            'counts': {
+                'input': 0,
+                'reduce': 0,
+                'emit': 0,
+                'output': 0},
+            'timeMillis': 0,
+            'ok': 1.0,
+            'result': None}
         map_ctx = execjs.compile("""
             function doMap(fnc, docList) {
                 var mappedDict = {};
@@ -697,7 +871,8 @@ class Collection(object):
                 return reducedList;
             }
         """)
-        doc_list = [json.dumps(doc, default=json_util.default) for doc in self.find(query)]
+        doc_list = [json.dumps(doc, default=json_util.default)
+                    for doc in self.find(query)]
         mapped_rows = map_ctx.call('doMap', map_func, doc_list)
         reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
         for reduced_row in reduced_rows:
@@ -713,14 +888,14 @@ class Collection(object):
                     full_dict['counts']['reduce'] += 1
             full_dict['counts']['output'] = len(reduced_rows)
         if isinstance(out, (str, bytes)):
-            out_collection = getattr(self._Collection__database, out)
+            out_collection = getattr(self._database, out)
             out_collection.drop()
             out_collection.insert(reduced_rows)
             ret_val = out_collection
             full_dict['result'] = out
         elif isinstance(out, SON) and out.get('replace') and out.get('db'):
             # Must be of the format SON([('replace','results'),('db','outdb')])
-            out_db = getattr(self._Collection__database._Database__connection, out['db'])
+            out_db = getattr(self._database._client, out['db'])
             out_collection = getattr(out_db, out['replace'])
             out_collection.insert(reduced_rows)
             ret_val = out_collection
@@ -735,8 +910,10 @@ class Collection(object):
             ret_val = full_dict
         return ret_val
 
-    def inline_map_reduce(self, map_func, reduce_func, full_response=False, query=None, limit=0):
-        return self.map_reduce(map_func, reduce_func, {'inline':1}, full_response, query, limit)
+    def inline_map_reduce(self, map_func, reduce_func, full_response=False,
+                          query=None, limit=0):
+        return self.map_reduce(
+            map_func, reduce_func, {'inline': 1}, full_response, query, limit)
 
     def distinct(self, key):
         return self.find().distinct(key)
@@ -785,8 +962,10 @@ class Collection(object):
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
             if not isinstance(k, basestring):
-                raise TypeError("Keys must be a list of key names, "
-                                "each an instance of %s" % (basestring.__name__,))
+                raise TypeError(
+                    "Keys must be a list of key names, "
+                    "each an instance of %s" %
+                    (basestring.__name__,))
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
@@ -801,29 +980,84 @@ class Collection(object):
         return ret_array
 
     def aggregate(self, pipeline, **kwargs):
-        pipeline_operators =       ['$project','$match','$redact','$limit','$skip','$unwind','$group','$sort','$geoNear','$out']
-        group_operators =          ['$addToSet', '$first','$last','$max','$min','$avg','$push','$sum']
-        boolean_operators =        ['$and','$or', '$not']
-        set_operators =            ['$setEquals', '$setIntersection', '$setDifference', '$setUnion', '$setIsSubset', '$anyElementTrue', '$allElementsTrue']
-        compairison_operators =    ['$cmp','$eq','$gt','$gte','$lt','$lte','$ne']
-        aritmetic_operators =      ['$add','$divide','$mod','$multiply','$subtract']
-        string_operators =         ['$concat','$strcasecmp','$substr','$toLower','$toUpper']
-        text_search_operators =    ['$meta']
-        array_operators =          ['$size']
-        projection_operators =     ['$map', '$let', '$literal']
-        date_operators =           ['$dayOfYear','$dayOfMonth','$dayOfWeek','$year','$month','$week','$hour','$minute','$second','$millisecond']
-        conditional_operators =    ['$cond', '$ifNull']
+        pipeline_operators = [
+            '$project',
+            '$match',
+            '$redact',
+            '$limit',
+            '$skip',
+            '$unwind',
+            '$group',
+            '$sort',
+            '$geoNear',
+            '$out']
+        group_operators = [
+            '$addToSet',
+            '$first',
+            '$last',
+            '$max',
+            '$min',
+            '$avg',
+            '$push',
+            '$sum']
+        boolean_operators = ['$and', '$or', '$not']
+        set_operators = [
+            '$setEquals',
+            '$setIntersection',
+            '$setDifference',
+            '$setUnion',
+            '$setIsSubset',
+            '$anyElementTrue',
+            '$allElementsTrue']
+        compairison_operators = [
+            '$cmp',
+            '$eq',
+            '$gt',
+            '$gte',
+            '$lt',
+            '$lte',
+            '$ne']
+        aritmetic_operators = [
+            '$add',
+            '$divide',
+            '$mod',
+            '$multiply',
+            '$subtract']
+        string_operators = [
+            '$concat',
+            '$strcasecmp',
+            '$substr',
+            '$toLower',
+            '$toUpper']
+        text_search_operators = ['$meta']
+        array_operators = ['$size']
+        projection_operators = ['$map', '$let', '$literal']
+        date_operators = [
+            '$dayOfYear',
+            '$dayOfMonth',
+            '$dayOfWeek',
+            '$year',
+            '$month',
+            '$week',
+            '$hour',
+            '$minute',
+            '$second',
+            '$millisecond']
+        conditional_operators = ['$cond', '$ifNull']
 
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
         for expression in pipeline:
             for k, v in iteritems(expression):
                 if k == '$match':
-                    out_collection = [doc for doc in out_collection if filter_applies(v, doc)]
+                    out_collection = [doc for doc in out_collection
+                                      if filter_applies(v, doc)]
                 elif k == '$group':
                     group_func_keys = expression['$group']['_id'][1:]
                     for group_key in reversed(group_func_keys):
-                        out_collection = sorted(out_collection, key=lambda x: _resolve_key(group_key, x))
+                        out_collection = sorted(
+                            out_collection,
+                            key=lambda x: _resolve_key(group_key, x))
                     for field, value in iteritems(v):
                         if field != '_id':
                             for func, key in iteritems(value):
@@ -848,38 +1082,45 @@ class Collection(object):
                                     if func in group_operators:
                                         raise NotImplementedError(
                                             "Although %s is a valid group operator for the aggregation pipeline, "
-                                            "%s is currently not implemented in Mongomock."
-                                        )
+                                            "%s is currently not implemented in Mongomock.")
                                     else:
                                         raise NotImplementedError(
                                             "%s is not a valid group operator for the aggregation pipeline. "
                                             "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
-                                            "for a complete list of valid operators."
-                                        )
+                                            "for a complete list of valid operators.")
                     out_collection = grouped_collection
                 elif k == '$sort':
                     sort_array = []
                     for x, y in v.items():
-                        sort_array.append({x:y})
+                        sort_array.append({x: y})
                     for sort_pair in reversed(sort_array):
                         for sortKey, sortDirection in sort_pair.items():
-                            out_collection = sorted(out_collection, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0)
+                            out_collection = sorted(
+                                out_collection,
+                                key=lambda x: _resolve_sort_key(sortKey, x),
+                                reverse=sortDirection < 0)
                 elif k == '$skip':
                     out_collection = out_collection[v:]
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
                     if not isinstance(v, basestring) and v[0] != '$':
-                        raise ValueError("$unwind failed: exception: field path references must be prefixed with a '$' ('%s'"%str(v))
+                        raise ValueError(
+                            "$unwind failed: exception: field path references must be prefixed with a '$' ('%s'" %
+                            str(v))
                     if len(v.split('.')) > 1:
-                        raise NotImplementedError('Mongmock does not currently support nested field paths in the $unwind implementation. ("%s"'%v)
+                        raise NotImplementedError(
+                            'Mongmock does not currently support nested field paths in the $unwind implementation. ("%s"' %
+                            v)
                     unwound_collection = []
                     for doc in out_collection:
                         array_value = doc.get(v[1:])
                         if array_value in (None, []):
                             continue
                         elif not isinstance(array_value, list):
-                            raise TypeError('$unwind must specify an array field, field: "%s", value found: %s'%(str(v),str(array_value)))
+                            raise TypeError(
+                                '$unwind must specify an array field, field: "%s", value found: %s' %
+                                (str(v), str(array_value)))
                         for field_item in array_value:
                             unwound_collection.append(copy.deepcopy(doc))
                             unwound_collection[-1][v[1:]] = field_item
@@ -888,18 +1129,18 @@ class Collection(object):
                     if k in pipeline_operators:
                         raise NotImplementedError(
                             "Although %s is a valid operator for the aggregation pipeline, "
-                            "%s is currently not implemented in Mongomock."
-                        )
+                            "%s is currently not implemented in Mongomock.")
                     else:
                         raise NotImplementedError(
                             "%s is not a valid operator for the aggregation pipeline. "
                             "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
-                            "for a complete list of valid operators."
-                        )
-        return {'ok':1.0, 'result':out_collection}
+                            "for a complete list of valid operators.")
+        return CommandCursor(out_collection)
+
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
+
 
 def _resolve_sort_key(key, doc):
     value = _resolve_key(key, doc)
@@ -909,13 +1150,16 @@ def _resolve_sort_key(key, doc):
 
     return 1, value
 
+
 class Cursor(object):
+
     def __init__(self, collection, dataset_factory, limit=0):
         super(Cursor, self).__init__()
         self.collection = collection
         self._factory = dataset_factory
         self._dataset = self._factory()
-        self._limit = limit if limit != 0 else None #pymongo limit defaults to 0, returning everything
+        # pymongo limit defaults to 0, returning everything
+        self._limit = limit if limit != 0 else None
         self._skip = None
 
     def __iter__(self):
@@ -935,14 +1179,24 @@ class Cursor(object):
             self._limit -= 1
         return next(self._dataset)
     next = __next__
-    def sort(self, key_or_list, direction = None):
+
+    def sort(self, key_or_list, direction=None):
         if direction is None:
             direction = 1
         if isinstance(key_or_list, (tuple, list)):
             for sortKey, sortDirection in reversed(key_or_list):
-                self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_sort_key(sortKey, x), reverse = sortDirection < 0))
+                self._dataset = iter(
+                    sorted(
+                        self._dataset,
+                        key=lambda x: _resolve_sort_key(
+                            sortKey,
+                            x),
+                        reverse=sortDirection < 0))
         else:
-            self._dataset = iter(sorted(self._dataset, key = lambda x: _resolve_sort_key(key_or_list, x), reverse = direction < 0))
+            self._dataset = iter(
+                sorted(self._dataset,
+                       key=lambda x: _resolve_sort_key(key_or_list, x),
+                       reverse=direction < 0))
         return self
 
     def count(self, with_limit_and_skip=False):
@@ -959,9 +1213,11 @@ class Cursor(object):
     def skip(self, count):
         self._skip = count
         return self
+
     def limit(self, count):
         self._limit = count if count != 0 else None
         return self
+
     def batch_size(self, count):
         return self
 
@@ -975,20 +1231,23 @@ class Cursor(object):
         unique_dict_vals = []
         for x in iter(self._dataset):
             value = _resolve_key(key, x)
-            if value == NOTHING: continue
+            if value == NOTHING:
+                continue
             if isinstance(value, dict):
                 if any(dict_val == value for dict_val in unique_dict_vals):
                     continue
                 unique_dict_vals.append(value)
             else:
-                unique.update(value if isinstance(value, (tuple, list)) else [value])
+                unique.update(
+                    value if isinstance(
+                        value, (tuple, list)) else [value])
         return list(unique) + unique_dict_vals
 
     def __getitem__(self, index):
         arr = [x for x in self._dataset]
-        count = len(arr)
         self._dataset = iter(arr)
         return arr[index]
+
 
 def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
@@ -996,9 +1255,11 @@ def _set_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = value
 
+
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
+
 
 def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
