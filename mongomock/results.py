@@ -53,7 +53,7 @@ except ImportError:
         def matched_count(self):
             if self.upserted_id is not None:
                 return 0
-            self.__raw_result.get('n', 0)
+            return self.__raw_result.get('n', 0)
 
         @property
         def modified_count(self):
