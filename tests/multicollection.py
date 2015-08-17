@@ -12,9 +12,7 @@ class MultiCollection(object):
         self.do = Foreach(self.conns, compare=False)
         self.compare = Foreach(self.conns, compare=True)
         self.compare_ignore_order = Foreach(
-            self.conns,
-            compare=True,
-            ignore_order=True)
+            self.conns, compare=True, ignore_order=True)
 
 
 class Foreach(object):
@@ -39,14 +37,12 @@ class Foreach(object):
             self.___objs,
             self.___compare,
             self.___ignore_order,
-            self.___decorators +
-            list(decorators))
+            self.___decorators + list(decorators))
 
 
 class ForeachMethod(object):
 
     def __init__(self, objs, compare, ignore_order, method_name, decorators):
-        super(ForeachMethod, self).__init__()
         self.___objs = objs
         self.___compare = compare
         self.___ignore_order = ignore_order
@@ -73,7 +69,7 @@ class ForeachMethod(object):
 
 
 def _assert_no_diff(results, ignore_order):
-    if _result_is_cursor(results):
+    if _result_is_cursor(results) or _result_is_command_cursor(results):
         value_processor = functools.partial(_expand_cursor, sort=ignore_order)
     else:
         assert not ignore_order
@@ -93,14 +89,16 @@ def _result_is_cursor(results):
     return any(type(result).__name__ == "Cursor" for result in results.values())
 
 
+def _result_is_command_cursor(results):
+    return any(type(result).__name__ == "CommandCursor"
+               for result in results.values())
+
+
 def _expand_cursor(cursor, sort):
     returned = [result.copy() for result in cursor]
     if sort:
         returned.sort(
-            key=lambda document: str(
-                document.get(
-                    '_id',
-                    str(document))))
+            key=lambda document: str(document.get('_id', str(document))))
     for result in returned:
         result.pop("_id", None)
     return returned

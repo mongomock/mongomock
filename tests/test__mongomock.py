@@ -156,10 +156,18 @@ class _CollectionTest(_CollectionComparisonTest):
                 "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
 
+    def test__insert_one(self):
+        self.cmp.do.insert_one({'a': 1})
+        self.cmp.compare.find()
+
+    def test__insert_many(self):
+        self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
+        self.cmp.compare.find()
+
     def test__save(self):
         # add an item with a non ObjectId _id first.
         self.cmp.do.insert({"_id": "b"})
-        self.cmp.do.save({"_id": ObjectId(), "someProp": 1}, safe=True)
+        self.cmp.do.save({"_id": ObjectId(), "someProp": 1})
         self.cmp.compare_ignore_order.find()
 
     def test__insert_object_id_as_dict(self):
@@ -193,9 +201,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count()
         self.cmp.do.insert({"a": 1})
         self.cmp.compare.count()
+        self.cmp.do.insert({"a": 0})
+        self.cmp.compare.count()
+        self.cmp.compare.count({"a": 1})
 
     def test__find_one(self):
-        id1 = self.cmp.do.insert({"_id": "id1", "name": "new"})
+        self.cmp.do.insert({"_id": "id1", "name": "new"})
         self.cmp.compare.find_one({"_id": "id1"})
         self.cmp.do.insert({"_id": "id2", "name": "another new"})
         self.cmp.compare.find_one({"_id": "id2"}, {"_id": 1})
@@ -383,7 +394,7 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'goatness': {'$ne': 'not very'}})
         self.cmp.compare_ignore_order.find({'snakeness': {'$ne': 'very'}})
 
-    def test__find_notequal(self):
+    def test__find_notequal_by_value(self):
         """Test searching for None."""
         bob = {'_id': 1, 'name': 'bob', 'sheepness': {'sometimes': True}}
         sam = {'_id': 2, 'name': 'sam', 'sheepness': {'sometimes': True}}
@@ -433,6 +444,23 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert([{"a": x} for x in range(10)])
         self.cmp.do.find_and_modify({"a": 2}, remove=True)
         self.cmp.compare_ignore_order.find()
+
+    def test__find_one_and_delete(self):
+        self.cmp.do.insert_many([{'a': i} for i in range(10)])
+        self.cmp.compare.find_one_and_delete({'a': 5}, {'_id': False})
+        self.cmp.compare.find()
+
+    def test__find_one_and_replace(self):
+        self.cmp.do.insert_many([{'a': i} for i in range(10)])
+        self.cmp.compare.find_one_and_replace(
+            {'a': 5}, {'a': 11}, projection={'_id': False})
+        self.cmp.compare.find()
+
+    def test__find_one_and_update(self):
+        self.cmp.do.insert_many([{'a': i} for i in range(10)])
+        self.cmp.compare.find_one_and_update(
+            {'a': 5}, {'$set': {'a': 11}}, projection={'_id': False})
+        self.cmp.compare.find()
 
     def test__find_sort_list(self):
         self.cmp.do.remove()
@@ -487,79 +515,80 @@ class _CollectionTest(_CollectionComparisonTest):
         # pymongo limit defaults to 0, returning everything
         self.cmp.compare.find(limit=0, sort=[("a", 1), ("b", -1)])
 
-    def test__as_class(self):
-        class MyDict(dict):
-            pass
-
-        self.cmp.do.remove()
-        self.cmp.do.insert(
-            {"a": 1, "b": {"ba": 3, "bb": 4, "bc": [{"bca": 5}]}})
-        self.cmp.compare.find({}, as_class=MyDict)
-        self.cmp.compare.find({"a": 1}, as_class=MyDict)
+    # def test__as_class(self):
+    #     class MyDict(dict):
+    #         pass
+    #
+    #     self.cmp.do.remove()
+    #     self.cmp.do.insert(
+    #         {"a": 1, "b": {"ba": 3, "bb": 4, "bc": [{"bca": 5}]}})
+    #     self.cmp.compare.find({}, as_class=MyDict)
+    #     self.cmp.compare.find({"a": 1}, as_class=MyDict)
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
-        self.cmp.compare_ignore_order.find({'name': 'Chucky'}, fields=['type'])
+        self.cmp.compare_ignore_order.find(
+            {'name': 'Chucky'}, projection=['type'])
 
     def test__return_only_selected_fields_no_id(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'type': 1, '_id': 0})
+            {'name': 'Chucky'}, projection={'type': 1, '_id': 0})
 
     def test__return_only_selected_fields_nested_field_found(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields=['properties.type'])
+            {'name': 'Chucky'}, projection=['properties.type'])
 
     def test__return_only_selected_fields_nested_field_not_found(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields=['properties.color'])
+            {'name': 'Chucky'}, projection=['properties.color'])
 
     def test__return_only_selected_fields_nested_field_found_no_id(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'properties.type': 1, '_id': 0})
+            {'name': 'Chucky'}, projection={'properties.type': 1, '_id': 0})
 
     def test__return_only_selected_fields_nested_field_not_found_no_id(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'properties.color': 1, '_id': 0})
+            {'name': 'Chucky'}, projection={'properties.color': 1, '_id': 0})
 
     def test__exclude_selected_fields(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'type': 0})
+            {'name': 'Chucky'}, projection={'type': 0})
 
     def test__exclude_selected_fields_including_id(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'type': 0, '_id': 0})
+            {'name': 'Chucky'}, projection={'type': 0, '_id': 0})
 
     def test__exclude_all_fields_including_id(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll'})
         self.cmp.compare.find(
-            {'name': 'Chucky'}, fields={'type': 0, '_id': 0, 'name': 0})
+            {'name': 'Chucky'}, projection={'type': 0, '_id': 0, 'name': 0})
 
     def test__exclude_selected_nested_fields(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'properties.type': 0})
+            {'name': 'Chucky'}, projection={'properties.type': 0})
 
     def test__exclude_all_selected_nested_fields(self):
         self.cmp.do.insert(
             {'name': 'Chucky', 'properties': {'type': 'doll', 'model': 'v6'}})
         self.cmp.compare_ignore_order.find(
-            {'name': 'Chucky'}, fields={'properties.type': 0, 'properties.model': 0})
+            {'name': 'Chucky'}, projection={'properties.type': 0, 'properties.model': 0})
 
     def test__default_fields_to_id_if_empty(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
-        self.cmp.compare_ignore_order.find({'name': 'Chucky'}, fields=[])
+        self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
 
     def test__remove(self):
         """Test the remove method."""
@@ -579,12 +608,66 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove({'name': 'sam'})
         self.cmp.compare.find()
 
+    def test__delete_one(self):
+        self.cmp.do.insert_many([{'a': i} for i in range(10)])
+        self.cmp.compare.find()
+
+        self.cmp.do.delete_one({'a': 5})
+        self.cmp.compare.find()
+
+    def test__delete_many(self):
+        self.cmp.do.insert_many([{'a': i} for i in range(10)])
+        self.cmp.compare.find()
+
+        self.cmp.do.delete_many({'a': {'$gt': 5}})
+        self.cmp.compare.find()
+
     def test__update(self):
         doc = {"a": 1}
         self.cmp.do.insert(doc)
         new_document = {"new_attr": 2}
         self.cmp.do.update({"a": 1}, new_document)
         self.cmp.compare_ignore_order.find()
+
+    def test__update_one(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 0},
+                                 {'a': 2, 'b': 0}])
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({'a': 2}, {'$set': {'b': 1}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({'a': 3}, {'$set': {'a': 3, 'b': 0}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({'a': 3}, {'$set': {'a': 3, 'b': 0}},
+                               upsert=True)
+        self.cmp.compare.find()
+
+    def test__update_many(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 0},
+                                 {'a': 2, 'b': 0}])
+        self.cmp.compare.find()
+
+        self.cmp.do.update_many({'b': 1}, {'$set': {'b': 1}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_many({'b': 0}, {'$set': {'b': 1}})
+        self.cmp.compare.find()
+
+    def test__replace_one(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 0},
+                                 {'a': 2, 'b': 0}])
+        self.cmp.compare.find()
+
+        self.cmp.do.replace_one({'a': 2}, {'a': 3, 'b': 0})
+        self.cmp.compare.find()
+
+        self.cmp.do.replace_one({'a': 4}, {'a': 4, 'b': 0})
+        self.cmp.compare.find()
+
+        self.cmp.do.replace_one({'a': 4}, {'a': 4, 'b': 0}, upsert=True)
+        self.cmp.compare.find()
 
     def test__set(self):
         """Tests calling update with $set members."""

@@ -37,6 +37,7 @@ from mongomock import DuplicateKeyError
 from mongomock import helpers
 from mongomock import ObjectId
 from mongomock import OperationFailure
+from mongomock.command_cursor import CommandCursor
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
 from mongomock.helpers import basestring
@@ -1134,7 +1135,7 @@ class Collection(object):
                             "%s is not a valid operator for the aggregation pipeline. "
                             "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
                             "for a complete list of valid operators.")
-        return {'ok': 1.0, 'result': out_collection}
+        return CommandCursor(out_collection)
 
 
 def _resolve_key(key, doc):
@@ -1193,12 +1194,9 @@ class Cursor(object):
                         reverse=sortDirection < 0))
         else:
             self._dataset = iter(
-                sorted(
-                    self._dataset,
-                    key=lambda x: _resolve_sort_key(
-                        key_or_list,
-                        x),
-                    reverse=direction < 0))
+                sorted(self._dataset,
+                       key=lambda x: _resolve_sort_key(key_or_list, x),
+                       reverse=direction < 0))
         return self
 
     def count(self, with_limit_and_skip=False):
