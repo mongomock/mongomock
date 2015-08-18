@@ -439,6 +439,8 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$or': [{'x': 4}, {'x': 2}]})
         self.cmp.compare_ignore_order.find({'$or': [{'x': 4}, {'x': 7}]})
         self.cmp.compare_ignore_order.find({'$and': [{'x': 2}, {'x': 7}]})
+        self.cmp.compare_ignore_order.find({'$nor': [{'x': 3}]})
+        self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
 
     def test__find_and_modify_remove(self):
         self.cmp.do.insert([{"a": x} for x in range(10)])
