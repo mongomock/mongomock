@@ -4,7 +4,7 @@ import warnings
 from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
-
+from . import OperationFailure
 
 def filter_applies(search_filter, document):
     """
@@ -35,6 +35,8 @@ def filter_applies(search_filter, document):
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
             elif key in LOGICAL_OPERATOR_MAP:
+                if not search:
+                    raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
                 is_match = LOGICAL_OPERATOR_MAP[key] (document, search)
             elif isinstance(doc_val, (list, tuple)):
                 is_match = (search in doc_val or search == doc_val)

@@ -1064,6 +1064,13 @@ class _CollectionTest(_CollectionComparisonTest):
         # Does nothing - just make sure it exists
         self.cmp.do.index_information()
 
+    def test__empty_logical_operators(self):
+        for operator in mongomock.filtering.LOGICAL_OPERATOR_MAP:
+            try:
+                self.cmp.compare_ignore_order.find({operator: []})
+            except Exception as e:
+                assert isinstance(e, mongomock.OperationFailure)
+
 
 class MongoClientCollectionTest(_CollectionTest, _MongoClientMixin):
     pass
