@@ -629,6 +629,11 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({"a": 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
+    def test__update_upsert_with_id(self):
+        self.cmp.do.update(
+            {'a': 1}, {'_id': ObjectId('52d669dcad547f059424f783'), 'a': 1}, upsert=True)
+        self.cmp.compare.find()
+
     def test__update_one(self):
         self.cmp.do.insert_many([{'a': 1, 'b': 0},
                                  {'a': 2, 'b': 0}])
