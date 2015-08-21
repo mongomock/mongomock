@@ -182,7 +182,6 @@ class Collection(object):
         validate_is_mapping('spec', spec)
         validate_is_mapping('document', document)
 
-        found = False
         updated_existing = False
         upserted_id = None
         num_updated = 0
@@ -193,14 +192,15 @@ class Collection(object):
             if existing_document is None:
                 if not upsert:
                     continue
-                upserted_id = self._insert(self._discard_operators(spec))
+                _id = document.get('_id')
+                to_insert = dict(spec, _id=_id) if _id else spec
+                upserted_id = self._insert(self._discard_operators(to_insert))
                 existing_document = self._documents[upserted_id]
                 was_insert = True
             else:
                 updated_existing = True
             num_updated += 1
             first = True
-            found = True
             subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
@@ -292,8 +292,7 @@ class Collection(object):
                                 arr = existing_document[field]
                                 if isinstance(value, dict):
                                     existing_document[field] = [
-                                        obj for obj in arr
-                                        if not filter_applies(value, obj)]
+                                        obj for obj in arr if not filter_applies(value, obj)]
                                 else:
                                     existing_document[field] = [
                                         obj for obj in arr if not value == obj]
@@ -415,8 +414,7 @@ class Collection(object):
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
-                        existing_document.update(
-                            self._internalize_dict(document))
+                        existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
                                 "The _id field cannot be changed from {0} to {1}"
