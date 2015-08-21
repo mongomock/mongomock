@@ -26,6 +26,9 @@ class MongoClient(object):
         identifier = ["'{0}'".format(self._host), str(self._port)]
         return "mongomock.MongoClient({0})".format(', '.join(identifier))
 
+    def close(self):
+        pass
+
     @property
     def address(self):
         return self._host, self._port
