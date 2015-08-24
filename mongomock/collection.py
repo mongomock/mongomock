@@ -287,17 +287,6 @@ class Collection(object):
                 elif k == '$pull':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
-                        if len(nested_field_list) == 1:
-                            if field in existing_document:
-                                arr = existing_document[field]
-                                if isinstance(value, dict):
-                                    existing_document[field] = [
-                                        obj for obj in arr if not filter_applies(value, obj)]
-                                else:
-                                    existing_document[field] = [
-                                        obj for obj in arr if not value == obj]
-                            continue
-
                         # nested fields includes a positional element
                         # need to find that element
                         if '$' in nested_field_list:
@@ -320,6 +309,19 @@ class Collection(object):
                             # cannot write to doc directly as it doesn't save to
                             # existing_document
                             subdocument[nested_field_list[-1]] = pull_results
+                        else:
+                            arr = existing_document
+                            for field in nested_field_list:
+                                if field not in arr:
+                                    break
+                                arr = arr[field]
+                            if not isinstance(arr, list):
+                                continue
+                            if isinstance(value, dict):
+                                existing_document[field] = [
+                                    obj for obj in arr if not filter_applies(value, obj)]
+                            else:
+                                arr.remove(value)
                 elif k == '$pullAll':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')

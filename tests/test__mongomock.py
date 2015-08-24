@@ -871,6 +871,12 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat': 'green'}})
         self.cmp.compare.find({'name': 'bob'})
 
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'nested': ['aaaa']}})
+        self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat.nested': 'aaaa'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+
     def test__pull_query(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': [{'size': 5}, {'size': 10}]})
