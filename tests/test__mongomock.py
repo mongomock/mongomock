@@ -878,6 +878,12 @@ class _CollectionTest(_CollectionComparisonTest):
             {'name': 'bob'}, {'$pull': {'hat': {'size': {'$gt': 6}}}})
         self.cmp.compare.find({'name': 'bob'})
 
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 10}]}})
+        self.cmp.do.update(
+            {'name': 'bob'}, {'$pull': {'hat.sizes': {'size': {'$gt': 6}}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__pull_nested_dict(self):
         self.cmp.do.remove()
         self.cmp.do.insert({
@@ -905,6 +911,11 @@ class _CollectionTest(_CollectionComparisonTest):
         self.cmp.do.update(
             {'hat': {'$elemMatch': {'name': 'derby'}}},
             {'$pull': {'hat.$.sizes': 'XL'}})
+        self.cmp.compare.find({'name': 'bob'})
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': {'nested': ['element1', 'element2', 'element1']}})
+        self.cmp.do.update({'name': 'bob'}, {'$pull': {'hat.nested': 'element1'}})
         self.cmp.compare.find({'name': 'bob'})
 
     def test__pullAll(self):
