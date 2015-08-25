@@ -147,4 +147,5 @@ OPERATOR_MAP = {'$ne': operator.ne,
 
 LOGICAL_OPERATOR_MAP = {'$or':lambda d, subq: any(filter_applies(q, d) for q in subq),
                         '$and':lambda d, subq: all(filter_applies(q, d) for q in subq),
+                        '$nor': lambda d, subq: all(not filter_applies(q, d) for q in subq),
                         }
