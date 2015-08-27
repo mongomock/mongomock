@@ -124,6 +124,16 @@ def _all_op(doc_val, search_val):
 
 
 def _not_op(d, k, s):
+    if isinstance(s, dict):
+        for key in s.keys():
+            if key == '$regex':
+                raise OperationFailure('BadValue $not cannot have a regex')
+            if key not in OPERATOR_MAP and key not in LOGICAL_OPERATOR_MAP:
+                raise OperationFailure('BadValue $not needs a regex or a document')
+    elif isinstance(s, type(re.compile(''))):
+        pass
+    else:
+        raise OperationFailure('BadValue $not needs a regex or a document')
     return not filter_applies({k: s}, d)
 
 
@@ -141,7 +151,9 @@ def _elem_match_op(doc_val, query):
 def _regex(doc_val, regex):
     return any(regex.search(item) for item in _force_list(doc_val))
 
+
 OPERATOR_MAP = {
+    '$eq': operator.eq,
     '$ne': operator.ne,
     '$gt': _not_nothing_and(operator.gt),
     '$gte': _not_nothing_and(operator.ge),
@@ -154,6 +166,7 @@ OPERATOR_MAP = {
     '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
     '$elemMatch': _elem_match_op,
 }
+
 
 LOGICAL_OPERATOR_MAP = {
     '$or': lambda d, subq: any(filter_applies(q, d) for q in subq),
