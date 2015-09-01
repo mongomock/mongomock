@@ -776,15 +776,19 @@ class Collection(object):
         if not isinstance(filter, collections.Mapping):
             filter = {'_id': filter}
         to_delete = list(self.find(filter))
+        deleted_count = 0
         for doc in to_delete:
             doc_id = doc['_id']
             if isinstance(doc_id, dict):
                 doc_id = hashdict(doc_id)
             del self._documents[doc_id]
+            deleted_count += 1
+            if not multi:
+                break
 
         return {
             "connectionId": self._database.client._id,
-            "n": len(to_delete),
+            "n": deleted_count,
             "ok": 1.0,
             "err": None,
         }
@@ -793,7 +797,7 @@ class Collection(object):
         warnings.warn("remove is deprecated. Use delete_one or delete_many "
                       "instead.", DeprecationWarning, stacklevel=2)
         validate_write_concern_params(**kwargs)
-        return self._delete(spec_or_id, multi=True)
+        return self._delete(spec_or_id, multi=multi)
 
     def count(self, filter=None, **kwargs):
         if filter is None:
