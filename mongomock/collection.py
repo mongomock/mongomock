@@ -190,7 +190,7 @@ class Collection(object):
             was_insert = False
             # the sentinel document means we should do an upsert
             if existing_document is None:
-                if not upsert:
+                if not upsert or num_updated:
                     continue
                 _id = document.get('_id')
                 to_insert = dict(spec, _id=_id) if _id else spec
