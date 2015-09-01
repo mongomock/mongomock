@@ -5,6 +5,7 @@ import itertools
 import json
 import time
 import warnings
+import functools
 try:
     from collections import OrderedDict
 except ImportError:
@@ -86,6 +87,114 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
+class BulkWriteOperation:
+    def __init__(self, builder, selector, is_upsert=False):
+        self.builder = builder
+        self.selector = selector
+        self.is_upsert = is_upsert
+
+    def upsert(self):
+        return BulkWriteOperation(self.builder, self.selector, is_upsert=True)
+
+    def register_remove_op(self, multi):
+        collection = self.builder.collection
+        selector = self.selector
+        def exec_remove():
+            op_result = collection.remove(selector, multi=multi)
+            if op_result.get("ok"):
+                return {'nRemoved': op_result.get('n')}
+            err = op_result.get("err")
+            if err:
+                return { "writeErrors": [err]}
+            return {}
+        self.builder.executors.append(exec_remove)
+
+    def remove(self):
+        assert not self.is_upsert
+        self.register_remove_op(multi=True)
+
+    def remove_one(self,):
+        assert not self.is_upsert
+        self.register_remove_op(multi=False)
+
+    def register_update_op(self, document, multi, **extra_args):
+        if not extra_args.get("remove"):
+            validate_ok_for_update(document)
+
+        collection = self.builder.collection
+        selector = self.selector
+        def exec_update():
+            result = collection._update(spec=selector, document=document, multi=multi, upsert=self.is_upsert,
+                                        **extra_args)
+            ret_val = {}
+            if result.get('upserted'):
+                ret_val["upserted"] = result.get('upserted')
+                ret_val["nUpserted"] = result.get('n')
+            modified = result.get('nModified')
+            if modified:
+                ret_val['nModified'] = modified
+                ret_val['nMatched'] = modified
+            if result.get('err'):
+                ret_val['err'] = result.get('err')
+            return ret_val
+        self.builder.executors.append(exec_update)
+
+    def update(self, document):
+        self.register_update_op(document, multi=True)
+
+    def update_one(self, document):
+        self.register_update_op(document, multi=False)
+
+    def replace_one(self, document):
+        self.register_update_op(document, multi=False, remove=True)
+
+
+class BulkOperationBuilder(object):
+    def __init__(self, collection, ordered=False):
+        self.collection = collection
+        self.ordered = ordered
+        self.results = {}
+        self.executors = []
+
+    def find(self, selector):
+        return BulkWriteOperation(self, selector)
+
+    def insert(self, doc):
+        def executor():
+            self.collection.insert(doc)
+            return {'nInserted': 1}
+        self.executors.append(executor)
+
+    def __aggregate_operation_result(self, total_result, key, value):
+        agg_val = total_result.get(key)
+        assert agg_val is not None, "Unknow operation result %s=%s (unrecognized key)" % (key, value)
+        if isinstance(agg_val, int):
+            total_result[key] += value
+        elif isinstance(agg_val, list):
+            if key == "upserted":
+                new_element = {"index": len(agg_val), "_id": value}
+                agg_val.append(new_element)
+            else:
+                agg_val.append(value)
+        else:
+            assert False, "Fixme: missed aggreation rule for type: %s for key {%s=%s}" % (type(agg_val), key, agg_val)
+
+    def execute(self, write_concern=None):
+        result = {'nModified': 0,
+         'nUpserted': 0,
+         'nMatched': 0,
+         'writeErrors': [],
+         'upserted': [],
+         'writeConcernErrors': [],
+         'nRemoved': 0,
+         'nInserted': 0}
+        op_results = [e() for e in self.executors]
+        for op_result in op_results:
+            for (key, value) in op_result.items():
+                self.__aggregate_operation_result(result, key, value)
+        return result
+
+
 class Collection(object):
 
     def __init__(self, db, name):
@@ -103,6 +212,12 @@ class Collection(object):
 
     def __getattr__(self, name):
         return self.__getitem__(name)
+
+    def initialize_unordered_bulk_op(self):
+        return BulkOperationBuilder(self, ordered=False)
+
+    def initialize_ordered_bulk_op(self):
+        return BulkOperationBuilder(self, ordered=True)
 
     def insert(self, data, manipulate=True, check_keys=True,
                continue_on_error=False, **kwargs):
