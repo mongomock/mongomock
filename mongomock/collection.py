@@ -526,6 +526,51 @@ class Collection(object):
         else:
             return copy.copy(obj)
 
+    def _extract_projection_operators(self, fields):
+        """Removes and returns fields with projection operators."""
+        result = {}
+        allowed_projection_operators = set(['$elemMatch'])
+        for key, value in iteritems(fields):
+            if isinstance(value, dict):
+                for op in value:
+                    if op not in allowed_projection_operators:
+                        raise ValueError('Unsupported projection option: {}'.format(op))
+                result[key] = value
+
+        for key in result:
+            del fields[key]
+
+        return result
+
+    def _apply_projection_operators(self, ops, doc, doc_copy):
+        """Applies projection operators to copied document."""
+        for field, op in iteritems(ops):
+            if field not in doc_copy:
+                if field in doc:
+                    # field was not copied yet (since we are in include mode)
+                    doc_copy[field] = doc[field]
+                else:
+                    # field doesn't exist in original document, no work to do
+                    continue
+
+            if '$elemMatch' in op:
+                if isinstance(doc_copy[field], list):
+                    # find the first item that matches
+                    matched = False
+                    for item in doc_copy[field]:
+                        if filter_applies(op['$elemMatch'], item):
+                            matched = True
+                            doc_copy[field] = [item]
+                            break
+
+                    # nothing have matched
+                    if not matched:
+                        del doc_copy[field]
+
+                else:
+                    # remove the field since there is nothing to iterate
+                    del doc_copy[field]
+
     def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
 
@@ -540,6 +585,9 @@ class Collection(object):
             # we can pass in something like {"_id":0, "field":1}, so pull the id
             # value out and hang on to it until later
             id_value = fields.pop('_id', 1)
+
+            # filter out fields with projection operators, we will take care of them later
+            projection_operators = self._extract_projection_operators(fields)
 
             # other than the _id field, all fields must be either includes or
             # excludes, this can evaluate to 0
@@ -595,6 +643,12 @@ class Collection(object):
                     doc_copy['_id'] = doc['_id']
 
             fields['_id'] = id_value  # put _id back in fields
+
+            # time to apply the projection operators and put back their fields
+            self._apply_projection_operators(projection_operators, doc, doc_copy)
+            for field, op in iteritems(projection_operators):
+                fields[field] = op
+
             return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
