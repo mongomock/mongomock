@@ -8,37 +8,48 @@ try:
 except ImportError:
     _HAVE_PYMONGO = False
 
-from .utils import TestCase
+
+from .utils import TestCase, skipIf
+from tests.multicollection import MultiCollection
+
 
 class BulkOperationsTest(TestCase):
 
+    test_with_pymongo = False
+
     def setUp(self):
         super(BulkOperationsTest, self).setUp()
-        self.client = mongomock.MongoClient()
-        #self.client = pymongo.MongoClient()
+        if self.test_with_pymongo:
+            self.client = pymongo.MongoClient()
+        else:
+            self.client = mongomock.MongoClient()
         self.db = self.client['somedb']
         self.db.collection.drop()
         for _i in "abx":
-            self.db.collection.create_index(_i, unique=False, name="idx" + _i, sparse=True, background=True)
+            self.db.collection.create_index(_i, unique=False,
+                                            name="idx" + _i, sparse=True,
+                                            background=True)
         self.bulk_op = self.db.collection.initialize_ordered_bulk_op()
-
 
     def __check_document(self, doc, count=1):
         found_num = self.db.collection.find(doc).count()
         if found_num != count:
             all = list(self.db.collection.find())
-            self.fail("Document %s count()=%s BUT expected count=%s! All documents: %s" % (doc, found_num, count, all))
-
+            self.fail("Document %s count()=%s BUT expected count=%s! All"
+                      " documents: %s" % (doc, found_num, count, all))
 
     def __check_result(self, result, **expecting_values):
-        for key in ('nModified', 'nUpserted','nMatched', 'writeErrors', 'upserted', 'writeConcernErrors', 'nRemoved',
-                    'nInserted'):
+        for key in ('nModified', 'nUpserted', 'nMatched', 'writeErrors',
+                    'upserted', 'writeConcernErrors', 'nRemoved', 'nInserted'):
             exp_val = expecting_values.get(key)
             has_val = result.get(key)
+            if self.test_with_pymongo and key == 'nModified' and has_val is None:
+                # ops, real pymongo did not returned 'nModified' key!
+                continue
             self.assertFalse(has_val is None, "Missed key '%s' in result: %s" % (key, result))
             if exp_val:
-                self.assertEqual(exp_val, has_val,
-                             "Invalid result %s=%s (but expected value=%s)" % (key, has_val, exp_val))
+                self.assertEqual(exp_val, has_val, "Invalid result %s=%s (but expected value=%s)" %
+                                 (key, has_val, exp_val))
             else:
                 self.assertFalse(bool(has_val), "Received unexpected value %s = %s" % (key, has_val))
 
@@ -49,7 +60,6 @@ class BulkOperationsTest(TestCase):
     def __check_number_of_elements(self, count):
         has_count = self.db.collection.count()
         self.assertEqual(has_count, count, "There is %s documents but there should be %s" % (has_count, count))
-
 
     def test__insert(self):
         self.bulk_op.insert({"a": 1, "b": 2})
@@ -62,16 +72,16 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2, "b": 4})
         self.__check_document({"a": 2, "b": 6})
 
-
     def test__bulk_update_must_raise_error_if_missed_operator(self):
         self.assertRaises(ValueError, self.bulk_op.find({"a": 1}).update, {"b": 20})
 
+    def test__bulk_execute_must_raise_error_if_bulk_empty(self):
+        self.assertRaises(mongomock.InvalidOperation, self.bulk_op.execute)
 
     def test_update(self):
         self.bulk_op.find({"a": 1}).update({"$set": {"b": 20}})
         self.__execute_and_check_result()
         self.__check_number_of_elements(0)
-
 
     def test__update_must_update_all_documents(self):
         self.db.collection.insert({"a": 1, "b": 2})
@@ -89,13 +99,11 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 1, "b": 20})
         self.__check_document({"a": 2, "b": 40}, 2)
 
-
     def test__ordered_insert_and_update(self):
         self.bulk_op.insert({"a": 1, "b": 2})
         self.bulk_op.find({"a": 1}).update({"$set": {"b": 3}})
         self.__execute_and_check_result(nInserted=1, nMatched=1, nModified=1)
         self.__check_document({"a": 1, "b": 3})
-
 
     def test__update_one(self):
         self.db.collection.insert({"a": 2, "b": 1})
@@ -106,12 +114,10 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2}, count=2)
         self.__check_number_of_elements(2)
 
-
     def test__remove(self):
         self.bulk_op.find({"a": 2}).remove()
         self.__execute_and_check_result()
         self.__check_number_of_elements(0)
-
 
     def test__remove(self):
         self.db.collection.insert({"a": 2, "b": 1})
@@ -121,7 +127,6 @@ class BulkOperationsTest(TestCase):
 
         self.__execute_and_check_result(nRemoved=2)
         self.__check_number_of_elements(0)
-
 
     def test__remove_one(self):
         self.db.collection.insert({"a": 2, "b": 1})
@@ -133,11 +138,9 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2}, 1)
         self.__check_number_of_elements(1)
 
-
     def test_upsert_replace_one_on_empty_set(self):
         self.bulk_op.find({}).upsert().replace_one({"x": 1})
         self.__execute_and_check_result(nUpserted=1, upserted=[{"index": 0, "_id": mock.ANY}])
-
 
     def test_upsert_replace_one(self):
         self.db.collection.insert({"a": 2, "b": 1})
@@ -147,7 +150,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2}, 1)
         self.__check_document({"x": 1}, 1)
         self.__check_number_of_elements(2)
-
 
     def test_upsert_update_on_empty_set(self):
         self.bulk_op.find({}).upsert().update({"$set": {"a": 1, "b": 2}})
@@ -163,7 +165,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2, "b": 3}, 2)
         self.__check_number_of_elements(2)
 
-
     def test_upsert_update_one(self):
         self.db.collection.insert({"a": 2, "b": 1})
         self.db.collection.insert({"a": 2, "b": 1})
@@ -172,3 +173,70 @@ class BulkOperationsTest(TestCase):
         self.__check_document({"a": 2, "b": 1}, 1)
         self.__check_document({"a": 2, "b": 2, "x": 1}, 1)
         self.__check_number_of_elements(2)
+
+
+@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+class BulkOperationsWithPymongoTest(BulkOperationsTest):
+    test_with_pymongo = True
+
+
+@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+class CollectionComparisonTest(TestCase):
+
+    def setUp(self):
+        super(CollectionComparisonTest, self).setUp()
+        self.fake_conn = mongomock.MongoClient()
+        self.mongo_conn = pymongo.MongoClient()
+        self.db_name = "mongomock___testing_db"
+        self.collection_name = "mongomock___testing_collection"
+        self.mongo_conn[self.db_name][self.collection_name].remove()
+        self.cmp = MultiCollection({
+            "fake": self.fake_conn[self.db_name][self.collection_name],
+            "real": self.mongo_conn[self.db_name][self.collection_name],
+        })
+        self.bulks = MultiCollection({
+            "fake": self.cmp.conns["fake"].initialize_ordered_bulk_op(),
+            "real": self.cmp.conns["real"].initialize_ordered_bulk_op()
+        })
+
+        # hacky! Depending on mongo server version 'nModified' is returned or not..
+        # so let make simple bulk operation to know what's the server behaviour...
+        coll = self.mongo_conn[self.db_name]["mongomock_testing_prepare_test"]
+        bulk = coll.initialize_ordered_bulk_op()
+        bulk.insert({'a': 1})
+        insert_returns_nmodified = "nModified" in bulk.execute()
+
+        bulk = self.cmp.conns["real"].initialize_ordered_bulk_op()
+        bulk.find({'a': 1}).update({'$set': {'a': 2}})
+        update_returns_nmodified = "nModified" in bulk.execute()
+        coll.drop()
+
+        self.bulks.conns["fake"]._set_nModified_policy(insert_returns_nmodified,
+                                                       update_returns_nmodified)
+
+    def test__insert(self):
+        self.bulks.do.insert({"a": 1, "b": 1})
+        self.bulks.do.insert({"a": 2, "b": 2})
+        self.bulks.do.insert({"a": 2, "b": 2})
+        self.bulks.compare.execute()
+
+    def test__mixed_operations(self):
+        self.cmp.do.insert({"a": 1, "b": 3})
+        self.cmp.do.insert({"a": 2, "c": 1})
+        self.cmp.do.insert({"a": 2, "c": 2})
+        self.cmp.do.insert({"a": 3, "c": 1})
+        self.cmp.do.insert({"a": 4, "d": 2})
+        self.cmp.do.insert({"a": 5, "d": 11})
+        self.cmp.do.insert({"a": 5, "d": 22})
+
+        self.bulks.do.insert({"a": 1, "b": 1})
+        for bwo in self.bulks.do.find({"a": 2}).values():
+            bwo.remove_one()
+        for bwo in self.bulks.do.find({"a": 3}).values():
+            bwo.update({"$inc": {"b": 1}})
+        for bwo in self.bulks.do.find({"a": 4}).values():
+            bwo.upsert().replace_one({"b": 11, "x": 'y'})
+        for bwo in self.bulks.do.find({"a": 5}).values():
+            bwo.upsert().update({"$inc": {"b": 11}})
+        self.bulks.compare.execute()
+        self.cmp.compare.find(sort=[("a", 1), ("b", 1), ("c", 1), ("d", 1)])

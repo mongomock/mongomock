@@ -1300,6 +1300,7 @@ class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
     pass
 
 
+
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
 class _AggregateTest(_CollectionComparisonTest):
