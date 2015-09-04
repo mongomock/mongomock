@@ -3,20 +3,17 @@ sudo: false
 cache:
   directories:
     - $HOME/.cache/pip
-python:
-  - "2.6"
-  - "2.7"
-  - "3.3"
-  - "3.4"
-  - "pypy"
 env:
-  - INSTALL_PYMONGO=true INSTALL_PYEXECJS=true
-  - INSTALL_PYMONGO=false INSTALL_PYEXECJS=false
+  - TOX_ENV=py27-pymongo
+  - TOX_ENV=py27-pyexecjs
+  - TOX_ENV=py33-pymongo
+  - TOX_ENV=py33-pyexecjs
+  - TOX_ENV=py34-pymongo
+  - TOX_ENV=py34-pyexecjs
+  - TOX_ENV=pypy-pymongo
+  - TOX_ENV=pypy-pyexecjs
+script:
+  - tox -e $TOX_ENV
 services:
   - mongodb
-# command to install dependencies, e.g. pip install -r requirements.txt
-install: 
-  - travis_retry pip install -e .
-  - travis_retry pip install nose
-# command to run tests, e.g. python setup.py test
-script: nosetests -w tests
+install: pip install tox
