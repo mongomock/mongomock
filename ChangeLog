@@ -1,0 +1,312 @@
+CHANGES
+=======
+
+* Changes setup to pbr and travis and dependency building to tox
+* pep8 + additional test
+* added support for bulk operations (issue #161)
+* fix support for multi=False in delete
+* fix problem with upserting after update
+* Add $elemMatch return fields operator
+
+3.0.0
+-----
+
+* Use the containerized infrastructure and cache pip dependencies
+* Nested pulling and tests added
+* Add close method to MongoClient
+* Allow update with upsert to have an _id field in doc
+* Adds exception raising and test for empty logical operators
+* Adds $nor operator and tests for it
+* Add version and platform specifiers
+* Fix UpdateResult.matched_count. Improve code style
+* Add CommandCursor, more back-to-back-tests
+* Add result classes for update/insert/delete ops
+* Initial commit for Pymongo3 port
+
+2.3.1
+-----
+
+* Allow subdocuments to be replaced with positional operator
+
+2.3.0
+-----
+
+* Fixing issue #162 - adding support for document values in 'distinct'
+* Correctly sort missing values
+
+2.2.0
+-----
+
+* Fixing issue #155 - properly supporting the {$exists : false} feature
+* Fix for issue #153 - supporting nested 'fields
+* Fixing #150 - adding support for $each modifier in $addToSet command
+* Fixing issue #151 - adding support for $pullAll
+* Added create_index with test cases to collection
+* Fix "not enough args for format string" exception
+* collection.remove(): kwargs -> write_concern_kwargs
+* Added support for WriteConcern
+* collection.remove: Accept kwargs
+* collection.find(): New no_cursor_timeout option
+* Fix pushing multiple values to nested attribute
+
+2.1.0
+-----
+
+* Allow subdocument replacement with $set operator
+* Test for setting limit to 0
+* Use pip to install dependencies so you'd be able to retry failed installations
+* Fix for setting limit to 0
+* Remove support for updating _id on docs to work like mongo
+* Add support for lists as values of _id
+* Make iterators python 3 compatible using six
+* Simplify hashdict handling of embedded dicts
+* Hashdict support dicts in values, turn them into hashdicts
+* Add back in test which was failing locally but not on travis
+* Add support for _id as dict()
+* Implemented in update
+* Added update op. tests
+* Missing import in collection.py (_print_deprecation_warning) (#126)
+* use basestring for python3
+* implement $unwind in the aggregation pipeline with test
+* Raise error in group if execjs not installed
+* resolve missed merge conflict
+* add test for complex $pull queries
+* Proper filtering of array elements in $pull command
+* fixed test
+* second atempt to check db name check
+* fixed name check
+* added database property to DBRef test mock
+* pep8
+* added dereference
+* new line at the end
+* added dereference
+* refs #114: Added alive method to Connection
+* fixed dump syntax error
+* fixed find by document value
+* added drop database functionality
+* fixed collection dropping
+* added drop database tests
+* added valid drop colleciton test cases
+* Added Database.create_collection method
+* support uniq indexes
+* support positional operator $ for $set operation
+* support sort in find_and_modify * avoid original data modification if send as link in $set
+* $ne in filtering nested structures
+* Added Python 3.4 and PyPy to the build matrix
+* Fixing now the test failure on python 2.6
+* Fixing the test failure on python 3.3
+* Fixing issue #108 - adding array fields support in 'distinct'
+* fix databases list test
+* add method database_names() on Connection
+* fix $pull for key that does not exist
+* Allow $push to array in a nested attribute, #85
+
+2.0.0
+-----
+
+* Revert "Revert "Revert "Revert "Adding the missing 'with_limit_and_skip' parameter for count - fixing #98""""
+* Revert "Revert "Revert "Adding the missing 'with_limit_and_skip' parameter for count - fixing #98"""
+* Revert "Revert "Adding the missing 'with_limit_and_skip' parameter for count - fixing #98""
+* Revert "Adding the missing 'with_limit_and_skip' parameter for count - fixing #98"
+* Adding the missing 'with_limit_and_skip' parameter for count - fixing #98
+* Adding missing 'drop_index' and 'index_information' collection methods
+* Add Contributing guidelines
+* Attempt fix python 3 bug
+* Python 3 fix attempt
+* Fix python3 failure
+* Finalize group and aggregate
+* Removes debug code from tests
+* Remove print statements from group function
+* Fixes pushing initial values to documents in collection, new tests run properly
+* make the group/agregate functions inherit from _CollectionComparisonTest, write more broken tests
+* initialize reduced val to proper value
+* remove bad merge
+* Remove initial parameter from reduce_ctx call in group()
+* Refactor reduce_ctx in group, simplify group, remove ungrouped key, value pairs from group results
+* skip the new group and aggregate tests if execs and pymongo aren't installed
+* failing test for reduce
+* fix parameters on group and aggregate to match pymongo
+* add group and aggregate functions
+* Connection.__init__(): set document_class
+* Credits
+* allow with_limit_and_skip to be passed to cursor count method
+* searching for {'propertyName' : None} and {'propertyName.subProp' : None} was inconsistent with MongoDb
+* Fix + test for #90
+* Add arguments to Collection.insert
+* Add slave_okay for Collection.find() (#86)
+* test doc string
+* fix error message content
+* addresses issue #65. Implement dummy aggregate and group methods on collection. Raise not implemented unless dummy responses are pre specified
+* Fix + test for #81
+* Fix + test for #80
+* Fix matching ObjectId search filters (#79)
+* Fix subselect in lists (#78)
+* Add test for #79
+* add Makefile
+
+1.2.0
+-----
+
+* Support skip for cursors
+* Test for skip param of Collection find()
+* Internalize dicts on updates
+* Forbid non-string keys (#71)
+* fixing "global name DuplicateKeyError is not defined" error
+* dotted names in sorting
+* fixed arguments in collection_names fixed some python 3 compatibility
+* More support on regex searches
+* Fix: $push should create the field if absent
+
+1.1.0
+-----
+
+* more name tests
+* Add tests for #63
+* Make sub-collections accessible by __getattr__ and __getitem__
+* Updated tests
+* Fix issue where return keys are supposed to be unicode. Also, fixed typo in updatedExisting key
+* Fix distinct method for nested field (#58). Add distinct method to collection
+* Fix distinct method for nested field (#58)
+* Support cursor.clone (#54)
+* Fix find_one() with no args (#56)
+* Implement cursor.collection (#55)
+* Support distinct (based on code by @zcarter) (#53)
+* Fix return value from update and remove (#50)
+* python3 basestring compatability
+* Test cases for update and remove adding ouput for Acknowledged-level write concern (default in MongoDB)
+* add "distinct" functionality for cursors, tests
+* Modify README to kick off tests
+* Add more doc. Also used to kick off a new build on Travis CI
+* Refactor the subdocument searching into its own method for reusability
+* Increase num retries for mongodb connection (for travis builds
+* Fix exception handling in test
+* Fix deepcopy issue with classes deriving from dicts (#52)
+* Revert imports to what they were before
+* Fix issue where we need to use iterkeys from six
+* Fix resolve_key_value to check for specific list items
+* test for $unset fixed
+* unset fixed The value of the field in the $unset statement does not impact the operation. http://docs.mongodb.org/manual/reference/operator/unset/#op._S_unset
+* better tests and small fix
+* Add more tests cases to test suite for $push, $pull, and $inc
+* Fix $push and $pull to handle more cases
+* Fix find_and_modify behavior with remove, new (#49)
+* Remove dangerous stub for $where
+* ok, no ordered dictionary in python 2.6
+* added test for as_class parameter
+* as_class parameter added to find
+* There are cases in which the document can contain an array. Mongo handles it and so should the mock framework
+* Add positional operator for $inc. Also, fix an issue with multiple edits and positional operators
+* Add $push functionality
+* Missing pymongo import in tests for pymongo.errors.ConnectionFailure usage
+* Add support for $pull with positional operator
+* Implement a rudimentary pull with nested arrays
+* Support for $elemMatch (#39)
+* Refactor filtering logic
+* Add snapshot param to find method in Collection class
+* add ability to index cursor
+* fix for limit=0
+* tests to show difference in functionality of "limit=0" between mongomock and pymongo
+* Minor test fix, update contributors
+* Add support for calling find_one('id'), matching pymongo behavior
+* Cover image
+
+1.0.1
+-----
+
+* Fix string matching bug
+* remove extra line from last checkin
+* Obscure naming bug, under certain instances the db doesn't return the right thing
+* Fix tests
+
+1.0.0
+-----
+
+* Drop Python 3.2 from the test matrix
+* #34: fixing MongoClient compatibility
+* Add badges
+* Add retries for local mongodb connection (for Travis-CI)
+* Travis build matrix for both including and excluding pymongo
+* Rename skip predicates
+* Minor fix to not actually skip duplicate keys in case we don't have pymongo
+* Include tests in MANIFEST for devpi testing
+* limit searches need to be sorted to return the same from both libs
+* add limit to the find and cursor calls
+* Implemented $not
+* Restore Database mock connection attribute
+* Slightly more graceful failure in case of missing execjs
+* Added build status image
+* Update the test instructions
+* Add unit tests
+* pymongo requirement is in setup.py now
+* Fix install order to work with travis CI build plan
+* Increment version due to new requirements to support map-reduce
+* Update tests for python 3
+* Add tests for map-reduce using query and limit
+* Support Map-Reduce
+* Implement find sort and cursor sort with list. Also, stub out collection ensure_index and cursor close
+* #15: handle upserts with special operators
+* test that shows a failing "upsert"
+* Fix support for on nested documents
+* Ignore flycheck files (emacs)
+* #28: support $set for subdocument properties
+* change errors to match pymongo errors
+* pymongo update - in pymongo version 2.4, Connection was replaced with MongoClient
+* Python 3 compatibility cast field.values to list to prevent error: TypeError: 'dict_values' object does not support indexing
+* compare_ignore_order: provide a default sort if there is no "_id" in the document
+* tests and fix for find(spec, fields) unsupported behavior fields now supports: {"_id":1, "field":1} {"_id":1, "field":0} {"_id":0, "field":0} {"field":0} {"field":1}
+* support excluding fields fields={'_id':0} should return full document with '_id' excluded
+* remove venv from the .gitignore, I put the value in .git/info/exclude instead
+* remove the next test, fails on the build machine
+* fix the arguments on find_one properly, using an *args parameter instead of the specific parameter name
+* protect against ObjectId vs String collisions when comparing properties
+* add fields parameter to find_one so that you can call it without kwargs (like in pymongo). also test find_one
+* Add drop functionality and tests
+* add setup instructions to the readme
+* add python to the git ignore
+* spec_or_id instead of spec
+* Add Database.drop_collection(...)
+* Spell out timeout=True and not **kwargs
+* Check for Iterable not ListType
+* Implemented $and and $or
+* Fix query qrray field with single value
+* Collection#find() can take additional args
+* batch_size on cursor
+* Use pip mirrors in travis
+* Use update, upsert and $set to insert a document
+* Fix travis and tox scripts
+* Issue #11: test against a real mongo instance
+* Fix: deep copy documents in find()
+* Fix: deepcopy the inserted document(s), but assign _id to original (like pymongo does)
+
+0.0.2
+-----
+
+* From xrange to range
+* Python 3 compatability
+* removed pymongo
+* Added sort
+* Added skip and limit
+* updated Connection to support providing a database path
+* Added $unset keyword to update
+* Adds count, modifies remove and find
+* Fix Python 3.2 compatibility
+* Fixed some incompatibilities with MongoDB
+* Added find_and_modify and some extra update logic
+* fix for ObjectId.__str__ to return str
+* Allow mongomock.Connection's constructor to take in a variable number of arguments with *args
+
+0.0.1
+-----
+
+* Python 3.2 and 2.6 fixes
+* Add travis CI file
+* add more search operators and tests, fix bugs in comparison operators
+* remove dependincy on sentinels library
+* don't overwrite passed _id fields; basic support for search operators other than equality
+* use isinstance rather than type(...) == to check for regular expressions
+* support searching only by object id
+* add rudimentary support for updates with "$set"
+* add support for the remove operation
+* add support for searching by regular expression
+* support dot notation in search keys
+* Add .achievements to gitignore
