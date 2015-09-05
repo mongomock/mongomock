@@ -27,25 +27,25 @@ class CollectionAPITest(TestCase):
 
     def test__get_subcollections(self):
         self.db.a.b
-        self.assertEquals(self.db.a.b.full_name, "somedb.a.b")
-        self.assertEquals(self.db.a.b.name, "a.b")
+        self.assertEqual(self.db.a.b.full_name, "somedb.a.b")
+        self.assertEqual(self.db.a.b.name, "a.b")
 
-        self.assertEquals(
+        self.assertEqual(
             set(self.db.collection_names()),
             set(["a.b", "system.indexes", "a"]))
 
     def test__get_collection_full_name(self):
-        self.assertEquals(self.db.coll.name, "coll")
-        self.assertEquals(self.db.coll.full_name, "somedb.coll")
+        self.assertEqual(self.db.coll.name, "coll")
+        self.assertEqual(self.db.coll.full_name, "somedb.coll")
 
     def test__get_collection_names(self):
         self.db.a
         self.db.b
-        self.assertEquals(set(self.db.collection_names()),
+        self.assertEqual(set(self.db.collection_names()),
                           set(['a', 'b', 'system.indexes']))
-        self.assertEquals(set(self.db.collection_names(True)),
+        self.assertEqual(set(self.db.collection_names(True)),
                           set(['a', 'b', 'system.indexes']))
-        self.assertEquals(set(self.db.collection_names(False)),
+        self.assertEqual(set(self.db.collection_names(False)),
                           set(['a', 'b']))
 
     def test__create_collection(self):
@@ -64,7 +64,7 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
-        self.assertEquals(
+        self.assertEqual(
             set(self.db.collection_names()), set(['a', 'system.indexes']))
 
         col = self.db.a
@@ -98,18 +98,18 @@ class CollectionAPITest(TestCase):
     def test__distinct_nested_field(self):
         self.db.collection.insert({'f1': {'f2': 'v'}})
         cursor = self.db.collection.find()
-        self.assertEquals(cursor.distinct('f1.f2'), ['v'])
+        self.assertEqual(cursor.distinct('f1.f2'), ['v'])
 
     def test__distinct_array_field(self):
         self.db.collection.insert(
             [{'f1': ['v1', 'v2', 'v1']}, {'f1': ['v2', 'v3']}])
         cursor = self.db.collection.find()
-        self.assertEquals(set(cursor.distinct('f1')), set(['v1', 'v2', 'v3']))
+        self.assertEqual(set(cursor.distinct('f1')), set(['v1', 'v2', 'v3']))
 
     def test__distinct_document_field(self):
         self.db.collection.insert({'f1': {'f2': 'v2', 'f3': 'v3'}})
         cursor = self.db.collection.find()
-        self.assertEquals(cursor.distinct('f1'), [{'f2': 'v2', 'f3': 'v3'}])
+        self.assertEqual(cursor.distinct('f1'), [{'f2': 'v2', 'f3': 'v3'}])
 
     def test__cursor_clone(self):
         self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
@@ -118,9 +118,9 @@ class CollectionAPITest(TestCase):
         first_item = next(iterator1)
         cursor2 = cursor1.clone()
         iterator2 = iter(cursor2)
-        self.assertEquals(next(iterator2), first_item)
+        self.assertEqual(next(iterator2), first_item)
         for item in iterator1:
-            self.assertEquals(item, next(iterator2))
+            self.assertEqual(item, next(iterator2))
 
         with self.assertRaises(StopIteration):
             next(iterator2)
@@ -131,11 +131,11 @@ class CollectionAPITest(TestCase):
         self.assertIsInstance(retval, dict)
         self.assertIsInstance(retval[text_type("connectionId")], int)
         self.assertIsNone(retval[text_type("err")])
-        self.assertEquals(retval[text_type("n")], 1)
+        self.assertEqual(retval[text_type("n")], 1)
         self.assertTrue(retval[text_type("updatedExisting")])
-        self.assertEquals(retval["ok"], 1.0)
+        self.assertEqual(retval["ok"], 1.0)
 
-        self.assertEquals(self.db.col.update({"bla": 1}, {"bla": 2})["n"], 0)
+        self.assertEqual(self.db.col.update({"bla": 1}, {"bla": 2})["n"], 0)
 
     def test__remove_retval(self):
         self.db.col.save({"a": 1})
@@ -143,10 +143,10 @@ class CollectionAPITest(TestCase):
         self.assertIsInstance(retval, dict)
         self.assertIsInstance(retval[text_type("connectionId")], int)
         self.assertIsNone(retval[text_type("err")])
-        self.assertEquals(retval[text_type("n")], 1)
-        self.assertEquals(retval[text_type("ok")], 1.0)
+        self.assertEqual(retval[text_type("n")], 1)
+        self.assertEqual(retval[text_type("ok")], 1.0)
 
-        self.assertEquals(self.db.col.remove({"bla": 1})["n"], 0)
+        self.assertEqual(self.db.col.remove({"bla": 1})["n"], 0)
 
     def test__remove_write_concern(self):
         self.db.col.remove({"a": 1}, w=None, wtimeout=None, j=None, fsync=None)
@@ -263,7 +263,7 @@ class CollectionAPITest(TestCase):
 
     def test__find_returns_cursors(self):
         collection = self.db.collection
-        self.assertEquals(type(collection.find()).__name__, "Cursor")
+        self.assertEqual(type(collection.find()).__name__, "Cursor")
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
@@ -386,7 +386,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.update({"_id": obj_id}, {"d": d, "l": l})
         d["a"] = "b"
         l.append(1)
-        self.assertEquals(
+        self.assertEqual(
             list(self.db.collection.find()),
             [{"_id": obj_id, "d": {}, "l": []}])
 
@@ -506,7 +506,7 @@ class CollectionAPITest(TestCase):
     def test__collection_is_indexable(self):
         self.db['def'].save({'name': 'test1'})
         self.assertTrue(self.db['def'].find({'name': 'test1'}).count() > 0)
-        self.assertEquals(
+        self.assertEqual(
             self.db['def'].find({'name': 'test1'})[0]['name'], 'test1')
 
     def test__cursor_distinct(self):
@@ -547,11 +547,11 @@ class CollectionAPITest(TestCase):
         u1 = {'name': 'first'}
         u2 = {'name': 'second'}
         self.db['users'].insert([u1, u2])
-        self.assertEquals(
+        self.assertEqual(
             self.db['users'].find(
                 sort=[
                     ("name", 1)], skip=1).count(), 1)
-        self.assertEquals(
+        self.assertEqual(
             self.db['users'].find(
                 sort=[
                     ("name", 1)], skip=1)[0]['name'], 'second')
@@ -572,7 +572,7 @@ class CollectionAPITest(TestCase):
         for val in values:
             in_db_val = find_cursor.next()
             expected = {'_id': val}
-            self.assertEquals(in_db_val, expected)
+            self.assertEqual(in_db_val, expected)
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__create_uniq_idxs_with_ascending_ordering(self):
@@ -583,7 +583,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__create_uniq_idxs_with_descending_ordering(self):
@@ -594,7 +594,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__create_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([("value", 1)], unique=True)
@@ -603,7 +603,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__ensure_uniq_idxs_with_ascending_ordering(self):
@@ -614,7 +614,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__ensure_uniq_idxs_with_descending_ordering(self):
@@ -625,7 +625,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.ensure_index([("value", 1)], unique=True)
@@ -634,7 +634,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
 
-        self.assertEquals(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__set_with_positional_operator(self):
         """
@@ -651,7 +651,7 @@ class CollectionAPITest(TestCase):
 
         expected_document = copy.deepcopy(base_document)
         expected_document["list_field"][1]["marker"] = True
-        self.assertEquals(list(self.db.collection.find()), [expected_document])
+        self.assertEqual(list(self.db.collection.find()), [expected_document])
 
         self.db.collection.update({"int_field": 1, "list_field.str_field": "a"},
                                   {"$set": {"list_field.$.marker": True}})
@@ -661,7 +661,7 @@ class CollectionAPITest(TestCase):
 
         expected_document["list_field"][0]["marker"] = True
         expected_document["list_field"][2]["marker"] = True
-        self.assertEquals(list(self.db.collection.find()), [expected_document])
+        self.assertEqual(list(self.db.collection.find()), [expected_document])
 
     def test__set_replace_subdocument(self):
         base_document = {
@@ -685,7 +685,7 @@ class CollectionAPITest(TestCase):
         expected_document["list_field"][1] = new_subdoc
         expected_document["list_field"][2] = new_subdoc
 
-        self.assertEquals(list(self.db.collection.find()), [expected_document])
+        self.assertEqual(list(self.db.collection.find()), [expected_document])
 
     def test__set_replace_subdocument_positional_operator(self):
         base_document = {
@@ -704,7 +704,7 @@ class CollectionAPITest(TestCase):
         expected_document = copy.deepcopy(base_document)
         expected_document["list_field"][1] = new_subdoc
 
-        self.assertEquals(list(self.db.collection.find()), [expected_document])
+        self.assertEqual(list(self.db.collection.find()), [expected_document])
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__find_and_modify_with_sort(self):
@@ -721,7 +721,7 @@ class CollectionAPITest(TestCase):
             list(
                 self.db.collection.find()),
             key=lambda x: x["time_check"])
-        self.assertEquals(sorted_records[-1]["checked"], True)
+        self.assertEqual(sorted_records[-1]["checked"], True)
 
         self.db.collection.find_and_modify(
             {"time_check": {'$lt': start_check_time}},
