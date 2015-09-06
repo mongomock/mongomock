@@ -33,6 +33,10 @@ class InterfaceTest(TestCase):
     def test__can_create_db_with_path(self):
         self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
 
+    def test__repr(self):
+        self.assertEqual(repr(mongomock.MongoClient()),
+                         "mongomock.MongoClient('localhost', 27017)")
+
 
 class DatabaseGettingTest(TestCase):
 
@@ -837,7 +841,7 @@ class _CollectionTest(_CollectionComparisonTest):
             {'name': 'ann'}, {'$setOnInsert': {'data.age': 1}}, True)
         self.cmp.compare.find()
 
-    def test__inc_subdocument_positional(self):
+    def test__setOnInsert_subdocument_elemMatch(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'data': [{'age': 0}, {'age': 1}]})
         self.cmp.do.update({'name': 'bob', 'data': {'$elemMatch': {'age': 0}}},
@@ -1332,7 +1336,6 @@ class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
     pass
 
 
-
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
 class _AggregateTest(_CollectionComparisonTest):
@@ -1343,9 +1346,11 @@ class _AggregateTest(_CollectionComparisonTest):
             {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
             {"_id": ObjectId(), "a": 1, "count": 2, "swallows": ['African swallow']},
             {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 2, "count": 3, "swallows": ['African swallow', 'European swallow']},
+            {"_id": ObjectId(), "a": 2, "count": 3, "swallows": ['African swallow',
+                                                                 'European swallow']},
             {"_id": ObjectId(), "a": 2, "count": 1, "swallows": []},
-            {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow', 'European swallow']},
+            {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow',
+                                                                 'European swallow']},
             {"_id": ObjectId(), "a": 4, "count": 4, "swallows": ['unladen swallow']}]
         for item in self.data:
             self.cmp.do.insert(item)
@@ -1361,8 +1366,7 @@ class _AggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$group': {
                 '_id': '$a',
-                'count': {'$sum': '$count'}}
-            },
+                'count': {'$sum': '$count'}}},
             {'$match': {'a': {'$lt': 3}}},
             {'$sort': {'_id': -1, 'count': 1}},
         ]

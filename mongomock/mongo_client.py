@@ -23,15 +23,14 @@ class MongoClient(object):
         return self[attr]
 
     def __repr__(self):
-        identifier = ["'{0}'".format(self._host), str(self._port)]
-        return "mongomock.MongoClient({0})".format(', '.join(identifier))
+        return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
 
     def close(self):
         pass
 
     @property
     def address(self):
-        return self._host, self._port
+        return self.host, self.port
 
     def server_info(self):
         return {
