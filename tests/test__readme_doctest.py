@@ -1,6 +1,7 @@
-from unittest import TestCase
-import os
 import doctest
+import os
+from unittest import TestCase
+
 
 class ReadMeDocTest(TestCase):
     def test__readme_doctests(self):

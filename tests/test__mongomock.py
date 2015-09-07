@@ -1,24 +1,26 @@
 import copy
-import time
 import re
+import time
+from unittest import TestCase, skipIf
 
-from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
 
+from .utils import DBRef
+
 try:
+    from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
-    from bson.objectid import ObjectId
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId
     _HAVE_PYMONGO = False
 try:
-    import execjs
     from bson.code import Code
     from bson.son import SON
+    import execjs  # noqa
     _HAVE_MAP_REDUCE = True
 except ImportError:
     _HAVE_MAP_REDUCE = False
@@ -99,7 +101,8 @@ class DatabaseGettingTest(TestCase):
 class _CollectionComparisonTest(TestCase):
 
     """Compares a fake collection with the real mongo collection implementation
-       via cross-comparison.
+
+       This is done via cross-comparison of the results.
     """
 
     def setUp(self):
@@ -1352,6 +1355,7 @@ class _AggregateTest(_CollectionComparisonTest):
             {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow',
                                                                  'European swallow']},
             {"_id": ObjectId(), "a": 4, "count": 4, "swallows": ['unladen swallow']}]
+
         for item in self.data:
             self.cmp.do.insert(item)
 
@@ -1364,9 +1368,7 @@ class _AggregateTest(_CollectionComparisonTest):
 
     def test__aggregate2(self):
         pipeline = [
-            {'$group': {
-                '_id': '$a',
-                'count': {'$sum': '$count'}}},
+            {'$group': {'_id': '$a', 'count': {'$sum': '$count'}}},
             {'$match': {'a': {'$lt': 3}}},
             {'$sort': {'_id': -1, 'count': 1}},
         ]
@@ -1374,8 +1376,7 @@ class _AggregateTest(_CollectionComparisonTest):
 
     def test__aggregate3(self):
         pipeline = [
-            {'$group': {'_id': 'a',
-                        'count': {'$sum': '$count'}}},
+            {'$group': {'_id': 'a', 'count': {'$sum': '$count'}}},
             {'$match': {'a': {'$lt': 3}}},
             {'$sort': {'_id': -1, 'count': 1}},
             {'$skip': 1},
@@ -1531,7 +1532,7 @@ class InsertedDocumentTest(TestCase):
         self.assertEqual(object1, object2)
         self.assertIsNot(object1, object2)
         object1["b"].append("bla")
-        self.assertNotEquals(object1, object2)
+        self.assertNotEqual(object1, object2)
 
 
 class ObjectIdTest(TestCase):

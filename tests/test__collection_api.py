@@ -1,9 +1,11 @@
-import mongomock
-from six import text_type
-import random
-import time
 import copy
+import random
+from six import text_type
+import time
+from unittest import TestCase, skipIf
 import warnings
+
+import mongomock
 
 try:
     import pymongo
@@ -11,8 +13,6 @@ try:
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
-
-from .utils import TestCase, skipIf
 
 
 warnings.simplefilter('ignore', DeprecationWarning)
@@ -41,12 +41,9 @@ class CollectionAPITest(TestCase):
     def test__get_collection_names(self):
         self.db.a
         self.db.b
-        self.assertEqual(set(self.db.collection_names()),
-                          set(['a', 'b', 'system.indexes']))
-        self.assertEqual(set(self.db.collection_names(True)),
-                          set(['a', 'b', 'system.indexes']))
-        self.assertEqual(set(self.db.collection_names(False)),
-                          set(['a', 'b']))
+        self.assertEqual(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
     def test__create_collection(self):
         coll = self.db.create_collection("c")
@@ -64,35 +61,24 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
-        self.assertEqual(
-            set(self.db.collection_names()), set(['a', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names()), set(['a', 'system.indexes']))
 
         col = self.db.a
-
         r = col.insert({"aa": "bb"})
-
         qr = col.find({"_id": r})
-
         self.assertEqual(qr.count(), 1)
 
         self.db.drop_collection("a")
-
         qr = col.find({"_id": r})
-
         self.assertEqual(qr.count(), 0)
 
         col = self.db.a
-
         r = col.insert({"aa": "bb"})
-
         qr = col.find({"_id": r})
-
         self.assertEqual(qr.count(), 1)
 
         self.db.drop_collection(col)
-
         qr = col.find({"_id": r})
-
         self.assertEqual(qr.count(), 0)
 
     def test__distinct_nested_field(self):
@@ -268,7 +254,7 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), tuple)
 
     def test__find_removed_and_changed_options(self):
-        '''Test that options that have been removed are rejected.'''
+        """Test that options that have been removed are rejected."""
         options = [
             {'slave_okay': True},
             {'as_class': dict},
@@ -495,9 +481,7 @@ class CollectionAPITest(TestCase):
         self.assert_document_count(0)
 
     def test__string_matching(self):
-        """
-        Make sure strings are not treated as collections on find
-        """
+        """Make sure strings are not treated as collections on find"""
         self.db['abc'].save({'name': 'test1'})
         self.db['abc'].save({'name': 'test2'})
         # now searching for 'name':'e' returns test1
@@ -506,8 +490,7 @@ class CollectionAPITest(TestCase):
     def test__collection_is_indexable(self):
         self.db['def'].save({'name': 'test1'})
         self.assertTrue(self.db['def'].find({'name': 'test1'}).count() > 0)
-        self.assertEqual(
-            self.db['def'].find({'name': 'test1'})[0]['name'], 'test1')
+        self.assertEqual(self.db['def'].find({'name': 'test1'})[0]['name'], 'test1')
 
     def test__cursor_distinct(self):
         larry_bob = {'name': 'larry'}
@@ -540,9 +523,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(count, 2)
 
     def test__find_with_skip_param(self):
-        """
-        Make sure that find() will take in account skip parametter
-        """
+        """Make sure that find() will take in account skip parameter"""
 
         u1 = {'name': 'first'}
         u2 = {'name': 'second'}
@@ -557,8 +538,9 @@ class CollectionAPITest(TestCase):
                     ("name", 1)], skip=1)[0]['name'], 'second')
 
     def test__ordered_insert_find(self):
-        """
-        If we insert values 1, 2, 3 and find them, we must see them in orderd as
+        """Tests ordered inserts
+
+        If we insert values 1, 2, 3 and find them, we must see them in order as
         we inserted them.
         """
 
@@ -576,8 +558,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__create_uniq_idxs_with_ascending_ordering(self):
-        self.db.collection.create_index(
-            [("value", pymongo.ASCENDING)], unique=True)
+        self.db.collection.create_index([("value", pymongo.ASCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
@@ -587,8 +568,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__create_uniq_idxs_with_descending_ordering(self):
-        self.db.collection.create_index(
-            [("value", pymongo.DESCENDING)], unique=True)
+        self.db.collection.create_index([("value", pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
@@ -607,8 +587,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__ensure_uniq_idxs_with_ascending_ordering(self):
-        self.db.collection.ensure_index(
-            [("value", pymongo.ASCENDING)], unique=True)
+        self.db.collection.ensure_index([("value", pymongo.ASCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
@@ -618,8 +597,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test__ensure_uniq_idxs_with_descending_ordering(self):
-        self.db.collection.ensure_index(
-            [("value", pymongo.DESCENDING)], unique=True)
+        self.db.collection.ensure_index([("value", pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
@@ -637,9 +615,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__set_with_positional_operator(self):
-        """
-        Real mongodb support positional operator $ for $set operation
-        """
+        """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,
                          "list_field": [{"str_field": "a"},
                                         {"str_field": "b"},
@@ -717,10 +693,7 @@ class CollectionAPITest(TestCase):
             {"time_check": {'$lt': start_check_time}},
             {"$set": {"time_check": float(time.time()), "checked": True}},
             sort=[("time_check", pymongo.ASCENDING)])
-        sorted_records = sorted(
-            list(
-                self.db.collection.find()),
-            key=lambda x: x["time_check"])
+        sorted_records = sorted(list(self.db.collection.find()), key=lambda x: x["time_check"])
         self.assertEqual(sorted_records[-1]["checked"], True)
 
         self.db.collection.find_and_modify(
@@ -733,15 +706,10 @@ class CollectionAPITest(TestCase):
             {"$set": {"time_check": float(time.time()), "checked": True}},
             sort=[("time_check", pymongo.ASCENDING)])
 
-        expected = list(
-            filter(
-                lambda x: "checked" in x,
-                list(
-                    self.db.collection.find())))
+        expected = list(filter(lambda x: "checked" in x, list(self.db.collection.find())))
         self.assertEqual(self.db.collection.find().count(), len(expected))
         self.assertEqual(
-            list(self.db.collection.find({"checked": True})),
-            list(self.db.collection.find()))
+            list(self.db.collection.find({"checked": True})), list(self.db.collection.find()))
 
     def test__avoid_change_data_after_set(self):
         test_data = {"test": ["test_data"]}

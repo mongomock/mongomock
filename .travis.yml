@@ -12,6 +12,7 @@ env:
   - TOX_ENV=py34-pyexecjs
   - TOX_ENV=pypy-pymongo
   - TOX_ENV=pypy-pyexecjs
+  - TOX_ENV=pep8
 script:
   - tox -e $TOX_ENV
 services:

@@ -1,15 +1,11 @@
 import collections
+from collections import OrderedDict
 import copy
 import functools
 import itertools
 import json
 import time
 import warnings
-import functools
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 try:
     from bson import json_util, SON
@@ -28,26 +24,23 @@ except ImportError:
         AFTER = True
 
 from sentinels import NOTHING
+from six import iteritems
+from six import iterkeys
+from six import itervalues
 from six import string_types
 from six import text_type
-from six import iteritems
-from six import itervalues
-from six import iterkeys
 
-from mongomock import DuplicateKeyError
-from mongomock import helpers
-from mongomock import ObjectId
-from mongomock import OperationFailure
-from mongomock import InvalidOperation
 from mongomock.command_cursor import CommandCursor
+from mongomock import DuplicateKeyError
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
-from mongomock.helpers import basestring
-from mongomock.helpers import hashdict
-from mongomock.helpers import xrange
+from mongomock import helpers
+from mongomock import InvalidOperation
+from mongomock import ObjectId
+from mongomock import OperationFailure
 from mongomock.results import DeleteResult
-from mongomock.results import InsertOneResult
 from mongomock.results import InsertManyResult
+from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 
@@ -88,7 +81,7 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
-class BulkWriteOperation:
+class BulkWriteOperation(object):
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
         self.selector = selector
@@ -283,7 +276,7 @@ class Collection(object):
             data['_id'] = ObjectId()
         object_id = data['_id']
         if isinstance(object_id, dict):
-            object_id = hashdict(object_id)
+            object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
         for unique in self._uniques:
@@ -595,11 +588,12 @@ class Collection(object):
         }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
-        """
-        This method retrieves the subdocument of the existing_document.nested_field_list. It uses the spec to filter
-        through the items. It will continue to grab nested documents until it can go no further. It will then return the
-        subdocument that was last saved. '$' is the positional operator, so we use the $elemMatch in the spec to find
-        the right subdocument in the array.
+        """This method retrieves the subdocument of the existing_document.nested_field_list.
+
+        It uses the spec to filter through the items. It will continue to grab nested documents
+        until it can go no further. It will then return the subdocument that was last saved.
+        '$' is the positional operator, so we use the $elemMatch in the spec to find the right
+        subdocument in the array.
         """
         # current document in view
         doc = existing_document
@@ -625,14 +619,14 @@ class Collection(object):
 
             subdocument = doc
             doc = doc[subfield]
-            if not subfield in subspec:
+            if subfield not in subspec:
                 break
             subspec = subspec[subfield]
 
         return subdocument
 
     def _discard_operators(self, doc):
-        # TODO: this looks a little too naive...
+        # TODO(this looks a little too naive...)
         return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
 
     def find(self, filter=None, projection=None, skip=0, limit=0,
@@ -654,7 +648,7 @@ class Collection(object):
                 dataset = iter(sorted(
                     dataset, key=lambda x: _resolve_sort_key(sortKey, x),
                     reverse=sortDirection < 0))
-        for i in xrange(skip):
+        for i in helpers.xrange(skip):
             try:
                 next(dataset)
             except StopIteration:
@@ -872,7 +866,7 @@ class Collection(object):
         if isinstance(doc, list):
             try:
                 doc[int(field_name)] = field_value
-            except:
+            except IndexError:
                 pass
         else:
             updater(doc, field_name, field_value)
@@ -984,7 +978,7 @@ class Collection(object):
         for doc in to_delete:
             doc_id = doc['_id']
             if isinstance(doc_id, dict):
-                doc_id = hashdict(doc_id)
+                doc_id = helpers.hashdict(doc_id)
             del self._documents[doc_id]
             deleted_count += 1
             if not multi:
@@ -1173,11 +1167,10 @@ class Collection(object):
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
-            if not isinstance(k, basestring):
+            if not isinstance(k, helpers.basestring):
                 raise TypeError(
                     "Keys must be a list of key names, "
-                    "each an instance of %s" %
-                    (basestring.__name__,))
+                    "each an instance of %s" % helpers.basestring.__name__)
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
@@ -1212,8 +1205,8 @@ class Collection(object):
             '$avg',
             '$push',
             '$sum']
-        boolean_operators = ['$and', '$or', '$not']
-        set_operators = [
+        boolean_operators = ['$and', '$or', '$not']  # noqa
+        set_operators = [  # noqa
             '$setEquals',
             '$setIntersection',
             '$setDifference',
@@ -1221,7 +1214,7 @@ class Collection(object):
             '$setIsSubset',
             '$anyElementTrue',
             '$allElementsTrue']
-        compairison_operators = [
+        compairison_operators = [  # noqa
             '$cmp',
             '$eq',
             '$gt',
@@ -1229,22 +1222,22 @@ class Collection(object):
             '$lt',
             '$lte',
             '$ne']
-        aritmetic_operators = [
+        aritmetic_operators = [  # noqa
             '$add',
             '$divide',
             '$mod',
             '$multiply',
             '$subtract']
-        string_operators = [
+        string_operators = [  # noqa
             '$concat',
             '$strcasecmp',
             '$substr',
             '$toLower',
             '$toUpper']
-        text_search_operators = ['$meta']
-        array_operators = ['$size']
-        projection_operators = ['$map', '$let', '$literal']
-        date_operators = [
+        text_search_operators = ['$meta']  # noqa
+        array_operators = ['$size']  # noqa
+        projection_operators = ['$map', '$let', '$literal']  # noqa
+        date_operators = [  # noqa
             '$dayOfYear',
             '$dayOfMonth',
             '$dayOfWeek',
@@ -1255,7 +1248,7 @@ class Collection(object):
             '$minute',
             '$second',
             '$millisecond']
-        conditional_operators = ['$cond', '$ifNull']
+        conditional_operators = ['$cond', '$ifNull']  # noqa
 
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
@@ -1275,7 +1268,9 @@ class Collection(object):
                             for func, key in iteritems(value):
                                 if func == "$sum" or "$avg":
                                     for group_key in group_func_keys:
-                                        for ret_value, group in itertools.groupby(out_collection, lambda item: item[group_key]):
+                                        grouped = itertools.groupby(
+                                            out_collection, lambda item: item[group_key])
+                                        for ret_value, group in grouped:
                                             doc_dict = {}
                                             group_list = ([x for x in group])
                                             doc_dict['_id'] = ret_value
@@ -1287,19 +1282,20 @@ class Collection(object):
                                             else:
                                                 for doc in group_list:
                                                     current_val = sum([current_val, doc[field]])
-                                                    avg = current_val / len(group_list)
                                                 doc_dict[field] = current_val
                                             grouped_collection.append(doc_dict)
                                 else:
                                     if func in group_operators:
                                         raise NotImplementedError(
-                                            "Although %s is a valid group operator for the aggregation pipeline, "
-                                            "%s is currently not implemented in Mongomock.")
+                                            "Although %s is a valid group operator for the "
+                                            "aggregation pipeline, %s is currently not implemented "
+                                            "in Mongomock.")
                                     else:
                                         raise NotImplementedError(
-                                            "%s is not a valid group operator for the aggregation pipeline. "
-                                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
-                                            "for a complete list of valid operators.")
+                                            "%s is not a valid group operator for the aggregation "
+                                            "pipeline. See http://docs.mongodb.org/manual/meta/"
+                                            "aggregation-quick-reference/ for a complete list of "
+                                            "valid operators.")
                     out_collection = grouped_collection
                 elif k == '$sort':
                     sort_array = []
@@ -1316,14 +1312,14 @@ class Collection(object):
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
-                    if not isinstance(v, basestring) and v[0] != '$':
+                    if not isinstance(v, helpers.basestring) and v[0] != '$':
                         raise ValueError(
-                            "$unwind failed: exception: field path references must be prefixed with a '$' ('%s'" %
-                            str(v))
+                            "$unwind failed: exception: field path references must be prefixed "
+                            "with a '$' '%s'" % v)
                     if len(v.split('.')) > 1:
                         raise NotImplementedError(
-                            'Mongmock does not currently support nested field paths in the $unwind implementation. ("%s"' %
-                            v)
+                            "Mongmock does not currently support nested field paths in the $unwind "
+                            "implementation. '%s'" % v)
                     unwound_collection = []
                     for doc in out_collection:
                         array_value = doc.get(v[1:])
@@ -1331,8 +1327,8 @@ class Collection(object):
                             continue
                         elif not isinstance(array_value, list):
                             raise TypeError(
-                                '$unwind must specify an array field, field: "%s", value found: %s' %
-                                (str(v), str(array_value)))
+                                '$unwind must specify an array field, field: '
+                                '"%s", value found: %s' % (v, array_value))
                         for field_item in array_value:
                             unwound_collection.append(copy.deepcopy(doc))
                             unwound_collection[-1][v[1:]] = field_item
@@ -1437,7 +1433,7 @@ class Cursor(object):
         pass
 
     def distinct(self, key):
-        if not isinstance(key, basestring):
+        if not isinstance(key, helpers.basestring):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         unique_dict_vals = []
