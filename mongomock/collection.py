@@ -1289,13 +1289,13 @@ class Collection(object):
                                         raise NotImplementedError(
                                             "Although %s is a valid group operator for the "
                                             "aggregation pipeline, %s is currently not implemented "
-                                            "in Mongomock.")
+                                            "in Mongomock." % func)
                                     else:
                                         raise NotImplementedError(
                                             "%s is not a valid group operator for the aggregation "
                                             "pipeline. See http://docs.mongodb.org/manual/meta/"
                                             "aggregation-quick-reference/ for a complete list of "
-                                            "valid operators.")
+                                            "valid operators." % func)
                     out_collection = grouped_collection
                 elif k == '$sort':
                     sort_array = []
@@ -1336,13 +1336,13 @@ class Collection(object):
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
-                            "Although %s is a valid operator for the aggregation pipeline, "
-                            "%s is currently not implemented in Mongomock.")
+                            "Although '%s' is a valid operator for the aggregation pipeline, it is "
+                            "currently not implemented in Mongomock." % k)
                     else:
                         raise NotImplementedError(
                             "%s is not a valid operator for the aggregation pipeline. "
                             "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
-                            "for a complete list of valid operators.")
+                            "for a complete list of valid operators." % k)
         return CommandCursor(out_collection)
 
 
