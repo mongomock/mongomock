@@ -116,9 +116,7 @@ def _format_diff_message(a_name, b_name, diff):
 
 
 def _deepcopy(x):
-    """
-    Deepcopy, but ignore regex objects...
-    """
+    """Deepcopy, but ignore regex objects..."""
     if isinstance(x, re._pattern_type):
         return x
     if isinstance(x, list) or isinstance(x, tuple):

@@ -1,11 +1,11 @@
-from unittest import TestCase
 from mongomock.helpers import hashdict
 from mongomock.helpers import print_deprecation_warning
+from unittest import TestCase
 
 
 class HashdictTest(TestCase):
     def test__hashdict(self):
-        """ Make sure hashdict can be used as a key for a dict """
+        """Make sure hashdict can be used as a key for a dict"""
         h = {}
         _id = hashdict({'a': 1})
         h[_id] = 'foo'
@@ -19,6 +19,7 @@ class HashdictTest(TestCase):
         _id = hashdict({hashdict({'a': '3'}): {'foo': 2}})
         h[_id] = 'foo'
         self.assertEqual(h[_id], 'foo')
+
 
 class TestDeprecationWarning(TestCase):
     def test__deprecation_warning(self):

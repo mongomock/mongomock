@@ -1,8 +1,8 @@
 try:
-    from pymongo.results import InsertOneResult
-    from pymongo.results import InsertManyResult
-    from pymongo.results import UpdateResult
     from pymongo.results import DeleteResult
+    from pymongo.results import InsertManyResult
+    from pymongo.results import InsertOneResult
+    from pymongo.results import UpdateResult
 except ImportError:
     class _WriteResult(object):
 

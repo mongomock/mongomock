@@ -1,4 +1,4 @@
-from .helpers import ObjectId
+from .helpers import ObjectId  # noqa
 
 try:
     from pymongo.errors import PyMongoError
@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 
-from .write_concern import WriteConcern
-from .mongo_client import MongoClient
-from .database import Database
 from .collection import Collection
+from .database import Database
+from .mongo_client import MongoClient
+from .write_concern import WriteConcern

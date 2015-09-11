@@ -1,5 +1,5 @@
-import itertools
 from .database import Database
+import itertools
 
 
 class MongoClient(object):
@@ -74,8 +74,7 @@ class MongoClient(object):
         return db
 
     def alive(self):
-        """The original MongoConnection.alive method checks the
-        status of the server.
+        """The original MongoConnection.alive method checks the status of the server.
 
         In our case as we mock the actual server, we should always return True.
         """

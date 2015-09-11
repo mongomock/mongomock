@@ -1,5 +1,5 @@
-from .collection import Collection
 from . import CollectionInvalid
+from .collection import Collection
 
 
 class Database(object):
@@ -62,7 +62,7 @@ class Database(object):
                 del self._collections[name_or_collection]
         # EAFP paradigm
         # (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
-        except:
+        except Exception:
             pass
 
     def create_collection(self, name, **kwargs):

@@ -1,43 +1,42 @@
 import re
-import sys
+from six import iteritems, PY2
 import warnings
-from six import (iteritems)
 
-
-def print_deprecation_warning(old_param_name, new_param_name):
-    warnings.warn("'%s' has been deprecated to be in line with pymongo implementation, "
-                  "a new parameter '%s' should be used instead. the old parameter will be kept for backward "
-                  "compatibility purposes." % (old_param_name, new_param_name), DeprecationWarning)
-
-
-_PY2 = sys.version_info < (3, 0)
 
 try:
     from bson import (ObjectId, RE_TYPE)
 except ImportError:
-    from mongomock.object_id import ObjectId
-    RE_TYPE = type(re.compile(''))
+    from mongomock.object_id import ObjectId  # noqa
+    RE_TYPE = re._pattern_type
 
-if _PY2:
+if PY2:
     from __builtin__ import xrange
 else:
     xrange = range
 
-#for Python 3 compatibility
-try:
-  unicode = unicode
-  from __builtin__ import basestring
-except NameError:
-  unicode = str
-  basestring = (str, bytes)
+# for Python 3 compatibility
+if PY2:
+    unicode = unicode
+    from __builtin__ import basestring
+else:
+    unicode = str
+    basestring = (str, bytes)
 
 
 ASCENDING = 1
 
 
+def print_deprecation_warning(old_param_name, new_param_name):
+    warnings.warn(
+        "'%s' has been deprecated to be in line with pymongo implementation, a new parameter '%s' "
+        "should be used instead. the old parameter will be kept for backward compatibility "
+        "purposes." % (old_param_name, new_param_name), DeprecationWarning)
+
+
 def _index_list(key_or_list, direction=None):
     """Helper to generate a list of (key, direction) pairs.
-       Takes such a list, or a single key, or a single key and direction.
+
+       It takes such a list, or a single key, or a single key and direction.
     """
     if direction is not None:
         return [(key_or_list, direction)]
@@ -51,9 +50,7 @@ def _index_list(key_or_list, direction=None):
 
 
 class hashdict(dict):
-    """
-    hashable dict implementation, suitable for use as a key into
-    other dicts.
+    """hashable dict implementation, suitable for use as a key into other dicts.
 
     >>> h1 = hashdict({"apples": 1, "bananas":2})
     >>> h2 = hashdict({"bananas": 3, "mangoes": 5})
@@ -70,7 +67,6 @@ class hashdict(dict):
 
     based on answers from
     http://stackoverflow.com/questions/1151658/python-hashable-dicts
-
     """
     def __key(self):
         return frozenset((k,

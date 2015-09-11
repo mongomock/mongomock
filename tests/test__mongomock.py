@@ -1,24 +1,26 @@
 import copy
-import time
 import re
+import time
+from unittest import TestCase, skipIf
 
-from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
 
+from .utils import DBRef
+
 try:
+    from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
-    from bson.objectid import ObjectId
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId
     _HAVE_PYMONGO = False
 try:
-    import execjs
     from bson.code import Code
     from bson.son import SON
+    import execjs  # noqa
     _HAVE_MAP_REDUCE = True
 except ImportError:
     _HAVE_MAP_REDUCE = False
@@ -92,14 +94,15 @@ class DatabaseGettingTest(TestCase):
         collection.insert(to_insert)
 
         a = db.dereference(DBRef("a", "a", db.name))
-        self.assertEquals(to_insert, a)
+        self.assertEqual(to_insert, a)
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 class _CollectionComparisonTest(TestCase):
 
     """Compares a fake collection with the real mongo collection implementation
-       via cross-comparison.
+
+       This is done via cross-comparison of the results.
     """
 
     def setUp(self):
@@ -154,8 +157,8 @@ class _CollectionTest(_CollectionComparisonTest):
         objs = [{"a": 2, "b": {"c": 3}}, {"c": 5}, {"d": 7}]
         results_dict = self.cmp.do.insert(objs)
         for results in results_dict.values():
-            self.assertEquals(len(results), len(objs))
-            self.assertEquals(
+            self.assertEqual(len(results), len(objs))
+            self.assertEqual(
                 len(set(results)), len(results),
                 "Returned object ids not unique!")
         self.cmp.compare_ignore_order.find()
@@ -1352,6 +1355,7 @@ class _AggregateTest(_CollectionComparisonTest):
             {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow',
                                                                  'European swallow']},
             {"_id": ObjectId(), "a": 4, "count": 4, "swallows": ['unladen swallow']}]
+
         for item in self.data:
             self.cmp.do.insert(item)
 
@@ -1364,9 +1368,7 @@ class _AggregateTest(_CollectionComparisonTest):
 
     def test__aggregate2(self):
         pipeline = [
-            {'$group': {
-                '_id': '$a',
-                'count': {'$sum': '$count'}}},
+            {'$group': {'_id': '$a', 'count': {'$sum': '$count'}}},
             {'$match': {'a': {'$lt': 3}}},
             {'$sort': {'_id': -1, 'count': 1}},
         ]
@@ -1374,8 +1376,7 @@ class _AggregateTest(_CollectionComparisonTest):
 
     def test__aggregate3(self):
         pipeline = [
-            {'$group': {'_id': 'a',
-                        'count': {'$sum': '$count'}}},
+            {'$group': {'_id': 'a', 'count': {'$sum': '$count'}}},
             {'$match': {'a': {'$lt': 3}}},
             {'$sort': {'_id': -1, 'count': 1}},
             {'$skip': 1},
@@ -1501,11 +1502,11 @@ class InsertedDocumentTest(TestCase):
 
     def test__object_is_consistent(self):
         [object] = self.collection.find()
-        self.assertEquals(object["_id"], self.object_id)
+        self.assertEqual(object["_id"], self.object_id)
 
     def test__find_by_id(self):
         [object] = self.collection.find({"_id": self.object_id})
-        self.assertEquals(object, self.data)
+        self.assertEqual(object, self.data)
 
     def test__remove_by_id(self):
         self.collection.remove(self.object_id)
@@ -1514,24 +1515,24 @@ class InsertedDocumentTest(TestCase):
     def test__inserting_changes_argument(self):
         # Like pymongo, we should fill the _id in the inserted dict
         # (odd behavior, but we need to stick to it)
-        self.assertEquals(self.data, dict(self.orig_data, _id=self.object_id))
+        self.assertEqual(self.data, dict(self.orig_data, _id=self.object_id))
 
     def test__data_is_copied(self):
         [object] = self.collection.find()
-        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+        self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
         self.data.pop("a")
         self.data["b"].append(5)
-        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+        self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
         [object] = self.collection.find()
-        self.assertEquals(dict(self.orig_data, _id=self.object_id), object)
+        self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
 
     def test__find_returns_copied_object(self):
         [object1] = self.collection.find()
         [object2] = self.collection.find()
-        self.assertEquals(object1, object2)
+        self.assertEqual(object1, object2)
         self.assertIsNot(object1, object2)
         object1["b"].append("bla")
-        self.assertNotEquals(object1, object2)
+        self.assertNotEqual(object1, object2)
 
 
 class ObjectIdTest(TestCase):
@@ -1553,4 +1554,4 @@ class DatabasesNamesTest(TestCase):
         self.client.foo.bar.insert({'unit': 'test'})
         names = self.client.database_names()
         self.assertIsInstance(names, list)
-        self.assertEquals(sorted(['foo', 'unit']), sorted(names))
+        self.assertEqual(sorted(['foo', 'unit']), sorted(names))
