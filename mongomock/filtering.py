@@ -1,10 +1,10 @@
 import operator
 import re
+import warnings
 from six import iteritems, string_types
 from sentinels import NOTHING
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
-
 
 def filter_applies(search_filter, document):
     """
@@ -53,7 +53,6 @@ def filter_applies(search_filter, document):
 
     return True
 
-
 def iter_key_candidates(key, doc):
     """
     Get possible subdocuments or lists that are referred to by the key in question
@@ -78,7 +77,6 @@ def iter_key_candidates(key, doc):
     sub_key = '.'.join(key_parts[1:])
     sub_doc = doc.get(key_parts[0], {})
     return iter_key_candidates(sub_key, sub_doc)
-
 
 def _iter_key_candidates_sublist(key, doc):
     """
@@ -114,54 +112,37 @@ def _iter_key_candidates_sublist(key, doc):
 
         return [sub_doc]
 
-
 def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
-
 
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
     return all(x in dv for x in search_val)
 
-
 def _not_op(d, k, s):
-    if isinstance(s, dict):
-        for key in s.keys():
-            if key == '$regex':
-                raise OperationFailure('BadValue $not cannot have a regex')
-            if key not in OPERATOR_MAP and key not in LOGICAL_OPERATOR_MAP:
-                raise OperationFailure('BadValue $not needs a regex or a document')
-    elif isinstance(s, type(re.compile(''))):
-        pass
-    else:
-        raise OperationFailure('BadValue $not needs a regex or a document')
     return not filter_applies({k: s}, d)
-
 
 def _not_nothing_and(f):
     "wrap an operator to return False if the first arg is NOTHING"
     return lambda v, l: v is not NOTHING and f(v, l)
-
 
 def _elem_match_op(doc_val, query):
     if not isinstance(doc_val, list):
         return False
     return any(filter_applies(query, item) for item in doc_val)
 
-
 def _regex(doc_val, regex):
     return any(regex.search(item) for item in _force_list(doc_val))
 
-OPERATOR_MAP = {'$eq': operator.eq,
-                '$ne': operator.ne,
+OPERATOR_MAP = {'$ne': operator.ne,
                 '$gt': _not_nothing_and(operator.gt),
                 '$gte': _not_nothing_and(operator.ge),
                 '$lt': _not_nothing_and(operator.lt),
                 '$lte': _not_nothing_and(operator.le),
                 '$all':_all_op,
-                '$in': lambda dv, sv: any(x in sv for x in _force_list(dv)),
-                '$nin': lambda dv, sv: all(x not in sv for x in _force_list(dv)),
-                '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
+                '$in':lambda dv, sv: any(x in sv for x in _force_list(dv)),
+                '$nin':lambda dv, sv: all(x not in sv for x in _force_list(dv)),
+                '$exists':lambda dv, sv: bool(sv) == (dv is not NOTHING),
                 '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
                 '$elemMatch': _elem_match_op,
                 }
