@@ -17,3 +17,13 @@ script:
 services:
   - mongodb
 install: pip install tox
+deploy:
+  provider: pypi
+  user: vmalloc
+  distributions: bdist_wheel
+  password:
+    secure: sNOkUNFfWKGsRy4BI+1jyqycZGSMiXTLtpCrX1mTuvjddbndULrHL3ecIPsCno49/nPR4Gww+e9U3HXc8LKJ9qR4mJ8bVCNiHO5GlGVnpV+wdGh9LVnsU1LWwuD8uWlLyTSOKP+ZmerCw7tGACYiv0e9zp8SqZXCH6VS+sAGFxU=
+  on:
+    tags: true
+    all_branches: true
+    repo: vmalloc/mongomock
