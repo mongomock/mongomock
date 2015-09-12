@@ -6,7 +6,6 @@ from .utils import TestCase, skipIf, DBRef
 
 import mongomock
 from mongomock import Database
-from mongomock import OperationFailure
 
 try:
     import pymongo
@@ -24,7 +23,6 @@ try:
 except ImportError:
     _HAVE_MAP_REDUCE = False
 from tests.multicollection import MultiCollection
-from nose.tools import assert_raises
 
 
 class InterfaceTest(TestCase):
@@ -95,31 +93,31 @@ class DatabaseGettingTest(TestCase):
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 class _CollectionComparisonTest(TestCase):
+
     """Compares a fake collection with the real mongo collection implementation
        via cross-comparison.
     """
 
     def setUp(self):
         super(_CollectionComparisonTest, self).setUp()
-        self.fake_conn = mongomock.MongoClient()
+        self.fake_conn = self._get_mongomock_connection_class()()
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = "mongomock___testing_db"
         self.collection_name = "mongomock___testing_collection"
         self.mongo_conn[self.db_name][self.collection_name].remove()
-        self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
-        self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
         self.cmp = MultiCollection({
-            "fake": self.fake_collection,
-            "real": self.mongo_collection,
+            "fake": self.fake_conn[self.db_name][self.collection_name],
+            "real": self.mongo_conn[self.db_name][self.collection_name],
         })
 
     def _connect_to_local_mongodb(self, num_retries=60):
-        """Performs retries on connection refused errors (for travis-ci builds)"""
+        "Performs retries on connection refused errors (for travis-ci builds)"
+        connection_class = self._get_real_connection_class()
         for retry in range(num_retries):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient()
+                return connection_class()
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
@@ -127,7 +125,16 @@ class _CollectionComparisonTest(TestCase):
                     raise
 
 
-class MongoClientCollectionTest(_CollectionComparisonTest):
+class _MongoClientMixin(object):
+
+    def _get_real_connection_class(self):
+        return PymongoClient
+
+    def _get_mongomock_connection_class(self):
+        return mongomock.MongoClient
+
+
+class _CollectionTest(_CollectionComparisonTest):
 
     def test__find_is_empty(self):
         self.cmp.do.remove()
@@ -221,7 +228,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({"name": "another new"})
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"doc": {"key": "val"}})
-        self.cmp.compare.find({"doc": {"key": {'$eq': 'val'}}})
 
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
@@ -430,33 +436,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'bob'}}})
         self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'sam'}}})
         self.cmp.compare_ignore_order.find({'name': {'$not': {'$ne': 'dan'}}})
-        self.cmp.compare_ignore_order.find({'name': {'$not': {'$eq': 'bob'}}})
-        self.cmp.compare_ignore_order.find({'name': {'$not': {'$eq': 'sam'}}})
-        self.cmp.compare_ignore_order.find({'name': {'$not': {'$eq': 'dan'}}})
-
-        self.cmp.compare_ignore_order.find({'name': {'$not': re.compile('dan')}})
-
-    def test__find_not_exceptions(self):
-        self.cmp.do.insert(dict(noise="longhorn"))
-        with assert_raises(OperationFailure):
-            self.mongo_collection.find({'name': {'$not': True}}).count()
-        with assert_raises(OperationFailure):
-            self.fake_collection.find({'name': {'$not': True}}).count()
-
-        with assert_raises(OperationFailure):
-            self.mongo_collection.find({'name': {'$not': {'$regex': ''}}}).count()
-        with assert_raises(OperationFailure):
-            self.fake_collection.find({'name': {'$not': {'$regex': ''}}}).count()
-
-        with assert_raises(OperationFailure):
-            self.mongo_collection.find({'name': {'$not': []}}).count()
-        with assert_raises(OperationFailure):
-            self.fake_collection.find({'name': {'$not': []}}).count()
-
-        with assert_raises(OperationFailure):
-            self.mongo_collection.find({'name': {'$not': ''}}).count()
-        with assert_raises(OperationFailure):
-            self.fake_collection.find({'name': {'$not': ''}}).count()
 
     def test__find_compare(self):
         self.cmp.do.insert(dict(noise="longhorn"))
@@ -770,8 +749,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__set_subdocuments(self):
         """Tests using $set for setting subdocument fields"""
-        self.skipTest(
-            "MongoClient does not allow setting subdocuments on existing non-documents")
+        if isinstance(self, _MongoClientMixin):
+            self.skipTest(
+                "MongoClient does not allow setting subdocuments on existing non-documents")
         self.cmp.do.insert(
             {'name': 'bob', 'data1': 1, 'subdocument': {'a': {'b': {'c': 20}}}})
         self.cmp.do.update({'name': 'bob'}, {'$set': {'data1.field1': 11}})
@@ -1135,6 +1115,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 assert isinstance(e, mongomock.OperationFailure)
 
 
+class MongoClientCollectionTest(_CollectionTest, _MongoClientMixin):
+    pass
+
+
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
 class CollectionMapReduceTest(TestCase):
@@ -1344,12 +1328,17 @@ class _GroupTest(_CollectionComparisonTest):
             reduce=reducer)
 
 
+class MongoClientGroupTest(_GroupTest, _MongoClientMixin):
+    pass
+
+
+
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
-class MongoClientAggregateTest(_CollectionComparisonTest):
+class _AggregateTest(_CollectionComparisonTest):
 
     def setUp(self):
-        super(MongoClientAggregateTest, self).setUp()
+        _CollectionComparisonTest.setUp(self)
         self.data = [
             {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
             {"_id": ObjectId(), "a": 1, "count": 2, "swallows": ['African swallow']},
@@ -1396,6 +1385,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate(pipeline)
 
 
+class MongoClientAggregateTest(_AggregateTest, _MongoClientMixin):
+    pass
+
+
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
 
@@ -1408,10 +1401,10 @@ def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
 
-class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
+class _SortSkipLimitTest(_CollectionComparisonTest):
 
     def setUp(self):
-        super(MongoClientSortSkipLimitTest, self).setUp()
+        super(_SortSkipLimitTest, self).setUp()
         self.cmp.do.insert([{"_id": i, "index": i} for i in range(30)])
 
     def test__skip(self):
@@ -1487,6 +1480,10 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__close(self):
         # Does nothing - just make sure it exists and takes the right args
         self.cmp.do(lambda cursor: cursor.close()).find()
+
+
+class MongoClientSortSkipLimitTest(_SortSkipLimitTest, _MongoClientMixin):
+    pass
 
 
 class InsertedDocumentTest(TestCase):
