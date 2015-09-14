@@ -1,16 +1,15 @@
-import mongomock
 import mock
+import mongomock
 
 try:
     import pymongo
-    from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
 
 
-from .utils import TestCase, skipIf
 from tests.multicollection import MultiCollection
+from unittest import TestCase, skipIf
 
 
 class BulkOperationsTest(TestCase):
@@ -26,9 +25,8 @@ class BulkOperationsTest(TestCase):
         self.db = self.client['somedb']
         self.db.collection.drop()
         for _i in "abx":
-            self.db.collection.create_index(_i, unique=False,
-                                            name="idx" + _i, sparse=True,
-                                            background=True)
+            self.db.collection.create_index(
+                _i, unique=False, name="idx" + _i, sparse=True, background=True)
         self.bulk_op = self.db.collection.initialize_ordered_bulk_op()
 
     def __check_document(self, doc, count=1):
@@ -48,10 +46,12 @@ class BulkOperationsTest(TestCase):
                 continue
             self.assertFalse(has_val is None, "Missed key '%s' in result: %s" % (key, result))
             if exp_val:
-                self.assertEqual(exp_val, has_val, "Invalid result %s=%s (but expected value=%s)" %
-                                 (key, has_val, exp_val))
+                self.assertEqual(
+                    exp_val, has_val, "Invalid result %s=%s (but expected value=%s)" % (
+                        key, has_val, exp_val))
             else:
-                self.assertFalse(bool(has_val), "Received unexpected value %s = %s" % (key, has_val))
+                self.assertFalse(
+                    bool(has_val), "Received unexpected value %s = %s" % (key, has_val))
 
     def __execute_and_check_result(self, write_concern=None, **expecting_result):
         result = self.bulk_op.execute(write_concern=write_concern)
@@ -59,7 +59,8 @@ class BulkOperationsTest(TestCase):
 
     def __check_number_of_elements(self, count):
         has_count = self.db.collection.count()
-        self.assertEqual(has_count, count, "There is %s documents but there should be %s" % (has_count, count))
+        self.assertEqual(
+            has_count, count, "There is %s documents but there should be %s" % (has_count, count))
 
     def test__insert(self):
         self.bulk_op.insert({"a": 1, "b": 2})
@@ -113,11 +114,6 @@ class BulkOperationsTest(TestCase):
         self.__execute_and_check_result(nMatched=1, nModified=1)
         self.__check_document({"a": 2}, count=2)
         self.__check_number_of_elements(2)
-
-    def test__remove(self):
-        self.bulk_op.find({"a": 2}).remove()
-        self.__execute_and_check_result()
-        self.__check_number_of_elements(0)
 
     def test__remove(self):
         self.db.collection.insert({"a": 2, "b": 1})
@@ -211,8 +207,8 @@ class CollectionComparisonTest(TestCase):
         update_returns_nmodified = "nModified" in bulk.execute()
         coll.drop()
 
-        self.bulks.conns["fake"]._set_nModified_policy(insert_returns_nmodified,
-                                                       update_returns_nmodified)
+        self.bulks.conns["fake"]._set_nModified_policy(
+            insert_returns_nmodified, update_returns_nmodified)
 
     def test__insert(self):
         self.bulks.do.insert({"a": 1, "b": 1})

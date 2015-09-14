@@ -1,5 +1,5 @@
-import itertools
 from .database import Database
+import itertools
 
 
 class MongoClient(object):
@@ -23,15 +23,14 @@ class MongoClient(object):
         return self[attr]
 
     def __repr__(self):
-        identifier = ["'{0}'".format(self._host), str(self._port)]
-        return "mongomock.MongoClient({0})".format(', '.join(identifier))
+        return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
 
     def close(self):
         pass
 
     @property
     def address(self):
-        return self._host, self._port
+        return self.host, self.port
 
     def server_info(self):
         return {
@@ -75,8 +74,7 @@ class MongoClient(object):
         return db
 
     def alive(self):
-        """The original MongoConnection.alive method checks the
-        status of the server.
+        """The original MongoConnection.alive method checks the status of the server.
 
         In our case as we mock the actual server, we should always return True.
         """
