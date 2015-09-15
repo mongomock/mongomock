@@ -632,7 +632,7 @@ class Collection(object):
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True):
+             batch_size=0, manipulate=True, **kw):
         spec = filter
         if spec is None:
             spec = {}
