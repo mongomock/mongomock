@@ -759,7 +759,7 @@ class Collection(object):
                             full_key_path_found = False
                             break
                         subdocument = subdocument[key_part]
-                        subdocument_copy = doc_copy.setdefault(key_part, {})
+                        subdocument_copy = subdocument_copy.setdefault(key_part, {})
                     if not full_key_path_found or key_parts[-1] not in subdocument:
                         continue
                     subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
@@ -792,7 +792,6 @@ class Collection(object):
             self._apply_projection_operators(projection_operators, doc, doc_copy)
             for field, op in iteritems(projection_operators):
                 fields[field] = op
-
             return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):

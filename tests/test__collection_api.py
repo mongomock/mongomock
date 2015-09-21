@@ -729,3 +729,9 @@ class CollectionAPITest(TestCase):
             {"test_list.marker_field": {"$ne": True}})
         self.assertEqual(
             list(data_in_db), [{"_id": 1, "test_list": [{"data": "val"}]}])
+
+    def test__find_and_project_3_level_deep_nested_field(self):
+        self.db.collection.insert({"_id": 1, "a": {"b": {"c": 2}}})
+        data_in_db = self.db.collection.find(projection=['a.b.c'])
+        self.assertEqual(
+            list(data_in_db), [{"_id": 1, "a": {"b": {"c": 2}}}])
