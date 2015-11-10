@@ -295,7 +295,20 @@ class Collection(object):
         return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
 
     def _has_key(self, doc, key):
-        return key in doc
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts:
+            if part not in sub_doc:
+                return False
+            sub_doc = sub_doc[part]
+        return True
+
+    def _remove_key(self, doc, key):
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts[:-1]:
+            sub_doc = sub_doc[part]
+        del sub_doc[key_parts[-1]]
 
     def update_one(self, criteria, update, upsert=False):
         validate_ok_for_update(update)
@@ -372,7 +385,8 @@ class Collection(object):
                 elif k == '$unset':
                     for field, value in iteritems(v):
                         if self._has_key(existing_document, field):
-                            del existing_document[field]
+                            self._remove_key(existing_document, field)
+
                 elif k == '$inc':
                     positional = False
                     for key in iterkeys(v):

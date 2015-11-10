@@ -742,7 +742,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
     def test__unset(self):
-        """Tests calling update with $set members."""
+        """Tests calling update with $unset members."""
         self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
         self.cmp.compare.find({'name': 'bob'})
         self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': 0}})
@@ -767,6 +767,23 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
         self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': False}})
         self.cmp.compare.find({'name': 'bob'})
+
+    def test__unset_nested(self):
+        self.cmp.do.update({'_id': 1}, {'$set': {'a': {'b': 1, 'c': 2}}}, upsert=True)
+        self.cmp.do.update({'_id': 1}, {'$unset': {'a.b': True}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update({'_id': 1}, {'$set': {'a': {'b': 1, 'c': 2}}}, upsert=True)
+        self.cmp.do.update({'_id': 1}, {'$unset': {'a.b': False}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update({'_id': 1}, {'$set': {'a': {'b': 1}}}, upsert=True)
+        self.cmp.do.update({'_id': 1}, {'$unset': {'a.b': True}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update({'_id': 1}, {'$set': {'a': {'b': 1}}}, upsert=True)
+        self.cmp.do.update({'_id': 1}, {'$unset': {'a.b': False}})
+        self.cmp.compare.find()
 
     def test__set_upsert(self):
         self.cmp.do.remove()
