@@ -295,7 +295,20 @@ class Collection(object):
         return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
 
     def _has_key(self, doc, key):
-        return key in doc
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts:
+            if part not in sub_doc:
+                return False
+            sub_doc = sub_doc[part]
+        return True
+
+    def _remove_key(self, doc, key):
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts[:-1]:
+            sub_doc = sub_doc[part]
+        del sub_doc[key_parts[-1]]
 
     def update_one(self, criteria, update, upsert=False):
         validate_ok_for_update(update)
@@ -372,7 +385,8 @@ class Collection(object):
                 elif k == '$unset':
                     for field, value in iteritems(v):
                         if self._has_key(existing_document, field):
-                            del existing_document[field]
+                            self._remove_key(existing_document, field)
+
                 elif k == '$inc':
                     positional = False
                     for key in iterkeys(v):
@@ -759,7 +773,7 @@ class Collection(object):
                             full_key_path_found = False
                             break
                         subdocument = subdocument[key_part]
-                        subdocument_copy = doc_copy.setdefault(key_part, {})
+                        subdocument_copy = subdocument_copy.setdefault(key_part, {})
                     if not full_key_path_found or key_parts[-1] not in subdocument:
                         continue
                     subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
@@ -792,7 +806,6 @@ class Collection(object):
             self._apply_projection_operators(projection_operators, doc, doc_copy)
             for field, op in iteritems(projection_operators):
                 fields[field] = op
-
             return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
