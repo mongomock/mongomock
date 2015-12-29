@@ -1375,15 +1375,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def setUp(self):
         super(MongoClientAggregateTest, self).setUp()
         self.data = [
-            {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 1, "count": 2, "swallows": ['African swallow']},
-            {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 2, "count": 3, "swallows": ['African swallow',
-                                                                 'European swallow']},
-            {"_id": ObjectId(), "a": 2, "count": 1, "swallows": []},
-            {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow',
-                                                                 'European swallow']},
-            {"_id": ObjectId(), "a": 4, "count": 4, "swallows": ['unladen swallow']}]
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 4, "swallows": ['European swallow']},
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 2, "swallows": ['African swallow']},
+            {"_id": ObjectId(), "a": 1, "b": 2, "count": 4, "swallows": ['European swallow']},
+            {"_id": ObjectId(), "a": 2, "b": 2, "count": 3, "swallows": ['African swallow',
+                                                                         'European swallow']},
+            {"_id": ObjectId(), "a": 2, "b": 3, "count": 1, "swallows": []},
+            {"_id": ObjectId(), "a": 1, "b": 4, "count": 5, "swallows": ['African swallow',
+                                                                         'European swallow']},
+            {"_id": ObjectId(), "a": 4, "b": 4, "count": 4, "swallows": ['unladen swallow']}]
 
         for item in self.data:
             self.cmp.do.insert(item)
@@ -1416,6 +1416,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$unwind': '$swallows'},
             {'$sort': {'count': -1, 'swallows': -1}}]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate5(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a'}, 'total': {'$sum': '$count'},
+                        'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.a': 1, 'total': 1, 'avg': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate6(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a', 'id_b': '$b'}, 'total': {'$sum': '$count'},
+                        'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.id_a': 1, '_id.id_b': 1, 'total': 1, 'avg': 1}}
+        ]
         self.cmp.compare.aggregate(pipeline)
 
 

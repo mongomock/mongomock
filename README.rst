@@ -165,4 +165,5 @@ Many thanks go to the following people for helping out:
 * pacud
 * tipok
 * waskew (waskew _at_ narrativescience.com)
+* jmsantorum (jmsantorum [at] gmail [dot] com)
 
