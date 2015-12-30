@@ -1,4 +1,5 @@
 import copy
+import datetime
 import re
 import time
 from unittest import TestCase, skipIf
@@ -1375,15 +1376,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def setUp(self):
         super(MongoClientAggregateTest, self).setUp()
         self.data = [
-            {"_id": ObjectId(), "a": 1, "b": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 1, "b": 1, "count": 2, "swallows": ['African swallow']},
-            {"_id": ObjectId(), "a": 1, "b": 2, "count": 4, "swallows": ['European swallow']},
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 4, "swallows": ['European swallow'],
+             "date": datetime.datetime(2015, 10, 1, 10, 0)},
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 2, "swallows": ['African swallow'],
+             "date": datetime.datetime(2015, 12, 1, 12, 0)},
+            {"_id": ObjectId(), "a": 1, "b": 2, "count": 4, "swallows": ['European swallow'],
+             "date": datetime.datetime(2014, 10, 2, 12, 0)},
             {"_id": ObjectId(), "a": 2, "b": 2, "count": 3, "swallows": ['African swallow',
-                                                                         'European swallow']},
-            {"_id": ObjectId(), "a": 2, "b": 3, "count": 1, "swallows": []},
+                                                                         'European swallow'],
+             "date": datetime.datetime(2015, 1, 2, 10, 0)},
+            {"_id": ObjectId(), "a": 2, "b": 3, "count": 1, "swallows": [],
+             "date": datetime.datetime(2013, 1, 3, 12, 0)},
             {"_id": ObjectId(), "a": 1, "b": 4, "count": 5, "swallows": ['African swallow',
-                                                                         'European swallow']},
-            {"_id": ObjectId(), "a": 4, "b": 4, "count": 4, "swallows": ['unladen swallow']}]
+                                                                         'European swallow'],
+             "date": datetime.datetime(2015, 8, 4, 12, 0)},
+            {"_id": ObjectId(), "a": 4, "b": 4, "count": 4, "swallows": ['unladen swallow'],
+             "date": datetime.datetime(2014, 7, 4, 13, 0)}]
 
         for item in self.data:
             self.cmp.do.insert(item)
@@ -1430,6 +1438,14 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$group': {'_id': {'id_a': '$a', 'id_b': '$b'}, 'total': {'$sum': '$count'},
                         'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.id_a': 1, '_id.id_b': 1, 'total': 1, 'avg': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate7(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a', 'id_b': {'$year': '$date'}},
+                        'total': {'$sum': '$count'}, 'avg': {'$avg': '$count'}}},
             {'$sort': {'_id.id_a': 1, '_id.id_b': 1, 'total': 1, 'avg': 1}}
         ]
         self.cmp.compare.aggregate(pipeline)

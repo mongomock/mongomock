@@ -1198,6 +1198,84 @@ class Collection(object):
         ret_array = ret_array_copy
         return ret_array
 
+    def _get_group_id_fields(self, keys, parent=''):
+        date_operators = [
+            '$dayOfYear',
+            '$dayOfMonth',
+            '$dayOfWeek',
+            '$year',
+            '$month',
+            '$week',
+            '$hour',
+            '$minute',
+            '$second',
+            '$millisecond']
+
+        fields = []
+
+        if isinstance(keys, dict):
+            for k, v in keys.items():
+                if isinstance(v, str):
+                    if k in date_operators:
+                        fields.append((parent + '__' + k + '_' + v).replace('$', ''))
+                    else:
+                        fields.append(v.replace('$', ''))
+                elif isinstance(v, dict):
+                    fields.extend(self._get_group_id_fields(v, parent + '__' + k if parent else k))
+        elif isinstance(keys, str):
+            fields.append(keys.replace('$', ''))
+
+        return fields
+
+    def _add_group_id_fields(self, out_collection, group_func_keys):
+        date_operators = [
+            'dayOfYear',
+            'dayOfMonth',
+            'dayOfWeek',
+            'year',
+            'month',
+            'week',
+            'hour',
+            'minute',
+            'second',
+            'millisecond']
+
+        clear_group_func_keys = []
+        for key in group_func_keys:
+            out_field = key.split('__')[0]
+
+            for doc in out_collection:
+                if key not in doc.keys():
+                    func_field = key.split('__')[1]
+                    func, in_field = func_field.split('_')
+                    out_value = doc.get(in_field)
+
+                    if func in date_operators:
+                        if func == 'dayOfYear':
+                            pass
+                        elif func == 'dayOfMonth':
+                            out_value = out_value.day
+                        elif func == 'dayOfWeek':
+                            out_value = out_value.isoweekday()
+                        elif func == 'year':
+                            out_value = out_value.year
+                        elif func == 'month':
+                            out_value = out_value.month
+                        elif func == 'week':
+                            pass
+                        elif func == 'hour':
+                            out_value = out_value.hour
+                        elif func == 'minute':
+                            out_value = out_value.minute
+                        elif func == 'millisecond':
+                            pass
+
+                    doc[out_field] = out_value
+
+            clear_group_func_keys.append(out_field)
+
+        return out_collection, clear_group_func_keys
+
     def aggregate(self, pipeline, **kwargs):
         pipeline_operators = [
             '$project',
@@ -1273,8 +1351,10 @@ class Collection(object):
                                       if filter_applies(v, doc)]
                 elif k == '$group':
                     _id = expression['$group']['_id']
-                    group_func_keys = [v.replace('$', '') for v in _id.values()]\
-                        if isinstance(_id, dict) else _id.replace('$', '')
+                    group_func_keys = self._get_group_id_fields(_id)
+
+                    out_collection, group_func_keys = self._add_group_id_fields(out_collection,
+                                                                                group_func_keys)
 
                     out_collection = sorted(out_collection, key=itemgetter(*group_func_keys))
                     for field, value in iteritems(v):
