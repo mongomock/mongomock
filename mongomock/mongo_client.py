@@ -6,6 +6,7 @@ class MongoClient(object):
 
     HOST = 'localhost'
     PORT = 27017
+    DEFAULT_DB = '__DEFAULT__'
     _CONNECTION_ID = itertools.count()
 
     def __init__(self, host=None, port=None, document_class=dict,
@@ -72,6 +73,9 @@ class MongoClient(object):
         if db is None:
             db = self._databases[name] = Database(self, name)
         return db
+
+    def get_default_database(self):
+        return self[self.__class__.DEFAULT_DB]
 
     def alive(self):
         """The original MongoConnection.alive method checks the status of the server.

@@ -98,6 +98,14 @@ class DatabaseGettingTest(TestCase):
         a = db.dereference(DBRef("a", "a", db.name))
         self.assertEqual(to_insert, a)
 
+    def test__getting_default_database(self):
+        db = self.client.get_default_database()
+
+        self.assertIsNotNone(db)
+        self.assertIs(db, self.client[mongomock.MongoClient.DEFAULT_DB])
+        self.assertIsInstance(db, Database)
+        self.assertIs(db.client, self.client)
+
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 class _CollectionComparisonTest(TestCase):
