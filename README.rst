@@ -112,6 +112,13 @@ When submitting a PR, please make sure that:
 2. No existing test got deleted or unintentionally castrated
 3. The travis build passes on your PR.
 
+Branching model
+~~~~~~~~~~~~~~~
+
+The branching model used for this project follows the `gitflow workflow`_.  This means that pull requests
+should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
+the legacy 2.x branch than your pull request should go into the `support/2.x` branch.
+
 Acknowledgements
 ----------------
 
@@ -168,6 +175,8 @@ Many thanks go to the following people for helping out:
 
 
 .. _examples in tests: https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108
+
+.. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
 
 .. |travis| image:: https://img.shields.io/travis/vmalloc/mongomock/master.svg
