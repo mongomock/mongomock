@@ -1252,7 +1252,7 @@ class Collection(object):
 
                     if func in date_operators:
                         if func == 'dayOfYear':
-                            pass
+                            out_value = out_value.timetuple().tm_yday
                         elif func == 'dayOfMonth':
                             out_value = out_value.day
                         elif func == 'dayOfWeek':
@@ -1262,13 +1262,13 @@ class Collection(object):
                         elif func == 'month':
                             out_value = out_value.month
                         elif func == 'week':
-                            pass
+                            out_value = out_value.isocalendar()[1]
                         elif func == 'hour':
                             out_value = out_value.hour
                         elif func == 'minute':
                             out_value = out_value.minute
                         elif func == 'millisecond':
-                            pass
+                            out_value = int(out_value.microsecond / 1000)
 
                     doc[out_field] = out_value
 
