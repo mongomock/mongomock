@@ -885,7 +885,7 @@ class Collection(object):
             updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter=None):
-        return (document for document in itervalues(self._documents)
+        return (document for document in list(itervalues(self._documents))
                 if filter_applies(filter, document))
 
     def find_one(self, spec_or_id=None, *args, **kwargs):
