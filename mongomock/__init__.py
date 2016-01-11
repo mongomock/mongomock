@@ -1,5 +1,3 @@
-from .helpers import ObjectId  # noqa
-
 try:
     from pymongo.errors import PyMongoError
 except ImportError:
@@ -30,6 +28,19 @@ except ImportError:
     class InvalidOperation(PyMongoError):
         pass
 
+try:
+    from pymongo.errors import ConfigurationError
+except ImportError:
+    class ConfigurationError(PyMongoError):
+        pass
+
+try:
+    from pymongo.errors import InvalidURI
+except ImportError:
+    class InvalidURI(ConfigurationError):
+        pass
+
+from .helpers import ObjectId  # noqa
 from mongomock.__version__ import __version__
 
 
