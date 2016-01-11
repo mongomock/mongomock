@@ -1267,6 +1267,8 @@ class Collection(object):
                             out_value = out_value.hour
                         elif func == 'minute':
                             out_value = out_value.minute
+                        elif func == 'second':
+                            out_value = out_value.second
                         elif func == 'millisecond':
                             out_value = int(out_value.microsecond / 1000)
 
