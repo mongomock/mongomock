@@ -1,12 +1,13 @@
 from .database import Database
+from .helpers import parse_dbase_from_uri
 import itertools
+from mongomock import ConfigurationError
 
 
 class MongoClient(object):
 
     HOST = 'localhost'
     PORT = 27017
-    DEFAULT_DB = '__DEFAULT__'
     _CONNECTION_ID = itertools.count()
 
     def __init__(self, host=None, port=None, document_class=dict,
@@ -16,6 +17,13 @@ class MongoClient(object):
         self._databases = {}
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class
+
+        dbase = None
+
+        if "://" in self.host:
+            dbase = parse_dbase_from_uri(self.host)
+
+        self.__default_datebase_name = dbase
 
     def __getitem__(self, db_name):
         return self.get_database(db_name)
@@ -75,7 +83,10 @@ class MongoClient(object):
         return db
 
     def get_default_database(self):
-        return self[self.__class__.DEFAULT_DB]
+        if self.__default_datebase_name is None:
+            raise ConfigurationError('No default database defined')
+
+        return self[self.__default_datebase_name]
 
     def alive(self):
         """The original MongoConnection.alive method checks the status of the server.

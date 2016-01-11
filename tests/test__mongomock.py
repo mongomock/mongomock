@@ -5,7 +5,9 @@ from unittest import TestCase, skipIf
 
 
 import mongomock
+from mongomock import ConfigurationError
 from mongomock import Database
+from mongomock import InvalidURI
 from mongomock import OperationFailure
 
 from .utils import DBRef
@@ -40,6 +42,18 @@ class InterfaceTest(TestCase):
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
+
+    def test__bad_uri_raises(self):
+        with assert_raises(InvalidURI):
+            mongomock.MongoClient("http://host1")
+
+        with assert_raises(InvalidURI):
+            mongomock.MongoClient("://host1")
+
+    def test__none_uri_host(self):
+        self.assertIsNotNone(mongomock.MongoClient('host1'))
+        self.assertIsNotNone(mongomock.MongoClient('//host2'))
+        self.assertIsNotNone(mongomock.MongoClient('mongodb:host2'))
 
 
 class DatabaseGettingTest(TestCase):
@@ -98,13 +112,49 @@ class DatabaseGettingTest(TestCase):
         a = db.dereference(DBRef("a", "a", db.name))
         self.assertEqual(to_insert, a)
 
-    def test__getting_default_database(self):
-        db = self.client.get_default_database()
+    def test__getting_default_database_valid(self):
+        def gddb(uri):
+            client = mongomock.MongoClient(uri)
+            return client, client.get_default_database()
 
+        c, db = gddb("mongodb://host1/foo")
         self.assertIsNotNone(db)
-        self.assertIs(db, self.client[mongomock.MongoClient.DEFAULT_DB])
         self.assertIsInstance(db, Database)
-        self.assertIs(db.client, self.client)
+        self.assertIs(db.client, c)
+        self.assertIs(db, c['foo'])
+
+        c, db = gddb("mongodb://host1/bar")
+        self.assertIs(db, c['bar'])
+
+        c, db = gddb(r"mongodb://a%00lice:f%00oo@127.0.0.1/t%00est")
+        self.assertIs(db, c["t\x00est"])
+
+        c, db = gddb("mongodb://bob:bar@[::1]:27018/admin")
+        self.assertIs(db, c['admin'])
+
+        c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
+                     "admin%3F?authMechanism=MONGODB-CR")
+        self.assertIs(db, c['admin?'])
+
+    def test__getting_default_database_invalid(self):
+        def client(uri):
+            return mongomock.MongoClient(uri)
+
+        c = client("mongodb://host1")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("host1")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("mongodb://host1/")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
