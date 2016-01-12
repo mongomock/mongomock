@@ -172,6 +172,7 @@ Many thanks go to the following people for helping out:
 * pacud
 * tipok
 * waskew (waskew _at_ narrativescience.com)
+* jmsantorum (jmsantorum [at] gmail [dot] com)
 
 
 .. _examples in tests: https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108
