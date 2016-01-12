@@ -1,3 +1,4 @@
+from mongomock import InvalidURI
 import re
 from six import iteritems, PY2
 import warnings
@@ -21,6 +22,11 @@ if PY2:
 else:
     unicode = str
     basestring = (str, bytes)
+
+if PY2:
+    from urllib import unquote_plus
+else:
+    from urllib.parse import unquote_plus
 
 
 ASCENDING = 1
@@ -133,3 +139,63 @@ def _fields_list_to_dict(fields):
                             "each an instance of %s" % (basestring.__name__,))
         as_dict[field] = 1
     return as_dict
+
+
+def parse_dbase_from_uri(uri):
+    """A simplified version of pymongo.uri_parser.parse_uri to get the dbase.
+
+    Returns a string representing the database provided in the URI or None if
+    no database is provided in the URI.
+
+    An invalid MongoDB connection URI may raise an InvalidURI exception,
+    however, the URI is not fully parsed and some invalid URIs may not result
+    in an exception.
+
+    "mongodb://host1/database" becomes "database"
+
+    and
+
+    "mongodb://host1" becomes None
+    """
+    SCHEME = "mongodb://"
+
+    if not uri.startswith(SCHEME):
+        raise InvalidURI("Invalid URI scheme: URI "
+                         "must begin with '%s'" % (SCHEME,))
+
+    scheme_free = uri[len(SCHEME):]
+
+    if not scheme_free:
+        raise InvalidURI("Must provide at least one hostname or IP.")
+
+    dbase = None
+
+    # Check for unix domain sockets in the uri
+    if '.sock' in scheme_free:
+        host_part, _, path_part = scheme_free.rpartition('/')
+        if not host_part:
+            host_part = path_part
+            path_part = ""
+        if '/' in host_part:
+            raise InvalidURI("Any '/' in a unix domain socket must be"
+                             " URL encoded: %s" % host_part)
+        path_part = unquote_plus(path_part)
+    else:
+        host_part, _, path_part = scheme_free.partition('/')
+
+    if not path_part and '?' in host_part:
+        raise InvalidURI("A '/' is required between "
+                         "the host list and any options.")
+
+    if path_part:
+        if path_part[0] == '?':
+            opts = path_part[1:]
+        else:
+            dbase, _, opts = path_part.partition('?')
+            if '.' in dbase:
+                dbase, _ = dbase.split('.', 1)
+
+    if dbase is not None:
+        dbase = unquote_plus(dbase)
+
+    return dbase
