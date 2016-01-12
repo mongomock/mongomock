@@ -1,11 +1,14 @@
 import copy
+import datetime
 import re
 import time
 from unittest import TestCase, skipIf
 
 
 import mongomock
+from mongomock import ConfigurationError
 from mongomock import Database
+from mongomock import InvalidURI
 from mongomock import OperationFailure
 
 from .utils import DBRef
@@ -40,6 +43,18 @@ class InterfaceTest(TestCase):
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
+
+    def test__bad_uri_raises(self):
+        with assert_raises(InvalidURI):
+            mongomock.MongoClient("http://host1")
+
+        with assert_raises(InvalidURI):
+            mongomock.MongoClient("://host1")
+
+    def test__none_uri_host(self):
+        self.assertIsNotNone(mongomock.MongoClient('host1'))
+        self.assertIsNotNone(mongomock.MongoClient('//host2'))
+        self.assertIsNotNone(mongomock.MongoClient('mongodb:host2'))
 
 
 class DatabaseGettingTest(TestCase):
@@ -97,6 +112,50 @@ class DatabaseGettingTest(TestCase):
 
         a = db.dereference(DBRef("a", "a", db.name))
         self.assertEqual(to_insert, a)
+
+    def test__getting_default_database_valid(self):
+        def gddb(uri):
+            client = mongomock.MongoClient(uri)
+            return client, client.get_default_database()
+
+        c, db = gddb("mongodb://host1/foo")
+        self.assertIsNotNone(db)
+        self.assertIsInstance(db, Database)
+        self.assertIs(db.client, c)
+        self.assertIs(db, c['foo'])
+
+        c, db = gddb("mongodb://host1/bar")
+        self.assertIs(db, c['bar'])
+
+        c, db = gddb(r"mongodb://a%00lice:f%00oo@127.0.0.1/t%00est")
+        self.assertIs(db, c["t\x00est"])
+
+        c, db = gddb("mongodb://bob:bar@[::1]:27018/admin")
+        self.assertIs(db, c['admin'])
+
+        c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
+                     "admin%3F?authMechanism=MONGODB-CR")
+        self.assertIs(db, c['admin?'])
+
+    def test__getting_default_database_invalid(self):
+        def client(uri):
+            return mongomock.MongoClient(uri)
+
+        c = client("mongodb://host1")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("host1")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
+
+        c = client("mongodb://host1/")
+        with assert_raises(ConfigurationError):
+            c.get_default_database()
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
@@ -1375,15 +1434,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def setUp(self):
         super(MongoClientAggregateTest, self).setUp()
         self.data = [
-            {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 1, "count": 2, "swallows": ['African swallow']},
-            {"_id": ObjectId(), "a": 1, "count": 4, "swallows": ['European swallow']},
-            {"_id": ObjectId(), "a": 2, "count": 3, "swallows": ['African swallow',
-                                                                 'European swallow']},
-            {"_id": ObjectId(), "a": 2, "count": 1, "swallows": []},
-            {"_id": ObjectId(), "a": 1, "count": 5, "swallows": ['African swallow',
-                                                                 'European swallow']},
-            {"_id": ObjectId(), "a": 4, "count": 4, "swallows": ['unladen swallow']}]
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 4, "swallows": ['European swallow'],
+             "date": datetime.datetime(2015, 10, 1, 10, 0)},
+            {"_id": ObjectId(), "a": 1, "b": 1, "count": 2, "swallows": ['African swallow'],
+             "date": datetime.datetime(2015, 12, 1, 12, 0)},
+            {"_id": ObjectId(), "a": 1, "b": 2, "count": 4, "swallows": ['European swallow'],
+             "date": datetime.datetime(2014, 10, 2, 12, 0)},
+            {"_id": ObjectId(), "a": 2, "b": 2, "count": 3, "swallows": ['African swallow',
+                                                                         'European swallow'],
+             "date": datetime.datetime(2015, 1, 2, 10, 0)},
+            {"_id": ObjectId(), "a": 2, "b": 3, "count": 1, "swallows": [],
+             "date": datetime.datetime(2013, 1, 3, 12, 0)},
+            {"_id": ObjectId(), "a": 1, "b": 4, "count": 5, "swallows": ['African swallow',
+                                                                         'European swallow'],
+             "date": datetime.datetime(2015, 8, 4, 12, 0)},
+            {"_id": ObjectId(), "a": 4, "b": 4, "count": 4, "swallows": ['unladen swallow'],
+             "date": datetime.datetime(2014, 7, 4, 13, 0)}]
 
         for item in self.data:
             self.cmp.do.insert(item)
@@ -1416,6 +1482,30 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$unwind': '$swallows'},
             {'$sort': {'count': -1, 'swallows': -1}}]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate5(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a'}, 'total': {'$sum': '$count'},
+                        'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.a': 1, 'total': 1, 'avg': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate6(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a', 'id_b': '$b'}, 'total': {'$sum': '$count'},
+                        'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.id_a': 1, '_id.id_b': 1, 'total': 1, 'avg': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate7(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a', 'id_b': {'$year': '$date'}},
+                        'total': {'$sum': '$count'}, 'avg': {'$avg': '$count'}}},
+            {'$sort': {'_id.id_a': 1, '_id.id_b': 1, 'total': 1, 'avg': 1}}
+        ]
         self.cmp.compare.aggregate(pipeline)
 
 

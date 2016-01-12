@@ -3,24 +3,16 @@
 
    .. image:: http://vmalloc.github.io/mongomock/mongomock-small.png
 
-
-.. image:: https://travis-ci.org/vmalloc/mongomock.png?branch=master
-
-
-.. image:: https://pypip.in/d/mongomock/badge.png
-        :target: https://crate.io/packages/mongomock
-
-
-.. image:: https://pypip.in/v/mongomock/badge.png
-        :target: https://crate.io/packages/mongomock
-
+|travis| |pypi_version| |pypi_license| |pypi_wheel|
 
 
 What is this?
 -------------
 Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
 
-To understand what it's useful for, we can take the following code::
+To understand what it's useful for, we can take the following code:
+
+.. code-block:: python
 
  def increase_votes(collection):
      for document in collection.find():
@@ -40,7 +32,9 @@ other bizarre platforms - which makes the mongodb requirement a liability.
 
 We are left with #2 and #3. Unfortunately they are very high maintenance in real scenarios,
 since they replicate the series of calls made in the code, violating the DRY rule. Let's see
-#2 in action - we might write our test like so::
+#2 in action - we might write our test like so:
+
+.. code-block:: python
 
  def test_increase_votes():
      objects = [dict(...), dict(...), ...]
@@ -53,7 +47,9 @@ since they replicate the series of calls made in the code, violating the DRY rul
      increase_votes(collection_mock)
      verify()
 
-Let's assume the code changes one day, because the author just learned about the '$inc' instruction::
+Let's assume the code changes one day, because the author just learned about the '$inc' instruction:
+
+.. code-block:: python
 
  def increase_votes(collection):
      collection.update({}, {'$inc' : {'votes' : 1}})
@@ -63,7 +59,9 @@ large portions of the code we already wrote.
 
 We are left, therefore, with option #3 -- you want something to behave like a mongodb database
 collection, without being one. This is exactly what this library aims to provide. With mongomock,
-the test simply becomes::
+the test simply becomes:
+
+.. code-block:: python
 
  def test_increase_votes():
      collection = mongomock.MongoClient().db.collection
@@ -79,7 +77,9 @@ the test simply becomes::
 This code checks *increase_votes* with respect to its functionality, not syntax or algorithm, and
 therefore is much more robust as a test.
 
-To download, setup and perfom tests, run the following commands on Mac / Linux::
+To download, setup and perfom tests, run the following commands on Mac / Linux:
+
+.. code-block:: bash
 
  git clone git@github.com:vmalloc/mongomock.git
  cd mongomock
@@ -108,9 +108,16 @@ Contributing
 When submitting a PR, please make sure that:
 
 1. You include tests for the feature you are adding or bug you are fixing. Preferably, the test should
-   compare against the real MongoDB engine (See `examples in tests <https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108>`_ for reference).
+   compare against the real MongoDB engine (see `examples in tests`_ for reference).
 2. No existing test got deleted or unintentionally castrated
 3. The travis build passes on your PR.
+
+Branching model
+~~~~~~~~~~~~~~~
+
+The branching model used for this project follows the `gitflow workflow`_.  This means that pull requests
+should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
+the legacy 2.x branch than your pull request should go into the `support/2.x` branch.
 
 Acknowledgements
 ----------------
@@ -165,4 +172,24 @@ Many thanks go to the following people for helping out:
 * pacud
 * tipok
 * waskew (waskew _at_ narrativescience.com)
+* jmsantorum (jmsantorum [at] gmail [dot] com)
 
+
+.. _examples in tests: https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108
+
+.. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
+
+
+.. |travis| image:: https://img.shields.io/travis/vmalloc/mongomock/master.svg
+    :target: https://travis-ci.org/vmalloc/mongomock
+    :alt: Travis CI build
+
+.. |pypi_version| image:: https://img.shields.io/pypi/v/mongomock.svg
+    :target: https://pypi.python.org/pypi/mongomock
+    :alt: PyPI package
+
+.. |pypi_license| image:: https://img.shields.io/pypi/l/mongomock.svg
+    :alt: PyPI license
+
+.. |pypi_wheel| image:: https://img.shields.io/pypi/wheel/mongomock.svg
+    :alt: PyPI wheel status
