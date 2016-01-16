@@ -337,6 +337,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # test no match
         self.cmp.compare.find({'_id': id}, {'owns': {'$elemMatch': {'type': 'cap'}}})
 
+    def test__regex_match_non_string(self):
+        id = ObjectId()
+        self.cmp.do.insert({
+            '_id': id,
+            'test': 1
+        })
+        self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
+
     def test__find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {
