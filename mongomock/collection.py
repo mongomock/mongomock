@@ -1,6 +1,7 @@
 import collections
 from collections import OrderedDict
 import copy
+from datetime import datetime
 import functools
 import itertools
 import json
@@ -400,6 +401,18 @@ class Collection(object):
                             existing_document, v, spec, _inc_updater, subdocument)
                         continue
                     self._update_document_fields(existing_document, v, _inc_updater)
+                elif k == '$currentDate':
+                    for value in itervalues(v):
+                        if value == {'$type': 'timestamp'}:
+                            raise NotImplementedError('timestamp is not supported so far')
+
+                    positional = any('$' in key for key in iterkeys(v))
+
+                    if positional:
+                        subdocument = self._update_document_fields_positional(
+                            existing_document, v, spec, _current_date_updater, subdocument)
+                        continue
+                    self._update_document_fields(existing_document, v, _current_date_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -1591,3 +1604,8 @@ def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
         result = current + doc.get[field_name, 0]
         return result
+
+
+def _current_date_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = datetime.utcnow()
