@@ -1459,6 +1459,10 @@ class Collection(object):
                             "for a complete list of valid operators." % k)
         return CommandCursor(out_collection)
 
+    def with_options(
+            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+        return self
+
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)

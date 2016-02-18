@@ -735,3 +735,6 @@ class CollectionAPITest(TestCase):
         data_in_db = self.db.collection.find(projection=['a.b.c'])
         self.assertEqual(
             list(data_in_db), [{"_id": 1, "a": {"b": {"c": 2}}}])
+
+    def test__with_options(self):
+        self.db.collection.with_options(read_preference=None)
