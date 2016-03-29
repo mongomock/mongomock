@@ -40,6 +40,12 @@ except ImportError:
     class InvalidURI(ConfigurationError):
         pass
 
+try:
+    from pymongo.errors import WriteError
+except ImportError:
+    class WriteError(OperationFailure):
+        pass
+
 from .helpers import ObjectId  # noqa
 from mongomock.__version__ import __version__
 
