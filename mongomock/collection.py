@@ -44,6 +44,7 @@ from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
+from mongomock import WriteError
 
 
 def validate_is_mapping(option, value):
@@ -351,6 +352,7 @@ class Collection(object):
                     continue
                 _id = document.get('_id')
                 to_insert = dict(spec, _id=_id) if _id else spec
+                to_insert = self._expand_dots(to_insert)
                 upserted_id = self._insert(self._discard_operators(to_insert))
                 existing_document = self._documents[upserted_id]
                 was_insert = True
@@ -639,6 +641,24 @@ class Collection(object):
             subspec = subspec[subfield]
 
         return subdocument
+
+    def _expand_dots(self, doc):
+        expanded = {}
+        paths = {}
+        for k, v in iteritems(doc):
+            key_parts = k.split('.')
+            sub_doc = v
+            for i in reversed(range(1, len(key_parts))):
+                key = key_parts[i]
+                sub_doc = {key: sub_doc}
+            key = key_parts[0]
+            if key in expanded:
+                raise WriteError("cannot infer query fields to set, "
+                                 "both paths '%s' and '%s' are matched"
+                                 % (k, paths[key]))
+            paths[key] = k
+            expanded[key] = sub_doc
+        return expanded
 
     def _discard_operators(self, doc):
         # TODO(this looks a little too naive...)
@@ -1458,6 +1478,10 @@ class Collection(object):
                             "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
                             "for a complete list of valid operators." % k)
         return CommandCursor(out_collection)
+
+    def with_options(
+            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+        return self
 
 
 def _resolve_key(key, doc):

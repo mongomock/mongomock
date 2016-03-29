@@ -401,6 +401,20 @@ class CollectionAPITest(TestCase):
         self.assertIsNotNone(update_result.upserted_id)
         self.assert_document_stored(update_result.upserted_id, {'a': 1})
 
+    def test__update_one_upsert_dots(self):
+        self.assert_document_count(0)
+        update_result = self.db.collection.update_one(
+            {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)
+        self.assertEqual(update_result.modified_count, 0)
+        self.assertEqual(update_result.matched_count, 0)
+        self.assertIsNotNone(update_result.upserted_id)
+        self.assert_document_stored(update_result.upserted_id, {'a': {'b': 1}, 'c': 2})
+
+    def test__update_one_upsert_invalid_filter(self):
+        with self.assertRaises(mongomock.WriteError):
+            self.db.collection.update_one(
+                {'a.b': 1, 'a': 3}, {'$set': {'c': 2}}, upsert=True)
+
     def test__update_many(self):
         self.db.collection.insert_many([
             {'a': 1, 'c': 2},
@@ -735,3 +749,6 @@ class CollectionAPITest(TestCase):
         data_in_db = self.db.collection.find(projection=['a.b.c'])
         self.assertEqual(
             list(data_in_db), [{"_id": 1, "a": {"b": {"c": 2}}}])
+
+    def test__with_options(self):
+        self.db.collection.with_options(read_preference=None)
