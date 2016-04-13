@@ -362,7 +362,8 @@ class Collection(object):
             first = True
             subdocument = None
             for k, v in iteritems(document):
-                if k == '$set':
+                if k in _updaters.keys():
+                    updater = _updaters[k]
                     positional = False
                     for key in iterkeys(v):
                         if '$' in key:
@@ -370,10 +371,10 @@ class Collection(object):
                             break
                     if positional:
                         subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _set_updater, subdocument)
+                            existing_document, v, spec, updater, subdocument)
                         continue
 
-                    self._update_document_fields(existing_document, v, _set_updater)
+                    self._update_document_fields(existing_document, v, updater)
                 elif k == '$setOnInsert':
                     if not was_insert:
                         continue
@@ -390,18 +391,6 @@ class Collection(object):
                         if self._has_key(existing_document, field):
                             self._remove_key(existing_document, field)
 
-                elif k == '$inc':
-                    positional = False
-                    for key in iterkeys(v):
-                        if '$' in key:
-                            positional = True
-                            break
-
-                    if positional:
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _inc_updater, subdocument)
-                        continue
-                    self._update_document_fields(existing_document, v, _inc_updater)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -1607,7 +1596,25 @@ def _inc_updater(doc, field_name, value):
         doc[field_name] = doc.get(field_name, 0) + value
 
 
+def _max_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = max(doc.get(field_name, value), value)
+
+
+def _min_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = min(doc.get(field_name, value), value)
+
+
 def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
         result = current + doc.get[field_name, 0]
         return result
+
+
+_updaters = {
+    '$set': _set_updater,
+    '$inc': _inc_updater,
+    '$max': _max_updater,
+    '$min': _min_updater,
+}
