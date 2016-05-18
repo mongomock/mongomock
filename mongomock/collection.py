@@ -1,12 +1,33 @@
 import collections
-from collections import OrderedDict
 import copy
 import functools
 import itertools
 import json
-from operator import itemgetter
 import time
 import warnings
+from collections import OrderedDict
+from operator import itemgetter
+
+from mongomock import (
+    DuplicateKeyError,
+    InvalidOperation,
+    ObjectId,
+    OperationFailure,
+    WriteError,
+    helpers,
+)
+from mongomock.command_cursor import CommandCursor
+from mongomock.filtering import filter_applies, iter_key_candidates
+from mongomock.results import (
+    DeleteResult,
+    InsertManyResult,
+    InsertOneResult,
+    UpdateResult,
+)
+from mongomock.write_concern import WriteConcern
+from sentinels import NOTHING
+from six import iteritems, iterkeys, itervalues, string_types, text_type
+
 
 try:
     from bson import json_util, SON
@@ -24,27 +45,7 @@ except ImportError:
         BEFORE = False
         AFTER = True
 
-from sentinels import NOTHING
-from six import iteritems
-from six import iterkeys
-from six import itervalues
-from six import string_types
-from six import text_type
 
-from mongomock.command_cursor import CommandCursor
-from mongomock import DuplicateKeyError
-from mongomock.filtering import filter_applies
-from mongomock.filtering import iter_key_candidates
-from mongomock import helpers
-from mongomock import InvalidOperation
-from mongomock import ObjectId
-from mongomock import OperationFailure
-from mongomock.results import DeleteResult
-from mongomock.results import InsertManyResult
-from mongomock.results import InsertOneResult
-from mongomock.results import UpdateResult
-from mongomock.write_concern import WriteConcern
-from mongomock import WriteError
 
 
 def validate_is_mapping(option, value):

@@ -1,5 +1,3 @@
-
-
 class CommandCursor(object):
 
     def __init__(self, collection, curser_info=None, address=None, retrieved=0):
