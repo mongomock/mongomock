@@ -1,7 +1,8 @@
-from mongomock import InvalidURI
 import re
-from six import iteritems, PY2
 import warnings
+
+from mongomock import InvalidURI
+from six import PY2, iteritems
 
 
 try:

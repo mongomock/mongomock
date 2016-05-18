@@ -1,10 +1,12 @@
 import json
 import os
-
-from mongomock.helpers import hashdict
-from mongomock.helpers import parse_dbase_from_uri
-from mongomock.helpers import print_deprecation_warning
 from unittest import TestCase
+
+from mongomock.helpers import (
+    hashdict,
+    parse_dbase_from_uri,
+    print_deprecation_warning,
+)
 
 
 class HashdictTest(TestCase):

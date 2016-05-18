@@ -1,5 +1,9 @@
+from unittest import TestCase, skipIf
+
 import mock
 import mongomock
+from tests.multicollection import MultiCollection
+
 
 try:
     import pymongo
@@ -8,8 +12,6 @@ except ImportError:
     _HAVE_PYMONGO = False
 
 
-from tests.multicollection import MultiCollection
-from unittest import TestCase, skipIf
 
 
 class BulkOperationsTest(TestCase):

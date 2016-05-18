@@ -1,11 +1,12 @@
 import copy
 import random
-from six import text_type
 import time
-from unittest import TestCase, skipIf
 import warnings
+from unittest import TestCase, skipIf
 
 import mongomock
+from six import text_type
+
 
 try:
     import pymongo

@@ -4,14 +4,13 @@ import re
 import time
 from unittest import TestCase, skipIf
 
-
 import mongomock
-from mongomock import ConfigurationError
-from mongomock import Database
-from mongomock import InvalidURI
-from mongomock import OperationFailure
+from mongomock import ConfigurationError, Database, InvalidURI, OperationFailure
+from nose.tools import assert_raises
+from tests.multicollection import MultiCollection
 
 from .utils import DBRef
+
 
 try:
     from bson.objectid import ObjectId
@@ -28,8 +27,6 @@ try:
     _HAVE_MAP_REDUCE = True
 except ImportError:
     _HAVE_MAP_REDUCE = False
-from nose.tools import assert_raises
-from tests.multicollection import MultiCollection
 
 
 class InterfaceTest(TestCase):

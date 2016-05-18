@@ -1,5 +1,6 @@
-from .diff import diff
 from unittest import TestCase
+
+from .diff import diff
 
 
 class DiffTest(TestCase):

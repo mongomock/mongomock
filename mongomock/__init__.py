@@ -46,8 +46,13 @@ except ImportError:
     class WriteError(OperationFailure):
         pass
 
-from .helpers import ObjectId  # noqa
 from mongomock.__version__ import __version__
+
+from .collection import Collection
+from .database import Database
+from .helpers import ObjectId  # noqa
+from .mongo_client import MongoClient
+from .write_concern import WriteConcern
 
 
 __all__ = [
@@ -63,7 +68,3 @@ __all__ = [
 ]
 
 
-from .collection import Collection
-from .database import Database
-from .mongo_client import MongoClient
-from .write_concern import WriteConcern

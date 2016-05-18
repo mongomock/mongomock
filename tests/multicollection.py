@@ -1,7 +1,8 @@
-from .diff import diff
 import copy
 import functools
 import re
+
+from .diff import diff
 
 
 class MultiCollection(object):

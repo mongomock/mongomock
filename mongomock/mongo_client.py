@@ -1,7 +1,9 @@
+import itertools
+
+from mongomock import ConfigurationError
+
 from .database import Database
 from .helpers import parse_dbase_from_uri
-import itertools
-from mongomock import ConfigurationError
 
 
 class MongoClient(object):
