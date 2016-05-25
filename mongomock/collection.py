@@ -1,6 +1,7 @@
 import collections
 from collections import OrderedDict
 import copy
+from datetime import datetime
 import functools
 import itertools
 import json
@@ -363,27 +364,14 @@ class Collection(object):
             subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
-                    positional = False
-                    for key in iterkeys(v):
-                        if '$' in key:
-                            positional = True
-                            break
-                    if positional:
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _set_updater, subdocument)
-                        continue
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _set_updater, subdocument)
 
-                    self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$setOnInsert':
                     if not was_insert:
                         continue
-                    positional = any('$' in key for key in iterkeys(v))
-                    if positional:
-                        # we use _set_updater
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _set_updater, subdocument)
-                    else:
-                        self._update_document_fields(existing_document, v, _set_updater)
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _set_updater, subdocument)
 
                 elif k == '$unset':
                     for field, value in iteritems(v):
@@ -391,17 +379,15 @@ class Collection(object):
                             self._remove_key(existing_document, field)
 
                 elif k == '$inc':
-                    positional = False
-                    for key in iterkeys(v):
-                        if '$' in key:
-                            positional = True
-                            break
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _inc_updater, subdocument)
+                elif k == '$currentDate':
+                    for value in itervalues(v):
+                        if value == {'$type': 'timestamp'}:
+                            raise NotImplementedError('timestamp is not supported so far')
 
-                    if positional:
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _inc_updater, subdocument)
-                        continue
-                    self._update_document_fields(existing_document, v, _inc_updater)
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _current_date_updater, subdocument)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -878,6 +864,16 @@ class Collection(object):
             # otherwise, we handle it the standard way
             self._update_document_single_field(doc, k, v, updater)
 
+        return subdocument
+
+    def _update_document_fields_with_positional_awareness(self, existing_document, v, spec,
+                                                          updater, subdocument):
+        positional = any('$' in key for key in iterkeys(v))
+
+        if positional:
+            return self._update_document_fields_positional(
+                existing_document, v, spec, updater, subdocument)
+        self._update_document_fields(existing_document, v, updater)
         return subdocument
 
     def _update_document_single_field(self, doc, field_name, field_value, updater):
@@ -1611,3 +1607,8 @@ def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
         result = current + doc.get[field_name, 0]
         return result
+
+
+def _current_date_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = datetime.utcnow()

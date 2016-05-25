@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 import random
 from six import text_type
 import time
@@ -752,3 +753,16 @@ class CollectionAPITest(TestCase):
 
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
+
+    def test__update_current_date(self):
+        for type_specification in [True, {'$type': 'date'}]:
+            self.db.collection.update_one(
+                {}, {'$currentDate': {'updated_at': type_specification}}, upsert=True)
+            self.assertIsInstance(
+                self.db.collection.find_one({})['updated_at'], datetime)
+
+    # should be removed once Timestamp supported or implemented
+    def test__current_date_timestamp_is_not_supported_yet(self):
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_one(
+                {}, {'$currentDate': {'updated_at': {'$type': 'timestamp'}}}, upsert=True)
