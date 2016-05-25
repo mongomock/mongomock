@@ -29,9 +29,8 @@ class Database(object):
 
         result = []
         for name in self._collections.keys():
-            if name.startswith("system."):
-                continue
-            result.append(name)
+            if not name.startswith("system."):
+                result.append(name)
 
         return result
 
