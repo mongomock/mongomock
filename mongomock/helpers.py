@@ -1,5 +1,6 @@
 from mongomock import InvalidURI
 import re
+from six.moves.urllib_parse import unquote_plus
 from six import iteritems, PY2
 import warnings
 
@@ -10,24 +11,11 @@ except ImportError:
     from mongomock.object_id import ObjectId  # noqa
     RE_TYPE = re._pattern_type
 
-if PY2:
-    from __builtin__ import xrange
-else:
-    xrange = range
-
 # for Python 3 compatibility
 if PY2:
-    unicode = unicode
     from __builtin__ import basestring
 else:
-    unicode = str
     basestring = (str, bytes)
-
-if PY2:
-    from urllib import unquote_plus
-else:
-    from urllib.parse import unquote_plus
-
 
 ASCENDING = 1
 

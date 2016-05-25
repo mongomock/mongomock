@@ -29,8 +29,10 @@ from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
 from six import itervalues
+from six.moves import xrange
 from six import string_types
 from six import text_type
+
 
 from mongomock.command_cursor import CommandCursor
 from mongomock import DuplicateKeyError
@@ -669,7 +671,7 @@ class Collection(object):
                 dataset = iter(sorted(
                     dataset, key=lambda x: _resolve_sort_key(sortKey, x),
                     reverse=sortDirection < 0))
-        for i in helpers.xrange(skip):
+        for i in xrange(skip):
             try:
                 next(dataset)
             except StopIteration:
