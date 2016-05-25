@@ -1,6 +1,7 @@
 import collections
 from collections import OrderedDict
 import copy
+from datetime import datetime
 import functools
 import itertools
 import json
@@ -28,8 +29,10 @@ from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
 from six import itervalues
+from six.moves import xrange
 from six import string_types
 from six import text_type
+
 
 from mongomock.command_cursor import CommandCursor
 from mongomock import DuplicateKeyError
@@ -363,27 +366,14 @@ class Collection(object):
             subdocument = None
             for k, v in iteritems(document):
                 if k == '$set':
-                    positional = False
-                    for key in iterkeys(v):
-                        if '$' in key:
-                            positional = True
-                            break
-                    if positional:
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _set_updater, subdocument)
-                        continue
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _set_updater, subdocument)
 
-                    self._update_document_fields(existing_document, v, _set_updater)
                 elif k == '$setOnInsert':
                     if not was_insert:
                         continue
-                    positional = any('$' in key for key in iterkeys(v))
-                    if positional:
-                        # we use _set_updater
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _set_updater, subdocument)
-                    else:
-                        self._update_document_fields(existing_document, v, _set_updater)
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _set_updater, subdocument)
 
                 elif k == '$unset':
                     for field, value in iteritems(v):
@@ -391,17 +381,15 @@ class Collection(object):
                             self._remove_key(existing_document, field)
 
                 elif k == '$inc':
-                    positional = False
-                    for key in iterkeys(v):
-                        if '$' in key:
-                            positional = True
-                            break
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _inc_updater, subdocument)
+                elif k == '$currentDate':
+                    for value in itervalues(v):
+                        if value == {'$type': 'timestamp'}:
+                            raise NotImplementedError('timestamp is not supported so far')
 
-                    if positional:
-                        subdocument = self._update_document_fields_positional(
-                            existing_document, v, spec, _inc_updater, subdocument)
-                        continue
-                    self._update_document_fields(existing_document, v, _inc_updater)
+                    subdocument = self._update_document_fields_with_positional_awareness(
+                        existing_document, v, spec, _current_date_updater, subdocument)
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -683,7 +671,7 @@ class Collection(object):
                 dataset = iter(sorted(
                     dataset, key=lambda x: _resolve_sort_key(sortKey, x),
                     reverse=sortDirection < 0))
-        for i in helpers.xrange(skip):
+        for i in xrange(skip):
             try:
                 next(dataset)
             except StopIteration:
@@ -880,6 +868,16 @@ class Collection(object):
 
         return subdocument
 
+    def _update_document_fields_with_positional_awareness(self, existing_document, v, spec,
+                                                          updater, subdocument):
+        positional = any('$' in key for key in iterkeys(v))
+
+        if positional:
+            return self._update_document_fields_positional(
+                existing_document, v, spec, updater, subdocument)
+        self._update_document_fields(existing_document, v, updater)
+        return subdocument
+
     def _update_document_single_field(self, doc, field_name, field_value, updater):
         field_name_parts = field_name.split(".")
         for part in field_name_parts[:-1]:
@@ -909,16 +907,16 @@ class Collection(object):
         return (document for document in list(itervalues(self._documents))
                 if filter_applies(filter, document))
 
-    def find_one(self, spec_or_id=None, *args, **kwargs):
+    def find_one(self, filter=None, *args, **kwargs):
         # Allow calling find_one with a non-dict argument that gets used as
         # the id for the query.
-        if spec_or_id is None:
-            spec_or_id = {}
-        if not isinstance(spec_or_id, collections.Mapping):
-            spec_or_id = {'_id': spec_or_id}
+        if filter is None:
+            filter = {}
+        if not isinstance(filter, collections.Mapping):
+            filter = {'_id': filter}
 
         try:
-            return next(self.find(spec_or_id, *args, **kwargs))
+            return next(self.find(filter, *args, **kwargs))
         except StopIteration:
             return None
 
@@ -1611,3 +1609,8 @@ def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
         result = current + doc.get[field_name, 0]
         return result
+
+
+def _current_date_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = datetime.utcnow()
