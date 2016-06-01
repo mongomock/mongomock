@@ -162,6 +162,7 @@ Many thanks go to the following people for helping out:
 * Papp Győző
 * Paul Glass
 * Scott Sexton
+* Srinivas Reddy Thatiparthy
 * Taras Boiko
 * Todd Tomkinson 
 * Zachary Carter
