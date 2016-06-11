@@ -297,7 +297,7 @@ class Collection(object):
         return data['_id']
 
     def _internalize_dict(self, d):
-        return {k: copy.deepcopy(v)) for k, v in iteritems(d)}
+        return {k: copy.deepcopy(v) for k, v in iteritems(d)}
 
     def _has_key(self, doc, key):
         key_parts = key.split('.')
