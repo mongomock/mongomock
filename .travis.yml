@@ -1,8 +1,6 @@
 language: python
 sudo: true
-cache:
-  directories:
-    - $HOME/.cache/pip
+cache: pip
 env:
   - TOX_ENV=py27-pymongo
   - TOX_ENV=py27-pyexecjs
