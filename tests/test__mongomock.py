@@ -893,6 +893,20 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             self.cmp.do.update({'name': 'bob'}, {'$inc': {'count': 1}})
             self.cmp.compare.find({'name': 'bob'})
 
+    def test__max(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name': 'bob'}, {'$max': {'count': i}})
+            self.cmp.compare.find({'name': 'bob'})
+
+    def test__min(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob'})
+        for i in range(3):
+            self.cmp.do.update({'name': 'bob'}, {'$min': {'count': i}})
+            self.cmp.compare.find({'name': 'bob'})
+
     def test__inc_upsert(self):
         self.cmp.do.remove()
         for i in range(3):
