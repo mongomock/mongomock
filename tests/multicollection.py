@@ -122,5 +122,5 @@ def _deepcopy(x):
     if isinstance(x, list) or isinstance(x, tuple):
         return type(x)(_deepcopy(y) for y in x)
     if isinstance(x, dict):
-        return dict((_deepcopy(k), _deepcopy(v)) for k, v in x.items())
+        return {_deepcopy(k): _deepcopy(v) for k, v in x.items()}
     return copy.deepcopy(x)
