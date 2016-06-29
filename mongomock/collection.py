@@ -1232,7 +1232,7 @@ class Collection(object):
 
         if isinstance(keys, dict):
             for k, v in keys.items():
-                if isinstance(v, str):
+                if isinstance(v, str) or isinstance(v, unicode):
                     if k in date_operators:
                         fields.append((parent + '__' + k + '_' + v).replace('$', ''))
                     else:
