@@ -6,6 +6,7 @@ import functools
 import itertools
 import json
 from operator import itemgetter
+import threading
 import time
 import warnings
 
@@ -48,6 +49,8 @@ from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
+
+lock = threading.RLock()
 
 
 def validate_is_mapping(option, value):
@@ -292,8 +295,8 @@ class Collection(object):
             answer = self.find(find_kwargs)
             if answer.count() > 0:
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
-
-        self._documents[object_id] = self._internalize_dict(data)
+        with lock:
+            self._documents[object_id] = self._internalize_dict(data)
         return data['_id']
 
     def _internalize_dict(self, d):
