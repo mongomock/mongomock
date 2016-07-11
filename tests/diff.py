@@ -1,4 +1,5 @@
 from platform import python_version
+import datetime
 
 
 class _NO_VALUE(object):
@@ -7,7 +8,7 @@ class _NO_VALUE(object):
 NO_VALUE = _NO_VALUE()
 
 _SUPPORTED_TYPES = set([
-    int, float, bool, str
+    int, float, bool, str, datetime.datetime
 ])
 
 dict_type = dict
