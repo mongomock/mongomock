@@ -1,5 +1,5 @@
-from platform import python_version
 import datetime
+from platform import python_version
 
 
 class _NO_VALUE(object):
