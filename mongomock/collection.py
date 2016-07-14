@@ -6,7 +6,6 @@ import functools
 import itertools
 import json
 from operator import itemgetter
-import six
 import threading
 import time
 import warnings
@@ -1236,7 +1235,7 @@ class Collection(object):
 
         if isinstance(keys, dict):
             for k, v in keys.items():
-                if isinstance(v, six.text_type):
+                if isinstance(v, string_types):
                     if k in date_operators:
                         fields.append((parent + '__' + k + '_' + v).replace('$', ''))
                     else:
