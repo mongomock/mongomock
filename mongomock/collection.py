@@ -6,6 +6,7 @@ import functools
 import itertools
 import json
 from operator import itemgetter
+import threading
 import time
 import warnings
 
@@ -48,6 +49,8 @@ from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
+
+lock = threading.RLock()
 
 
 def validate_is_mapping(option, value):
@@ -292,12 +295,12 @@ class Collection(object):
             answer = self.find(find_kwargs)
             if answer.count() > 0:
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
-
-        self._documents[object_id] = self._internalize_dict(data)
+        with lock:
+            self._documents[object_id] = self._internalize_dict(data)
         return data['_id']
 
     def _internalize_dict(self, d):
-        return dict((k, copy.deepcopy(v)) for k, v in iteritems(d))
+        return {k: copy.deepcopy(v) for k, v in iteritems(d)}
 
     def _has_key(self, doc, key):
         key_parts = key.split('.')
@@ -365,9 +368,10 @@ class Collection(object):
             first = True
             subdocument = None
             for k, v in iteritems(document):
-                if k == '$set':
+                if k in _updaters.keys():
+                    updater = _updaters[k]
                     subdocument = self._update_document_fields_with_positional_awareness(
-                        existing_document, v, spec, _set_updater, subdocument)
+                        existing_document, v, spec, updater, subdocument)
 
                 elif k == '$setOnInsert':
                     if not was_insert:
@@ -380,9 +384,6 @@ class Collection(object):
                         if self._has_key(existing_document, field):
                             self._remove_key(existing_document, field)
 
-                elif k == '$inc':
-                    subdocument = self._update_document_fields_with_positional_awareness(
-                        existing_document, v, spec, _inc_updater, subdocument)
                 elif k == '$currentDate':
                     for value in itervalues(v):
                         if value == {'$type': 'timestamp'}:
@@ -390,6 +391,7 @@ class Collection(object):
 
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, _current_date_updater, subdocument)
+
                 elif k == '$addToSet':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')
@@ -650,7 +652,7 @@ class Collection(object):
 
     def _discard_operators(self, doc):
         # TODO(this looks a little too naive...)
-        return dict((k, v) for k, v in iteritems(doc) if not k.startswith("$"))
+        return {k: v for k, v in iteritems(doc) if not k.startswith("$")}
 
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
@@ -1233,7 +1235,7 @@ class Collection(object):
 
         if isinstance(keys, dict):
             for k, v in keys.items():
-                if isinstance(v, str):
+                if isinstance(v, string_types):
                     if k in date_operators:
                         fields.append((parent + '__' + k + '_' + v).replace('$', ''))
                     else:
@@ -1605,6 +1607,16 @@ def _inc_updater(doc, field_name, value):
         doc[field_name] = doc.get(field_name, 0) + value
 
 
+def _max_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = max(doc.get(field_name, value), value)
+
+
+def _min_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc[field_name] = min(doc.get(field_name, value), value)
+
+
 def _sum_updater(doc, field_name, current, result):
     if isinstance(doc, dict):
         result = current + doc.get[field_name, 0]
@@ -1614,3 +1626,10 @@ def _sum_updater(doc, field_name, current, result):
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = datetime.utcnow()
+
+_updaters = {
+    '$set': _set_updater,
+    '$inc': _inc_updater,
+    '$max': _max_updater,
+    '$min': _min_updater,
+}
