@@ -68,13 +68,11 @@ class MongoClient(object):
                 if tmp_database is name_or_db:
                     if tmp_database:
                         drop_collections_for_db(tmp_database)
-                    del self._databases[database_name]
                     break
 
         elif name_or_db in self._databases:
             db = self._databases[name_or_db]
             drop_collections_for_db(db)
-            del self._databases[name_or_db]
 
     def get_database(self, name, codec_options=None, read_preference=None,
                      write_concern=None):
