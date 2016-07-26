@@ -1,3 +1,4 @@
+from __future__ import division
 import collections
 from collections import OrderedDict
 import copy
