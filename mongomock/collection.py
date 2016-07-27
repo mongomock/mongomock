@@ -48,9 +48,6 @@ except ImportError:
         BEFORE = False
         AFTER = True
 
-
-
-
 lock = threading.RLock()
 
 
