@@ -1,10 +1,11 @@
-from .helpers import ObjectId, RE_TYPE
-from . import OperationFailure
-
 import operator
 import re
+
 from sentinels import NOTHING
 from six import iteritems, string_types
+
+from . import OperationFailure
+from .helpers import RE_TYPE, ObjectId
 
 
 def filter_applies(search_filter, document):
