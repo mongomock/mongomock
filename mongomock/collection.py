@@ -1382,7 +1382,7 @@ class Collection(object):
                     for field, value in iteritems(v):
                         if field != '_id':
                             for func, key in iteritems(value):
-                                if func == "$sum" or "$avg":
+                                if func in ("$sum", "$avg"):
                                     grouped = itertools.groupby(out_collection,
                                                                 itemgetter(*group_func_keys))
 
