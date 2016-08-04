@@ -1,8 +1,9 @@
-from mongomock import InvalidURI
 import re
-from six.moves.urllib_parse import unquote_plus
-from six import iteritems, PY2
 import warnings
+
+from mongomock import InvalidURI
+from six import PY2, iteritems
+from six.moves.urllib_parse import unquote_plus
 
 
 try:
