@@ -1549,6 +1549,25 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate10(self):     # group on compound index
+        self.cmp.do.remove()
+
+        data = [
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_1"}, "nb": 1},
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_2"}, "nb": 1},
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_1"}, "nb": 2}
+        ]
+        for item in data:
+            self.cmp.do.insert(item)
+
+        pipeline = [
+            {'$group': {"_id": "$key_1.sub_key_1", "nb": {"$sum": "$nb"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

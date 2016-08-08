@@ -1266,7 +1266,7 @@ class Collection(object):
             out_field = key.split('__')[0]
 
             for doc in out_collection:
-                if key not in doc.keys():
+                if '__' in key:
                     func_field = key.split('__')[1]
                     func, in_field = func_field.split('_')
                     out_value = doc.get(in_field)
@@ -1382,7 +1382,10 @@ class Collection(object):
                     if len(group_func_keys) == 0:
                         grouped_collection = []
                     else:
-                        out_collection = sorted(out_collection, key=itemgetter(*group_func_keys))
+                        out_collection = sorted(out_collection,
+                                                key=itemgetter(*map(lambda x: x.split('.')[0],
+                                                                    group_func_keys)))
+
                     for field, value in iteritems(v):
                         if field == '_id':
                             continue
@@ -1392,7 +1395,8 @@ class Collection(object):
                                     grouped = itertools.groupby(out_collection)
                                 else:
                                     grouped = itertools.groupby(out_collection,
-                                                                itemgetter(*group_func_keys))
+                                                                helpers.embedded_item_getter(
+                                                                    *group_func_keys))
 
                                 for ret_value, group in grouped:
                                     group_list = ([x for x in group])
