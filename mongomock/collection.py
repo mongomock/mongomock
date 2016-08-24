@@ -1156,8 +1156,8 @@ class Collection(object):
         return self.map_reduce(
             map_func, reduce_func, {'inline': 1}, full_response, query, limit)
 
-    def distinct(self, key):
-        return self.find().distinct(key)
+    def distinct(self, key, filter=None):
+        return self.find(filter).distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
         if execjs is None:

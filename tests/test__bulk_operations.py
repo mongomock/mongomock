@@ -1,8 +1,9 @@
+import mongomock
+
 try:
     import unittest.mock as mock
-except:
+except ImportError:
     import mock
-import mongomock
 
 try:
     import pymongo
