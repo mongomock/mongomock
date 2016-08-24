@@ -1535,6 +1535,20 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate8(self):
+        pipeline = [
+            {'$group': {'_id': None, 'counts': {'$sum': '$count'}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate9(self):
+        pipeline = [
+            {'$group': {'_id': {'id_a': '$a'}, 'total': {'$sum': '$count'},
+                        'avg': {'$avg': '$count'}}},
+            {'$group': {'_id': None, 'counts': {'$sum': '$total'}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
