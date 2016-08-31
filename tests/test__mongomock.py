@@ -1549,6 +1549,38 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate10(self):
+        pipeline = [
+            {'$group': {'_id': None, 'max_count': {'$max': '$count'},
+                        'min_count': {'$min': '$count'}}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate11(self):
+        pipeline = [
+            {'$group': {'_id': '$a', 'max_count': {'$max': '$count'},
+                        'min_count': {'$min': '$count'}}},
+            {'$sort': {'_id': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate12(self):
+        pipeline = [
+            {'$sort': {'date': 1}},
+            {'$group': {'_id': None, 'last_date': {'$last': '$date'},
+                        'first_date': {'$first': '$date'}}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate13(self):
+        pipeline = [
+            {'$sort': {'date': 1}},
+            {'$group': {'_id': '$a', 'last_date': {'$last': '$date'},
+                        'first_date': {'$first': '$date'}}},
+            {'$sort': {'_id': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

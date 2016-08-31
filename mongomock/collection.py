@@ -31,6 +31,7 @@ from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
 from six import itervalues
+from six import MAXSIZE
 from six.moves import xrange
 from six import string_types
 from six import text_type
@@ -1387,7 +1388,7 @@ class Collection(object):
                         if field == '_id':
                             continue
                         for func, key in iteritems(value):
-                            if func in ("$sum", "$avg"):
+                            if func in ("$sum", "$avg", "$min", "$max", "$first", "$last"):
                                 if len(group_func_keys) == 0:
                                     grouped = itertools.groupby(out_collection)
                                 else:
@@ -1413,19 +1414,44 @@ class Collection(object):
                                             new_doc = False
                                             break
 
-                                    current_val = doc_dict.get(field, 0)
                                     from_field = key.replace('$', '')
                                     if func == "$sum":
+                                        current_val = doc_dict.get(field, 0)
                                         for doc in group_list:
                                             current_val = sum([current_val,
                                                                doc.get(from_field, 0)])
                                         doc_dict[field] = current_val
                                     elif func == "$avg":
+                                        current_val = doc_dict.get(field, 0)
                                         for doc in group_list:
                                             current_val = sum([current_val,
                                                                doc.get(from_field, 0)])
                                         current_avg = current_val / max(len(group_list), 1)
                                         doc_dict[field] = current_avg
+                                    elif func == "$min":
+                                        current_val = doc_dict.get(field, MAXSIZE)
+                                        for doc in group_list:
+                                            current_val = min([current_val,
+                                                               doc.get(from_field, MAXSIZE)])
+                                        doc_dict[field] = current_val
+                                    elif func == "$max":
+                                        current_val = doc_dict.get(field, -MAXSIZE)
+                                        for doc in group_list:
+                                            current_val = max([current_val,
+                                                               doc.get(from_field, -MAXSIZE)])
+                                        doc_dict[field] = current_val
+                                    elif func == "$first":
+                                        current_val = doc_dict.get(field, datetime.max)
+                                        for doc in group_list:
+                                            current_val = min([current_val,
+                                                               doc.get(from_field, datetime.max)])
+                                        doc_dict[field] = current_val
+                                    elif func == "$last":
+                                        current_val = doc_dict.get(field, datetime.min)
+                                        for doc in group_list:
+                                            current_val = max([current_val,
+                                                               doc.get(from_field, datetime.min)])
+                                        doc_dict[field] = current_val
 
                                     if new_doc:
                                         grouped_collection.append(doc_dict)
