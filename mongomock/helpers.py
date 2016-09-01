@@ -187,3 +187,35 @@ def parse_dbase_from_uri(uri):
         dbase = unquote_plus(dbase)
 
     return dbase
+
+
+def embedded_item_getter(*keys):
+    """Get items from embedded dictionaries.
+
+    use case:
+    d = {"a": {"b": 1}}
+    embedded_item_getter("a.b")(d) == 1
+
+    :param keys: keys to get
+                 embedded keys are separated with dot in string
+    :return: itemgetter function
+    """
+
+    def recurse_embedded(obj, key):
+        ret = obj
+        for k in key.split('.'):
+            ret = ret[k]
+        return ret
+
+    if len(keys) == 1:
+        item = keys[0]
+
+        def g(obj):
+            return recurse_embedded(obj, item)
+
+    else:
+
+        def g(obj):
+            return tuple(recurse_embedded(obj, item) for item in keys)
+
+    return g
