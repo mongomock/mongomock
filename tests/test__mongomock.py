@@ -1549,14 +1549,33 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate10(self):
+    def test__aggregate10(self):     # group on compound index
+        self.cmp.do.remove()
+
+        data = [
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_1"}, "nb": 1},
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_2"}, "nb": 1},
+            {"_id": ObjectId(),
+             "key_1": {"sub_key_1": "value_1"}, "nb": 2}
+        ]
+        for item in data:
+            self.cmp.do.insert(item)
+
+        pipeline = [
+            {'$group': {"_id": "$key_1.sub_key_1", "nb": {"$sum": "$nb"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate11(self):
         pipeline = [
             {'$group': {'_id': None, 'max_count': {'$max': '$count'},
                         'min_count': {'$min': '$count'}}},
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate11(self):
+    def test__aggregate12(self):
         pipeline = [
             {'$group': {'_id': '$a', 'max_count': {'$max': '$count'},
                         'min_count': {'$min': '$count'}}},
@@ -1564,7 +1583,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate12(self):
+    def test__aggregate13(self):
         pipeline = [
             {'$sort': {'date': 1}},
             {'$group': {'_id': None, 'last_date': {'$last': '$date'},
@@ -1572,7 +1591,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate13(self):
+    def test__aggregate14(self):
         pipeline = [
             {'$sort': {'date': 1}},
             {'$group': {'_id': '$a', 'last_date': {'$last': '$date'},
