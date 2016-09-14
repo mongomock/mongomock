@@ -1,3 +1,4 @@
+from __future__ import division
 import collections
 from collections import OrderedDict
 import copy
@@ -30,6 +31,7 @@ from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
 from six import itervalues
+from six import MAXSIZE
 from six.moves import xrange
 from six import string_types
 from six import text_type
@@ -1155,8 +1157,8 @@ class Collection(object):
         return self.map_reduce(
             map_func, reduce_func, {'inline': 1}, full_response, query, limit)
 
-    def distinct(self, key):
-        return self.find().distinct(key)
+    def distinct(self, key, filter=None):
+        return self.find(filter).distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
         if execjs is None:
@@ -1265,7 +1267,7 @@ class Collection(object):
             out_field = key.split('__')[0]
 
             for doc in out_collection:
-                if key not in doc.keys():
+                if '__' in key:
                     func_field = key.split('__')[1]
                     func, in_field = func_field.split('_')
                     out_value = doc.get(in_field)
@@ -1378,58 +1380,89 @@ class Collection(object):
                     out_collection, group_func_keys = self._add_group_id_fields(out_collection,
                                                                                 group_func_keys)
 
-                    out_collection = sorted(out_collection, key=itemgetter(*group_func_keys))
-                    for field, value in iteritems(v):
-                        if field != '_id':
-                            for func, key in iteritems(value):
-                                if func == "$sum" or "$avg":
-                                    grouped = itertools.groupby(out_collection,
-                                                                itemgetter(*group_func_keys))
+                    if len(group_func_keys) == 0:
+                        grouped_collection = []
+                    else:
+                        out_collection = sorted(out_collection,
+                                                key=itemgetter(*map(lambda x: x.split('.')[0],
+                                                                    group_func_keys)))
 
-                                    for ret_value, group in grouped:
-                                        group_list = ([x for x in group])
+                    for field, value in iteritems(v):
+                        if field == '_id':
+                            continue
+                        for func, key in iteritems(value):
+                            if func in ("$sum", "$avg", "$min", "$max", "$first", "$last"):
+                                if len(group_func_keys) == 0:
+                                    grouped = itertools.groupby(out_collection)
+                                else:
+                                    grouped = itertools.groupby(out_collection,
+                                                                helpers.embedded_item_getter(
+                                                                    *group_func_keys))
+
+                                for ret_value, group in grouped:
+                                    group_list = ([x for x in group])
+                                    if len(group_func_keys) == 0:
+                                        doc_id = None
+                                    else:
                                         ret_value = ret_value if isinstance(ret_value, tuple)\
                                             else [ret_value]
                                         doc_id = {k: v for (k, v) in zip(_id.keys(), ret_value)}\
                                             if isinstance(_id, dict) else ret_value[0]
 
-                                        doc_dict = {'_id': doc_id}
+                                    doc_dict = {'_id': doc_id}
 
-                                        new_doc = True
-                                        for doc in grouped_collection:
-                                            if doc['_id'] == doc_id:
-                                                doc_dict = doc
-                                                new_doc = False
-                                                break
+                                    new_doc = True
+                                    for doc in grouped_collection:
+                                        if doc['_id'] == doc_id:
+                                            doc_dict = doc
+                                            new_doc = False
+                                            break
 
-                                        current_val = doc_dict.get(field, 0)
-                                        from_field = key.replace('$', '')
-                                        if func == "$sum":
-                                            for doc in group_list:
-                                                current_val = sum([current_val,
-                                                                   doc.get(from_field, 0)])
-                                            doc_dict[field] = current_val
-                                        elif func == "$avg":
-                                            for doc in group_list:
-                                                current_val = sum([current_val,
-                                                                   doc.get(from_field, 0)])
-                                            current_avg = current_val / max(len(group_list), 1)
-                                            doc_dict[field] = current_avg
+                                    from_field = key.replace('$', '')
+                                    if func == "$sum":
+                                        current_val = doc_dict.get(field, 0) + \
+                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                        doc_dict[field] = current_val
+                                    elif func == "$avg":
+                                        current_val = doc_dict.get(field, 0) + \
+                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                        current_avg = current_val / max(len(group_list), 1)
+                                        doc_dict[field] = current_avg
+                                    elif func == "$min":
+                                        current_val = doc_dict.get(field, MAXSIZE)
+                                        min_doc = min([doc.get(from_field, MAXSIZE) for doc
+                                                      in group_list])
+                                        doc_dict[field] = min(current_val, min_doc)
+                                    elif func == "$max":
+                                        current_val = doc_dict.get(field, -MAXSIZE)
+                                        max_doc = max([doc.get(from_field, -MAXSIZE) for doc
+                                                      in group_list])
+                                        doc_dict[field] = max(current_val, max_doc)
+                                    elif func == "$first":
+                                        current_val = doc_dict.get(field, datetime.max)
+                                        min_doc = min([doc.get(from_field, datetime.max) for doc
+                                                      in group_list])
+                                        doc_dict[field] = min(current_val, min_doc)
+                                    elif func == "$last":
+                                        current_val = doc_dict.get(field, datetime.min)
+                                        max_doc = max([doc.get(from_field, datetime.min) for doc
+                                                      in group_list])
+                                        doc_dict[field] = max(current_val, max_doc)
 
-                                        if new_doc:
-                                            grouped_collection.append(doc_dict)
+                                    if new_doc:
+                                        grouped_collection.append(doc_dict)
+                            else:
+                                if func in group_operators:
+                                    raise NotImplementedError(
+                                        "Although %s is a valid group operator for the "
+                                        "aggregation pipeline, %s is currently not implemented "
+                                        "in Mongomock." % func)
                                 else:
-                                    if func in group_operators:
-                                        raise NotImplementedError(
-                                            "Although %s is a valid group operator for the "
-                                            "aggregation pipeline, %s is currently not implemented "
-                                            "in Mongomock." % func)
-                                    else:
-                                        raise NotImplementedError(
-                                            "%s is not a valid group operator for the aggregation "
-                                            "pipeline. See http://docs.mongodb.org/manual/meta/"
-                                            "aggregation-quick-reference/ for a complete list of "
-                                            "valid operators." % func)
+                                    raise NotImplementedError(
+                                        "%s is not a valid group operator for the aggregation "
+                                        "pipeline. See http://docs.mongodb.org/manual/meta/"
+                                        "aggregation-quick-reference/ for a complete list of "
+                                        "valid operators." % func)
                     out_collection = grouped_collection
                 elif k == '$sort':
                     sort_array = []
