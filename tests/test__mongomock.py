@@ -1600,6 +1600,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate15(self):
+        pipeline = [
+            {'$project': {'_id': 1, 'a': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate16(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'a': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

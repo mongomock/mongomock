@@ -1368,13 +1368,13 @@ class Collection(object):
 
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
-        for expression in pipeline:
-            for k, v in iteritems(expression):
+        for stage in pipeline:
+            for k, v in iteritems(stage):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection
                                       if filter_applies(v, doc)]
                 elif k == '$group':
-                    _id = expression['$group']['_id']
+                    _id = stage['$group']['_id']
                     group_func_keys = self._get_group_id_fields(_id)
 
                     out_collection, group_func_keys = self._add_group_id_fields(out_collection,
@@ -1500,6 +1500,16 @@ class Collection(object):
                             unwound_collection.append(copy.deepcopy(doc))
                             unwound_collection[-1][v[1:]] = field_item
                     out_collection = unwound_collection
+                elif k == '$project':
+                    filter_list = ['_id']
+                    for field, value in iteritems(v):
+                        if field == '_id':
+                            if value == 0:
+                                filter_list.remove('_id')
+                        if value == 1:
+                            filter_list.append(field)
+                    out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
+                                      for x in out_collection]
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
