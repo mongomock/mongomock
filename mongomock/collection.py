@@ -1395,7 +1395,38 @@ class Collection(object):
             '$dateToString']
 
         def _handle_arithmetic_operator(operator, values, doc_dict):
-            if operator == '$subtract':
+            import math
+            if operator == '$abs':
+                return abs(_parse_expression(values, doc_dict))
+            elif operator == '$ceil':
+                return math.ceil(_parse_expression(values, doc_dict))
+            elif operator == '$divide':
+                assert len(values) == 2, 'divide must have only 2 items'
+                return _parse_expression(values[0], doc_dict) / _parse_expression(values[1],
+                                                                                  doc_dict)
+            elif operator == '$exp':
+                return math.exp(_parse_expression(values, doc_dict))
+            elif operator == '$floor':
+                return math.floor(_parse_expression(values, doc_dict))
+            elif operator == '$ln':
+                return math.log(_parse_expression(values, doc_dict))
+            elif operator == '$log':
+                assert len(values) == 2, 'log must have only 2 items'
+                return math.log(_parse_expression(values[0], doc_dict),
+                                _parse_expression(values[1], doc_dict))
+            elif operator == '$log10':
+                return math.log10(_parse_expression(values, doc_dict))
+            elif operator == '$mod':
+                assert len(values) == 2, 'mod must have only 2 items'
+                return math.fmod(_parse_expression(values[0], doc_dict),
+                                 _parse_expression(values[1], doc_dict))
+            elif operator == '$pow':
+                assert len(values) == 2, 'pow must have only 2 items'
+                return math.pow(_parse_expression(values[0], doc_dict),
+                                _parse_expression(values[1], doc_dict))
+            elif operator == '$sqrt':
+                return math.sqrt(_parse_expression(values, doc_dict))
+            elif operator == '$subtract':
                 assert len(values) == 2, 'subtract must have only 2 items'
                 return _parse_expression(values[0], doc_dict) - _parse_expression(values[1],
                                                                                   doc_dict)

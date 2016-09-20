@@ -1630,6 +1630,16 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate20(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'abs': {'$abs': '$b'}, 'ceil': {'$ceil': 8.35},
+                          'div': {'$divide': ['$a', 1]}, 'exp': {'$exp': 2},
+                          'floor': {'$floor': 4.65}, 'ln': {'$ln': 100},
+                          'log10': {'$log10': 1000}, 'mod': {'$mod': [46, 9]},
+                          'pow': {'$pow': [4, 2]}, 'sqrt': {'$sqrt': 100}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
