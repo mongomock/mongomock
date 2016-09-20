@@ -1309,9 +1309,12 @@ class Collection(object):
             '$skip',
             '$unwind',
             '$group',
+            '$sample'
             '$sort',
             '$geoNear',
-            '$out']
+            '$lookup'
+            '$out',
+            '$indexStats']
         group_operators = [
             '$addToSet',
             '$first',
@@ -1320,7 +1323,16 @@ class Collection(object):
             '$min',
             '$avg',
             '$push',
-            '$sum']
+            '$sum',
+            '$stdDevPop',
+            '$stdDevSamp']
+        project_operators = [
+            '$max',
+            '$min',
+            '$avg',
+            '$sum',
+            '$stdDevPop',
+            '$stdDevSamp']
         boolean_operators = ['$and', '$or', '$not']  # noqa
         set_operators = [  # noqa
             '$setEquals',
@@ -1330,7 +1342,7 @@ class Collection(object):
             '$setIsSubset',
             '$anyElementTrue',
             '$allElementsTrue']
-        compairison_operators = [  # noqa
+        comparison_operators = [  # noqa
             '$cmp',
             '$eq',
             '$gt',
@@ -1338,12 +1350,22 @@ class Collection(object):
             '$lt',
             '$lte',
             '$ne']
-        aritmetic_operators = [  # noqa
+        arithmetic_operators = [  # noqa
+            '$abs',
             '$add',
+            '$ceil',
             '$divide',
+            '$exp',
+            '$floor',
+            '$ln',
+            '$log',
+            '$log10',
             '$mod',
             '$multiply',
-            '$subtract']
+            '$pow',
+            '$sqrt',
+            '$subtract',
+            '$trunc']
         string_operators = [  # noqa
             '$concat',
             '$strcasecmp',
@@ -1351,7 +1373,13 @@ class Collection(object):
             '$toLower',
             '$toUpper']
         text_search_operators = ['$meta']  # noqa
-        array_operators = ['$size']  # noqa
+        array_operators = [  # noqa
+            '$arrayElemAt',
+            '$concatArrays',
+            '$filter',
+            '$isArray',
+            '$size',
+            '$slice']
         projection_operators = ['$map', '$let', '$literal']  # noqa
         date_operators = [  # noqa
             '$dayOfYear',
@@ -1363,9 +1391,62 @@ class Collection(object):
             '$hour',
             '$minute',
             '$second',
-            '$millisecond']
-        conditional_operators = ['$cond', '$ifNull']  # noqa
+            '$millisecond',
+            '$dateToString']
 
+        def _handle_arithmetic_operator(operator, values, doc_dict):
+            if operator == '$subtract':
+                assert len(values) == 2, 'subtract must have only 2 items'
+                return _parse_expression(values[0], doc_dict) - _parse_expression(values[1],
+                                                                                  doc_dict)
+            else:
+                raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
+                                          "aggregation pipeline, it is currently not implemented "
+                                          " in Mongomock." % operator)
+
+        def _handle_project_operator(operator, values, doc_dict):
+            if operator == '$min':
+                if len(values) > 2:
+                    raise NotImplementedError("Although %d is a valid amount of elements in "
+                                              "aggregation pipeline, it is currently not "
+                                              " implemented in Mongomock" % len(values))
+                return min(_parse_expression(values[0], doc_dict),
+                           _parse_expression(values[1], doc_dict))
+            else:
+                raise NotImplementedError("Although '%s' is a valid project operator for the "
+                                          "aggregation pipeline, it is currently not implemented "
+                                          "in Mongomock." % operator)
+
+        def _parse_expression(expression, doc_dict):
+            if not isinstance(expression, dict):
+                if isinstance(expression, str):
+                    return doc_dict.get(expression.replace('$', ''), None)
+                else:
+                    return expression
+            k, v = next(iteritems(expression))
+
+            if k in arithmetic_operators:
+                return _handle_arithmetic_operator(k, v, doc_dict)
+            if k in project_operators:
+                return _handle_project_operator(k, v, doc_dict)
+            else:
+                raise NotImplementedError("%s is not supported operator for the aggregation "
+                                          "pipeline. See http://docs.mongodb.org/manual/meta/"
+                                          "aggregation-quick-reference/ for a complete list of "
+                                          "valid operators." % k)
+
+        def _extend_collection(out_collection, field, expression):
+            field_exists = False
+            for doc in out_collection:
+                if field in doc.keys():
+                    field_exists = True
+            if not field_exists:
+                for doc in out_collection:
+                    # verify expression has operator as first
+                    doc[field] = _parse_expression(expression.copy(), doc)
+            return out_collection
+
+        conditional_operators = ['$cond', '$ifNull']  # noqa
         out_collection = [doc for doc in self.find()]
         grouped_collection = []
         for stage in pipeline:
@@ -1506,8 +1587,9 @@ class Collection(object):
                         if field == '_id':
                             if value == 0:
                                 filter_list.remove('_id')
-                        if value == 1:
+                        if value != 0:
                             filter_list.append(field)
+                            out_collection = _extend_collection(out_collection, field, value)
                     out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
                                       for x in out_collection]
                 else:

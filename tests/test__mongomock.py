@@ -1612,6 +1612,24 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate17(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': [{'$min': ['$a', '$b']}, '$count']}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate18(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': ['$a', '$b']}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate19(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': ['$a', 1]}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
