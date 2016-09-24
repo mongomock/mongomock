@@ -771,3 +771,34 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.update_one(
                 {}, {'$currentDate': {'updated_at': {'$type': 'timestamp'}}}, upsert=True)
+
+    def test__rename_collection(self):
+        self.db.collection.insert({"_id": 1, "test_list": [{"data": "val"}]})
+        coll = self.db.collection
+
+        coll.rename("other_name")
+
+        self.assertEqual("other_name", coll.name)
+        self.assertEqual(
+            set(["other_name"]), set(self.db.collection_names(False)))
+        self.assertEqual(coll, self.db.other_name)
+        data_in_db = coll.find()
+        self.assertEqual(
+            [({"_id": 1, "test_list": [{"data": "val"}]})], list(data_in_db))
+
+    def test__rename_collectiont_to_bad_names(self):
+        coll = self.db.create_collection("a")
+        self.assertRaises(TypeError, coll.rename, ["a"])
+        self.assertRaises(mongomock.InvalidName, coll.rename, ".a")
+        self.assertRaises(mongomock.InvalidName, coll.rename, "$a")
+
+    def test__rename_collection_already_exists(self):
+        coll = self.db.create_collection("a")
+        self.db.create_collection("c")
+        self.assertRaises(mongomock.OperationFailure, coll.rename, "c")
+
+    def test__rename_collection_drop_target(self):
+        coll = self.db.create_collection("a")
+        self.db.create_collection("c")
+        coll.rename("c", dropTarget=True)
+        self.assertEqual(set(["c"]), set(self.db.collection_names(False)))

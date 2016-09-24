@@ -1516,6 +1516,9 @@ class Collection(object):
             self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
         return self
 
+    def rename(self, new_name, **kwargs):
+        self._database.rename_collection(self.name, new_name, **kwargs)
+
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
