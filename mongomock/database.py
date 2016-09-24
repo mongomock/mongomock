@@ -1,5 +1,9 @@
 from . import CollectionInvalid
+from . import InvalidName
+from . import OperationFailure
 from .collection import Collection
+
+from mongomock import helpers
 
 
 class Database(object):
@@ -68,6 +72,32 @@ class Database(object):
             raise NotImplementedError("Special options not supported")
 
         return self[name]
+
+    def rename_collection(self, name, new_name, dropTarget=False):
+        """Changes the name of an existing collection."""
+        # These are the same checks that are done in pymongo.
+        if not isinstance(new_name, helpers.basestring):
+            raise TypeError("new_name must be an instance of basestring")
+        if new_name[0] == "." or new_name[-1] == ".":
+            raise InvalidName("collection names must not start or end with '.'")
+        if "$" in new_name:
+            raise InvalidName("collection names must not contain '$'")
+
+        # Reference for server implementation:
+        # https://docs.mongodb.com/manual/reference/command/renameCollection/
+        if name not in self._collections:
+            raise OperationFailure(
+                'The collection "{0}" does not exist.'.format(name), 10026)
+        if new_name in self._collections:
+            if dropTarget:
+                self.drop_collection(new_name)
+            else:
+                raise OperationFailure(
+                    'The target collection "{0}" already exists'.format(new_name),
+                    10027)
+        collection = self._collections.pop(name)
+        collection.name = new_name
+        self._collections[new_name] = collection
 
     def dereference(self, dbref):
 

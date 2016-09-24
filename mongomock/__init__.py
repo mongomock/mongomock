@@ -23,6 +23,12 @@ except ImportError:
         pass
 
 try:
+    from pymongo.errors import InvalidName
+except ImportError:
+    class InvalidName(PyMongoError):
+        pass
+
+try:
     from pymongo.errors import InvalidOperation
 except ImportError:
     class InvalidOperation(PyMongoError):
@@ -56,6 +62,7 @@ __all__ = [
     'DuplicateKeyError',
     'Collection',
     'CollectionInvalid',
+    'InvalidName',
     'MongoClient',
     'ObjectId',
     'OperationFailure',
