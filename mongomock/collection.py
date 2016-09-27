@@ -6,6 +6,7 @@ from datetime import datetime
 import functools
 import itertools
 import json
+import math
 from operator import itemgetter
 import threading
 import time
@@ -1395,7 +1396,6 @@ class Collection(object):
             '$dateToString']
 
         def _handle_arithmetic_operator(operator, values, doc_dict):
-            import math
             if operator == '$abs':
                 return abs(_parse_expression(values, doc_dict))
             elif operator == '$ceil':
@@ -1451,7 +1451,7 @@ class Collection(object):
         def _parse_expression(expression, doc_dict):
             if not isinstance(expression, dict):
                 if isinstance(expression, str):
-                    return doc_dict.get(expression.replace('$', ''), None)
+                    return doc_dict.get(expression.replace('$', ''), NOTHING)
                 else:
                     return expression
             k, v = next(iteritems(expression))
@@ -1469,8 +1469,9 @@ class Collection(object):
         def _extend_collection(out_collection, field, expression):
             field_exists = False
             for doc in out_collection:
-                if field in doc.keys():
+                if field in doc:
                     field_exists = True
+                    break
             if not field_exists:
                 for doc in out_collection:
                     # verify expression has operator as first
