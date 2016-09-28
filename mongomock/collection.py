@@ -28,6 +28,8 @@ except ImportError:
         BEFORE = False
         AFTER = True
 
+from .bulk_write import BulkWriteOperation
+
 from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
@@ -52,7 +54,6 @@ from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
-from bulk_write import BulkWriteOperation
 from helpers import validate_ok_for_update, validate_is_mapping
 lock = threading.RLock()
 
