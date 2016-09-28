@@ -53,14 +53,8 @@ from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 from bulk_write import BulkWriteOperation
+from helpers import validate_ok_for_update, validate_is_mapping
 lock = threading.RLock()
-
-
-def validate_is_mapping(option, value):
-    if not isinstance(value, collections.Mapping):
-        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
-                        'other type that inherits from '
-                        'collections.Mapping' % (option,))
 
 
 def validate_is_mutable_mapping(option, value):
@@ -76,15 +70,6 @@ def validate_ok_for_replace(replacement):
         first = next(iter(replacement))
         if first.startswith('$'):
             raise ValueError('replacement can not include $ operators')
-
-
-def validate_ok_for_update(update):
-    validate_is_mapping('update', update)
-    if not update:
-        raise ValueError('update only works with $ operators')
-    first = next(iter(update))
-    if not first.startswith('$'):
-        raise ValueError('update only works with $ operators')
 
 
 def validate_write_concern_params(**params):
