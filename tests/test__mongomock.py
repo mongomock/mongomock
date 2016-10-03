@@ -337,6 +337,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # test no match
         self.cmp.compare.find({'_id': id}, {'owns': {'$elemMatch': {'type': 'cap'}}})
 
+    def test__size(self):
+        id = ObjectId()
+        self.cmp.do.insert({
+            '_id': id,
+            'l_string': 1,
+            'l_tuple': ['a', 'b']
+        })
+        self.cmp.compare.find({'_id': id})
+        self.cmp.compare.find({'_id': id, 'l_string': {'$not': {'$size': 0}}})
+        self.cmp.compare.find({'_id': id, 'l_tuple': {'$size': 2}})
+
     def test__regex_match_non_string(self):
         id = ObjectId()
         self.cmp.do.insert({
