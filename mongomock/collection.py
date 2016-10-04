@@ -7,7 +7,6 @@ import functools
 import itertools
 import json
 import math
-from operator import itemgetter
 import threading
 import time
 import warnings
@@ -1497,8 +1496,7 @@ class Collection(object):
                         grouped_collection = []
                     else:
                         out_collection = sorted(out_collection,
-                                                key=itemgetter(*map(lambda x: x.split('.')[0],
-                                                                    group_func_keys)))
+                                                key=helpers.embedded_item_getter(*group_func_keys))
 
                     for field, value in iteritems(v):
                         if field == '_id':
