@@ -292,8 +292,7 @@ class Collection(object):
         for unique in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                if key in data:
-                    find_kwargs[key] = data[key]
+                find_kwargs[key] = data.get(key)
             answer = self.find(find_kwargs)
             if answer.count() > 0:
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
