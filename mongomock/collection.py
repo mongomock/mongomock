@@ -320,20 +320,20 @@ class Collection(object):
             sub_doc = sub_doc[part]
         del sub_doc[key_parts[-1]]
 
-    def update_one(self, criteria, update, upsert=False):
+    def update_one(self, filter, update, upsert=False):
         validate_ok_for_update(update)
-        return UpdateResult(self._update(criteria, update, upsert=upsert),
+        return UpdateResult(self._update(filter, update, upsert=upsert),
                             acknowledged=True)
 
-    def update_many(self, criteria, update, upsert=False):
+    def update_many(self, filter, update, upsert=False):
         validate_ok_for_update(update)
-        return UpdateResult(self._update(criteria, update, upsert=upsert,
+        return UpdateResult(self._update(filter, update, upsert=upsert,
                                          multi=True),
                             acknowledged=True)
 
-    def replace_one(self, criteria, replacement, upsert=False):
+    def replace_one(self, filter, replacement, upsert=False):
         validate_ok_for_replace(replacement)
-        return UpdateResult(self._update(criteria, replacement, upsert=upsert),
+        return UpdateResult(self._update(filter, replacement, upsert=upsert),
                             acknowledged=True)
 
     def update(self, spec, document, upsert=False, manipulate=False,
