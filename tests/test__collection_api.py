@@ -659,6 +659,23 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__insert_empty_doc_uniq_idx(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        self.db.collection.insert({})
+
+        self.assertEqual(self.db.collection.find({}).count(), 2)
+
+    def test__insert_empty_doc_twice_uniq_idx(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({})
+
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,
