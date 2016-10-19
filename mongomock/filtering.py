@@ -154,6 +154,13 @@ def _regex(doc_val, regex):
     return any(regex.search(item) for item in _force_list(doc_val))
 
 
+def _size_op(doc_val, search_val):
+    if isinstance(doc_val, (list, tuple, dict)):
+        return search_val == len(doc_val)
+    else:
+        return search_val == 1 if doc_val else 0
+
+
 OPERATOR_MAP = {
     '$eq': operator.eq,
     '$ne': operator.ne,
@@ -167,6 +174,7 @@ OPERATOR_MAP = {
     '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
     '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
     '$elemMatch': _elem_match_op,
+    '$size': _size_op,
 }
 
 

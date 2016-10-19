@@ -337,6 +337,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # test no match
         self.cmp.compare.find({'_id': id}, {'owns': {'$elemMatch': {'type': 'cap'}}})
 
+    def test__size(self):
+        id = ObjectId()
+        self.cmp.do.insert({
+            '_id': id,
+            'l_string': 1,
+            'l_tuple': ['a', 'b']
+        })
+        self.cmp.compare.find({'_id': id})
+        self.cmp.compare.find({'_id': id, 'l_string': {'$not': {'$size': 0}}})
+        self.cmp.compare.find({'_id': id, 'l_tuple': {'$size': 2}})
+
     def test__regex_match_non_string(self):
         id = ObjectId()
         self.cmp.do.insert({
@@ -1597,6 +1608,46 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$group': {'_id': '$a', 'last_date': {'$last': '$date'},
                         'first_date': {'$first': '$date'}}},
             {'$sort': {'_id': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate15(self):
+        pipeline = [
+            {'$project': {'_id': 1, 'a': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate16(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'a': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate17(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': [{'$min': ['$a', '$b']}, '$count']}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate18(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': ['$a', '$b']}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate19(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'created': {'$subtract': ['$a', 1]}}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate20(self):
+        pipeline = [
+            {'$project': {'_id': 0, 'abs': {'$abs': '$b'}, 'ceil': {'$ceil': 8.35},
+                          'div': {'$divide': ['$a', 1]}, 'exp': {'$exp': 2},
+                          'floor': {'$floor': 4.65}, 'ln': {'$ln': 100},
+                          'log10': {'$log10': 1000}, 'mod': {'$mod': [46, 9]},
+                          'pow': {'$pow': [4, 2]}, 'sqrt': {'$sqrt': 100}}}
         ]
         self.cmp.compare.aggregate(pipeline)
 

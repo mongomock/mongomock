@@ -390,7 +390,9 @@ class CollectionAPITest(TestCase):
     def test__update_one(self):
         insert_result = self.db.collection.insert_one({'a': 1})
         update_result = self.db.collection.update_one(
-            {'a': 1}, {'$set': {'a': 2}})
+            filter={'a': 1},
+            update={'$set': {'a': 2}}
+        )
         self.assertEqual(update_result.matched_count, 1)
         self.assertEqual(update_result.modified_count, 1)
         self.assertIsNone(update_result.upserted_id)
@@ -401,7 +403,10 @@ class CollectionAPITest(TestCase):
     def test__update_one_upsert(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_one(
-            {'a': 1}, {'$set': {'a': 1}}, upsert=True)
+            filter={'a': 1},
+            update={'$set': {'a': 1}},
+            upsert=True
+        )
         self.assertEqual(update_result.modified_count, 0)
         self.assertEqual(update_result.matched_count, 0)
         self.assertIsNotNone(update_result.upserted_id)
@@ -410,7 +415,10 @@ class CollectionAPITest(TestCase):
     def test__update_one_upsert_dots(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_one(
-            {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)
+            filter={'a.b': 1},
+            update={'$set': {'c': 2}},
+            upsert=True
+        )
         self.assertEqual(update_result.modified_count, 0)
         self.assertEqual(update_result.matched_count, 0)
         self.assertIsNotNone(update_result.upserted_id)
@@ -419,7 +427,10 @@ class CollectionAPITest(TestCase):
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(
-                {'a.b': 1, 'a': 3}, {'$set': {'c': 2}}, upsert=True)
+                filter={'a.b': 1, 'a': 3},
+                update={'$set': {'c': 2}},
+                upsert=True
+            )
 
     def test__update_many(self):
         self.db.collection.insert_many([
@@ -428,7 +439,9 @@ class CollectionAPITest(TestCase):
             {'a': 2, 'c': 4}
         ])
         update_result = self.db.collection.update_many(
-            {'a': 1}, {'$set': {'c': 0}})
+            filter={'a': 1},
+            update={'$set': {'c': 0}}
+        )
         self.assertEqual(update_result.modified_count, 2)
         self.assertEqual(update_result.matched_count, 2)
         self.assertIsNone(update_result.upserted_id)
@@ -439,7 +452,10 @@ class CollectionAPITest(TestCase):
     def test__update_many_upsert(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_many(
-            {'a': 1}, {'$set': {'a': 1, 'c': 0}}, upsert=True)
+            filter={'a': 1},
+            update={'$set': {'a': 1, 'c': 0}},
+            upsert=True
+        )
         self.assertEqual(update_result.modified_count, 0)
         self.assertEqual(update_result.matched_count, 0)
         self.assertIsNotNone(update_result.upserted_id)
@@ -449,12 +465,18 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])
 
-        result = self.db.collection.replace_one({'a': 2}, {'x': 1, 'y': 2})
+        result = self.db.collection.replace_one(
+            filter={'a': 2},
+            replacement={'x': 1, 'y': 2}
+        )
         self.assert_documents([{'a': 1, 'b': 2}])
         self.assertEqual(result.matched_count, 0)
         self.assertEqual(result.modified_count, 0)
 
-        result = self.db.collection.replace_one({'a': 1}, {'x': 1, 'y': 2})
+        result = self.db.collection.replace_one(
+            filter={'a': 1},
+            replacement={'x': 1, 'y': 2}
+        )
         self.assert_documents([{'x': 1, 'y': 2}])
         self.assertEqual(result.matched_count, 1)
         self.assertEqual(result.modified_count, 1)
@@ -462,7 +484,10 @@ class CollectionAPITest(TestCase):
     def test__replace_one_upsert(self):
         self.assert_document_count(0)
         result = self.db.collection.replace_one(
-            {'a': 2}, {'x': 1, 'y': 2}, upsert=True)
+            filter={'a': 2},
+            replacement={'x': 1, 'y': 2},
+            upsert=True
+        )
         self.assertEqual(result.matched_count, 0)
         self.assertEqual(result.modified_count, 0)
         self.assertIsNotNone(result.upserted_id)
@@ -634,6 +659,23 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__insert_empty_doc_uniq_idx(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        self.db.collection.insert({})
+
+        self.assertEqual(self.db.collection.find({}).count(), 2)
+
+    def test__insert_empty_doc_twice_uniq_idx(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({})
+
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,
@@ -771,3 +813,34 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.update_one(
                 {}, {'$currentDate': {'updated_at': {'$type': 'timestamp'}}}, upsert=True)
+
+    def test__rename_collection(self):
+        self.db.collection.insert({"_id": 1, "test_list": [{"data": "val"}]})
+        coll = self.db.collection
+
+        coll.rename("other_name")
+
+        self.assertEqual("other_name", coll.name)
+        self.assertEqual(
+            set(["other_name"]), set(self.db.collection_names(False)))
+        self.assertEqual(coll, self.db.other_name)
+        data_in_db = coll.find()
+        self.assertEqual(
+            [({"_id": 1, "test_list": [{"data": "val"}]})], list(data_in_db))
+
+    def test__rename_collectiont_to_bad_names(self):
+        coll = self.db.create_collection("a")
+        self.assertRaises(TypeError, coll.rename, ["a"])
+        self.assertRaises(mongomock.InvalidName, coll.rename, ".a")
+        self.assertRaises(mongomock.InvalidName, coll.rename, "$a")
+
+    def test__rename_collection_already_exists(self):
+        coll = self.db.create_collection("a")
+        self.db.create_collection("c")
+        self.assertRaises(mongomock.OperationFailure, coll.rename, "c")
+
+    def test__rename_collection_drop_target(self):
+        coll = self.db.create_collection("a")
+        self.db.create_collection("c")
+        coll.rename("c", dropTarget=True)
+        self.assertEqual(set(["c"]), set(self.db.collection_names(False)))
