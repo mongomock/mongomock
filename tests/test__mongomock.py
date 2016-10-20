@@ -772,6 +772,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)
         self.cmp.compare.find()
 
+    def test__update_with_empty_document_comes(self):
+        """Tests calling update with just '{}' for replacing whole document"""
+        self.cmp.do.insert({'name': 'bob', 'hat': 'wide'})
+        self.cmp.do.update({'name': 'bob'}, {})
+        self.cmp.compare.find()
+
     def test__update_one(self):
         self.cmp.do.insert_many([{'a': 1, 'b': 0},
                                  {'a': 2, 'b': 0}])

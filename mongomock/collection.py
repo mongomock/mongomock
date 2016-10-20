@@ -582,6 +582,12 @@ class Collection(object):
                         raise ValueError(
                             'Invalid modifier specified: {}'.format(k))
                 first = False
+            # if empty document comes
+            if len(document) == 0:
+                _id = spec.get('_id', existing_document.get('_id'))
+                existing_document.clear()
+                if _id:
+                    existing_document['_id'] = _id
             if not multi:
                 break
 
