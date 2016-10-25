@@ -1657,6 +1657,12 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate21(self):
+        pipeline = [
+            {'$group': {'_id': '$a', 'count': {'$sum': 1}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
