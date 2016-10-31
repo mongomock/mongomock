@@ -1534,34 +1534,39 @@ class Collection(object):
                                             new_doc = False
                                             break
 
-                                    from_field = key.replace('$', '')
+                                    if isinstance(key, helpers.basestring) and key.startswith('$'):
+                                        from_field = key.replace('$', '')
+                                        get_val = lambda cur_doc: cur_doc.get(from_field)
+                                    else:
+                                        get_val = lambda cur_doc: key
+
                                     if func == "$sum":
                                         current_val = doc_dict.get(field, 0) + \
-                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                            sum([get_val(doc) or 0 for doc in group_list])
                                         doc_dict[field] = current_val
                                     elif func == "$avg":
                                         current_val = doc_dict.get(field, 0) + \
-                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                            sum([get_val(doc) or 0 for doc in group_list])
                                         current_avg = current_val / max(len(group_list), 1)
                                         doc_dict[field] = current_avg
                                     elif func == "$min":
                                         current_val = doc_dict.get(field, MAXSIZE)
-                                        min_doc = min([doc.get(from_field, MAXSIZE) for doc
+                                        min_doc = min([get_val(doc) or MAXSIZE for doc
                                                       in group_list])
                                         doc_dict[field] = min(current_val, min_doc)
                                     elif func == "$max":
                                         current_val = doc_dict.get(field, -MAXSIZE)
-                                        max_doc = max([doc.get(from_field, -MAXSIZE) for doc
+                                        max_doc = max([get_val(doc) or -MAXSIZE for doc
                                                       in group_list])
                                         doc_dict[field] = max(current_val, max_doc)
                                     elif func == "$first":
                                         current_val = doc_dict.get(field, datetime.max)
-                                        min_doc = min([doc.get(from_field, datetime.max) for doc
+                                        min_doc = min([get_val(doc) or datetime.max for doc
                                                       in group_list])
                                         doc_dict[field] = min(current_val, min_doc)
                                     elif func == "$last":
                                         current_val = doc_dict.get(field, datetime.min)
-                                        max_doc = max([doc.get(from_field, datetime.min) for doc
+                                        max_doc = max([get_val(doc) or datetime.min for doc
                                                       in group_list])
                                         doc_dict[field] = max(current_val, max_doc)
 
