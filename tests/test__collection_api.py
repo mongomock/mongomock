@@ -844,3 +844,16 @@ class CollectionAPITest(TestCase):
         self.db.create_collection("c")
         coll.rename("c", dropTarget=True)
         self.assertEqual(set(["c"]), set(self.db.collection_names(False)))
+
+    def test__cursor_rewind(self):
+        coll = self.db.create_collection('a')
+        coll.insert({'a': 1})
+        coll.insert({'a': 2})
+        coll.insert({'a': 3})
+
+        curs = coll.find().sort('a')
+        self.assertEqual(next(curs)['a'], 1)
+        self.assertEqual(next(curs)['a'], 2)
+        curs.rewind()
+        self.assertEqual(next(curs)['a'], 1)
+        self.assertEqual(next(curs)['a'], 2)
