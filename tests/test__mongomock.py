@@ -1663,6 +1663,39 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate22(self):
+        pipeline = [
+            {"$group": {"_id": {"$gte": ["$a", 2]}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate23(self):
+        # make sure we aggregate compound keys correctly
+        pipeline = [
+            {"$group": {"_id": {"id_a": "$a", "id_b": "$b"}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate24(self):
+        # make sure we aggregate zero rows correctly
+        pipeline = [
+            {"$match": {"_id": "123456"}},
+            {"$group": {"_id": {"$eq": ["$a", 1]}, 'total': {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate25(self):
+        pipeline = [
+            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate26(self):
+        pipeline = [
+            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
