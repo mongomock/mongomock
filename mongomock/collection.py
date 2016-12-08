@@ -1671,10 +1671,10 @@ class Cursor(object):
         super(Cursor, self).__init__()
         self.collection = collection
         self._factory = dataset_factory
-        self._dataset = self._factory()
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self._skip = None
+        self.rewind()
 
     def __iter__(self):
         return self
@@ -1683,16 +1683,21 @@ class Cursor(object):
         return Cursor(self.collection, self._factory, self._limit)
 
     def __next__(self):
-        if self._skip:
+        if self._skip and not self._skipped:
             for i in range(self._skip):
                 next(self._dataset)
-            self._skip = None
-        if self._limit is not None and self._limit <= 0:
+            self._skipped = self._skip
+        if self._limit is not None and self._limit <= self._emitted:
             raise StopIteration()
         if self._limit is not None:
-            self._limit -= 1
+            self._emitted += 1
         return next(self._dataset)
     next = __next__
+
+    def rewind(self):
+        self._dataset = self._factory()
+        self._emitted = 0
+        self._skipped = 0
 
     def sort(self, key_or_list, direction=None):
         if direction is None:
