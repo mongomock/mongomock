@@ -1461,7 +1461,10 @@ class Collection(object):
             if not field_exists:
                 for doc in out_collection:
                     # verify expression has operator as first
-                    doc[field] = _parse_expression(expression.copy(), doc)
+                    if isinstance(expression, str):
+                        doc[field] = _parse_expression(expression, doc)
+                    else:
+                        doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
         conditional_operators = ['$cond', '$ifNull']  # noqa
