@@ -876,7 +876,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__unset_positional(self):
         self.cmp.do.insert({'a': 1, 'b': [{'c': 2, 'd': 3}]})
-        self.cmp.do.update({'a': 1, 'b': {'$elemMatch': {'c': 2, 'd': 3}}}, {'$unset': {'b.$.c': ''}})
+        self.cmp.do.update(
+            {'a': 1, 'b': {'$elemMatch': {'c': 2, 'd': 3}}},
+            {'$unset': {'b.$.c': ''}}
+        )
         self.cmp.compare.find()
 
     def test__set_upsert(self):
