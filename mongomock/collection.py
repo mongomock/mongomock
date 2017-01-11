@@ -380,11 +380,6 @@ class Collection(object):
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, _set_updater, subdocument)
 
-                elif k == '$unset':
-                    for field, value in iteritems(v):
-                        if self._has_key(existing_document, field):
-                            self._remove_key(existing_document, field)
-
                 elif k == '$currentDate':
                     for value in itervalues(v):
                         if value == {'$type': 'timestamp'}:
@@ -1729,6 +1724,11 @@ def _set_updater(doc, field_name, value):
         doc[field_name] = value
 
 
+def _unset_updater(doc, field_name, value):
+    if isinstance(doc, dict):
+        doc.pop(field_name, None)
+
+
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
@@ -1756,6 +1756,7 @@ def _current_date_updater(doc, field_name, value):
 
 _updaters = {
     '$set': _set_updater,
+    '$unset': _unset_updater,
     '$inc': _inc_updater,
     '$max': _max_updater,
     '$min': _min_updater,
