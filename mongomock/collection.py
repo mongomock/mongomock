@@ -799,8 +799,7 @@ class Collection(object):
         sdoc_copy = doc_copy.setdefault(field, [])
         if len(sdoc_copy) < len(sdocitems):
             sdoc_copy.extend([{} if not subtract else {'$EMPTY$': True}
-                for _ in xrange(len(sdocitems)-len(sdoc_copy))
-            ])
+                              for _ in xrange(len(sdocitems) - len(sdoc_copy))])
         for (sdoc, sdocitem) in zip(sdoc_copy, sdocitems):
             if not subtract:
                 sdoc.update(sdocitem)
@@ -828,9 +827,8 @@ class Collection(object):
                         break
                     if isinstance(subdocument[key_part], list):
                         subdocitems = [
-                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i+1:]): 1},
-                                container
-                            )
+                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i + 1:]): 1},
+                                                      container)
                             for sdocitem in subdocument[key_part]
                         ]
                         self._subdocitem_merge(subdocument_copy, key_part, subdocitems)
@@ -838,7 +836,7 @@ class Collection(object):
                         subdocument = subdocument[key_part]
                         subdocument_copy = subdocument_copy.setdefault(key_part, {})
                 if not full_key_path_found or not isinstance(subdocument, dict) or \
-                    key_parts[-1] not in subdocument:
+                        key_parts[-1] not in subdocument:
                     continue
                 subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
         # otherwise, exclude the fields passed in
@@ -854,18 +852,16 @@ class Collection(object):
                         break
                     if isinstance(subdocument_copy[key_part], list):
                         subdocitems = [
-                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i+1:]): 0},
-                                container
-                            )
+                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i + 1:]): 0},
+                                                      container)
                             for sdocitem in subdocument_copy[key_part]
                         ]
                         self._subdocitem_merge(subdocument_copy, key_part, subdocitems,
-                            subtract=True
-                        )
+                                               subtract=True)
                     else:
                         subdocument_copy = subdocument_copy[key_part]
                 if not full_key_path_found or not isinstance(subdocument_copy, dict) or \
-                    key_parts[-1] not in subdocument_copy:
+                        key_parts[-1] not in subdocument_copy:
                     continue
                 del subdocument_copy[key_parts[-1]]
         return doc_copy

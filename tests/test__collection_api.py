@@ -263,18 +263,18 @@ class CollectionAPITest(TestCase):
         doc = {'a': 1, 'b': [{'c': 3, 'd': 4}, {'c': 5, 'd': 6}]}
         self.db.collection.insert_one(doc)
         result = self.db.collection.find_one({'a': 1}, {'a': 1, 'b': 1})
-        self.assertEquals(result, doc)
+        self.assertEqual(result, doc)
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c': 1})
-        self.assertEquals(result, {'a': 1, 'b': [{'c': 3}, {'c': 5}]})
+        self.assertEqual(result, {'a': 1, 'b': [{'c': 3}, {'c': 5}]})
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0})
-        self.assertEquals(result, {'b': [{'d': 4}, {'d': 6}]})
-        #Test that a projection that does not fit the document does not result in an error
+        self.assertEqual(result, {'b': [{'d': 4}, {'d': 6}]})
+        # Test that a projection that does not fit the document does not result in an error
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c.e': 1})
-        #Note that this does not match MongoDB behaviour exactly, will have to be fixed later
-        #Actual Mongo projection: {'a': 1, 'b': [{}, {}]}
-        self.assertEquals(result, {'a': 1, 'b': [{'c': {}}, {'c': {}}]})
+        # Note that this does not match MongoDB behaviour exactly, will have to be fixed later
+        # Actual Mongo projection: {'a': 1, 'b': [{}, {}]}
+        self.assertEqual(result, {'a': 1, 'b': [{'c': {}}, {'c': {}}]})
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0, 'b.c.e': 0})
-        self.assertEquals(result, {'b': [{'d': 4}, {'d': 6}]})
+        self.assertEqual(result, {'b': [{'d': 4}, {'d': 6}]})
 
     def test__find_removed_and_changed_options(self):
         """Test that options that have been removed are rejected."""
