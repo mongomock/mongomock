@@ -424,6 +424,16 @@ class CollectionAPITest(TestCase):
         self.assertIsNotNone(update_result.upserted_id)
         self.assert_document_stored(update_result.upserted_id, {'a': {'b': 1}, 'c': 2})
 
+    def test__update_one_unset_position(self):
+        insert_result = self.db.collection.insert_one({'a': 1, 'b': [{'c': 2, 'd': 3}]})
+        update_result = self.db.collection.update_one(
+            filter={'a': 1, 'b': {'$elemMatch': {'c': 2, 'd': 3}}},
+            update={'$unset': {'b.$.c': ''}}
+        )
+        self.assertEqual(update_result.modified_count, 1)
+        self.assertEqual(update_result.matched_count, 1)
+        self.assert_document_stored(insert_result.inserted_id, {'a': 1, 'b': [{'d': 3}]})
+
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(
