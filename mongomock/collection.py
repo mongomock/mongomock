@@ -1640,7 +1640,7 @@ class Cursor(object):
             raise StopIteration()
         if self._limit is not None:
             self._emitted += 1
-        return next(self._dataset)
+        return {k: copy.deepcopy(v) for k, v in iteritems(next(self._dataset))}
     next = __next__
 
     def rewind(self):
