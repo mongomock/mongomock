@@ -117,6 +117,15 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(StopIteration):
             next(iterator2)
 
+    def test_cursor_returns_document_copies(self):
+        obj = {'a': 1, 'b': 2}
+        self.db.collection.insert(obj)
+        fetched_obj = self.db.collection.find_one({'a': 1})
+        self.assertEqual(fetched_obj, obj)
+        fetched_obj['b'] = 3
+        refetched_obj = self.db.collection.find_one({'a': 1})
+        self.assertNotEqual(fetched_obj, refetched_obj)
+
     def test__update_retval(self):
         self.db.col.save({"a": 1})
         retval = self.db.col.update({"a": 1}, {"b": 2})
