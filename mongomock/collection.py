@@ -385,7 +385,8 @@ class Collection(object):
         self._documents = OrderedDict()
         self._force_created = create
         self._write_concern = write_concern or WriteConcern()
-        self._uniques = []
+        self._uniques = {}
+        self._index_information = {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.full_name}}
 
     def _is_created(self):
         return self._documents or self._uniques or self._force_created
@@ -478,7 +479,7 @@ class Collection(object):
 
     def _ensure_uniques(self, new_data):
         # Note we consider new_data is already inserted in db
-        for unique, is_sparse in self._uniques:
+        for unique, is_sparse in self._uniques.values():
             find_kwargs = {}
             for key, direction in unique:
                 try:
@@ -1313,38 +1314,50 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if not kwargs.pop('unique', False):
-            return
-
-        unique = helpers.index_list(key_or_list)
+        index_list = helpers.index_list(key_or_list)
+        is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 
-        # Check that documents already verify the uniquess of this new index.
-        indexed = set()
-        for doc in itervalues(self._documents):
-            index = []
-            for key, unused_order in unique:
-                try:
-                    index.append(get_value_by_dot(doc, key))
-                except KeyError:
-                    if is_sparse:
-                        continue
-                    index.append(None)
-            index = tuple(index)
-            if index in indexed:
-                raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
-            indexed.add(index)
+        index_string = "_".join("_".join([str(i) for i in ix]) for ix in index_list)
+        self._index_information[index_string] = {
+            'key': index_list,
+            'ns': self.full_name,
+            'v': 1,
+        }
 
-        self._uniques.append((unique, is_sparse))
+        # Check that documents already verify the uniquess of this new index.
+        if is_unique:
+            self._index_information[index_string]['unique'] = True
+            indexed = set()
+            for doc in itervalues(self._documents):
+                index = []
+                for key, unused_order in index_list:
+                    try:
+                        index.append(get_value_by_dot(doc, key))
+                    except KeyError:
+                        if is_sparse:
+                            continue
+                        index.append(None)
+                index = tuple(index)
+                if index in indexed:
+                    raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+                indexed.add(index)
+
+            self._uniques[index_string] = (index_list, is_sparse)
+
+        return index_string
 
     def drop_index(self, index_or_name, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
+        self._index_information.pop(index_or_name, None)
+        self._uniques.pop(index_or_name, None)
 
     def drop_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        self._uniques = []
+        self._uniques = {}
+        self._index_information = {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.full_name}}
 
     def reindex(self, session=None):
         if session:
@@ -1353,12 +1366,13 @@ class Collection(object):
     def list_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        return {}
+        for name, information in self._index_information.items():
+            yield [('name', name)] + list(sorted(information.items(), key=lambda kv: kv[0]))
 
     def index_information(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        return {}
+        return copy.deepcopy(self._index_information)
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False,
                    query=None, limit=0, session=None):

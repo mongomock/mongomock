@@ -1033,6 +1033,74 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({"value": 1})
         self.assertEqual(self.db.collection.find({}).count(), 3)
 
+    def test__insert_empty_doc_idx_information(self):
+        self.db.collection.insert({})
+
+        index_information = self.db.collection.index_information()
+        self.assertEqual(
+            {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            index_information,
+        )
+        self.assertEqual(
+            [[('name', '_id_'), ('key', [('_id', 1)]), ('ns', 'somedb.collection'), ('v', 1)]],
+            list(self.db.collection.list_indexes()),
+        )
+
+        del index_information['_id_']
+
+        self.assertEqual(
+            {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            self.db.collection.index_information(),
+            msg='index_information is immutable',
+        )
+
+    def test__create_idx_information(self):
+        index = self.db.collection.create_index([('value', 1)])
+
+        self.db.collection.insert({})
+
+        self.assertDictEqual(
+            {
+                'key': [('value', 1)],
+                'ns': self.db.collection.full_name,
+                'v': 1,
+            },
+            self.db.collection.index_information()[index])
+        self.assertEqual({'_id_', index}, set(self.db.collection.index_information().keys()))
+
+        self.db.collection.drop_index(index)
+        self.assertEqual({'_id_'}, set(self.db.collection.index_information().keys()))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_unique_idx_information_with_ascending_ordering(self):
+        index = self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
+
+        self.db.collection.insert({'value': 1})
+
+        self.assertDictEqual(
+            {
+                'key': [('value', pymongo.ASCENDING)],
+                'ns': self.db.collection.full_name,
+                'unique': True,
+                'v': 1,
+            },
+            self.db.collection.index_information()[index])
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_unique_idx_information_with_descending_ordering(self):
+        index = self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
+
+        self.db.collection.insert({'value': 1})
+
+        self.assertDictEqual(
+            self.db.collection.index_information()[index],
+            {
+                'key': [("value", pymongo.DESCENDING)],
+                'ns': self.db.collection.full_name,
+                'unique': True,
+                'v': 1,
+            })
+
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,
