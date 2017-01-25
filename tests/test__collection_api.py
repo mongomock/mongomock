@@ -867,3 +867,125 @@ class CollectionAPITest(TestCase):
         curs.rewind()
         self.assertEqual(next(curs)['a'], 1)
         self.assertEqual(next(curs)['a'], 2)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_insert_one(self):
+        operations = [pymongo.InsertOne({'a': 1, 'b': 2})]
+        result = self.db.collection.bulk_write(operations)
+
+        self.assert_document_count(1)
+        doc = next(self.db.collection.find({}))
+        self.assert_document_stored(doc['_id'], {'a': 1, 'b': 2})
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 1})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_update_one(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.UpdateOne({'a': 1}, {"$set": {'a': 2}})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 2}))
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(result, {
+            'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.UpdateOne({'a': 1}, {"$set": {'a': 3}}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_update_many(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1, 'b': 1})
+        self.db.collection.insert_one({'a': 1, 'b': 0})
+        operations = [pymongo.UpdateMany({'a': 1}, {"$set": {'b': 2}})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'b': 2}))
+        self.assertEqual(len(docs), 2)
+        self.assertEqual(result, {
+            'nModified': 2, 'nUpserted': 0, 'nMatched': 2,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.UpdateMany({'a': 2}, {"$set": {'a': 3}}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_replace_one(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1, 'b': 0})
+        operations = [pymongo.ReplaceOne({'a': 1}, {'a': 2})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 2}))
+        self.assertEqual(len(docs), 1)
+        doc = docs[0]
+        doc_id = doc['_id']
+        self.assertEqual(doc, {'_id': doc_id, 'a': 2})
+        self.assertEqual(result, {
+            'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.ReplaceOne({'a': 1}, {'a': 3}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_delete_one(self):
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.DeleteOne({'a': 1})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({}))
+        self.assertEqual(len(docs), 0)
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 1, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_delete_many(self):
+        self.db.collection.insert_one({'a': 1})
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.DeleteMany({'a': 1})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({}))
+        self.assertEqual(len(docs), 0)
+        self.assertEqual(result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 2, 'nInserted': 0})

@@ -232,6 +232,21 @@ class BulkOperationBuilder(object):
             result.pop('nModified')
         return result
 
+    def add_insert(self, doc):
+        self.insert(doc)
+
+    def add_update(self, selector, doc, multi, upsert):
+        write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
+        write_operation.register_update_op(doc, multi)
+
+    def add_replace(self, selector, doc, upsert):
+        write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
+        write_operation.replace_one(doc)
+
+    def add_delete(self, selector, just_one):
+        write_operation = BulkWriteOperation(self, selector, is_upsert=False)
+        write_operation.register_remove_op(not just_one)
+
 
 class Collection(object):
 
@@ -1599,6 +1614,12 @@ class Collection(object):
 
     def rename(self, new_name, **kwargs):
         self._database.rename_collection(self.name, new_name, **kwargs)
+
+    def bulk_write(self, operations):
+        bulk = BulkOperationBuilder(self)
+        for operation in operations:
+            operation._add_to_bulk(bulk)
+        return bulk.execute()
 
 
 def _resolve_key(key, doc):
