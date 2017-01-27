@@ -1,3 +1,4 @@
+import os
 from .database import Database
 from .helpers import parse_dbase_from_uri
 import itertools
@@ -11,7 +12,7 @@ class MongoClient(object):
     _CONNECTION_ID = itertools.count()
 
     def __init__(self, host=None, port=None, document_class=dict,
-                 tz_aware=False, connect=True, **kwargs):
+                 tz_aware=False, connect=True, dbpath=None, **kwargs):
         self.host = host or self.HOST
         self.port = port or self.PORT
         self._databases = {}
@@ -24,7 +25,14 @@ class MongoClient(object):
             dbase = parse_dbase_from_uri(self.host)
 
         self.__default_datebase_name = dbase
-
+        
+        if dbpath is not None:
+            self.dbpath = os.path.abspath(dbpath) # the database dir, by default it's data/db
+            try:
+                os.makedirs(self.dbpath)
+            except:
+                pass
+            
     def __getitem__(self, db_name):
         return self.get_database(db_name)
 
