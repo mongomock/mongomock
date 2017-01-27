@@ -108,7 +108,7 @@ class Database(object):
                              "another database (%r not %r)" % (dbref.database,
                                                                self.__name))
         return self[dbref.collection].find_one({"_id": dbref.id})
-    
+
     def load(self):
         """Load database from a local json file.
         """

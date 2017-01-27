@@ -25,7 +25,7 @@ class MongoClient(object):
             dbase = parse_dbase_from_uri(self.host)
 
         self.__default_datebase_name = dbase
-        
+
         if dbpath is not None:
             self.dbpath = os.path.abspath(dbpath) # the database dir, by default it's data/db
             try:
