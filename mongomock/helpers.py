@@ -1,4 +1,5 @@
 from mongomock import InvalidURI
+import collections
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import iteritems, PY2
@@ -41,6 +42,22 @@ def _index_list(key_or_list, direction=None):
             raise TypeError("if no direction is specified, "
                             "key_or_list must be an instance of list")
     return key_or_list
+
+
+def validate_is_mapping(option, value):
+    if not isinstance(value, collections.Mapping):
+        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
+                        'other type that inherits from '
+                        'collections.Mapping' % (option,))
+
+
+def validate_ok_for_update(update):
+    validate_is_mapping('update', update)
+    if not update:
+        raise ValueError('update only works with $ operators')
+    first = next(iter(update))
+    if not first.startswith('$'):
+        raise ValueError('update only works with $ operators')
 
 
 class hashdict(dict):
