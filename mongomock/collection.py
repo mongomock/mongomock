@@ -232,21 +232,6 @@ class BulkOperationBuilder(object):
             result.pop('nModified')
         return result
 
-    def add_insert(self, doc):
-        self.insert(doc)
-
-    def add_update(self, selector, doc, multi, upsert):
-        write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.register_update_op(doc, multi)
-
-    def add_replace(self, selector, doc, upsert):
-        write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.replace_one(doc)
-
-    def add_delete(self, selector, just_one):
-        write_operation = BulkWriteOperation(self, selector, is_upsert=False)
-        write_operation.register_remove_op(not just_one)
-
 
 class Collection(object):
 
@@ -394,6 +379,11 @@ class Collection(object):
                         continue
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, _set_updater, subdocument)
+
+                elif k == '$unset':
+                    for field, value in iteritems(v):
+                        if self._has_key(existing_document, field):
+                            self._remove_key(existing_document, field)
 
                 elif k == '$currentDate':
                     for value in itervalues(v):
@@ -592,12 +582,6 @@ class Collection(object):
                         raise ValueError(
                             'Invalid modifier specified: {}'.format(k))
                 first = False
-            # if empty document comes
-            if len(document) == 0:
-                _id = spec.get('_id', existing_document.get('_id'))
-                existing_document.clear()
-                if _id:
-                    existing_document['_id'] = _id
             if not multi:
                 break
 
@@ -1056,7 +1040,7 @@ class Collection(object):
 
     def drop(self):
         del self._documents
-        self._documents = {}
+        self._documents = OrderedDict()
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)
@@ -1235,6 +1219,86 @@ class Collection(object):
         ret_array = ret_array_copy
         return ret_array
 
+    def _get_group_id_fields(self, keys, parent=''):
+        date_operators = [
+            '$dayOfYear',
+            '$dayOfMonth',
+            '$dayOfWeek',
+            '$year',
+            '$month',
+            '$week',
+            '$hour',
+            '$minute',
+            '$second',
+            '$millisecond']
+
+        fields = []
+
+        if isinstance(keys, dict):
+            for k, v in keys.items():
+                if isinstance(v, string_types):
+                    if k in date_operators:
+                        fields.append((parent + '__' + k + '_' + v).replace('$', ''))
+                    else:
+                        fields.append(v.replace('$', ''))
+                elif isinstance(v, dict):
+                    fields.extend(self._get_group_id_fields(v, parent + '__' + k if parent else k))
+        elif isinstance(keys, str):
+            fields.append(keys.replace('$', ''))
+
+        return fields
+
+    def _add_group_id_fields(self, out_collection, group_func_keys):
+        date_operators = [
+            'dayOfYear',
+            'dayOfMonth',
+            'dayOfWeek',
+            'year',
+            'month',
+            'week',
+            'hour',
+            'minute',
+            'second',
+            'millisecond']
+
+        clear_group_func_keys = []
+        for key in group_func_keys:
+            out_field = key.split('__')[0]
+
+            for doc in out_collection:
+                if '__' in key:
+                    func_field = key.split('__')[1]
+                    func, in_field = func_field.split('_')
+                    out_value = doc.get(in_field)
+
+                    if func in date_operators:
+                        if func == 'dayOfYear':
+                            out_value = out_value.timetuple().tm_yday
+                        elif func == 'dayOfMonth':
+                            out_value = out_value.day
+                        elif func == 'dayOfWeek':
+                            out_value = out_value.isoweekday()
+                        elif func == 'year':
+                            out_value = out_value.year
+                        elif func == 'month':
+                            out_value = out_value.month
+                        elif func == 'week':
+                            out_value = out_value.isocalendar()[1]
+                        elif func == 'hour':
+                            out_value = out_value.hour
+                        elif func == 'minute':
+                            out_value = out_value.minute
+                        elif func == 'second':
+                            out_value = out_value.second
+                        elif func == 'millisecond':
+                            out_value = int(out_value.microsecond / 1000)
+
+                    doc[out_field] = out_value
+
+            clear_group_func_keys.append(out_field)
+
+        return out_collection, clear_group_func_keys
+
     def aggregate(self, pipeline, **kwargs):
         pipeline_operators = [
             '$project',
@@ -1369,60 +1433,6 @@ class Collection(object):
                                           "aggregation pipeline, it is currently not implemented "
                                           " in Mongomock." % operator)
 
-        def _handle_comparison_operator(operator, values, doc_dict):
-            assert len(values) == 2, 'Comparison requires two expressions'
-            if operator == '$eq':
-                return _parse_expression(values[0], doc_dict) == \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$gt':
-                return _parse_expression(values[0], doc_dict) > \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$gte':
-                return _parse_expression(values[0], doc_dict) >= \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$lt':
-                return _parse_expression(values[0], doc_dict) < \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$lte':
-                return _parse_expression(values[0], doc_dict) <= \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$ne':
-                return _parse_expression(values[0], doc_dict) != \
-                    _parse_expression(values[1], doc_dict)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid comparison operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    " in Mongomock." % operator)
-
-        def _handle_date_operator(operator, values, doc_dict):
-            out_value = _parse_expression(values, doc_dict)
-            if operator == '$dayOfYear':
-                return out_value.timetuple().tm_yday
-            elif operator == '$dayOfMonth':
-                return out_value.day
-            elif operator == '$dayOfWeek':
-                return out_value.isoweekday()
-            elif operator == '$year':
-                return out_value.year
-            elif operator == '$month':
-                return out_value.month
-            elif operator == '$week':
-                return out_value.isocalendar()[1]
-            elif operator == '$hour':
-                return out_value.hour
-            elif operator == '$minute':
-                return out_value.minute
-            elif operator == '$second':
-                return out_value.second
-            elif operator == '$millisecond':
-                return int(out_value.microsecond / 1000)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid date operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    " in Mongomock." % operator)
-
         def _handle_project_operator(operator, values, doc_dict):
             if operator == '$min':
                 if len(values) > 2:
@@ -1436,31 +1446,23 @@ class Collection(object):
                                           "aggregation pipeline, it is currently not implemented "
                                           "in Mongomock." % operator)
 
-        def _parse_basic_expression(expression, doc_dict):
-            if isinstance(expression, str) and expression.startswith('$'):
-                get_value = helpers.embedded_item_getter(expression.replace('$', ''))
-                return get_value(doc_dict)
-            else:
-                return expression
-
         def _parse_expression(expression, doc_dict):
             if not isinstance(expression, dict):
-                return _parse_basic_expression(expression, doc_dict)
-
-            value_dict = {}
-            for k, v in iteritems(expression):
-                if k in arithmetic_operators:
-                    return _handle_arithmetic_operator(k, v, doc_dict)
-                elif k in project_operators:
-                    return _handle_project_operator(k, v, doc_dict)
-                elif k in comparison_operators:
-                    return _handle_comparison_operator(k, v, doc_dict)
-                elif k in date_operators:
-                    return _handle_date_operator(k, v, doc_dict)
+                if isinstance(expression, str):
+                    return doc_dict.get(expression.replace('$', ''), NOTHING)
                 else:
-                    value_dict[k] = _parse_expression(v, doc_dict)
+                    return expression
+            k, v = next(iteritems(expression))
 
-            return value_dict
+            if k in arithmetic_operators:
+                return _handle_arithmetic_operator(k, v, doc_dict)
+            if k in project_operators:
+                return _handle_project_operator(k, v, doc_dict)
+            else:
+                raise NotImplementedError("%s is not supported operator for the aggregation "
+                                          "pipeline. See http://docs.mongodb.org/manual/meta/"
+                                          "aggregation-quick-reference/ for a complete list of "
+                                          "valid operators." % k)
 
         def _extend_collection(out_collection, field, expression):
             field_exists = False
@@ -1476,79 +1478,102 @@ class Collection(object):
 
         conditional_operators = ['$cond', '$ifNull']  # noqa
         out_collection = [doc for doc in self.find()]
+        grouped_collection = []
         for stage in pipeline:
             for k, v in iteritems(stage):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection
                                       if filter_applies(v, doc)]
                 elif k == '$group':
-                    grouped_collection = []
                     _id = stage['$group']['_id']
-                    if _id:
-                        key_getter = functools.partial(_parse_expression, _id)
-                        out_collection = sorted(out_collection, key=key_getter)
-                        grouped = itertools.groupby(out_collection, key_getter)
+                    group_func_keys = self._get_group_id_fields(_id)
+
+                    out_collection, group_func_keys = self._add_group_id_fields(out_collection,
+                                                                                group_func_keys)
+
+                    if len(group_func_keys) == 0:
+                        grouped_collection = []
                     else:
-                        grouped = [(None, out_collection)]
+                        out_collection = sorted(out_collection,
+                                                key=helpers.embedded_item_getter(*group_func_keys))
 
-                    for doc_id, group in grouped:
-                        group_list = ([x for x in group])
-                        doc_dict = {'_id': doc_id}
-
-                        for field, value in iteritems(v):
-                            if field == '_id':
-                                continue
-                            for operator, key in iteritems(value):
-                                if operator in (
-                                        "$sum",
-                                        "$avg",
-                                        "$min",
-                                        "$max",
-                                        "$first",
-                                        "$last",
-                                        "$addToSet"
-                                ):
-                                    key_getter = functools.partial(_parse_expression, key)
-                                    values = [key_getter(doc) for doc in group_list]
-
-                                    if operator == "$sum":
-                                        val_it = (val or 0 for val in values)
-                                        doc_dict[field] = sum(val_it)
-                                    elif operator == "$avg":
-                                        values = [val or 0 for val in values]
-                                        doc_dict[field] = sum(values) / max(len(values), 1)
-                                    elif operator == "$min":
-                                        val_it = (val or MAXSIZE for val in values)
-                                        doc_dict[field] = min(val_it)
-                                    elif operator == "$max":
-                                        val_it = (val or -MAXSIZE for val in values)
-                                        doc_dict[field] = max(val_it)
-                                    elif operator == "$first":
-                                        val_it = (val or datetime.max for val in values)
-                                        doc_dict[field] = min(val_it)
-                                    elif operator == "$last":
-                                        val_it = (val or datetime.min for val in values)
-                                        doc_dict[field] = max(val_it)
-                                    elif operator == "$addToSet":
-                                        val_it = (val or None for val in values)
-                                        doc_dict[field] = set(val_it)
+                    for field, value in iteritems(v):
+                        if field == '_id':
+                            continue
+                        for func, key in iteritems(value):
+                            if func in ("$sum", "$avg", "$min", "$max", "$first", "$last"):
+                                if len(group_func_keys) == 0:
+                                    grouped = itertools.groupby(out_collection)
                                 else:
-                                    if operator in group_operators:
-                                        raise NotImplementedError(
-                                            "Although %s is a valid group operator for the "
-                                            "aggregation pipeline, %s is currently not implemented "
-                                            "in Mongomock." % operator)
+                                    grouped = itertools.groupby(out_collection,
+                                                                helpers.embedded_item_getter(
+                                                                    *group_func_keys))
+
+                                for ret_value, group in grouped:
+                                    group_list = ([x for x in group])
+                                    if len(group_func_keys) == 0:
+                                        doc_id = None
                                     else:
-                                        raise NotImplementedError(
-                                            "%s is not a valid group operator for the aggregation "
-                                            "pipeline. See http://docs.mongodb.org/manual/meta/"
-                                            "aggregation-quick-reference/ for a complete list of "
-                                            "valid operators." % operator)
+                                        ret_value = ret_value if isinstance(ret_value, tuple)\
+                                            else [ret_value]
+                                        doc_id = {k: v for (k, v) in zip(_id.keys(), ret_value)}\
+                                            if isinstance(_id, dict) else ret_value[0]
 
-                        grouped_collection.append(doc_dict)
+                                    doc_dict = {'_id': doc_id}
 
+                                    new_doc = True
+                                    for doc in grouped_collection:
+                                        if doc['_id'] == doc_id:
+                                            doc_dict = doc
+                                            new_doc = False
+                                            break
+
+                                    from_field = key.replace('$', '')
+                                    if func == "$sum":
+                                        current_val = doc_dict.get(field, 0) + \
+                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                        doc_dict[field] = current_val
+                                    elif func == "$avg":
+                                        current_val = doc_dict.get(field, 0) + \
+                                            sum([doc.get(from_field, 0) for doc in group_list])
+                                        current_avg = current_val / max(len(group_list), 1)
+                                        doc_dict[field] = current_avg
+                                    elif func == "$min":
+                                        current_val = doc_dict.get(field, MAXSIZE)
+                                        min_doc = min([doc.get(from_field, MAXSIZE) for doc
+                                                      in group_list])
+                                        doc_dict[field] = min(current_val, min_doc)
+                                    elif func == "$max":
+                                        current_val = doc_dict.get(field, -MAXSIZE)
+                                        max_doc = max([doc.get(from_field, -MAXSIZE) for doc
+                                                      in group_list])
+                                        doc_dict[field] = max(current_val, max_doc)
+                                    elif func == "$first":
+                                        current_val = doc_dict.get(field, datetime.max)
+                                        min_doc = min([doc.get(from_field, datetime.max) for doc
+                                                      in group_list])
+                                        doc_dict[field] = min(current_val, min_doc)
+                                    elif func == "$last":
+                                        current_val = doc_dict.get(field, datetime.min)
+                                        max_doc = max([doc.get(from_field, datetime.min) for doc
+                                                      in group_list])
+                                        doc_dict[field] = max(current_val, max_doc)
+
+                                    if new_doc:
+                                        grouped_collection.append(doc_dict)
+                            else:
+                                if func in group_operators:
+                                    raise NotImplementedError(
+                                        "Although %s is a valid group operator for the "
+                                        "aggregation pipeline, %s is currently not implemented "
+                                        "in Mongomock." % func)
+                                else:
+                                    raise NotImplementedError(
+                                        "%s is not a valid group operator for the aggregation "
+                                        "pipeline. See http://docs.mongodb.org/manual/meta/"
+                                        "aggregation-quick-reference/ for a complete list of "
+                                        "valid operators." % func)
                     out_collection = grouped_collection
-
                 elif k == '$sort':
                     sort_array = []
                     for x, y in v.items():
@@ -1615,12 +1640,6 @@ class Collection(object):
     def rename(self, new_name, **kwargs):
         self._database.rename_collection(self.name, new_name, **kwargs)
 
-    def bulk_write(self, operations):
-        bulk = BulkOperationBuilder(self)
-        for operation in operations:
-            operation._add_to_bulk(bulk)
-        return bulk.execute()
-
 
 def _resolve_key(key, doc):
     return next(iter(iter_key_candidates(key, doc)), NOTHING)
@@ -1641,10 +1660,10 @@ class Cursor(object):
         super(Cursor, self).__init__()
         self.collection = collection
         self._factory = dataset_factory
+        self._dataset = self._factory()
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self._skip = None
-        self.rewind()
 
     def __iter__(self):
         return self
@@ -1653,21 +1672,16 @@ class Cursor(object):
         return Cursor(self.collection, self._factory, self._limit)
 
     def __next__(self):
-        if self._skip and not self._skipped:
+        if self._skip:
             for i in range(self._skip):
                 next(self._dataset)
-            self._skipped = self._skip
-        if self._limit is not None and self._limit <= self._emitted:
+            self._skip = None
+        if self._limit is not None and self._limit <= 0:
             raise StopIteration()
         if self._limit is not None:
-            self._emitted += 1
-        return {k: copy.deepcopy(v) for k, v in iteritems(next(self._dataset))}
+            self._limit -= 1
+        return next(self._dataset)
     next = __next__
-
-    def rewind(self):
-        self._dataset = self._factory()
-        self._emitted = 0
-        self._skipped = 0
 
     def sort(self, key_or_list, direction=None):
         if direction is None:
@@ -1745,11 +1759,6 @@ def _set_updater(doc, field_name, value):
         doc[field_name] = value
 
 
-def _unset_updater(doc, field_name, value):
-    if isinstance(doc, dict):
-        doc.pop(field_name, None)
-
-
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
@@ -1777,7 +1786,6 @@ def _current_date_updater(doc, field_name, value):
 
 _updaters = {
     '$set': _set_updater,
-    '$unset': _unset_updater,
     '$inc': _inc_updater,
     '$max': _max_updater,
     '$min': _min_updater,

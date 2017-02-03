@@ -108,3 +108,41 @@ class Database(object):
                              "another database (%r not %r)" % (dbref.database,
                                                                self.__name))
         return self[dbref.collection].find_one({"_id": dbref.id})
+
+    def load(self):
+        """Load database from a local json file.
+        """
+        import os
+        from dataIO import js # https://pypi.python.org/pypi/dataIO/0.0.3
+        from collections import OrderedDict
+        
+        path = os.path.join(self._client.dbpath, self.name + ".json")
+        
+        data = js.load(path, enable_verbose=False)
+        if data["name"] != self.name:
+            raise ValueError("Wrong database file!")
+        
+        for col_name, col_data in data["collections"].items():
+            col = self.get_collection(col_name)
+            col._documents = OrderedDict(col_data)
+    
+    def dump(self, fast_mode=False):
+        """Dump database to a local json file.
+        
+        **TODO**, unique index information are not dumped.
+        """
+        import os
+        from dataIO import js # https://pypi.python.org/pypi/dataIO/0.0.3
+                
+        data = {"name": self.name, "collections": dict()}
+        for col_name, col in self._collections.items():
+            if col_name != "system.indexes":
+                data["collections"][col_name] = list(col._documents.items())
+        
+        path = os.path.join(self._client.dbpath, self.name + ".json")
+        
+        if fast_mode:
+            indent_format = False
+        else:
+            indent_format = True
+        js.safe_dump(data, path, indent_format=indent_format, enable_verbose=False)
