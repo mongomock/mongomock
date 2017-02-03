@@ -26,13 +26,10 @@ class MongoClient(object):
 
         self.__default_datebase_name = dbase
 
+        # the database dir, by default it's data/db
         if dbpath is not None:
-            self.dbpath = os.path.abspath(dbpath) # the database dir, by default it's data/db
-            try:
-                os.makedirs(self.dbpath)
-            except:
-                pass
-            
+            self.dbpath = os.path.abspath(dbpath)
+
     def __getitem__(self, db_name):
         return self.get_database(db_name)
 

@@ -8,8 +8,10 @@ import unittest
 class TestDumpAndLoad(unittest.TestCase):
 
     def test_dump_and_load(self):
+        dbpath = "."
+
         # dump
-        client = mongomock.MongoClient(dbpath=r"db")
+        client = mongomock.MongoClient(dbpath=dbpath)
         db = client.get_database("test")
 
         col = db.get_collection("col")
@@ -21,7 +23,7 @@ class TestDumpAndLoad(unittest.TestCase):
         db.dump()
 
         # load
-        client = mongomock.MongoClient(dbpath=r"db")
+        client = mongomock.MongoClient(dbpath=dbpath)
         db = client.get_database("test")
 
         db.load()
