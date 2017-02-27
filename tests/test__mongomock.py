@@ -573,6 +573,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 3}]})
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
 
+    def test__find_operators_in_list(self):
+        self.cmp.do.insert([
+            dict(x=4),
+            dict(x=[300, 500, 4]),
+            dict(x=[1200, 300, 1400])])
+        self.cmp.compare_ignore_order.find({'x': {'$gte': 1100, '$lte': 1250}})
+        self.cmp.compare_ignore_order.find({'x': {'$gt': 300, '$lt': 400}})
+
     def test__find_and_modify_remove(self):
         self.cmp.do.insert([{"a": x} for x in range(10)])
         self.cmp.do.find_and_modify({"a": 2}, remove=True)

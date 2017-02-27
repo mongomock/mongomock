@@ -160,14 +160,24 @@ def _size_op(doc_val, search_val):
     else:
         return search_val == 1 if doc_val else 0
 
+def _list_expand(f):
+    def func(doc_val, search_val):
+        if isinstance(doc_val, list):
+            for val in doc_val:
+                if f(val, search_val):
+                    return True
+            return False
+        else:
+            return f(doc_val, search_val)
+    return func
 
 OPERATOR_MAP = {
     '$eq': operator.eq,
     '$ne': operator.ne,
-    '$gt': _not_nothing_and(operator.gt),
-    '$gte': _not_nothing_and(operator.ge),
-    '$lt': _not_nothing_and(operator.lt),
-    '$lte': _not_nothing_and(operator.le),
+    '$gt': _not_nothing_and(_list_expand(operator.gt)),
+    '$gte': _not_nothing_and(_list_expand(operator.ge)),
+    '$lt': _not_nothing_and(_list_expand(operator.lt)),
+    '$lte': _not_nothing_and(_list_expand(operator.le)),
     '$all': _all_op,
     '$in': lambda dv, sv: any(x in sv for x in _force_list(dv)),
     '$nin': lambda dv, sv: all(x not in sv for x in _force_list(dv)),
