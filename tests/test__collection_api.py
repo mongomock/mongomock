@@ -998,3 +998,18 @@ class CollectionAPITest(TestCase):
             'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 2, 'nInserted': 0})
+
+    def test__aggregate_project_array_element_at(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'a': {
+                        '$arrayElemAt': ['$arr', 1]
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 3}], list(actual))

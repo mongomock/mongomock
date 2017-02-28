@@ -1267,7 +1267,9 @@ class Collection(object):
             '$avg',
             '$sum',
             '$stdDevPop',
-            '$stdDevSamp']
+            '$stdDevSamp',
+            '$arrayElemAt'
+        ]
         boolean_operators = ['$and', '$or', '$not']  # noqa
         set_operators = [  # noqa
             '$setEquals',
@@ -1431,6 +1433,11 @@ class Collection(object):
                                               " implemented in Mongomock" % len(values))
                 return min(_parse_expression(values[0], doc_dict),
                            _parse_expression(values[1], doc_dict))
+            elif operator == '$arrayElemAt':
+                key, index = values
+                array = _parse_basic_expression(key, doc_dict)
+                v = array[index]
+                return v
             else:
                 raise NotImplementedError("Although '%s' is a valid project operator for the "
                                           "aggregation pipeline, it is currently not implemented "
@@ -1588,10 +1595,9 @@ class Collection(object):
                 elif k == '$project':
                     filter_list = ['_id']
                     for field, value in iteritems(v):
-                        if field == '_id':
-                            if value == 0:
-                                filter_list.remove('_id')
-                        if value != 0:
+                        if field == '_id' and not value:
+                            filter_list.remove('_id')
+                        elif value:
                             filter_list.append(field)
                             out_collection = _extend_collection(out_collection, field, value)
                     out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
