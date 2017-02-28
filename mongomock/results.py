@@ -1,9 +1,9 @@
 try:
+    from pymongo.results import BulkWriteResult
     from pymongo.results import DeleteResult
     from pymongo.results import InsertManyResult
     from pymongo.results import InsertOneResult
     from pymongo.results import UpdateResult
-    from pymongo.results import BulkWriteResult
 except ImportError:
     class _WriteResult(object):
 

@@ -45,11 +45,11 @@ from mongomock import helpers
 from mongomock import InvalidOperation
 from mongomock import ObjectId
 from mongomock import OperationFailure
+from mongomock.results import BulkWriteResult
 from mongomock.results import DeleteResult
 from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
-from mongomock.results import BulkWriteResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 
