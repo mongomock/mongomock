@@ -49,6 +49,7 @@ from mongomock.results import DeleteResult
 from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
+from mongomock.results import BulkWriteResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 
@@ -1619,7 +1620,7 @@ class Collection(object):
         bulk = BulkOperationBuilder(self)
         for operation in operations:
             operation._add_to_bulk(bulk)
-        return bulk.execute()
+        return BulkWriteResult(bulk.execute(), True)
 
 
 def _resolve_key(key, doc):

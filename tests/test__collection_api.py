@@ -885,7 +885,8 @@ class CollectionAPITest(TestCase):
         self.assert_document_count(1)
         doc = next(self.db.collection.find({}))
         self.assert_document_stored(doc['_id'], {'a': 1, 'b': 2})
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 0, 'nInserted': 1})
@@ -899,7 +900,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 2}))
         self.assertEqual(len(docs), 1)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 0, 'nInserted': 0})
@@ -910,7 +912,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
             'writeErrors': [], 'writeConcernErrors': [],
             'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
@@ -926,7 +929,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'b': 2}))
         self.assertEqual(len(docs), 2)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 2, 'nUpserted': 0, 'nMatched': 2,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 0, 'nInserted': 0})
@@ -937,7 +941,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
             'writeErrors': [], 'writeConcernErrors': [],
             'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
@@ -955,7 +960,7 @@ class CollectionAPITest(TestCase):
         doc = docs[0]
         doc_id = doc['_id']
         self.assertEqual(doc, {'_id': doc_id, 'a': 2})
-        self.assertEqual(result, {
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 0, 'nInserted': 0})
@@ -966,7 +971,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
             'writeErrors': [], 'writeConcernErrors': [],
             'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
@@ -980,7 +986,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({}))
         self.assertEqual(len(docs), 0)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 1, 'nInserted': 0})
@@ -994,7 +1001,8 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({}))
         self.assertEqual(len(docs), 0)
-        self.assertEqual(result, {
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
             'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 2, 'nInserted': 0})

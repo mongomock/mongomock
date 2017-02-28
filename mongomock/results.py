@@ -3,6 +3,7 @@ try:
     from pymongo.results import InsertManyResult
     from pymongo.results import InsertOneResult
     from pymongo.results import UpdateResult
+    from pymongo.results import BulkWriteResult
 except ImportError:
     class _WriteResult(object):
 
@@ -78,3 +79,41 @@ except ImportError:
         @property
         def deleted_count(self):
             return self.__raw_result.get('n', 0)
+
+    class BulkWriteResult(_WriteResult):
+
+        __slots__ = ("__bulk_api_result", "__acknowledged")
+
+        def __init__(self, bulk_api_result, acknowledged):
+            self.__bulk_api_result = bulk_api_result
+            super(BulkWriteResult, self).__init__(acknowledged)
+
+        @property
+        def bulk_api_result(self):
+            return self.__bulk_api_result
+
+        @property
+        def inserted_count(self):
+            return self.__bulk_api_result.get("nInserted")
+
+        @property
+        def matched_count(self):
+            return self.__bulk_api_result.get("nMatched")
+
+        @property
+        def modified_count(self):
+            return self.__bulk_api_result.get("nModified")
+
+        @property
+        def deleted_count(self):
+            return self.__bulk_api_result.get("nRemoved")
+
+        @property
+        def upserted_count(self):
+            return self.__bulk_api_result.get("nUpserted")
+
+        @property
+        def upserted_ids(self):
+            if self.__bulk_api_result:
+                return dict((upsert["index"], upsert["_id"])
+                            for upsert in self.bulk_api_result["upserted"])
