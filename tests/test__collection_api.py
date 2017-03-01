@@ -1021,3 +1021,20 @@ class CollectionAPITest(TestCase):
             }
         ])
         self.assertEqual([{'a': 3}], list(actual))
+
+    def test__aggregate_project_rename__id(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'rename_id': '$_id',
+                    'a': {
+                        '$arrayElemAt': ['$arr', 1]
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 3, 'rename_id': 1}],
+                         list(actual))

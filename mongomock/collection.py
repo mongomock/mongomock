@@ -1478,8 +1478,11 @@ class Collection(object):
                     break
             if not field_exists:
                 for doc in out_collection:
-                    # verify expression has operator as first
-                    doc[field] = _parse_expression(expression.copy(), doc)
+                    if isinstance(expression, str) and expression.startswith('$'):
+                        doc[field] = doc[expression.lstrip('$')]
+                    else:
+                        # verify expression has operator as first
+                        doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
         conditional_operators = ['$cond', '$ifNull']  # noqa
