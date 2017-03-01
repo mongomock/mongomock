@@ -1653,7 +1653,6 @@ class Cursor(object):
         self._factory = functools.partial(collection._get_dataset, spec, sort, projection, dict, skip)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
-        # self._skip = None
         self.rewind()
 
     def __iter__(self):
