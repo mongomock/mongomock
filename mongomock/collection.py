@@ -1486,7 +1486,10 @@ class Collection(object):
             if not field_exists:
                 for doc in out_collection:
                     if isinstance(expression, str) and expression.startswith('$'):
-                        doc[field] = get_value_by_dot(doc, expression.lstrip('$'))
+                        try:
+                            doc[field] = get_value_by_dot(doc, expression.lstrip('$'))
+                        except KeyError:
+                            pass
                     else:
                         # verify expression has operator as first
                         doc[field] = _parse_expression(expression.copy(), doc)

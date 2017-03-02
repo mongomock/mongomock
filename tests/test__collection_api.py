@@ -1052,3 +1052,17 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'rename_dot': 2}],
                          list(actual))
+
+    def test__aggregate_project_missing_fields(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'rename_dot': '$arr.c'
+                }
+            }
+        ])
+        self.assertEqual([{}],
+                         list(actual))
