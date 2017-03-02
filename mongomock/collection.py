@@ -1650,7 +1650,8 @@ class Cursor(object):
         self._sort = sort
         self._projection = projection
         self._skip = skip
-        self._factory = functools.partial(collection._get_dataset, spec, sort, projection, dict, skip)
+        self._factory = functools.partial(collection._get_dataset,
+                                          spec, sort, projection, dict, skip)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self.rewind()
@@ -1659,7 +1660,8 @@ class Cursor(object):
         return self
 
     def clone(self):
-        return Cursor(self.collection, self._spec, self._sort, self._projection, self._skip, self._limit)
+        return Cursor(self.collection,
+                      self._spec, self._sort, self._projection, self._skip, self._limit)
 
     def __next__(self):
         if self._skip and not self._skipped:
