@@ -688,8 +688,7 @@ class Collection(object):
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
-        return Cursor(self, functools.partial(
-            self._get_dataset, spec, sort, projection, dict, skip), limit=limit)
+        return Cursor(self, spec, sort, projection, skip, limit)
 
     def _get_dataset(self, spec, sort, fields, as_class, skip):
         dataset = (self._copy_only_fields(document, fields, as_class)
@@ -1655,20 +1654,25 @@ def _resolve_sort_key(key, doc):
 
 class Cursor(object):
 
-    def __init__(self, collection, dataset_factory, limit=0):
+    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0):
         super(Cursor, self).__init__()
         self.collection = collection
-        self._factory = dataset_factory
+        self._spec = spec
+        self._sort = sort
+        self._projection = projection
+        self._skip = skip
+        self._factory = functools.partial(collection._get_dataset,
+                                          spec, sort, projection, dict, skip)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
-        self._skip = None
         self.rewind()
 
     def __iter__(self):
         return self
 
     def clone(self):
-        return Cursor(self.collection, self._factory, self._limit)
+        return Cursor(self.collection,
+                      self._spec, self._sort, self._projection, self._skip, self._limit)
 
     def __next__(self):
         if self._skip and not self._skipped:
