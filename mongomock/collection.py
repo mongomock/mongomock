@@ -92,6 +92,14 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
+def get_value_by_dot(doc, key):
+    """Get dictionary value using dotted key"""
+    result = doc
+    for i in key.split('.'):
+        result = result[i]
+    return result
+
+
 class BulkWriteOperation(object):
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
@@ -1478,8 +1486,11 @@ class Collection(object):
                     break
             if not field_exists:
                 for doc in out_collection:
-                    # verify expression has operator as first
-                    doc[field] = _parse_expression(expression.copy(), doc)
+                    if isinstance(expression, str) and expression.startswith('$'):
+                        doc[field] = get_value_by_dot(doc, expression.lstrip('$'))
+                    else:
+                        # verify expression has operator as first
+                        doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
         conditional_operators = ['$cond', '$ifNull']  # noqa
