@@ -1066,3 +1066,41 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{}],
                          list(actual))
+
+    def test__aggregate_project_out(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        old_actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        new_collection = self.db.get_collection('new_collection')
+        new_actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, new_actual)
+        self.assertEqual(expect, list(old_actual))
+
+    def test__aggregate_project_out_replace(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        new_collection = self.db.get_collection('new_collection')
+        new_collection.insert({'_id': 3})
+        self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, actual)

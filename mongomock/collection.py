@@ -1616,6 +1616,12 @@ class Collection(object):
                             out_collection = _extend_collection(out_collection, field, value)
                     out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
                                       for x in out_collection]
+                elif k == '$out':
+                    # TODO: should leave the origin collection unchanged
+                    collection = self._database.get_collection(v)
+                    if collection.count() > 0:
+                        collection.drop()
+                    collection.insert_many(out_collection)
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
