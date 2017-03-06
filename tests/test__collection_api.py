@@ -1066,3 +1066,125 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{}],
                          list(actual))
+
+    def test__aggregate_project_out(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        old_actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        new_collection = self.db.get_collection('new_collection')
+        new_actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, new_actual)
+        self.assertEqual(expect, list(old_actual))
+
+    def test__aggregate_project_out_replace(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        new_collection = self.db.get_collection('new_collection')
+        new_collection.insert({'_id': 3})
+        self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, actual)
+
+    def test_aggregate_unwind_push_first(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {
+                    '_id': 1111,
+                    'a': [
+                        {
+                            'class': '03',
+                            'a': [
+                                {
+                                    'b': '030502',
+                                    'weight': 100.0
+                                },
+                                {
+                                    'b': '030207',
+                                    'weight': 100.0
+                                }
+                            ]
+                        }
+                    ],
+                    'id': 'ooo',
+                    'update_time': 1111
+                },
+                {
+                    '_id': 22222,
+                    'a': [
+                        {
+                            'class': '03',
+                            'a': [
+                                {
+                                    'b': '030502',
+                                    'weight': 99.0
+                                },
+                                {
+                                    'b': '0302071',
+                                    'weight': 100.0
+                                }
+                            ]
+                        }
+                    ],
+                    'id': 'ooo',
+                    'update_time': 1222
+                }
+            ]
+        )
+        actual = collection.aggregate(
+            [
+                {'$sort': {'update_time': -1}},
+                {'$match': {'a': {'$ne': None}}},
+                {
+                    '$group': {
+                        '_id': '$id',
+                        'update_time': {'$first': '$update_time'},
+                        'a': {'$first': '$a'}
+                    }
+                },
+                {'$unwind': '$a'},
+                {'$unwind': '$a.a'},
+                {
+                    '$group': {
+                        '_id': '$_id',
+                        'update_time': {'$first': '$update_time'},
+                        'a': {
+                            '$push': {
+                                'b': '$a.a.b',
+                                'weight': '$a.a.weight'
+                            }
+                        }
+                    }
+                },
+                {'$out': 'ooo'}
+            ],
+            allowDiskUse=True)
+        expect = [
+            {
+                'update_time': 1222,
+                'a': [
+                    {'weight': 99.0, 'b': '030502'},
+                    {'weight': 100.0, 'b': '0302071'}],
+                '_id': 'ooo'
+            }]
+        self.assertEqual(expect, list(actual))

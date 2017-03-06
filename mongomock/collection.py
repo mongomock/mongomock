@@ -100,6 +100,18 @@ def get_value_by_dot(doc, key):
     return result
 
 
+def set_value_by_dot(doc, key, value):
+    """Set dictionary value using dotted key"""
+    result = doc
+    keys = key.split('.')
+    for i in keys[:-1]:
+        if i not in result:
+            result[i] = {}
+        result = result[i]
+    result[keys[-1]] = value
+    return doc
+
+
 class BulkWriteOperation(object):
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
@@ -1527,7 +1539,8 @@ class Collection(object):
                                         "$max",
                                         "$first",
                                         "$last",
-                                        "$addToSet"
+                                        "$addToSet",
+                                        '$push'
                                 ):
                                     key_getter = functools.partial(_parse_expression, key)
                                     values = [key_getter(doc) for doc in group_list]
@@ -1545,19 +1558,21 @@ class Collection(object):
                                         val_it = (val or -MAXSIZE for val in values)
                                         doc_dict[field] = max(val_it)
                                     elif operator == "$first":
-                                        val_it = (val or datetime.max for val in values)
-                                        doc_dict[field] = min(val_it)
+                                        doc_dict[field] = values[0]
                                     elif operator == "$last":
-                                        val_it = (val or datetime.min for val in values)
-                                        doc_dict[field] = max(val_it)
+                                        doc_dict[field] = values[-1]
                                     elif operator == "$addToSet":
                                         val_it = (val or None for val in values)
                                         doc_dict[field] = set(val_it)
+                                    elif operator == '$push':
+                                        if field not in doc_dict:
+                                            doc_dict[field] = []
+                                        doc_dict[field].extend(values)
                                 else:
                                     if operator in group_operators:
                                         raise NotImplementedError(
                                             "Although %s is a valid group operator for the "
-                                            "aggregation pipeline, %s is currently not implemented "
+                                            "aggregation pipeline, it is currently not implemented "
                                             "in Mongomock." % operator)
                                     else:
                                         raise NotImplementedError(
@@ -1589,13 +1604,9 @@ class Collection(object):
                         raise ValueError(
                             "$unwind failed: exception: field path references must be prefixed "
                             "with a '$' '%s'" % v)
-                    if len(v.split('.')) > 1:
-                        raise NotImplementedError(
-                            "Mongmock does not currently support nested field paths in the $unwind "
-                            "implementation. '%s'" % v)
                     unwound_collection = []
                     for doc in out_collection:
-                        array_value = doc.get(v[1:])
+                        array_value = get_value_by_dot(doc, v[1:])
                         if array_value in (None, []):
                             continue
                         elif not isinstance(array_value, list):
@@ -1604,7 +1615,8 @@ class Collection(object):
                                 '"%s", value found: %s' % (v, array_value))
                         for field_item in array_value:
                             unwound_collection.append(copy.deepcopy(doc))
-                            unwound_collection[-1][v[1:]] = field_item
+                            unwound_collection[-1] = set_value_by_dot(
+                                unwound_collection[-1], v[1:], field_item)
                     out_collection = unwound_collection
                 elif k == '$project':
                     filter_list = ['_id']
@@ -1616,6 +1628,12 @@ class Collection(object):
                             out_collection = _extend_collection(out_collection, field, value)
                     out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
                                       for x in out_collection]
+                elif k == '$out':
+                    # TODO(MetrodataTeam): should leave the origin collection unchanged
+                    collection = self._database.get_collection(v)
+                    if collection.count() > 0:
+                        collection.drop()
+                    collection.insert_many(out_collection)
                 else:
                     if k in pipeline_operators:
                         raise NotImplementedError(
