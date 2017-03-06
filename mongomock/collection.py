@@ -274,15 +274,15 @@ class Collection(object):
     def __init__(self, db, name):
         self.name = name
         self.full_name = "{0}.{1}".format(db.name, name)
-        self._database = db
+        self.database = db
         self._documents = OrderedDict()
         self._uniques = []
 
     def __repr__(self):
-        return "Collection({0}, '{1}')".format(self._database, self.name)
+        return "Collection({0}, '{1}')".format(self.database, self.name)
 
     def __getitem__(self, name):
-        return self._database[self.name + '.' + name]
+        return self.database[self.name + '.' + name]
 
     def __getattr__(self, name):
         return self.__getitem__(name)
@@ -623,7 +623,7 @@ class Collection(object):
                 break
 
         return {
-            text_type("connectionId"): self._database.client._id,
+            text_type("connectionId"): self.database.client._id,
             text_type("err"): None,
             text_type("n"): num_updated,
             text_type("nModified"): num_updated if updated_existing else 0,
@@ -1056,7 +1056,7 @@ class Collection(object):
                 break
 
         return {
-            "connectionId": self._database.client._id,
+            "connectionId": self.database.client._id,
             "n": deleted_count,
             "ok": 1.0,
             "err": None,
@@ -1165,14 +1165,14 @@ class Collection(object):
                     full_dict['counts']['reduce'] += 1
             full_dict['counts']['output'] = len(reduced_rows)
         if isinstance(out, (str, bytes)):
-            out_collection = getattr(self._database, out)
+            out_collection = getattr(self.database, out)
             out_collection.drop()
             out_collection.insert(reduced_rows)
             ret_val = out_collection
             full_dict['result'] = out
         elif isinstance(out, SON) and out.get('replace') and out.get('db'):
             # Must be of the format SON([('replace','results'),('db','outdb')])
-            out_db = getattr(self._database._client, out['db'])
+            out_db = getattr(self.database._client, out['db'])
             out_collection = getattr(out_db, out['replace'])
             out_collection.insert(reduced_rows)
             ret_val = out_collection
@@ -1651,7 +1651,7 @@ class Collection(object):
         return self
 
     def rename(self, new_name, **kwargs):
-        self._database.rename_collection(self.name, new_name, **kwargs)
+        self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, operations):
         bulk = BulkOperationBuilder(self)

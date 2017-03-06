@@ -35,6 +35,11 @@ class CollectionAPITest(TestCase):
             set(self.db.collection_names()),
             set(["a.b", "system.indexes", "a"]))
 
+    def test__get_sibling_collection(self):
+        self.db.a.database.b
+        self.assertEqual(self.db.a.database.b.full_name, "somedb.b")
+        self.assertEqual(self.db.a.database.b.name, "b")
+
     def test__get_collection_full_name(self):
         self.assertEqual(self.db.coll.name, "coll")
         self.assertEqual(self.db.coll.full_name, "somedb.coll")
