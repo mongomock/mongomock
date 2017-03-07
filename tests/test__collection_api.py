@@ -1091,6 +1091,24 @@ class CollectionAPITest(TestCase):
         self.assertEqual(expect, new_actual)
         self.assertEqual(expect, list(old_actual))
 
+    def test__find_type_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        actual = self.db.collection.find(
+            {'arr': {'$type': 'array'}})
+        expect = [{'_id': 1, 'arr': [1, 2]}]
+
+        self.assertEqual(expect, list(actual))
+
+    def test__find_type_object(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        actual = self.db.collection.find(
+            {'arr': {'$type': 'object'}})
+        expect = [{'_id': 2, 'arr': {'a': 4, 'b': 5}}]
+
+        self.assertEqual(expect, list(actual))
+
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
