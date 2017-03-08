@@ -1630,7 +1630,7 @@ class Collection(object):
                                       for x in out_collection]
                 elif k == '$out':
                     # TODO(MetrodataTeam): should leave the origin collection unchanged
-                    collection = self._database.get_collection(v)
+                    collection = self.database.get_collection(v)
                     if collection.count() > 0:
                         collection.drop()
                     collection.insert_many(out_collection)
