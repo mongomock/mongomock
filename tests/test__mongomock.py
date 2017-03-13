@@ -212,12 +212,16 @@ class _CollectionComparisonTest(TestCase):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient()
+                return PymongoClient(maxPoolSize=1)
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
                 if "connection refused" not in e.message.lower():
                     raise
+
+    def tearDown(self):
+        super(_CollectionComparisonTest, self).tearDown()
+        self.mongo_conn.close()
 
 
 class MongoClientCollectionTest(_CollectionComparisonTest):
@@ -306,7 +310,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         id1 = ObjectId()
         self.cmp.do.insert({"_id": id1, "name": "new"})
         self.cmp.do.insert({"name": "another new"})
-        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.sort_by(lambda doc: str(doc.get("name", str(doc)))).find()
         self.cmp.compare.find({"_id": id1})
 
     def test__find_by_document(self):
