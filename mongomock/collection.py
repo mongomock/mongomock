@@ -1751,6 +1751,10 @@ class Cursor(object):
             # Limit the cursor to the given slice
             self._dataset = (x for x in list(self._dataset)[index])
             return self
+        elif not isinstance(index, int):
+            raise TypeError("index '%s' cannot be applied to Cursor instances" % index)
+        elif index < 0:
+            raise IndexError('Cursor instances do not support negativeindices')
         else:
             arr = [x for x in self._dataset]
             self._dataset = iter(arr)

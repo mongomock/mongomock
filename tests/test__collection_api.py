@@ -587,6 +587,24 @@ class CollectionAPITest(TestCase):
         count = cursor.count()
         self.assertEqual(count, 2)
 
+    def test__cursor_getitem_negative_index(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        with self.assertRaises(IndexError):
+            cursor[-1]
+
+    def test__cursor_getitem_bad_index(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        with self.assertRaises(TypeError):
+            cursor['not_a_number']
+
     def test__find_with_skip_param(self):
         """Make sure that find() will take in account skip parameter"""
 
