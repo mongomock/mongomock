@@ -1076,7 +1076,7 @@ class Collection(object):
 
     def drop(self):
         del self._documents
-        self._documents = {}
+        self._documents = OrderedDict()
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)

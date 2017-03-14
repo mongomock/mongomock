@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 from datetime import datetime
 import random
@@ -83,7 +84,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 1)
 
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         self.db.drop_collection(col)
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 0)
 
