@@ -1458,7 +1458,7 @@ class CollectionMapReduceTest(TestCase):
 
         # Act
         result = fake_etap.statuses.map_reduce(
-                map_function, reduce_function, "my_collection", query=search_query)
+            map_function, reduce_function, "my_collection", query=search_query)
 
         # Assert
         self.assertEqual(result.count(), 3)

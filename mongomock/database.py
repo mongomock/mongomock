@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
@@ -50,14 +52,14 @@ class Database(object):
             if isinstance(name_or_collection, Collection):
                 for name, collection in self._collections.items():
                     if collection is name_or_collection:
-                        collection.drop()
+                        collection._documents = OrderedDict()
                         del self._collections[name]
                         break
             else:
                 if name_or_collection in self._collections:
                     collection = self._collections.get(name_or_collection)
                     if collection:
-                        collection.drop()
+                        collection._documents = OrderedDict()
                 del self._collections[name_or_collection]
         # EAFP paradigm
         # (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)

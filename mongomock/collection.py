@@ -1075,8 +1075,7 @@ class Collection(object):
             return self.find(filter).count()
 
     def drop(self):
-        del self._documents
-        self._documents = OrderedDict()
+        self.database.drop_collection(self.name)
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)

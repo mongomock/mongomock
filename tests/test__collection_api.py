@@ -52,6 +52,9 @@ class CollectionAPITest(TestCase):
         self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
         self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
+        self.db.c.drop()
+        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
+
     def test__create_collection(self):
         coll = self.db.create_collection("c")
         self.assertIs(self.db.c, coll)
