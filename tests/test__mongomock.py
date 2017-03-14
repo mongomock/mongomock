@@ -1331,7 +1331,7 @@ class CollectionMapReduceTest(TestCase):
             out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
         self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'results')
-        self.assertEqual(result._database.name, 'map_reduce_son_test')
+        self.assertEqual(result.database.name, 'map_reduce_son_test')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
             self.assertIn(doc, self.expected_results)
@@ -1423,6 +1423,45 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.count(), 2)
         for doc in result.find():
             self.assertIn(doc, expected_results)
+
+    def test_mongomock_map_reduce(self):
+        # Arrange
+        fake_etap = mongomock.MongoClient().db
+        fake_statuses_collection = fake_etap.create_collection('statuses')
+        fake_config_id = "this_is_config_id"
+        test_name = "this_is_test_name"
+        fake_statuses_objects = [
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8392,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8393,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8394,
+                "configID": fake_config_id
+            }
+        ]
+        fake_statuses_collection.insert_many(fake_statuses_objects)
+
+        map_function = Code("function(){emit(this._id, this.duration);}")
+        reduce_function = Code("function() {}")
+        search_query = {'configID': fake_config_id, 'kind': 'Test', 'testID': test_name}
+
+        # Act
+        result = fake_etap.statuses.map_reduce(
+                map_function, reduce_function, "my_collection", query=search_query)
+
+        # Assert
+        self.assertEqual(result.count(), 3)
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
