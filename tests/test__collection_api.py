@@ -1138,6 +1138,58 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, actual)
 
+    def test__all_elemmatch(self):
+        self.db.collection.insert([
+            {
+                "_id": 5,
+                "code": "xyz",
+                "tags": ["school", "book", "bag", "headphone", "appliance"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 45, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 6,
+                "code": "abc",
+                "tags": ["appliance", "school", "book"],
+                "qty": [
+                    {"size": "6", "num": 100, "color": "green"},
+                    {"size": "6", "num": 50, "color": "blue"},
+                    {"size": "8", "num": 100, "color": "brown"},
+                ],
+            },
+            {
+                "_id": 7,
+                "code": "efg",
+                "tags": ["school", "book"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 100, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 8,
+                "code": "ijk",
+                "tags": ["electronics", "school"],
+                "qty": [
+                    {"size": "M", "num": 100, "color": "green"},
+                ],
+            },
+        ])
+        filters = {
+            "qty": {
+                "$all": [
+                    {"$elemMatch": {"size": "M", "num": {"$gt": 50}}},
+                    {"$elemMatch": {"num": 100, "color": "green"}},
+                ],
+            },
+        }
+        results = self.db.collection.find(filters)
+        self.assertEqual([doc["_id"] for doc in results], [7, 8])
+
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection
         collection.insert_many(

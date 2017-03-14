@@ -122,7 +122,13 @@ def _force_list(v):
 
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
-    return all(x in dv for x in search_val)
+    matches = []
+    for x in search_val:
+        if isinstance(x, dict) and '$elemMatch' in x:
+            matches.append(_elem_match_op(doc_val, x['$elemMatch']))
+        else:
+            matches.append(x in dv)
+    return all(matches)
 
 
 def _not_op(d, k, s):
