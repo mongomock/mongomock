@@ -1747,9 +1747,14 @@ class Cursor(object):
         return list(unique) + unique_dict_vals
 
     def __getitem__(self, index):
-        arr = [x for x in self._dataset]
-        self._dataset = iter(arr)
-        return arr[index]
+        if isinstance(index, slice):
+            # Limit the cursor to the given slice
+            self._dataset = (x for x in list(self._dataset)[index])
+            return self
+        else:
+            arr = [x for x in self._dataset]
+            self._dataset = iter(arr)
+            return arr[index]
 
 
 def _set_updater(doc, field_name, value):
