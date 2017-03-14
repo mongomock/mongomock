@@ -1600,7 +1600,7 @@ class Collection(object):
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
-                    if not isinstance(v, helpers.basestring) and v[0] != '$':
+                    if not isinstance(v, helpers.basestring) or v[0] != '$':
                         raise ValueError(
                             "$unwind failed: exception: field path references must be prefixed "
                             "with a '$' '%s'" % v)

@@ -1109,6 +1109,16 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test__unwind_no_prefix(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$unwind': 'arr'}
+            ])
+        self.assertEqual(
+            "$unwind failed: exception: field path references must be prefixed with a '$' 'arr'",
+            str(err.exception))
+
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
