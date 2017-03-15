@@ -1775,9 +1775,18 @@ class Cursor(object):
         return list(unique) + unique_dict_vals
 
     def __getitem__(self, index):
-        arr = [x for x in self._dataset]
-        self._dataset = iter(arr)
-        return arr[index]
+        if isinstance(index, slice):
+            # Limit the cursor to the given slice
+            self._dataset = (x for x in list(self._dataset)[index])
+            return self
+        elif not isinstance(index, int):
+            raise TypeError("index '%s' cannot be applied to Cursor instances" % index)
+        elif index < 0:
+            raise IndexError('Cursor instances do not support negativeindices')
+        else:
+            arr = [x for x in self._dataset]
+            self._dataset = iter(arr)
+            return arr[index]
 
 
 def _set_updater(doc, field_name, value):
