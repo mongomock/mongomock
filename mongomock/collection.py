@@ -277,6 +277,7 @@ class Collection(object):
         self.database = db
         self._documents = OrderedDict()
         self._uniques = []
+        self._sparses = []
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -329,9 +330,16 @@ class Collection(object):
             find_kwargs = {}
             for key, direction in unique:
                 find_kwargs[key] = data.get(key)
-            answer = self.find(find_kwargs)
-            if answer.count() > 0:
-                raise DuplicateKeyError("Duplicate Key Error", 11000)
+
+            for key in find_kwargs.keys():
+                if key in self._sparses:
+                    if find_kwargs[key] == None:
+                        del find_kwargs[key]
+
+            if find_kwargs != {}:
+                answer = self.find(find_kwargs)
+                if answer.count() > 0:
+                    raise DuplicateKeyError("Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
         return data['_id']
@@ -1083,6 +1091,8 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, **kwargs):
         if 'unique' in kwargs and kwargs['unique']:
             self._uniques.append(helpers._index_list(key_or_list))
+        if 'sparse' in kwargs and kwargs['sparse']:
+            self._sparses.append(key_or_list)
 
     def drop_index(self, index_or_name):
         pass
