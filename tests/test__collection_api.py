@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 from datetime import datetime
 import random
@@ -51,6 +52,9 @@ class CollectionAPITest(TestCase):
         self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
         self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
+        self.db.c.drop()
+        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
+
     def test__create_collection(self):
         coll = self.db.create_collection("c")
         self.assertIs(self.db.c, coll)
@@ -83,7 +87,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 1)
 
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         self.db.drop_collection(col)
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 0)
 
@@ -1109,6 +1115,16 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test__unwind_no_prefix(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$unwind': 'arr'}
+            ])
+        self.assertEqual(
+            "$unwind failed: exception: field path references must be prefixed with a '$' 'arr'",
+            str(err.exception))
+
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
@@ -1127,6 +1143,58 @@ class CollectionAPITest(TestCase):
         expect = [{'_id': 1, 'rename_dot': 2}]
 
         self.assertEqual(expect, actual)
+
+    def test__all_elemmatch(self):
+        self.db.collection.insert([
+            {
+                "_id": 5,
+                "code": "xyz",
+                "tags": ["school", "book", "bag", "headphone", "appliance"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 45, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 6,
+                "code": "abc",
+                "tags": ["appliance", "school", "book"],
+                "qty": [
+                    {"size": "6", "num": 100, "color": "green"},
+                    {"size": "6", "num": 50, "color": "blue"},
+                    {"size": "8", "num": 100, "color": "brown"},
+                ],
+            },
+            {
+                "_id": 7,
+                "code": "efg",
+                "tags": ["school", "book"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 100, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 8,
+                "code": "ijk",
+                "tags": ["electronics", "school"],
+                "qty": [
+                    {"size": "M", "num": 100, "color": "green"},
+                ],
+            },
+        ])
+        filters = {
+            "qty": {
+                "$all": [
+                    {"$elemMatch": {"size": "M", "num": {"$gt": 50}}},
+                    {"$elemMatch": {"num": 100, "color": "green"}},
+                ],
+            },
+        }
+        results = self.db.collection.find(filters)
+        self.assertEqual([doc["_id"] for doc in results], [7, 8])
 
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection

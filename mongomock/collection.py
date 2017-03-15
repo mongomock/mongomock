@@ -1075,8 +1075,7 @@ class Collection(object):
             return self.find(filter).count()
 
     def drop(self):
-        del self._documents
-        self._documents = {}
+        self.database.drop_collection(self.name)
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)
@@ -1600,7 +1599,7 @@ class Collection(object):
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
-                    if not isinstance(v, helpers.basestring) and v[0] != '$':
+                    if not isinstance(v, helpers.basestring) or v[0] != '$':
                         raise ValueError(
                             "$unwind failed: exception: field path references must be prefixed "
                             "with a '$' '%s'" % v)
