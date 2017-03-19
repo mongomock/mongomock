@@ -772,6 +772,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)
         self.cmp.compare.find()
 
+    def test__update_with_empty_document_comes(self):
+        """Tests calling update with just '{}' for replacing whole document"""
+        self.cmp.do.insert({'name': 'bob', 'hat': 'wide'})
+        self.cmp.do.update({'name': 'bob'}, {})
+        self.cmp.compare.find()
+
     def test__update_one(self):
         self.cmp.do.insert_many([{'a': 1, 'b': 0},
                                  {'a': 2, 'b': 0}])
@@ -866,6 +872,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
         self.cmp.do.update({'_id': 1}, {'$set': {'a': {'b': 1}}}, upsert=True)
         self.cmp.do.update({'_id': 1}, {'$unset': {'a.b': False}})
+        self.cmp.compare.find()
+
+    def test__unset_positional(self):
+        self.cmp.do.insert({'a': 1, 'b': [{'c': 2, 'd': 3}]})
+        self.cmp.do.update(
+            {'a': 1, 'b': {'$elemMatch': {'c': 2, 'd': 3}}},
+            {'$unset': {'b.$.c': ''}}
+        )
         self.cmp.compare.find()
 
     def test__set_upsert(self):
@@ -1317,7 +1331,7 @@ class CollectionMapReduceTest(TestCase):
             out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
         self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'results')
-        self.assertEqual(result._database.name, 'map_reduce_son_test')
+        self.assertEqual(result.database.name, 'map_reduce_son_test')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
             self.assertIn(doc, self.expected_results)
@@ -1409,6 +1423,45 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.count(), 2)
         for doc in result.find():
             self.assertIn(doc, expected_results)
+
+    def test_mongomock_map_reduce(self):
+        # Arrange
+        fake_etap = mongomock.MongoClient().db
+        fake_statuses_collection = fake_etap.create_collection('statuses')
+        fake_config_id = "this_is_config_id"
+        test_name = "this_is_test_name"
+        fake_statuses_objects = [
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8392,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8393,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8394,
+                "configID": fake_config_id
+            }
+        ]
+        fake_statuses_collection.insert_many(fake_statuses_objects)
+
+        map_function = Code("function(){emit(this._id, this.duration);}")
+        reduce_function = Code("function() {}")
+        search_query = {'configID': fake_config_id, 'kind': 'Test', 'testID': test_name}
+
+        # Act
+        result = fake_etap.statuses.map_reduce(
+            map_function, reduce_function, "my_collection", query=search_query)
+
+        # Assert
+        self.assertEqual(result.count(), 3)
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
@@ -1650,6 +1703,45 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                           'pow': {'$pow': [4, 2]}, 'sqrt': {'$sqrt': 100}}}
         ]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate21(self):
+        pipeline = [
+            {'$group': {'_id': '$a', 'count': {'$sum': 1}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate22(self):
+        pipeline = [
+            {"$group": {"_id": {"$gte": ["$a", 2]}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate23(self):
+        # make sure we aggregate compound keys correctly
+        pipeline = [
+            {"$group": {"_id": {"id_a": "$a", "id_b": "$b"}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate24(self):
+        # make sure we aggregate zero rows correctly
+        pipeline = [
+            {"$match": {"_id": "123456"}},
+            {"$group": {"_id": {"$eq": ["$a", 1]}, 'total': {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate25(self):
+        pipeline = [
+            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate26(self):
+        pipeline = [
+            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}, "total": {"$sum": "$count"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
 
 
 def _LIMIT(*args):

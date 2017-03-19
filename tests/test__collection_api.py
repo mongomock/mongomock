@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 from datetime import datetime
 import random
@@ -35,6 +36,11 @@ class CollectionAPITest(TestCase):
             set(self.db.collection_names()),
             set(["a.b", "system.indexes", "a"]))
 
+    def test__get_sibling_collection(self):
+        self.db.a.database.b
+        self.assertEqual(self.db.a.database.b.full_name, "somedb.b")
+        self.assertEqual(self.db.a.database.b.name, "b")
+
     def test__get_collection_full_name(self):
         self.assertEqual(self.db.coll.name, "coll")
         self.assertEqual(self.db.coll.full_name, "somedb.coll")
@@ -44,6 +50,9 @@ class CollectionAPITest(TestCase):
         self.db.b
         self.assertEqual(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
         self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
+
+        self.db.c.drop()
         self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
     def test__create_collection(self):
@@ -78,7 +87,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 1)
 
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         self.db.drop_collection(col)
+        self.assertTrue(isinstance(col._documents, OrderedDict))
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 0)
 
@@ -116,6 +127,15 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(StopIteration):
             next(iterator2)
+
+    def test_cursor_returns_document_copies(self):
+        obj = {'a': 1, 'b': 2}
+        self.db.collection.insert(obj)
+        fetched_obj = self.db.collection.find_one({'a': 1})
+        self.assertEqual(fetched_obj, obj)
+        fetched_obj['b'] = 3
+        refetched_obj = self.db.collection.find_one({'a': 1})
+        self.assertNotEqual(fetched_obj, refetched_obj)
 
     def test__update_retval(self):
         self.db.col.save({"a": 1})
@@ -424,6 +444,16 @@ class CollectionAPITest(TestCase):
         self.assertIsNotNone(update_result.upserted_id)
         self.assert_document_stored(update_result.upserted_id, {'a': {'b': 1}, 'c': 2})
 
+    def test__update_one_unset_position(self):
+        insert_result = self.db.collection.insert_one({'a': 1, 'b': [{'c': 2, 'd': 3}]})
+        update_result = self.db.collection.update_one(
+            filter={'a': 1, 'b': {'$elemMatch': {'c': 2, 'd': 3}}},
+            update={'$unset': {'b.$.c': ''}}
+        )
+        self.assertEqual(update_result.modified_count, 1)
+        self.assertEqual(update_result.matched_count, 1)
+        self.assert_document_stored(insert_result.inserted_id, {'a': 1, 'b': [{'d': 3}]})
+
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(
@@ -566,6 +596,44 @@ class CollectionAPITest(TestCase):
         count = self.db['coll_name'].find().skip(
             1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
+
+    def test__cursor_getitem(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        item = cursor[0]
+        self.assertEqual(item['name'], 'first')
+
+    def test__cursor_getitem_slice(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        ret = cursor[1:4]
+        self.assertIs(ret, cursor)
+        count = cursor.count()
+        self.assertEqual(count, 2)
+
+    def test__cursor_getitem_negative_index(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        with self.assertRaises(IndexError):
+            cursor[-1]
+
+    def test__cursor_getitem_bad_index(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        with self.assertRaises(TypeError):
+            cursor['not_a_number']
 
     def test__find_with_skip_param(self):
         """Make sure that find() will take in account skip parameter"""
@@ -844,3 +912,408 @@ class CollectionAPITest(TestCase):
         self.db.create_collection("c")
         coll.rename("c", dropTarget=True)
         self.assertEqual(set(["c"]), set(self.db.collection_names(False)))
+
+    def test__cursor_rewind(self):
+        coll = self.db.create_collection('a')
+        coll.insert({'a': 1})
+        coll.insert({'a': 2})
+        coll.insert({'a': 3})
+
+        curs = coll.find().sort('a')
+        self.assertEqual(next(curs)['a'], 1)
+        self.assertEqual(next(curs)['a'], 2)
+        curs.rewind()
+        self.assertEqual(next(curs)['a'], 1)
+        self.assertEqual(next(curs)['a'], 2)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_insert_one(self):
+        operations = [pymongo.InsertOne({'a': 1, 'b': 2})]
+        result = self.db.collection.bulk_write(operations)
+
+        self.assert_document_count(1)
+        doc = next(self.db.collection.find({}))
+        self.assert_document_stored(doc['_id'], {'a': 1, 'b': 2})
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 1})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_update_one(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.UpdateOne({'a': 1}, {"$set": {'a': 2}})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 2}))
+        self.assertEqual(len(docs), 1)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.UpdateOne({'a': 1}, {"$set": {'a': 3}}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_update_many(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1, 'b': 1})
+        self.db.collection.insert_one({'a': 1, 'b': 0})
+        operations = [pymongo.UpdateMany({'a': 1}, {"$set": {'b': 2}})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'b': 2}))
+        self.assertEqual(len(docs), 2)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 2, 'nUpserted': 0, 'nMatched': 2,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.UpdateMany({'a': 2}, {"$set": {'a': 3}}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_replace_one(self):
+        # Upsert == False
+        self.db.collection.insert_one({'a': 1, 'b': 0})
+        operations = [pymongo.ReplaceOne({'a': 1}, {'a': 2})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 2}))
+        self.assertEqual(len(docs), 1)
+        doc = docs[0]
+        doc_id = doc['_id']
+        self.assertEqual(doc, {'_id': doc_id, 'a': 2})
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 1, 'nUpserted': 0, 'nMatched': 1,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 0, 'nInserted': 0})
+
+        # Upsert == True
+        operations = [pymongo.ReplaceOne({'a': 1}, {'a': 3}, upsert=True)]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({'a': 3}))
+        self.assertEqual(len(docs), 1)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 1, 'nMatched': 0,
+            'writeErrors': [], 'writeConcernErrors': [],
+            'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
+            'nRemoved': 0, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_delete_one(self):
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.DeleteOne({'a': 1})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({}))
+        self.assertEqual(len(docs), 0)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 1, 'nInserted': 0})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__bulk_write_delete_many(self):
+        self.db.collection.insert_one({'a': 1})
+        self.db.collection.insert_one({'a': 1})
+        operations = [pymongo.DeleteMany({'a': 1})]
+        result = self.db.collection.bulk_write(operations)
+
+        docs = list(self.db.collection.find({}))
+        self.assertEqual(len(docs), 0)
+        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertEqual(result.bulk_api_result, {
+            'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
+            'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
+            'nRemoved': 2, 'nInserted': 0})
+
+    def test__aggregate_project_array_element_at(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'a': {
+                        '$arrayElemAt': ['$arr', 1]
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 3}], list(actual))
+
+    def test__aggregate_project_rename__id(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'rename_id': '$_id',
+                    'a': {
+                        '$arrayElemAt': ['$arr', 1]
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 3, 'rename_id': 1}],
+                         list(actual))
+
+    def test__aggregate_project_rename_dot_fields(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'rename_dot': '$arr.a'
+                }
+            }
+        ])
+        self.assertEqual([{'rename_dot': 2}],
+                         list(actual))
+
+    def test__aggregate_project_missing_fields(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'rename_dot': '$arr.c'
+                }
+            }
+        ])
+        self.assertEqual([{}],
+                         list(actual))
+
+    def test__aggregate_project_out(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        old_actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        new_collection = self.db.get_collection('new_collection')
+        new_actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, new_actual)
+        self.assertEqual(expect, list(old_actual))
+
+    def test__find_type_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        actual = self.db.collection.find(
+            {'arr': {'$type': 'array'}})
+        expect = [{'_id': 1, 'arr': [1, 2]}]
+
+        self.assertEqual(expect, list(actual))
+
+    def test__find_type_object(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        actual = self.db.collection.find(
+            {'arr': {'$type': 'object'}})
+        expect = [{'_id': 2, 'arr': {'a': 4, 'b': 5}}]
+
+        self.assertEqual(expect, list(actual))
+
+    def test__unwind_no_prefix(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$unwind': 'arr'}
+            ])
+        self.assertEqual(
+            "$unwind failed: exception: field path references must be prefixed with a '$' 'arr'",
+            str(err.exception))
+
+    def test__aggregate_project_out_replace(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
+        new_collection = self.db.get_collection('new_collection')
+        new_collection.insert({'_id': 3})
+        self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    'rename_dot': '$arr.a'
+                }
+            },
+            {'$out': 'new_collection'}
+        ])
+        actual = list(new_collection.find())
+        expect = [{'_id': 1, 'rename_dot': 2}]
+
+        self.assertEqual(expect, actual)
+
+    def test__all_elemmatch(self):
+        self.db.collection.insert([
+            {
+                "_id": 5,
+                "code": "xyz",
+                "tags": ["school", "book", "bag", "headphone", "appliance"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 45, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 6,
+                "code": "abc",
+                "tags": ["appliance", "school", "book"],
+                "qty": [
+                    {"size": "6", "num": 100, "color": "green"},
+                    {"size": "6", "num": 50, "color": "blue"},
+                    {"size": "8", "num": 100, "color": "brown"},
+                ],
+            },
+            {
+                "_id": 7,
+                "code": "efg",
+                "tags": ["school", "book"],
+                "qty": [
+                    {"size": "S", "num": 10, "color": "blue"},
+                    {"size": "M", "num": 100, "color": "blue"},
+                    {"size": "L", "num": 100, "color": "green"},
+                ],
+            },
+            {
+                "_id": 8,
+                "code": "ijk",
+                "tags": ["electronics", "school"],
+                "qty": [
+                    {"size": "M", "num": 100, "color": "green"},
+                ],
+            },
+        ])
+        filters = {
+            "qty": {
+                "$all": [
+                    {"$elemMatch": {"size": "M", "num": {"$gt": 50}}},
+                    {"$elemMatch": {"num": 100, "color": "green"}},
+                ],
+            },
+        }
+        results = self.db.collection.find(filters)
+        self.assertEqual([doc["_id"] for doc in results], [7, 8])
+
+    def test_aggregate_unwind_push_first(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {
+                    '_id': 1111,
+                    'a': [
+                        {
+                            'class': '03',
+                            'a': [
+                                {
+                                    'b': '030502',
+                                    'weight': 100.0
+                                },
+                                {
+                                    'b': '030207',
+                                    'weight': 100.0
+                                }
+                            ]
+                        }
+                    ],
+                    'id': 'ooo',
+                    'update_time': 1111
+                },
+                {
+                    '_id': 22222,
+                    'a': [
+                        {
+                            'class': '03',
+                            'a': [
+                                {
+                                    'b': '030502',
+                                    'weight': 99.0
+                                },
+                                {
+                                    'b': '0302071',
+                                    'weight': 100.0
+                                }
+                            ]
+                        }
+                    ],
+                    'id': 'ooo',
+                    'update_time': 1222
+                }
+            ]
+        )
+        actual = collection.aggregate(
+            [
+                {'$sort': {'update_time': -1}},
+                {'$match': {'a': {'$ne': None}}},
+                {
+                    '$group': {
+                        '_id': '$id',
+                        'update_time': {'$first': '$update_time'},
+                        'a': {'$first': '$a'}
+                    }
+                },
+                {'$unwind': '$a'},
+                {'$unwind': '$a.a'},
+                {
+                    '$group': {
+                        '_id': '$_id',
+                        'update_time': {'$first': '$update_time'},
+                        'a': {
+                            '$push': {
+                                'b': '$a.a.b',
+                                'weight': '$a.a.weight'
+                            }
+                        }
+                    }
+                },
+                {'$out': 'ooo'}
+            ],
+            allowDiskUse=True)
+        expect = [
+            {
+                'update_time': 1222,
+                'a': [
+                    {'weight': 99.0, 'b': '030502'},
+                    {'weight': 100.0, 'b': '0302071'}],
+                '_id': 'ooo'
+            }]
+        self.assertEqual(expect, list(actual))

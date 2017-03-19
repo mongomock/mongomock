@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
 
@@ -120,7 +122,13 @@ def _force_list(v):
 
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
-    return all(x in dv for x in search_val)
+    matches = []
+    for x in search_val:
+        if isinstance(x, dict) and '$elemMatch' in x:
+            matches.append(_elem_match_op(doc_val, x['$elemMatch']))
+        else:
+            matches.append(x in dv)
+    return all(matches)
 
 
 def _not_op(d, k, s):
@@ -161,6 +169,14 @@ def _size_op(doc_val, search_val):
         return search_val == 1 if doc_val else 0
 
 
+def _type_op(doc_val, search_val):
+    if search_val not in TYPE_MAP:
+        raise OperationFailure('%r is not a valid $type' % search_val)
+    elif TYPE_MAP[search_val] is None:
+        raise OperationFailure('%s is a valid $type but not implemented' % search_val)
+    return isinstance(doc_val, TYPE_MAP[search_val])
+
+
 OPERATOR_MAP = {
     '$eq': operator.eq,
     '$ne': operator.ne,
@@ -175,6 +191,7 @@ OPERATOR_MAP = {
     '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
     '$elemMatch': _elem_match_op,
     '$size': _size_op,
+    '$type': _type_op
 }
 
 
@@ -182,4 +199,28 @@ LOGICAL_OPERATOR_MAP = {
     '$or': lambda d, subq: any(filter_applies(q, d) for q in subq),
     '$and': lambda d, subq: all(filter_applies(q, d) for q in subq),
     '$nor': lambda d, subq: all(not filter_applies(q, d) for q in subq),
+}
+
+TYPE_MAP = {
+    'double': (float,),
+    'string': (str,),
+    'object': (dict,),
+    'array': (list,),
+    'binData': (bytes,),
+    'undefined': None,
+    'objectId': (ObjectId,),
+    'bool': (bool,),
+    'date': (datetime,),
+    'null': None,
+    'regex': None,
+    'dbPointer': None,
+    'javascript': None,
+    'symbol': None,
+    'javascriptWithScope': None,
+    'int': (int,),
+    'timestamp': None,
+    'long': (float,),
+    'decimal': (float,),
+    'minKey': None,
+    'maxKey': None,
 }
