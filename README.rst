@@ -1,8 +1,3 @@
-
-.. container::
-
-   .. image:: http://vmalloc.github.io/mongomock/mongomock-small.png
-
 |travis| |pypi_version| |pypi_license| |pypi_wheel|
 
 
