@@ -1153,6 +1153,17 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test__find_eq_none(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': None})
+        self.db.collection.insert_one({'_id': 2})
+        actual = self.db.collection.find(
+            {'arr': {'$eq': None}},
+            projection=['_id']
+        )
+        expect = [{'_id': 1}, {'_id': 2}]
+
+        self.assertEqual(expect, list(actual))
+
     def test__unwind_no_prefix(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         with self.assertRaises(ValueError) as err:
