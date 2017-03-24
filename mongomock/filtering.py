@@ -177,8 +177,13 @@ def _type_op(doc_val, search_val):
     return isinstance(doc_val, TYPE_MAP[search_val])
 
 
+def operator_eq(doc_val, search_val):
+    if doc_val is NOTHING and search_val is None:
+        return True
+    return operator.eq(doc_val, search_val)
+
 OPERATOR_MAP = {
-    '$eq': operator.eq,
+    '$eq': operator_eq,
     '$ne': operator.ne,
     '$gt': _not_nothing_and(operator.gt),
     '$gte': _not_nothing_and(operator.ge),
