@@ -160,7 +160,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Scott Sexton
 * Srinivas Reddy Thatiparthy
 * Taras Boiko
-* Todd Tomkinson 
+* Todd Tomkinson
 * Zachary Carter
 * catty (ca77y _at_ live.com)
 * emosenkis
@@ -177,8 +177,8 @@ Also, many thanks go to the following people for helping out, contributing pull 
 .. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
 
-.. |travis| image:: https://img.shields.io/travis/vmalloc/mongomock/master.svg
-    :target: https://travis-ci.org/vmalloc/mongomock
+.. |travis| image:: https://travis-ci.org/mongomock/mongomock.svg?branch=develop
+    :target: https://travis-ci.org/mongomock/mongomock
     :alt: Travis CI build
 
 .. |pypi_version| image:: https://img.shields.io/pypi/v/mongomock.svg
