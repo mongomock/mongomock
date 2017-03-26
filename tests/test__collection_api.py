@@ -1245,6 +1245,15 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find(filters)
         self.assertEqual([doc["_id"] for doc in results], [7, 8])
 
+    def test_insert_many_bulk_write_error(self):
+        collection = self.db.collection
+        with self.assertRaises(mongomock.BulkWriteError) as cm:
+            collection.insert_many([
+                {'_id': 1},
+                {'_id': 1}
+            ])
+        self.assertEqual(str(cm.exception), 'batch op errors occurred')
+
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection
         collection.insert_many(

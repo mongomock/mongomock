@@ -38,7 +38,7 @@ from six import text_type
 
 
 from mongomock.command_cursor import CommandCursor
-from mongomock import DuplicateKeyError
+from mongomock import DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
 from mongomock import helpers
@@ -309,7 +309,10 @@ class Collection(object):
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        return InsertManyResult(self._insert(documents), acknowledged=True)
+        try:
+            return InsertManyResult(self._insert(documents), acknowledged=True)
+        except DuplicateKeyError:
+            raise BulkWriteError('batch op errors occurred')
 
     def _insert(self, data):
         if isinstance(data, list):

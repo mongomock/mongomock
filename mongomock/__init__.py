@@ -11,6 +11,12 @@ except ImportError:
         pass
 
 try:
+    from pymongo.errors import BulkWriteError
+except ImportError:
+    class BulkWriteError(PyMongoError):
+        pass
+
+try:
     from pymongo.errors import OperationFailure
 except ImportError:
     class OperationFailure(PyMongoError):
