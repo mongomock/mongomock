@@ -12,9 +12,9 @@ import time
 import warnings
 
 try:
-    from bson import json_util, SON
+    from bson import json_util, SON, BSON
 except ImportError:
-    json_utils = SON = None
+    json_utils = SON = BSON = None
 try:
     import execjs
 except ImportError:
@@ -320,6 +320,10 @@ class Collection(object):
 
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError("Document keys must be strings")
+
+        if BSON:
+            # bson validation
+            BSON.encode(data, check_keys=True)
 
         if '_id' not in data:
             data['_id'] = ObjectId()

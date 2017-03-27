@@ -1,7 +1,9 @@
 from collections import OrderedDict
 import copy
 from datetime import datetime
+import platform
 import random
+import six
 from six import text_type
 import time
 from unittest import TestCase, skipIf
@@ -10,6 +12,7 @@ import warnings
 import mongomock
 
 try:
+    from bson.errors import InvalidDocument
     import pymongo
     from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
@@ -18,6 +21,7 @@ except ImportError:
 
 
 warnings.simplefilter('ignore', DeprecationWarning)
+IS_PYPY = platform.python_implementation() != 'CPython'
 
 
 class CollectionAPITest(TestCase):
@@ -1253,6 +1257,26 @@ class CollectionAPITest(TestCase):
                 {'_id': 1}
             ])
         self.assertEqual(str(cm.exception), 'batch op errors occurred')
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_bson_validation(self):
+        collection = self.db.collection
+        with self.assertRaises(InvalidDocument) as cm:
+            collection.insert({"a": {"b"}})
+        if IS_PYPY:
+            expect = "cannot convert value of type <type 'set'> to bson"
+        elif six.PY2:
+            expect = "Cannot encode object: set(['b'])"
+        else:
+            expect = "Cannot encode object: {'b'}"
+        self.assertEqual(str(cm.exception), expect)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_bson_invalid_encode_type(self):
+        collection = self.db.collection
+        with self.assertRaises(InvalidDocument) as cm:
+            collection.insert({"$foo": "bar"})
+        self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
 
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection
