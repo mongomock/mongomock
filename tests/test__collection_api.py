@@ -1079,6 +1079,11 @@ class CollectionAPITest(TestCase):
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 2, 'nInserted': 0})
 
+    def test_find_with_comment(self):
+        self.db.collection.insert_one({'_id': 1})
+        actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
+        self.assertEqual([{'_id': 1}], actual)
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
