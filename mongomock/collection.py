@@ -332,12 +332,12 @@ class Collection(object):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
-        for unique in self._uniques:
+        for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                find_kwargs[key] = data.get(key)
+                find_kwargs[key] = data.get(key, None)
             answer = self.find(find_kwargs)
-            if answer.count() > 0:
+            if answer.count() > 0 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
@@ -1088,8 +1088,8 @@ class Collection(object):
         self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, key_or_list, cache_for=300, **kwargs):
-        if 'unique' in kwargs and kwargs['unique']:
-            self._uniques.append(helpers._index_list(key_or_list))
+        if kwargs.pop('unique', False):
+            self._uniques.append((helpers.index_list(key_or_list), kwargs.pop('sparse', False)))
 
     def drop_index(self, index_or_name):
         pass

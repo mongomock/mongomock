@@ -27,7 +27,7 @@ def print_deprecation_warning(old_param_name, new_param_name):
         "purposes." % (old_param_name, new_param_name), DeprecationWarning)
 
 
-def _index_list(key_or_list, direction=None):
+def index_list(key_or_list, direction=None):
     """Helper to generate a list of (key, direction) pairs.
 
        It takes such a list, or a single key, or a single key and direction.
