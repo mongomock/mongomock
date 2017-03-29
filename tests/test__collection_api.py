@@ -889,6 +889,13 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             list(data_in_db), [{"_id": 1, "a": {"b": {"c": 2}}}])
 
+    def test_find_project_in_array(self):
+        self.db.collection.insert(
+            {'_id': 1, "list": [{"index": 1, "name": "name1"}, {"index": 2, "name": "name2"}]})
+        actual = self.db.collection.find(projection=['list.index'])
+        expect = [{'_id': 1, 'list': [{"index": 1}, {"index": 2}]}]
+        self.assertEqual(expect, list(actual))
+
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
 

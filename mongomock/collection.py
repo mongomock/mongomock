@@ -742,7 +742,7 @@ class Collection(object):
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
         result = {}
-        allowed_projection_operators = set(['$elemMatch'])
+        allowed_projection_operators = {'$elemMatch'}
         for key, value in iteritems(fields):
             if isinstance(value, dict):
                 for op in value:
@@ -822,16 +822,25 @@ class Collection(object):
                     key_parts = key.split('.')
                     subdocument = doc
                     subdocument_copy = doc_copy
+                    last_copy = subdocument_copy
                     full_key_path_found = True
                     for key_part in key_parts[:-1]:
                         if key_part not in subdocument:
                             full_key_path_found = False
                             break
                         subdocument = subdocument[key_part]
+                        last_copy = subdocument_copy
                         subdocument_copy = subdocument_copy.setdefault(key_part, {})
-                    if not full_key_path_found or key_parts[-1] not in subdocument:
-                        continue
-                    subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
+
+                    if full_key_path_found:
+                        last_key = key_parts[-1]
+                        if isinstance(subdocument, dict) and last_key in subdocument:
+                            subdocument_copy[last_key] = subdocument[last_key]
+                        elif isinstance(subdocument, (list, tuple)):
+                            subdocument = [{last_key: x[last_key]}
+                                           for x in subdocument if last_key in x]
+                            if subdocument:
+                                last_copy[key_parts[-2]] = subdocument
             # otherwise, exclude the fields passed in
             else:
                 doc_copy = self._copy_field(doc, container)
