@@ -1,7 +1,9 @@
 from collections import OrderedDict
 import copy
 from datetime import datetime
+import platform
 import random
+import six
 from six import text_type
 import time
 from unittest import TestCase, skipIf
@@ -10,6 +12,7 @@ import warnings
 import mongomock
 
 try:
+    from bson.errors import InvalidDocument
     import pymongo
     from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
@@ -18,6 +21,7 @@ except ImportError:
 
 
 warnings.simplefilter('ignore', DeprecationWarning)
+IS_PYPY = platform.python_implementation() != 'CPython'
 
 
 class CollectionAPITest(TestCase):
@@ -744,6 +748,25 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test_sparse_unique_index(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
+
+        self.db.collection.insert({})
+        self.db.collection.insert({})
+
+        self.assertEqual(self.db.collection.find({}).count(), 2)
+
+    def test_sparse_unique_index_dup(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
+
+        self.db.collection.insert({})
+        self.db.collection.insert({})
+        self.db.collection.insert({'value': 'a'})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({'value': 'a'})
+
+        self.assertEqual(self.db.collection.find({}).count(), 3)
+
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,
@@ -1056,6 +1079,11 @@ class CollectionAPITest(TestCase):
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 2, 'nInserted': 0})
 
+    def test_find_with_comment(self):
+        self.db.collection.insert_one({'_id': 1})
+        actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
+        self.assertEqual([{'_id': 1}], actual)
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
@@ -1244,6 +1272,35 @@ class CollectionAPITest(TestCase):
         }
         results = self.db.collection.find(filters)
         self.assertEqual([doc["_id"] for doc in results], [7, 8])
+
+    def test_insert_many_bulk_write_error(self):
+        collection = self.db.collection
+        with self.assertRaises(mongomock.BulkWriteError) as cm:
+            collection.insert_many([
+                {'_id': 1},
+                {'_id': 1}
+            ])
+        self.assertEqual(str(cm.exception), 'batch op errors occurred')
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_bson_validation(self):
+        collection = self.db.collection
+        with self.assertRaises(InvalidDocument) as cm:
+            collection.insert({"a": {"b"}})
+        if IS_PYPY:
+            expect = "cannot convert value of type <type 'set'> to bson"
+        elif six.PY2:
+            expect = "Cannot encode object: set(['b'])"
+        else:
+            expect = "Cannot encode object: {'b'}"
+        self.assertEqual(str(cm.exception), expect)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_bson_invalid_encode_type(self):
+        collection = self.db.collection
+        with self.assertRaises(InvalidDocument) as cm:
+            collection.insert({"$foo": "bar"})
+        self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
 
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection

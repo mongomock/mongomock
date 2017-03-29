@@ -28,6 +28,8 @@ def filter_applies(search_filter, document):
                 ('$ne' in search or search == {'$exists': False})
                 and len(iter_key_candidates(key, document)) == 0):
             continue
+        if key == '$comment':
+            continue
 
         for doc_val in iter_key_candidates(key, document):
             if isinstance(search, dict):

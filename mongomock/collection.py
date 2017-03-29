@@ -12,9 +12,9 @@ import time
 import warnings
 
 try:
-    from bson import json_util, SON
+    from bson import json_util, SON, BSON
 except ImportError:
-    json_utils = SON = None
+    json_utils = SON = BSON = None
 try:
     import execjs
 except ImportError:
@@ -38,7 +38,7 @@ from six import text_type
 
 
 from mongomock.command_cursor import CommandCursor
-from mongomock import DuplicateKeyError
+from mongomock import DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
 from mongomock import helpers
@@ -309,7 +309,10 @@ class Collection(object):
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        return InsertManyResult(self._insert(documents), acknowledged=True)
+        try:
+            return InsertManyResult(self._insert(documents), acknowledged=True)
+        except DuplicateKeyError:
+            raise BulkWriteError('batch op errors occurred')
 
     def _insert(self, data):
         if isinstance(data, list):
@@ -318,6 +321,10 @@ class Collection(object):
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError("Document keys must be strings")
 
+        if BSON:
+            # bson validation
+            BSON.encode(data, check_keys=True)
+
         if '_id' not in data:
             data['_id'] = ObjectId()
         object_id = data['_id']
@@ -325,12 +332,12 @@ class Collection(object):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("Duplicate Key Error", 11000)
-        for unique in self._uniques:
+        for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                find_kwargs[key] = data.get(key)
+                find_kwargs[key] = data.get(key, None)
             answer = self.find(find_kwargs)
-            if answer.count() > 0:
+            if answer.count() > 0 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
@@ -1081,8 +1088,8 @@ class Collection(object):
         self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, key_or_list, cache_for=300, **kwargs):
-        if 'unique' in kwargs and kwargs['unique']:
-            self._uniques.append(helpers._index_list(key_or_list))
+        if kwargs.pop('unique', False):
+            self._uniques.append((helpers.index_list(key_or_list), kwargs.pop('sparse', False)))
 
     def drop_index(self, index_or_name):
         pass
