@@ -815,39 +815,8 @@ class Collection(object):
                     doc_copy = container()
                 else:
                     doc_copy = self._copy_field(doc, container)
-            # if 1 was passed in as the field values, include those fields
-            elif list(fields.values())[0] == 1:
-                doc_copy = container()
-                for key in fields:
-                    key_parts = key.split('.')
-                    subdocument = doc
-                    subdocument_copy = doc_copy
-                    full_key_path_found = True
-                    for key_part in key_parts[:-1]:
-                        if key_part not in subdocument:
-                            full_key_path_found = False
-                            break
-                        subdocument = subdocument[key_part]
-                        subdocument_copy = subdocument_copy.setdefault(key_part, {})
-                    if not full_key_path_found or key_parts[-1] not in subdocument:
-                        continue
-                    subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
-            # otherwise, exclude the fields passed in
             else:
-                doc_copy = self._copy_field(doc, container)
-                for key in fields:
-                    key_parts = key.split('.')
-                    subdocument_copy = doc_copy
-                    full_key_path_found = True
-                    for key_part in key_parts[:-1]:
-                        if key_part not in subdocument_copy:
-                            full_key_path_found = False
-                            break
-                        subdocument_copy = subdocument_copy[key_part]
-                    if not full_key_path_found or key_parts[-1] not in subdocument_copy:
-                        continue
-                    del subdocument_copy[key_parts[-1]]
-
+                doc_copy = self._filter_subdocuments(doc, fields, container)
             # set the _id value if we requested it, otherwise remove it
             if id_value == 0:
                 doc_copy.pop('_id', None)
@@ -862,6 +831,77 @@ class Collection(object):
             for field, op in iteritems(projection_operators):
                 fields[field] = op
             return doc_copy
+
+    def _subdocitem_merge(self, doc_copy, field, sdocitems, subtract=False):
+        sdoc_copy = doc_copy.setdefault(field, [])
+        if len(sdoc_copy) < len(sdocitems):
+            sdoc_copy.extend([{} if not subtract else {'$EMPTY$': True}
+                              for _ in xrange(len(sdocitems) - len(sdoc_copy))])
+        for (sdoc, sdocitem) in zip(sdoc_copy, sdocitems):
+            if not subtract:
+                sdoc.update(sdocitem)
+            else:
+                if sdoc == {'$EMPTY$': True}:
+                    sdoc.clear()
+                    sdoc.update(sdocitem)
+                else:
+                    exc_keys = set(sdoc.keys()).difference(sdocitem.keys())
+                    for key in exc_keys:
+                        del sdoc[key]
+
+    def _filter_subdocuments(self, doc, fields, container):
+        # if 1 was passed in as the field values, include those fields
+        if list(fields.values())[0] == 1:
+            doc_copy = container()
+            for key in fields:
+                key_parts = key.split('.')
+                subdocument = doc
+                subdocument_copy = doc_copy
+                full_key_path_found = True
+                for (i, key_part) in enumerate(key_parts[:-1]):
+                    if not isinstance(subdocument, dict) or key_part not in subdocument:
+                        full_key_path_found = False
+                        break
+                    if isinstance(subdocument[key_part], list):
+                        subdocitems = [
+                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i + 1:]): 1},
+                                                      container)
+                            for sdocitem in subdocument[key_part]
+                        ]
+                        self._subdocitem_merge(subdocument_copy, key_part, subdocitems)
+                    else:
+                        subdocument = subdocument[key_part]
+                        subdocument_copy = subdocument_copy.setdefault(key_part, {})
+                if not full_key_path_found or not isinstance(subdocument, dict) or \
+                        key_parts[-1] not in subdocument:
+                    continue
+                subdocument_copy[key_parts[-1]] = subdocument[key_parts[-1]]
+        # otherwise, exclude the fields passed in
+        else:
+            doc_copy = self._copy_field(doc, container)
+            for key in fields:
+                key_parts = key.split('.')
+                subdocument_copy = doc_copy
+                full_key_path_found = True
+                for (i, key_part) in enumerate(key_parts[:-1]):
+                    if not isinstance(subdocument_copy, dict) or key_part not in subdocument_copy:
+                        full_key_path_found = False
+                        break
+                    if isinstance(subdocument_copy[key_part], list):
+                        subdocitems = [
+                            self._filter_subdocuments(sdocitem, {'.'.join(key_parts[i + 1:]): 0},
+                                                      container)
+                            for sdocitem in subdocument_copy[key_part]
+                        ]
+                        self._subdocitem_merge(subdocument_copy, key_part, subdocitems,
+                                               subtract=True)
+                    else:
+                        subdocument_copy = subdocument_copy[key_part]
+                if not full_key_path_found or not isinstance(subdocument_copy, dict) or \
+                        key_parts[-1] not in subdocument_copy:
+                    continue
+                del subdocument_copy[key_parts[-1]]
+        return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
