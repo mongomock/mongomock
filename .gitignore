@@ -10,6 +10,7 @@ ChangeLog
 dist
 build
 eggs
+.eggs/
 parts
 bin
 develop-eggs
@@ -22,6 +23,7 @@ pip-log.txt
 .coverage
 .tox
 .achievements
+.cache/
 
 #### Eclipse
 *.pydevproject
