@@ -1765,6 +1765,9 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
 
+    def test__skipped_find(self):
+        self.cmp.compare(_SORT("index", 1)).find(skip=10)
+
     def test__limit(self):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
 
