@@ -169,6 +169,7 @@ class _CollectionComparisonTest(TestCase):
         super(_CollectionComparisonTest, self).setUp()
         self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
+        self.server_version = self.mongo_conn.server_info()['versionArray']
         self.db_name = "mongomock___testing_db"
         self.collection_name = "mongomock___testing_collection"
         self.mongo_conn[self.db_name][self.collection_name].remove()
@@ -1680,7 +1681,11 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$project': {'_id': 0, 'created': {'$subtract': [{'$min': ['$a', '$b']}, '$count']}}}
         ]
-        self.cmp.compare.aggregate(pipeline)
+        # TODO(Metrodatateam): use skipif if version is accessible from decorator
+        if self.server_version >= [3, 2]:
+            self.cmp.compare.aggregate(pipeline)
+        else:
+            print('$min supported in $project from 3.2')
 
     def test__aggregate18(self):
         pipeline = [
@@ -1696,12 +1701,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def test__aggregate20(self):
         pipeline = [
-            {'$project': {'_id': 0, 'abs': {'$abs': '$b'}, 'ceil': {'$ceil': 8.35},
-                          'div': {'$divide': ['$a', 1]}, 'exp': {'$exp': 2},
-                          'floor': {'$floor': 4.65}, 'ln': {'$ln': 100},
-                          'log10': {'$log10': 1000}, 'mod': {'$mod': [46, 9]},
-                          'pow': {'$pow': [4, 2]}, 'sqrt': {'$sqrt': 100}}}
+            {'$project': {'_id': 0,
+                          'div': {'$divide': ['$a', 1]},
+                          'mod': {'$mod': [46, 9]}}}
         ]
+        if self.server_version >= [3, 2]:
+            pipeline[0]['$project'].update(
+                {
+                    'pow': {'$pow': [4, 2]},
+                    'ceil': {'$ceil': 8.35},
+                    'abs': {'$abs': '$b'},
+                    'exp': {'$exp': 2},
+                    'ln': {'$ln': 100},
+                    'log10': {'$log10': 1000},
+                    'floor': {'$floor': 4.65},
+                    'sqrt': {'$sqrt': 100}
+                })
         self.cmp.compare.aggregate(pipeline)
 
     def test__aggregate21(self):
