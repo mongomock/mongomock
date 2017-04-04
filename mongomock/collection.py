@@ -32,7 +32,6 @@ from six import iteritems
 from six import iterkeys
 from six import itervalues
 from six import MAXSIZE
-from six.moves import xrange
 from six import string_types
 from six import text_type
 
