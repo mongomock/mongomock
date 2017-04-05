@@ -32,7 +32,6 @@ from six import iteritems
 from six import iterkeys
 from six import itervalues
 from six import MAXSIZE
-from six.moves import xrange
 from six import string_types
 from six import text_type
 
@@ -709,7 +708,7 @@ class Collection(object):
         validate_is_mapping('filter', spec)
         return Cursor(self, spec, sort, projection, skip, limit)
 
-    def _get_dataset(self, spec, sort, fields, as_class, skip):
+    def _get_dataset(self, spec, sort, fields, as_class):
         dataset = (self._copy_only_fields(document, fields, as_class)
                    for document in self._iter_documents(spec))
         if sort:
@@ -717,12 +716,6 @@ class Collection(object):
                 dataset = iter(sorted(
                     dataset, key=lambda x: _resolve_sort_key(sortKey, x),
                     reverse=sortDirection < 0))
-        for i in xrange(skip):
-            try:
-                next(dataset)
-            except StopIteration:
-                pass
-
         return dataset
 
     def _copy_field(self, obj, container):
@@ -1698,7 +1691,7 @@ class Cursor(object):
         self._projection = projection
         self._skip = skip
         self._factory = functools.partial(collection._get_dataset,
-                                          spec, sort, projection, dict, skip)
+                                          spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self.rewind()
@@ -1800,7 +1793,7 @@ class Cursor(object):
         elif index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
         else:
-            arr = [x for x in self._dataset]
+            arr = list(self)
             self._dataset = iter(arr)
             return arr[index]
 

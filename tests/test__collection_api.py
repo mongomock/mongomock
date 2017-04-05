@@ -601,6 +601,14 @@ class CollectionAPITest(TestCase):
             1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
+    def test__cursor_count_with_skip_init(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        count = self.db['coll_name'].find(skip=1).count(with_limit_and_skip=True)
+        self.assertEqual(count, 2)
+
     def test__cursor_getitem(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
@@ -648,7 +656,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             self.db['users'].find(
                 sort=[
-                    ("name", 1)], skip=1).count(), 1)
+                    ("name", 1)], skip=1).count(with_limit_and_skip=True), 1)
         self.assertEqual(
             self.db['users'].find(
                 sort=[
