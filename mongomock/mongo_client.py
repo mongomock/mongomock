@@ -12,7 +12,10 @@ class MongoClient(object):
 
     def __init__(self, host=None, port=None, document_class=dict,
                  tz_aware=False, connect=True, **kwargs):
-        self.host = host or self.HOST
+        if host:
+            self.host = host[0] if isinstance(host, (list, tuple)) else host
+        else:
+            self.host = self.HOST
         self.port = port or self.PORT
         self._databases = {}
         self._id = next(self._CONNECTION_ID)

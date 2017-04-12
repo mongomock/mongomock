@@ -40,6 +40,10 @@ class InterfaceTest(TestCase):
     def test__can_create_db_with_path(self):
         self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
 
+    def test__can_create_db_with_multiple_pathes(self):
+        hostnames = ['mongodb://localhost:27017', 'mongodb://localhost:27018']
+        self.assertIsNotNone(mongomock.MongoClient(hostnames))
+
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
@@ -136,6 +140,8 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
                      "admin%3F?authMechanism=MONGODB-CR")
         self.assertIs(db, c['admin?'])
+        c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
+        self.assertIs(db, c['foo'])
 
     def test__getting_default_database_invalid(self):
         def client(uri):
