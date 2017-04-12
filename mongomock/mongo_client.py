@@ -38,6 +38,14 @@ class MongoClient(object):
         pass
 
     @property
+    def is_mongos(self):
+        return True
+
+    @property
+    def is_primary(self):
+        return True
+
+    @property
     def address(self):
         return self.host, self.port
 
