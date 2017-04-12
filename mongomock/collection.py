@@ -1707,8 +1707,9 @@ class Cursor(object):
         return self
 
     def clone(self):
-        return Cursor(self.collection,
-                      self._spec, self._sort, self._projection, self._skip, self._limit)
+        cursor = Cursor(self.collection,
+                        self._spec, self._sort, self._projection, self._skip, self._limit)
+        return cursor
 
     def __next__(self):
         if self._skip and not self._skipped:
@@ -1792,8 +1793,28 @@ class Cursor(object):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            # Limit the cursor to the given slice
-            self._dataset = (x for x in list(self._dataset)[index])
+            if index.step is not None:
+                raise IndexError("Cursor instances do not support slice steps")
+
+            skip = 0
+            if index.start is not None:
+                if index.start < 0:
+                    raise IndexError("Cursor instances do not support"
+                                     "negative indices")
+                skip = index.start
+
+            if index.stop is not None:
+                limit = index.stop - skip
+                if limit < 0:
+                    raise IndexError("stop index must be greater than start"
+                                     "index for slice %r" % index)
+                if limit == 0:
+                    self.__empty = True
+            else:
+                limit = 0
+
+            self._skip = skip
+            self._limit = limit
             return self
         elif not isinstance(index, int):
             raise TypeError("index '%s' cannot be applied to Cursor instances" % index)

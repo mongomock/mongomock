@@ -159,6 +159,20 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(StopIteration):
             next(iterator2)
 
+    def test__cursor_clone_keep_limit_skip(self):
+        self.db.collection.insert([{"a": "b"}, {"b": "c"}, {"c": "d"}])
+        cursor1 = self.db.collection.find()[1:2]
+        cursor2 = cursor1.clone()
+        result1 = list(cursor1)
+        result2 = list(cursor2)
+        self.assertEqual(result1, result2)
+
+        cursor3 = self.db.collection.find(skip=1, limit=1)
+        cursor4 = cursor3.clone()
+        result3 = list(cursor3)
+        result4 = list(cursor4)
+        self.assertEqual(result3, result4)
+
     def test_cursor_returns_document_copies(self):
         obj = {'a': 1, 'b': 2}
         self.db.collection.insert(obj)
@@ -654,6 +668,8 @@ class CollectionAPITest(TestCase):
         ret = cursor[1:4]
         self.assertIs(ret, cursor)
         count = cursor.count()
+        self.assertEqual(count, 3)
+        count = cursor.count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
     def test__cursor_getitem_negative_index(self):
