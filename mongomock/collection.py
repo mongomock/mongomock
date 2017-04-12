@@ -275,7 +275,11 @@ class Collection(object):
         self.full_name = "{0}.{1}".format(db.name, name)
         self.database = db
         self._documents = OrderedDict()
+        self._force_created = False
         self._uniques = []
+
+    def _is_created(self):
+        return self._documents or self._force_created
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)

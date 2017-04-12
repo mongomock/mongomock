@@ -32,16 +32,13 @@ class CollectionAPITest(TestCase):
         self.db = self.client['somedb']
 
     def test__get_subcollections(self):
-        self.db.a.b
+        self.db.create_collection('a.b')
         self.assertEqual(self.db.a.b.full_name, "somedb.a.b")
         self.assertEqual(self.db.a.b.name, "a.b")
 
-        self.assertEqual(
-            set(self.db.collection_names()),
-            set(["a.b", "a"]))
+        self.assertEqual(set(self.db.collection_names()), set(["a.b"]))
 
     def test__get_sibling_collection(self):
-        self.db.a.database.b
         self.assertEqual(self.db.a.database.b.full_name, "somedb.b")
         self.assertEqual(self.db.a.database.b.name, "b")
 
@@ -50,8 +47,8 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.coll.full_name, "somedb.coll")
 
     def test__get_collection_names(self):
-        self.db.a
-        self.db.b
+        self.db.create_collection('a')
+        self.db.create_collection('b')
         self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
         self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b']))
         self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
@@ -71,13 +68,19 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.InvalidName):
             self.db.create_collection('...')
 
+    def test__lazy_create_collection(self):
+        col = self.db.a
+        self.assertEqual(set(self.db.collection_names()), set())
+        col.insert({'foo': 'bar'})
+        self.assertEqual(set(self.db.collection_names()), set(['a']))
+
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
 
     def test__drop_collection(self):
-        self.db.a
-        self.db.b
-        self.db.c
+        self.db.create_collection('a')
+        self.db.create_collection('b')
+        self.db.create_collection('c')
         self.db.drop_collection('b')
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
@@ -102,6 +105,24 @@ class CollectionAPITest(TestCase):
         self.assertTrue(isinstance(col._documents, OrderedDict))
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 0)
+
+    def test__drop_n_recreate_collection(self):
+        col_a = self.db.create_collection('a')
+        col_a2 = self.db.a
+        col_a.insert({'foo': 'bar'})
+        self.assertEqual(col_a.find().count(), 1)
+        self.assertEqual(col_a2.find().count(), 1)
+        self.assertEqual(self.db.a.find().count(), 1)
+
+        self.db.drop_collection('a')
+        self.assertEqual(col_a.find().count(), 0)
+        self.assertEqual(col_a2.find().count(), 0)
+        self.assertEqual(self.db.a.find().count(), 0)
+
+        col_a2.insert({'foo2': 'bar2'})
+        self.assertEqual(col_a.find().count(), 1)
+        self.assertEqual(col_a2.find().count(), 1)
+        self.assertEqual(self.db.a.find().count(), 1)
 
     def test__distinct_nested_field(self):
         self.db.collection.insert({'f1': {'f2': 'v'}})

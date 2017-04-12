@@ -73,19 +73,13 @@ class MongoClient(object):
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):
-            databases_keys = list(self._databases.keys())
-            for database_name in databases_keys:
-                tmp_database = self._databases.get(database_name)
-                if tmp_database is name_or_db:
-                    if tmp_database:
-                        drop_collections_for_db(tmp_database)
-                    del self._databases[database_name]
-                    break
+            db = next(db for db in self._databases.values() if db is name_or_db)
+            if db:
+                drop_collections_for_db(db)
 
         elif name_or_db in self._databases:
             db = self._databases[name_or_db]
             drop_collections_for_db(db)
-            del self._databases[name_or_db]
 
     def get_database(self, name, codec_options=None, read_preference=None,
                      write_concern=None):
