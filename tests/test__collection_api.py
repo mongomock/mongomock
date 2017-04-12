@@ -788,19 +788,19 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert({})
         self.db.collection.insert({})
+        self.db.collection.insert({"value": None})
+        self.db.collection.insert({"value": None})
 
-        self.assertEqual(self.db.collection.find({}).count(), 2)
+        self.assertEqual(self.db.collection.find({}).count(), 4)
 
     def test_sparse_unique_index_dup(self):
         self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
 
-        self.db.collection.insert({})
-        self.db.collection.insert({})
         self.db.collection.insert({'value': 'a'})
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({'value': 'a'})
 
-        self.assertEqual(self.db.collection.find({}).count(), 3)
+        self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
