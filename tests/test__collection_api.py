@@ -38,7 +38,7 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(
             set(self.db.collection_names()),
-            set(["a.b", "system.indexes", "a"]))
+            set(["a.b", "a"]))
 
     def test__get_sibling_collection(self):
         self.db.a.database.b
@@ -52,8 +52,8 @@ class CollectionAPITest(TestCase):
     def test__get_collection_names(self):
         self.db.a
         self.db.b
-        self.assertEqual(set(self.db.collection_names()), set(['a', 'b', 'system.indexes']))
-        self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
+        self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b']))
         self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
         self.db.c.drop()
@@ -81,7 +81,7 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
-        self.assertEqual(set(self.db.collection_names()), set(['a', 'system.indexes']))
+        self.assertEqual(set(self.db.collection_names()), set(['a']))
 
         col = self.db.a
         r = col.insert({"aa": "bb"})

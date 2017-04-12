@@ -13,8 +13,7 @@ class Database(object):
     def __init__(self, client, name):
         self.name = name
         self._client = client
-        self._collections = {
-            'system.indexes': Collection(self, 'system.indexes')}
+        self._collections = {}
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
