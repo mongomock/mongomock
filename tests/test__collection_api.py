@@ -793,6 +793,23 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 4)
 
+    def test_unique_index_with_upsert_insertion(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.save({'_id': 1, 'value': 1})
+        # Updating document should not trigger error
+        self.db.collection.save({'_id': 1, 'value': 1})
+        self.db.collection.update({'value': 1}, {'value': 1}, upsert=True)
+        # Creating new documents with same value should
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.save({'value': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'bad': 'condition'}, {'value': 1}, upsert=True)
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.save({'_id': 2, 'value': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'_id': 2}, {'$set': {'value': 1}}, upsert=True)
+
     def test_sparse_unique_index_dup(self):
         self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
 

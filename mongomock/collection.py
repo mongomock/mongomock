@@ -403,11 +403,12 @@ class Collection(object):
             if existing_document is None:
                 if not upsert or num_updated:
                     continue
-                _id = document.get('_id')
-                to_insert = dict(spec, _id=_id) if _id else spec
+                # For upsert operation we have first to create a fake existing_document,
+                # update it like a regular one, then finally insert it
+                _id = spec.get('_id') or document.get('_id') or ObjectId()
+                to_insert = dict(spec, _id=_id)
                 to_insert = self._expand_dots(to_insert)
-                upserted_id = self._insert(self._discard_operators(to_insert))
-                existing_document = self._documents[upserted_id]
+                existing_document = to_insert
                 was_insert = True
             else:
                 updated_existing = True
@@ -629,6 +630,8 @@ class Collection(object):
                 existing_document.clear()
                 if _id:
                     existing_document['_id'] = _id
+            if was_insert:
+                upserted_id = self._insert(existing_document)
             if not multi:
                 break
 
