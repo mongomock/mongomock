@@ -17,6 +17,7 @@ try:
     from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
 except ImportError:
+    from mongomock.collection import ReturnDocument
     _HAVE_PYMONGO = False
 
 
@@ -353,6 +354,25 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(ValueError):  # this is also what pymongo raises
             self.db.collection.find_and_modify({"a": 2}, {"a": 3}, remove=True)
 
+    def test__find_one_and_update_doc_with_zero_ids(self):
+        ret = self.db.col_a.find_one_and_update(
+            {"_id": 0}, {"$inc": {"counter": 1}},
+            upsert=True, return_document=ReturnDocument.AFTER)
+        self.assertEqual(ret, {'_id': 0, 'counter': 1})
+        ret = self.db.col_a.find_one_and_update(
+            {"_id": 0}, {"$inc": {"counter": 1}},
+            upsert=True, return_document=ReturnDocument.AFTER)
+        self.assertEqual(ret, {'_id': 0, 'counter': 2})
+
+        ret = self.db.col_b.find_one_and_update(
+            {"_id": 0}, {"$inc": {"counter": 1}},
+            upsert=True, return_document=ReturnDocument.BEFORE)
+        self.assertIsNone(ret)
+        ret = self.db.col_b.find_one_and_update(
+            {"_id": 0}, {"$inc": {"counter": 1}},
+            upsert=True, return_document=ReturnDocument.BEFORE)
+        self.assertEqual(ret, {'_id': 0, 'counter': 1})
+
     def test__find_one_and_delete(self):
         documents = [
             {'x': 1, 's': 0},
@@ -397,13 +417,12 @@ class CollectionAPITest(TestCase):
         self.assertIsNotNone(self.db.collection.find_one({'x': 3}))
         self.assert_document_count(3)
 
-        if _HAVE_PYMONGO:
-            replacement = {'x': 4, 's': 1}
-            doc = self.db.collection.find_one_and_replace(
-                {'s': 1}, replacement,
-                return_document=ReturnDocument.AFTER)
-            doc.pop('_id')
-            self.assertDictEqual(doc, replacement)
+        replacement = {'x': 4, 's': 1}
+        doc = self.db.collection.find_one_and_replace(
+            {'s': 1}, replacement,
+            return_document=ReturnDocument.AFTER)
+        doc.pop('_id')
+        self.assertDictEqual(doc, replacement)
 
     def test__find_one_and_update(self):
         documents = [
@@ -427,13 +446,12 @@ class CollectionAPITest(TestCase):
         self.assertIsNone(doc)
         self.assertIsNotNone(self.db.collection.find_one({'x': 3}))
 
-        if _HAVE_PYMONGO:
-            update = {'x': 4, 's': 1}
-            doc = self.db.collection.find_one_and_update(
-                {'s': 1}, {'$set': update},
-                return_document=ReturnDocument.AFTER)
-            doc.pop('_id')
-            self.assertDictEqual(doc, update)
+        update = {'x': 4, 's': 1}
+        doc = self.db.collection.find_one_and_update(
+            {'s': 1}, {'$set': update},
+            return_document=ReturnDocument.AFTER)
+        doc.pop('_id')
+        self.assertDictEqual(doc, update)
 
     def test__update_interns_lists_and_dicts(self):
         obj = {}

@@ -405,7 +405,12 @@ class Collection(object):
                     continue
                 # For upsert operation we have first to create a fake existing_document,
                 # update it like a regular one, then finally insert it
-                _id = spec.get('_id') or document.get('_id') or ObjectId()
+                if spec.get('_id') is not None:
+                    _id = spec['_id']
+                elif document.get('_id') is not None:
+                    _id = document['_id']
+                else:
+                    _id = ObjectId()
                 to_insert = dict(spec, _id=_id)
                 to_insert = self._expand_dots(to_insert)
                 existing_document = to_insert
