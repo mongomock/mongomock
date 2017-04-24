@@ -65,6 +65,12 @@ class CollectionAPITest(TestCase):
         self.assertRaises(mongomock.CollectionInvalid,
                           self.db.create_collection, 'c')
 
+    def test__create_collection_bad_names(self):
+        with self.assertRaises(mongomock.InvalidName):
+            self.db.create_collection('')
+        with self.assertRaises(mongomock.InvalidName):
+            self.db.create_collection('...')
+
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
 

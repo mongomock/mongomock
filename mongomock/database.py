@@ -69,6 +69,8 @@ class Database(object):
     def create_collection(self, name, **kwargs):
         if name in self.collection_names():
             raise CollectionInvalid("collection %s already exists" % name)
+        if not name or '..' in name:
+            raise InvalidName('collection names cannot be empty')
 
         if kwargs:
             raise NotImplementedError("Special options not supported")
