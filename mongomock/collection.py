@@ -810,7 +810,10 @@ class Collection(object):
                     doc_copy = self._copy_field(doc, container)
 
             else:
-                doc_copy = self._project_by_spec(doc, self._combine_projection_spec(fields), is_include=(list(fields.values())[0] == 1), container=container)
+                doc_copy = self._project_by_spec(doc,
+                                                 self._combine_projection_spec(fields),
+                                                 is_include=(list(fields.values())[0] == 1),
+                                                 container=container)
 
             # set the _id value if we requested it, otherwise remove it
             if id_value == 0:
@@ -828,10 +831,11 @@ class Collection(object):
             return doc_copy
 
     def _combine_projection_spec(self, projection_fields_spec):
-        """
-        Re-formats a projection fields spec into a nested dictionary:
+        """ Re-format a projection fields spec into a nested dictionary.
+        
         e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
         """
+
         tmp_spec = defaultdict(dict)
         for f, v in iteritems(projection_fields_spec):
             if '.' not in f:
@@ -872,7 +876,8 @@ class Collection(object):
                 else:
                     sub = doc[key]
                     if isinstance(sub, (list, tuple)):
-                        doc_copy[key] = [self._project_by_spec(sub_doc, spec, is_include, container) for sub_doc in sub]
+                        doc_copy[key] = [self._project_by_spec(sub_doc, spec, is_include, container)
+                                         for sub_doc in sub]
                     elif isinstance(sub, dict):
                         doc_copy[key] = self._project_by_spec(sub, spec, is_include, container)
 
