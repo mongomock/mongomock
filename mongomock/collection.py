@@ -855,8 +855,6 @@ class Collection(object):
 
     def _project_by_spec(self, doc, combined_projection_spec, is_include, container):
         doc_copy = container()
-        if not isinstance(doc, dict):
-            return doc_copy if is_include else doc
 
         if not is_include:
             # copy only scalar values
@@ -875,12 +873,8 @@ class Collection(object):
                     sub = doc[key]
                     if isinstance(sub, (list, tuple)):
                         doc_copy[key] = [self._project_by_spec(sub_doc, spec, is_include, container) for sub_doc in sub]
-                    else:
+                    elif isinstance(sub, dict):
                         doc_copy[key] = self._project_by_spec(sub, spec, is_include, container)
-
-        new_container_type = type(container())
-        if all(isinstance(val, new_container_type) and not val for val in doc_copy.itervalues()):
-            return container()
 
         return doc_copy
 
