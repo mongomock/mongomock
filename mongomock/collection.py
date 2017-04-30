@@ -833,7 +833,7 @@ class Collection(object):
         e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
         """
         tmp_spec = defaultdict(dict)
-        for f, v in projection_fields_spec.iteritems():
+        for f, v in iteritems(projection_fields_spec):
             if '.' not in f:
                 tmp_spec.setdefault(f, v)
             else:
@@ -845,7 +845,7 @@ class Collection(object):
                     tmp_spec[base_field][new_field] = v
 
         combined_spec = {}
-        for f, v in tmp_spec.iteritems():
+        for f, v in iteritems(tmp_spec):
             if not isinstance(v, dict):
                 combined_spec[f] = v
             else:
@@ -858,11 +858,11 @@ class Collection(object):
 
         if not is_include:
             # copy only scalar values
-            for key, val in doc.iteritems():
+            for key, val in iteritems(doc):
                 if not isinstance(val, (list, tuple, dict)):
                     doc_copy[key] = val
 
-        for key, spec in combined_projection_spec.iteritems():
+        for key, spec in iteritems(combined_projection_spec):
             if key in doc:
                 if not isinstance(spec, dict):
                     if is_include:
