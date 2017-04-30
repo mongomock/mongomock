@@ -831,8 +831,8 @@ class Collection(object):
             return doc_copy
 
     def _combine_projection_spec(self, projection_fields_spec):
-        """ Re-format a projection fields spec into a nested dictionary.
-        
+        """Re-format a projection fields spec into a nested dictionary.
+
         e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
         """
 
