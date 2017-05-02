@@ -117,7 +117,7 @@ the legacy 2.x branch than your pull request should go into the `support/2.x` br
 Acknowledgements
 ----------------
 
-Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ and `Srinivas Reddy Thatiparthy <https://github.com/srinivasreddy>`_.
+Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ .
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing bugs:
 
