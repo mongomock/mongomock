@@ -1,6 +1,12 @@
 |travis| |pypi_version| |pypi_license| |pypi_wheel|
 
 
+Looking for Maintainers
+-----------------------
+
+We are currently looking for maintainers for Mongomock who will help advance the project, as the original authors have moved to other projects requiring all of their attention. Anyone interested, please ping @vmalloc.
+
+
 What is this?
 -------------
 Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
