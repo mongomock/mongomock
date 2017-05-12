@@ -321,6 +321,11 @@ class Collection(object):
         if isinstance(data, list):
             return [self._insert(item) for item in data]
 
+        # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
+        # but we need to stick to it), so we must patch in-place the data dict
+        for key in data.keys():
+            data[key] = helpers.patch_datetime_awareness_in_document(data[key])
+
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError("Document keys must be strings")
 
@@ -390,6 +395,8 @@ class Collection(object):
 
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, **kwargs):
+        spec = helpers.patch_datetime_awareness_in_document(spec)
+        document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
         validate_is_mapping('document', document)
 
@@ -1061,6 +1068,7 @@ class Collection(object):
         return DeleteResult(self._delete(filter, multi=True), True)
 
     def _delete(self, filter, multi=False):
+        filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
         if not isinstance(filter, collections.Mapping):
@@ -1698,6 +1706,7 @@ class Cursor(object):
     def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0):
         super(Cursor, self).__init__()
         self.collection = collection
+        spec = helpers.patch_datetime_awareness_in_document(spec)
         self._spec = spec
         self._sort = sort
         self._projection = projection

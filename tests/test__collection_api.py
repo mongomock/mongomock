@@ -1,6 +1,6 @@
 from collections import OrderedDict
 import copy
-from datetime import datetime
+from datetime import datetime, tzinfo, timedelta
 import platform
 import random
 import six
@@ -991,6 +991,32 @@ class CollectionAPITest(TestCase):
                 {}, {'$currentDate': {'updated_at': type_specification}}, upsert=True)
             self.assertIsInstance(
                 self.db.collection.find_one({})['updated_at'], datetime)
+
+    def test__mix_tz_naive_aware(self):
+        class TZ(tzinfo):
+            def fromutc(self, dt):
+                return dt + self.utcoffset()
+
+            def tzname(self, *args, **kwargs):
+                return '<dummy UTC+2>'
+
+            def utcoffset(self, dt):
+                return timedelta(seconds=2 * 3600)
+        utc2tz = TZ()
+        naive = datetime(1999, 12, 31, 22)
+        aware = datetime(2000, 1, 1, tzinfo=utc2tz)
+        self.db.collection.insert({'date_aware': aware, 'date_naive': naive})
+        self.assert_document_count(1)
+        # Given both date are equivalent, we can mix them
+        self.db.collection.update_one(
+            {'date_aware': naive, 'date_naive': aware},
+            {'$set': {'new_aware': aware, 'new_naive': naive}},
+            upsert=True
+        )
+        self.assert_document_count(1)
+        self.db.collection.find_one({'new_aware': naive, 'new_naive': aware})
+        self.db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
+        self.assert_document_count(0)
 
     # should be removed once Timestamp supported or implemented
     def test__current_date_timestamp_is_not_supported_yet(self):
