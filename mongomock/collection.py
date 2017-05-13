@@ -1116,6 +1116,12 @@ class Collection(object):
     def drop_index(self, index_or_name):
         pass
 
+    def reindex(self):
+        pass
+
+    def list_indexes(self):
+        return {}
+
     def index_information(self):
         return {}
 
