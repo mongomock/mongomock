@@ -1717,6 +1717,16 @@ class Cursor(object):
         self._limit = limit if limit != 0 else None
         self.rewind()
 
+    def _compute_results(self, with_limit_and_skip=False):
+        # Recompute the result each time it is needed given changes in database
+        # since cursor creation must be taken into account.
+        results = list(self._factory())
+        if with_limit_and_skip:
+            results = results[self._skip:]
+            if self._limit:
+                results = results[:self._limit]
+        return results
+
     def __iter__(self):
         return self
 
@@ -1726,51 +1736,38 @@ class Cursor(object):
         return cursor
 
     def __next__(self):
-        if self._skip and not self._skipped:
-            for i in range(self._skip):
-                next(self._dataset)
-            self._skipped = self._skip
-        if self._limit is not None and self._limit <= self._emitted:
-            raise StopIteration()
-        if self._limit is not None:
+        try:
+            doc = self._compute_results(with_limit_and_skip=True)[self._emitted]
             self._emitted += 1
-        return {k: copy.deepcopy(v) for k, v in iteritems(next(self._dataset))}
+            return doc
+        except IndexError:
+            raise StopIteration()
+
     next = __next__
 
     def rewind(self):
-        self._dataset = self._factory()
         self._emitted = 0
-        self._skipped = 0
 
     def sort(self, key_or_list, direction=None):
         if direction is None:
             direction = 1
+
+        def _make_sort_factory_layer(upper_factory, sortKey, sortDirection):
+            def layer():
+                return sorted(upper_factory(), key=lambda x: _resolve_sort_key(sortKey, x),
+                              reverse=sortDirection < 0)
+            return layer
+
         if isinstance(key_or_list, (tuple, list)):
             for sortKey, sortDirection in reversed(key_or_list):
-                self._dataset = iter(
-                    sorted(
-                        self._dataset,
-                        key=lambda x: _resolve_sort_key(
-                            sortKey,
-                            x),
-                        reverse=sortDirection < 0))
+                self._factory = _make_sort_factory_layer(self._factory, sortKey, sortDirection)
         else:
-            self._dataset = iter(
-                sorted(self._dataset,
-                       key=lambda x: _resolve_sort_key(key_or_list, x),
-                       reverse=direction < 0))
+            self._factory = _make_sort_factory_layer(self._factory, key_or_list, direction)
         return self
 
     def count(self, with_limit_and_skip=False):
-        arr = [x for x in self._dataset]
-        count = len(arr)
-        if with_limit_and_skip:
-            if self._skip:
-                count -= self._skip
-            if self._limit and count > self._limit:
-                count = self._limit
-        self._dataset = iter(arr)
-        return count
+        results = self._compute_results(with_limit_and_skip)
+        return len(results)
 
     def skip(self, count):
         self._skip = count
@@ -1791,7 +1788,7 @@ class Cursor(object):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         unique_dict_vals = []
-        for x in iter(self._dataset):
+        for x in self._compute_results():
             value = _resolve_key(key, x)
             if value == NOTHING:
                 continue
@@ -1835,9 +1832,7 @@ class Cursor(object):
         elif index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
         else:
-            arr = list(self)
-            self._dataset = iter(arr)
-            return arr[index]
+            return self._compute_results(with_limit_and_skip=True)[index]
 
 
 def _set_updater(doc, field_name, value):

@@ -668,6 +668,19 @@ class CollectionAPITest(TestCase):
         count = self.db['coll_name'].find(skip=1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
+    def test__cursor_count_when_db_changes(self):
+        self.db['coll_name'].insert({})
+        cursor = self.db['coll_name'].find()
+        self.db['coll_name'].insert({})
+        self.assertEqual(cursor.count(), 2)
+
+    def test__cursor_getitem_when_db_changes(self):
+        self.db['coll_name'].insert({})
+        cursor = self.db['coll_name'].find()
+        self.db['coll_name'].insert({})
+        cursor_items = [x for x in cursor]
+        self.assertEqual(len(cursor_items), 2)
+
     def test__cursor_getitem(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
