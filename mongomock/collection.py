@@ -339,14 +339,14 @@ class Collection(object):
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
-            raise DuplicateKeyError("Duplicate Key Error", 11000)
+            raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
                 find_kwargs[key] = data.get(key, None)
             answer = self.find(find_kwargs)
             if answer.count() > 0 and not (is_sparse and find_kwargs[key] is None):
-                raise DuplicateKeyError("Duplicate Key Error", 11000)
+                raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
         return data['_id']
