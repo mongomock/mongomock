@@ -33,4 +33,5 @@ If i miss to include a feature in the below list, Please feel free to add to the
   * Set operators ($setEquals, $setIntersection, $setDifference, …)
   * String operators ($concat, $strcasecmp, $substr, …)
   * Text search operator ($meta)
-  * Projection operators ($map, $let, $literal)
+  * Projection operators ($map, $let)
+  * Array operators ($concatArrays, $filter, $isArray, $slice)
