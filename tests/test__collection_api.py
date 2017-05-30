@@ -2021,6 +2021,62 @@ class CollectionAPITest(TestCase):
             ],
             list(actual))
 
+    def test__array_size_non_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr0': [], 'arr3': [1, 2, 3]})
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'size': {'$size': 'arr'}}}
+            ])
+        self.assertEqual(
+            "The argument to $size must be an array, but was of type: %s" % type('arr'),
+            str(err.exception))
+
+    def test__array_size_argument_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'size': {'$size': [1, 2, 3]}}}
+            ])
+        self.assertEqual(
+            "Expression $size takes exactly 1 arguments. 3 were passed in.",
+            str(err.exception))
+
+    def test__array_size_valid_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr0': [], 'arr3': [1, 2, 3]})
+        result1 = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': '$arr0'}}}
+        ]).next()
+        self.assertEqual(result1['size'], 0)
+
+        result2 = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': '$arr3'}}}
+        ]).next()
+        self.assertEqual(result2['size'], 3)
+
+    def test__array_size_valid_argument_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        result1 = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': [[1, 2]]}}}
+        ]).next()
+        self.assertEqual(result1['size'], 2)
+
+        result2 = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': ['$arr']}}}
+        ]).next()
+        self.assertEqual(result2['size'], 3)
+
+        result3 = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': [{'$literal': [1, 2, 3, 4, 5]}]}}}
+        ]).next()
+        self.assertEqual(result3['size'], 5)
+
+    def test__array_size_valid_expression(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        result = self.db.collection.aggregate([
+            {'$project': {'size': {'$size': {'$literal': [1, 2, 3, 4]}}}}
+        ]).next()
+        self.assertEqual(result['size'], 4)
+
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
