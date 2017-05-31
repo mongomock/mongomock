@@ -648,6 +648,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # pymongo limit defaults to 0, returning everything
         self.cmp.compare.find(limit=0, sort=[("a", 1), ("b", -1)])
 
+    def test__find_projection_subdocument_lists(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'a': 1, 'b': [{'c': 3, 'd': 4}, {'c': 5, 'd': 6}]})
+        for project in ({'_id': 0, 'a': 1, 'b': 1},
+                        {'_id': 0, 'a': 1, 'b.c': 1},
+                        {'_id': 0, 'a': 0, 'b.c': 0},
+                        {'_id': 0, 'a': 1, 'b.c.e': 1},
+                        {'_id': 0, 'a': 0, 'b.c': 0, 'b.c.e': 0}):
+            self.cmp.compare.find_one({'a': 1}, project)
+
     # def test__as_class(self):
     #     class MyDict(dict):
     #         pass

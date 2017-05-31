@@ -1,6 +1,6 @@
 from __future__ import division
 import collections
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import copy
 from datetime import datetime
 import functools
@@ -808,47 +808,12 @@ class Collection(object):
                     doc_copy = container()
                 else:
                     doc_copy = self._copy_field(doc, container)
-            # if 1 was passed in as the field values, include those fields
-            elif list(fields.values())[0] == 1:
-                doc_copy = container()
-                for key in fields:
-                    key_parts = key.split('.')
-                    subdocument = doc
-                    subdocument_copy = doc_copy
-                    last_copy = subdocument_copy
-                    full_key_path_found = True
-                    for key_part in key_parts[:-1]:
-                        if key_part not in subdocument:
-                            full_key_path_found = False
-                            break
-                        subdocument = subdocument[key_part]
-                        last_copy = subdocument_copy
-                        subdocument_copy = subdocument_copy.setdefault(key_part, {})
 
-                    if full_key_path_found:
-                        last_key = key_parts[-1]
-                        if isinstance(subdocument, dict) and last_key in subdocument:
-                            subdocument_copy[last_key] = subdocument[last_key]
-                        elif isinstance(subdocument, (list, tuple)):
-                            subdocument = [{last_key: x[last_key]}
-                                           for x in subdocument if last_key in x]
-                            if subdocument:
-                                last_copy[key_parts[-2]] = subdocument
-            # otherwise, exclude the fields passed in
             else:
-                doc_copy = self._copy_field(doc, container)
-                for key in fields:
-                    key_parts = key.split('.')
-                    subdocument_copy = doc_copy
-                    full_key_path_found = True
-                    for key_part in key_parts[:-1]:
-                        if key_part not in subdocument_copy:
-                            full_key_path_found = False
-                            break
-                        subdocument_copy = subdocument_copy[key_part]
-                    if not full_key_path_found or key_parts[-1] not in subdocument_copy:
-                        continue
-                    del subdocument_copy[key_parts[-1]]
+                doc_copy = self._project_by_spec(doc,
+                                                 self._combine_projection_spec(fields),
+                                                 is_include=(list(fields.values())[0] == 1),
+                                                 container=container)
 
             # set the _id value if we requested it, otherwise remove it
             if id_value == 0:
@@ -864,6 +829,59 @@ class Collection(object):
             for field, op in iteritems(projection_operators):
                 fields[field] = op
             return doc_copy
+
+    def _combine_projection_spec(self, projection_fields_spec):
+        """Re-format a projection fields spec into a nested dictionary.
+
+        e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
+        """
+
+        tmp_spec = defaultdict(dict)
+        for f, v in iteritems(projection_fields_spec):
+            if '.' not in f:
+                tmp_spec.setdefault(f, v)
+            else:
+                split_field = f.split('.', 1)
+                base_field, new_field = tuple(split_field)
+                if base_field in tmp_spec and not isinstance(tmp_spec[base_field], dict):
+                    tmp_spec[base_field] = {new_field: v}
+                else:
+                    tmp_spec[base_field][new_field] = v
+
+        combined_spec = {}
+        for f, v in iteritems(tmp_spec):
+            if not isinstance(v, dict):
+                combined_spec[f] = v
+            else:
+                combined_spec[f] = self._combine_projection_spec(v)
+
+        return combined_spec
+
+    def _project_by_spec(self, doc, combined_projection_spec, is_include, container):
+        doc_copy = container()
+
+        if not is_include:
+            # copy only scalar values
+            for key, val in iteritems(doc):
+                if not isinstance(val, (list, tuple, dict)):
+                    doc_copy[key] = val
+
+        for key, spec in iteritems(combined_projection_spec):
+            if key in doc:
+                if not isinstance(spec, dict):
+                    if is_include:
+                        doc_copy[key] = doc[key]
+                    else:
+                        doc_copy.pop(key)
+                else:
+                    sub = doc[key]
+                    if isinstance(sub, (list, tuple)):
+                        doc_copy[key] = [self._project_by_spec(sub_doc, spec, is_include, container)
+                                         for sub_doc in sub]
+                    elif isinstance(sub, dict):
+                        doc_copy[key] = self._project_by_spec(sub, spec, is_include, container)
+
+        return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
