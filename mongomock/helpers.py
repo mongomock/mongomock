@@ -17,8 +17,8 @@ if PY2:
 else:
     basestring = (str, bytes)
 
-ASCENDING = 1
-
+ASCENDING  = 1
+DESCENDING = -1
 
 def print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn(
