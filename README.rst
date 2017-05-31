@@ -83,6 +83,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
 .. code-block:: bash
 
  git clone git@github.com:vmalloc/mongomock.git
+ pip install tox
  cd mongomock
  tox
 
