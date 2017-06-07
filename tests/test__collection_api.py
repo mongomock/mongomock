@@ -107,6 +107,21 @@ class CollectionAPITest(TestCase):
         qr = col.find({"_id": r})
         self.assertEqual(qr.count(), 0)
 
+    def test__drop_collection_indexes(self):
+        col = self.db.a
+        col.create_index('simple')
+        col.create_index([("value", 1)], unique=True)
+        col.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+
+        self.db.drop_collection(col)
+
+        # Make sure indexes' rules no longer apply
+        col.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
+        col.insert({'value': 'not_unique_but_ok'})
+        col.insert({'sparsed': 'not_unique_but_ok'})
+        result = col.find({})
+        self.assertEqual(result.count(), 3)
+
     def test__drop_n_recreate_collection(self):
         col_a = self.db.create_collection('a')
         col_a2 = self.db.a

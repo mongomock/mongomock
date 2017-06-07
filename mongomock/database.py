@@ -55,12 +55,14 @@ class Database(object):
                 collection = next(c for c in self._collections.values() if c is name_or_collection)
                 collection._documents = OrderedDict()
                 collection._force_created = False
+                collection.drop_indexes()
             else:
                 if name_or_collection in self._collections:
                     collection = self._collections.get(name_or_collection)
                     if collection:
                         collection._documents = OrderedDict()
                         collection._force_created = False
+                        collection.drop_indexes()
         # EAFP paradigm
         # (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
         except Exception:

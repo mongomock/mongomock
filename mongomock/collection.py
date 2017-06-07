@@ -279,7 +279,7 @@ class Collection(object):
         self._uniques = []
 
     def _is_created(self):
-        return self._documents or self._force_created
+        return self._documents or self._uniques or self._force_created
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -1115,6 +1115,9 @@ class Collection(object):
 
     def drop_index(self, index_or_name):
         pass
+
+    def drop_indexes(self):
+        self._uniques = []
 
     def reindex(self):
         pass

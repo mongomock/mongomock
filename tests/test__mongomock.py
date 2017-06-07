@@ -105,6 +105,22 @@ class DatabaseGettingTest(TestCase):
         result = collection.find({"_id": doc_id})
         self.assertEqual(result.count(), 0)
 
+    def test__drop_database_indexes(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.create_index('simple')
+        collection.create_index([("value", 1)], unique=True)
+        collection.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+
+        self.client.drop_database("somedb")
+
+        # Make sure indexes' rules no longer apply
+        collection.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
+        collection.insert({'value': 'not_unique_but_ok'})
+        collection.insert({'sparsed': 'not_unique_but_ok'})
+        result = collection.find({})
+        self.assertEqual(result.count(), 3)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
