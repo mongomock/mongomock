@@ -35,3 +35,4 @@ If i miss to include a feature in the below list, Please feel free to add to the
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $filter, $isArray, $slice)
+* `map_reduce <https://docs.mongodb.com/manual/reference/command/mapReduce/>`_ options (``scope`` and ``finalize``)
