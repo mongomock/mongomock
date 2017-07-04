@@ -978,6 +978,24 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             list(self.db.collection.find({"checked": True})), list(self.db.collection.find()))
 
+    def test__cursor_sort_kept_after_clone(self):
+        self.db.collection.insert({"time_check": float(time.time())})
+        self.db.collection.insert({"time_check": float(time.time())})
+        self.db.collection.insert({"time_check": float(time.time())})
+
+        cursor = self.db.collection.find({}, sort=[('time_check', -1)])
+        cursor2 = cursor.clone()
+        cursor3 = self.db.collection.find({})
+        cursor3.sort([('time_check', -1)])
+        cursor4 = cursor3.clone()
+        cursor_result = list(cursor)
+        cursor2_result = list(cursor2)
+        cursor3_result = list(cursor3)
+        cursor4_result = list(cursor4)
+        self.assertEqual(cursor2_result, cursor_result)
+        self.assertEqual(cursor3_result, cursor_result)
+        self.assertEqual(cursor4_result, cursor_result)
+
     def test__avoid_change_data_after_set(self):
         test_data = {"test": ["test_data"]}
         self.db.collection.insert({"_id": 1})

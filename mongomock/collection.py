@@ -1742,6 +1742,7 @@ class Cursor(object):
     def clone(self):
         cursor = Cursor(self.collection,
                         self._spec, self._sort, self._projection, self._skip, self._limit)
+        cursor._factory = self._factory
         return cursor
 
     def __next__(self):
