@@ -289,6 +289,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({"doc": {"key": "val"}})
         self.cmp.compare.find({"doc": {"key": {'$eq': 'val'}}})
 
+    def test__find_by_empty_document(self):
+        self.cmp.do.insert({"doc": {"data": "val"}})
+        self.cmp.do.insert({"doc": {}})
+        self.cmp.do.insert({"doc": None})
+        self.cmp.compare.find({"doc": {}})
+
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
         id2 = ObjectId()
