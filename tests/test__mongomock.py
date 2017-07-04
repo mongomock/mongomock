@@ -1868,6 +1868,46 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         }}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate29(self):
+        # group addToSet
+        pipeline = [
+            {"$group": {"_id": "$a", "nb": {"$addToSet": "$count"}}},
+            {"$sort": {"_id": 1}}
+        ]
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        assert len(result) == len(expected)
+        for i, elt in enumerate(result):
+            for k, v in elt.items():
+                if type(v) is list:
+                    assert set(v) == set(result[i][k])
+                else:
+                    assert v == result[i][k]
+
+    def test__aggregate30(self):
+        # group addToSet dict element
+        self.cmp.do.remove()
+        data = [
+            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}, "nb": 1},
+            {"a": {"c": "3", "d": 3}, "b": {"c": "4", "d": 4}, "nb": 1},
+            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}, "nb": 2}
+        ]
+        for item in data:
+            self.cmp.do.insert(item)
+        pipeline = [
+            {'$group': {"_id": "a.c", "nb": {"$addToSet": "b"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate31(self):
+        # group addToSet creating dict
+        pipeline = [
+            {'$group': {"_id": "$count", "set": {"$addToSet": {"a": "$a", "b": "$b"}}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

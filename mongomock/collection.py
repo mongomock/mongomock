@@ -1764,8 +1764,13 @@ class Collection(object):
                                     elif operator == "$last":
                                         doc_dict[field] = values[-1]
                                     elif operator == "$addToSet":
+                                        doc_dict[field] = []
                                         val_it = (val or None for val in values)
-                                        doc_dict[field] = set(val_it)
+                                        # don't use set in case elt in not hashable (like dicts)
+                                        for elt in val_it:
+                                            if elt not in doc_dict[field]:
+                                                doc_dict[field].append(elt)
+                                        doc_dict[field].reverse()
                                     elif operator == '$push':
                                         if field not in doc_dict:
                                             doc_dict[field] = []
