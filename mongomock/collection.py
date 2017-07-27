@@ -24,13 +24,18 @@ except ImportError:
     execjs = None
 
 try:
+    from pymongo.operations import IndexModel
     from pymongo import ReadPreference
     from pymongo import ReturnDocument
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
+    class IndexModel(object):
+        pass
+
     class ReturnDocument(object):
         BEFORE = False
         AFTER = True
+
     _READ_PREFERENCE_PRIMARY = None
 
 from sentinels import NOTHING
@@ -1215,8 +1220,12 @@ class Collection(object):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter, session=session), True)
 
-    def delete_many(self, filter, session=None):
+    def delete_many(self, filter, collation=None, session=None):
         validate_is_mapping('filter', filter)
+        if collation:
+            raise NotImplementedError(
+                'The collation argument of delete_many is valid but has not been '
+                'implemented in mongomock yet')
         return DeleteResult(self._delete(filter, multi=True, session=session), True)
 
     def _delete(self, filter, multi=False, session=None):
@@ -1344,6 +1353,20 @@ class Collection(object):
             self._uniques[index_string] = (index_list, is_sparse)
 
         return index_string
+
+    def create_indexes(self, indexes, session=None):
+        for index in indexes:
+            if not isinstance(index, IndexModel):
+                raise TypeError(
+                    '%s is not an instance of pymongo.operations.IndexModel' % index)
+        return [
+            self.create_index(
+                index.document['key'].items(),
+                session=session,
+                unique=index.document.get('unique', False),
+                sparse=index.document.get('sparse', False))
+            for index in indexes
+        ]
 
     def drop_index(self, index_or_name, session=None):
         if session:
