@@ -45,6 +45,10 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.a.database.b.full_name, "somedb.b")
         self.assertEqual(self.db.a.database.b.name, "b")
 
+    def test__get_collection_read_concern_option(self):
+        """Ensure read_concern option isn't rejected."""
+        self.assertTrue(self.db.get_collection('new_collection', read_concern=None))
+
     def test__get_collection_full_name(self):
         self.assertEqual(self.db.coll.name, "coll")
         self.assertEqual(self.db.coll.full_name, "somedb.coll")
@@ -737,6 +741,10 @@ class CollectionAPITest(TestCase):
         self.db.collection.delete_many({'a': 1})
         self.assert_document_count(0)
 
+    def test__delete_many_collation_option(self):
+        """Ensure collation delete_many's option is not rejected."""
+        self.assertTrue(self.db.collection.delete_many({}, collation=None))
+
     def test__string_matching(self):
         """Make sure strings are not treated as collections on find"""
         self.db['abc'].save({'name': 'test1'})
@@ -900,6 +908,29 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({"value": 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert({"value": 1})
+
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__create_indexes_wrong_type(self):
+        indexes = [('value', 1), ('name', 1)]
+        with self.assertRaises(TypeError):
+            self.db.collection.create_indexes(indexes)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__create_indexes_uniq_idxs(self):
+        indexes = [
+            pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], unique=True),
+            pymongo.operations.IndexModel([('name', pymongo.ASCENDING)], unique=True)
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(2, len(index_names))
+
+        self.db.collection.insert({"value": 1, "name": "bob"})
+        # Ensure both uniq indexes have been created
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 1, "name": "different"})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"value": 0, "name": "bob"})
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 

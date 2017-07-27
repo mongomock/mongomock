@@ -49,7 +49,9 @@ class Database(object):
         return result
 
     def get_collection(self, name, codec_options=None, read_preference=None,
-                       write_concern=None):
+                       write_concern=None, read_concern=None):
+        if read_concern:
+            raise NotImplementedError('Mongomock does not handle read_concern yet')
         collection = self._collections.get(name)
         if collection is None:
             collection = self._collections[name] = \
