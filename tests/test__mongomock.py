@@ -1174,7 +1174,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
 
     def test__sort_name(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"a" : 1, "b" : 3, "c" : "data1"},
                      {"a" : 2, "b" : 2, "c" : "data3"},
                      {"a" : 3, "b" : 1, "c" : "data2"}):
@@ -1183,7 +1183,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT("b")).find()
 
     def test__sort_name_nested_doc(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
                      {"root": {"a" : 2, "b" : 2, "c" : "data3"}},
                      {"root": {"a" : 3, "b" : 1, "c" : "data2"}}):
@@ -1192,7 +1192,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT("root.b")).find()
 
     def test__sort_name_nested_list(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"root": [{"a" : 1, "b" : 3, "c" : "data1"}]},
                      {"root": [{"a" : 2, "b" : 2, "c" : "data3"}]},
                      {"root": [{"a" : 3, "b" : 1, "c" : "data2"}]}):
@@ -1201,7 +1201,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT("root.0.b")).find()
 
     def test__sort_list(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"a" : 1, "b" : 3, "c" : "data1"},
                      {"a" : 2, "b" : 2, "c" : "data3"},
                      {"a" : 3, "b" : 1, "c" : "data2"}):
@@ -1211,7 +1211,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT([("b", 1), ("a", -1), ("c", 1)])).find()
 
     def test__sort_list_nested_doc(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"root": {"a" : 1, "b" : 3, "c" : "data1"}},
                      {"root": {"a" : 2, "b" : 2, "c" : "data3"}},
                      {"root": {"a" : 3, "b" : 1, "c" : "data2"}}):
@@ -1221,7 +1221,7 @@ class _SortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.compare(_SORT([("root.b", 1), ("root.a", -1), ("root.c", 1)])).find()
 
     def test__sort_list_nested_list(self):
-        self.cmp.do.remove()
+        self.cmp.do.remove(multi=True)
         for data in ({"root": [{"a" : 1, "b" : 3, "c" : "data1"}]},
                      {"root": [{"a" : 2, "b" : 2, "c" : "data3"}]},
                      {"root": [{"a" : 3, "b" : 1, "c" : "data2"}]}):
