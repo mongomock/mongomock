@@ -144,6 +144,22 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.col.remove({"a": 1}, bad_kwarg=1)
 
+    def test__remove_single(self):
+        self.db.col.save({"a": 1})
+        self.db.col.save({"a": 1})
+        self.assertEquals(self.db.col.count(), 2)
+
+        self.db.col.remove({"a": 1})
+        self.assertEquals(self.db.col.count(), 1)
+
+    def test__remove_multi(self):
+        self.db.col.save({"a": 1})
+        self.db.col.save({"a": 1})
+        self.assertEquals(self.db.col.count(), 2)
+
+        self.db.col.remove({"a": 1}, multi = True)
+        self.assertEquals(self.db.col.count(), 0)
+
     def test__getting_collection_via_getattr(self):
         col1 = self.db.some_collection_here
         col2 = self.db.some_collection_here

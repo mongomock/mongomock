@@ -599,7 +599,7 @@ class Collection(object):
                         manipulate, safe, _check_keys = True, **kwargs)
             return to_save.get("_id", None)
 
-    def remove(self, spec_or_id = None, search_filter = None, **write_concern_kwargs):
+    def remove(self, spec_or_id = None, search_filter = None, multi = False, **write_concern_kwargs):
         """Remove objects matching spec_or_id from the collection."""
         if write_concern_kwargs:
             write_concern = WriteConcern(**write_concern_kwargs)
@@ -609,7 +609,7 @@ class Collection(object):
             spec_or_id = search_filter if search_filter else {}
         if not isinstance(spec_or_id, dict):
             spec_or_id = {'_id': spec_or_id}
-        to_delete = list(self.find(spec = spec_or_id))
+        to_delete = list(self.find(spec = spec_or_id, limit = 0 if multi else 1))
         for doc in to_delete:
             doc_id = doc['_id']
             if type(doc_id) == dict:
