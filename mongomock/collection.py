@@ -416,6 +416,11 @@ class Collection(object):
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, updater, subdocument)
 
+                elif k == '$rename':
+                    for src, dst in iteritems(v):
+                        if self._has_key(existing_document, src):
+                            existing_document[dst] = existing_document.pop(src)
+
                 elif k == '$setOnInsert':
                     if not was_insert:
                         continue

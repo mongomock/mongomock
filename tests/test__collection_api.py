@@ -464,6 +464,18 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, {'a': 1, 'b': [{'d': 3}]})
 
+    def test__rename_one_foo_to_bar(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        expected = {'_id': 1, 'bar': 'bar'}
+        insert_result = self.db.collection.insert_one(input_)
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'bar'}}
+        update_result = self.db.collection.update_one(query, update=update)
+
+        self.assertEqual(update_result.modified_count, 1)
+        self.assertEqual(update_result.matched_count, 1)
+        self.assert_document_stored(insert_result.inserted_id, expected)
+
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(
