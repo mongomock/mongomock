@@ -255,15 +255,15 @@ class BulkOperationBuilder(object):
     def add_insert(self, doc):
         self.insert(doc)
 
-    def add_update(self, selector, doc, multi, upsert):
+    def add_update(self, selector, doc, multi, upsert, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.register_update_op(doc, multi)
 
-    def add_replace(self, selector, doc, upsert):
+    def add_replace(self, selector, doc, upsert, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.replace_one(doc)
 
-    def add_delete(self, selector, just_one):
+    def add_delete(self, selector, just_one, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=False)
         write_operation.register_remove_op(not just_one)
 
