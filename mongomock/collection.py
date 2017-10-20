@@ -985,6 +985,8 @@ class Collection(object):
         warnings.warn("find_and_modify is deprecated, use find_one_and_delete"
                       ", find_one_and_replace, or find_one_and_update instead",
                       DeprecationWarning, stacklevel=2)
+        if 'projection' in kwargs:
+            raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
         return self._find_and_modify(query, update=update, upsert=upsert,
                                      sort=sort, projection=fields, **kwargs)
 

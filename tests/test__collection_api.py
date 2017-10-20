@@ -308,6 +308,10 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(ValueError):  # this is also what pymongo raises
             self.db.collection.find_and_modify({"a": 2}, {"a": 3}, remove=True)
 
+    def test__find_and_modify_no_projection_kwarg(self):
+        with self.assertRaises(TypeError):  # unlike pymongo, we warn about this
+            self.db.collection.find_and_modify({"a": 2}, {"a": 3}, projection=['a'])
+
     def test__find_one_and_delete(self):
         documents = [
             {'x': 1, 's': 0},
