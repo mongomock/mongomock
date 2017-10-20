@@ -981,12 +981,12 @@ class Collection(object):
                                      sort, return_document, **kwargs)
 
     def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
-                        full_response=False, manipulate=False, **kwargs):
+                        full_response=False, manipulate=False, fields=None, **kwargs):
         warnings.warn("find_and_modify is deprecated, use find_one_and_delete"
                       ", find_one_and_replace, or find_one_and_update instead",
                       DeprecationWarning, stacklevel=2)
         return self._find_and_modify(query, update=update, upsert=upsert,
-                                     sort=sort, **kwargs)
+                                     sort=sort, projection=fields, **kwargs)
 
     def _find_and_modify(self, query, projection=None, update=None,
                          upsert=False, sort=None,

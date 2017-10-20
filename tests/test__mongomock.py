@@ -574,8 +574,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
 
     def test__find_and_modify_remove(self):
-        self.cmp.do.insert([{"a": x} for x in range(10)])
-        self.cmp.do.find_and_modify({"a": 2}, remove=True)
+        self.cmp.do.insert([{"a": x, "junk": True} for x in range(10)])
+        self.cmp.compare.find_and_modify({"a": 2}, remove=True, fields={'_id': False, 'a': True})
         self.cmp.compare_ignore_order.find()
 
     def test__find_one_and_delete(self):
