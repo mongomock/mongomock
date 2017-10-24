@@ -1783,6 +1783,10 @@ class Cursor(object):
                         value, (tuple, list)) else [value])
         return list(unique) + unique_dict_vals
 
+    @property
+    def alive(self):
+        return self.count() > 0
+
     def __getitem__(self, index):
         if isinstance(index, slice):
             # Limit the cursor to the given slice
