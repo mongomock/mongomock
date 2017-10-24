@@ -615,6 +615,17 @@ class CollectionAPITest(TestCase):
         count = self.db['coll_name'].find(skip=1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
+    def test__cursor_alive(self):
+        first = {'name': 'first'}
+        second = {'name': 'second'}
+        third = {'name': 'third'}
+        self.db['coll_name'].insert([first, second, third])
+        cursor = self.db['coll_name'].find()
+        self.assertTrue(cursor.alive)
+        for item in cursor:
+            _ = item
+        self.assertFalse(cursor.alive)
+
     def test__cursor_getitem(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
