@@ -1796,6 +1796,12 @@ class Cursor(object):
             arr = list(self)
             self._dataset = iter(arr)
             return arr[index]
+        
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 
 def _set_updater(doc, field_name, value):
