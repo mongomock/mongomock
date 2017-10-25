@@ -1720,6 +1720,8 @@ class Cursor(object):
         self._sort = sort
         self._projection = projection
         self._skip = skip
+        self._factory_last_generated_results = None
+        self._results = None
         self._factory = functools.partial(collection._get_dataset,
                                           spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
@@ -1727,13 +1729,17 @@ class Cursor(object):
         self.rewind()
 
     def _compute_results(self, with_limit_and_skip=False):
-        # Recompute the result each time it is needed given changes in database
-        # since cursor creation must be taken into account.
-        results = list(self._factory())
+        # Recompute the result only if the query has changed
+        if not self._results or self._factory_last_generated_results != self._factory:
+            results = list(self._factory())
+            self._factory_last_generated_results = self._factory
+            self._results = results
         if with_limit_and_skip:
-            results = results[self._skip:]
+            results = self._results[self._skip:]
             if self._limit:
                 results = results[:self._limit]
+        else:
+            results = self._results
         return results
 
     def __iter__(self):

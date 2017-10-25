@@ -468,6 +468,28 @@ class CollectionAPITest(TestCase):
         doc.pop('_id')
         self.assertDictEqual(doc, update)
 
+    def test__iterate_on_find_and_update(self):
+        documents = [
+            {'x': 1, 's': 0},
+            {'x': 1, 's': 1},
+            {'x': 1, 's': 2},
+            {'x': 1, 's': 3}
+        ]
+        self.db.collection.insert_many(documents)
+        self.assert_documents(documents, ignore_ids=False)
+
+        cursor = self.db.collection.find({'x': 1})
+        self.assertEqual(cursor.count(), 4)
+
+        # Update the field used by the cursor's filter should not upset the iteration
+        for doc in cursor:
+            self.db.collection.update_one({'_id': doc['_id']}, {'$set': {'x': 2}})
+
+        cursor = self.db.collection.find({'x': 1})
+        self.assertEqual(cursor.count(), 0)
+        cursor = self.db.collection.find({'x': 2})
+        self.assertEqual(cursor.count(), 4)
+
     def test__update_interns_lists_and_dicts(self):
         obj = {}
         obj_id = self.db.collection.save(obj)
