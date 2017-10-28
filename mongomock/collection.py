@@ -1796,7 +1796,7 @@ class Cursor(object):
             arr = list(self)
             self._dataset = iter(arr)
             return arr[index]
-        
+
     def __enter__(self):
         return self
 
