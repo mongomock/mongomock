@@ -1155,6 +1155,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'name': 'bob'}, {'$push': {'hat': {'$each': ['wide', 'blue']}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__pushall(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update(
+            {'name': 'bob'}, {'$pushAll': {'hat': ['wide', 'blue']}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_nested_dict(self):
         self.cmp.do.remove()
         self.cmp.do.insert({

@@ -596,6 +596,59 @@ class Collection(object):
                                 push_results.append(value)
 
                             subdocument[nested_field_list[-1]] = push_results
+                elif k == '$pushAll':
+                    for field, value in iteritems(v):
+                        nested_field_list = field.rsplit('.')
+                        if len(nested_field_list) == 1:
+                            if field not in existing_document:
+                                existing_document[field] = []
+                            if isinstance(value, list):
+                                existing_document[field].extend(value)
+                            else:
+                                existing_document[field].append(value)
+                            continue
+                        # nested fields includes a positional element
+                        # need to find that element
+                        elif '$' in nested_field_list:
+                            if not subdocument:
+                                subdocument = self._get_subdocument(
+                                    existing_document, spec, nested_field_list)
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            if isinstance(value, list):
+                                push_results.extend(value)
+                            else:
+                                push_results.append(value)
+
+                            # cannot write to doc directly as it doesn't save to
+                            # existing_document
+                            subdocument[nested_field_list[-1]] = push_results
+                        # push to array in a nested attribute
+                        else:
+                            # create nested attributes if they do not exist
+                            subdocument = existing_document
+                            for field in nested_field_list[:-1]:
+                                if field not in subdocument:
+                                    subdocument[field] = {}
+                                subdocument = subdocument[field]
+
+                            # we're pushing a list
+                            push_results = []
+                            if nested_field_list[-1] in subdocument:
+                                # if the list exists, then use that list
+                                push_results = subdocument[nested_field_list[-1]]
+
+                            if isinstance(value, list):
+                                push_results.extend(value)
+                            else:
+                                push_results.append(value)
+
+                            subdocument[nested_field_list[-1]] = push_results
                 else:
                     if first:
                         # replace entire document
@@ -1286,6 +1339,7 @@ class Collection(object):
             '$min',
             '$avg',
             '$push',
+            '$pushAll',
             '$sum',
             '$stdDevPop',
             '$stdDevSamp']
@@ -1548,7 +1602,8 @@ class Collection(object):
                                         "$first",
                                         "$last",
                                         "$addToSet",
-                                        '$push'
+                                        '$push',
+                                        '$pushAll'
                                 ):
                                     key_getter = functools.partial(_parse_expression, key)
                                     values = [key_getter(doc) for doc in group_list]
@@ -1573,6 +1628,10 @@ class Collection(object):
                                         val_it = (val or None for val in values)
                                         doc_dict[field] = set(val_it)
                                     elif operator == '$push':
+                                        if field not in doc_dict:
+                                            doc_dict[field] = []
+                                        doc_dict[field].extend(values)
+                                    elif operator == '$pushAll':
                                         if field not in doc_dict:
                                             doc_dict[field] = []
                                         doc_dict[field].extend(values)
