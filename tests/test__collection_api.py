@@ -904,6 +904,29 @@ class CollectionAPITest(TestCase):
         expect = [{'_id': 1, 'list': [{"index": 1}, {"index": 2}]}]
         self.assertEqual(expect, list(actual))
 
+    def test__find_and_project(self):
+        self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other'})
+
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': 1})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': '1'})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': '0'})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': 'other'})))
+
+        self.assertEqual(
+            [{'_id': 1, 'b': 'other'}],
+            list(self.db.collection.find({}, projection={'a': 0})))
+        self.assertEqual(
+            [{'_id': 1, 'b': 'other'}],
+            list(self.db.collection.find({}, projection={'a': False})))
+
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
 
