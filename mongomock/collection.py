@@ -1387,6 +1387,7 @@ class Collection(object):
             '$second',
             '$millisecond',
             '$dateToString']
+        conditional_operators = ['$cond', '$ifNull']  # noqa
 
         def _handle_arithmetic_operator(operator, values, doc_dict):
             if operator == '$abs':
@@ -1482,6 +1483,30 @@ class Collection(object):
                     "aggregation pipeline, it is currently not implemented "
                     " in Mongomock." % operator)
 
+        def _handle_array_operator(operator, values, doc_dict):
+            out_value = _parse_expression(values, doc_dict)
+            if operator == '$size':
+                return len(out_value)
+            else:
+                raise NotImplementedError(
+                    "Although '%s' is a valid date operator for the "
+                    "aggregation pipeline, it is currently not implemented "
+                    " in Mongomock." % operator)
+
+        def _handle_conditional_operator(operator, values, doc_dict):
+            if operator == '$ifNull':
+                field, fallback = values
+                try:
+                    out_value = _parse_expression(field, doc_dict)
+                except KeyError:
+                    return fallback
+                return out_value if out_value is not None else fallback
+            else:
+                raise NotImplementedError(
+                    "Although '%s' is a valid date operator for the "
+                    "aggregation pipeline, it is currently not implemented "
+                    " in Mongomock." % operator)
+
         def _handle_project_operator(operator, values, doc_dict):
             if operator == '$min':
                 if len(values) > 2:
@@ -1521,6 +1546,10 @@ class Collection(object):
                     return _handle_comparison_operator(k, v, doc_dict)
                 elif k in date_operators:
                     return _handle_date_operator(k, v, doc_dict)
+                elif k in array_operators:
+                    return _handle_array_operator(k, v, doc_dict)
+                elif k in conditional_operators:
+                    return _handle_conditional_operator(k, v, doc_dict)
                 else:
                     value_dict[k] = _parse_expression(v, doc_dict)
 
@@ -1544,7 +1573,6 @@ class Collection(object):
                         doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
-        conditional_operators = ['$cond', '$ifNull']  # noqa
         out_collection = [doc for doc in self.find()]
         for stage in pipeline:
             for k, v in iteritems(stage):
