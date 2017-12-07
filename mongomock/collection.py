@@ -958,6 +958,9 @@ class Collection(object):
                 except ValueError:
                     pass
             elif isinstance(doc, dict):
+                if updater is _unset_updater and part not in doc:
+                    # If the parent doesn't exists, so does it child.
+                    return
                 doc = doc.setdefault(part, {})
             else:
                 return
