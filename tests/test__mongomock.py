@@ -9,6 +9,7 @@ from unittest import TestCase, skipIf
 import mongomock
 from mongomock import ConfigurationError
 from mongomock import Database
+from mongomock import helpers
 from mongomock import InvalidURI
 from mongomock import OperationFailure
 
@@ -2430,6 +2431,13 @@ def _SORT(*args):
     return lambda cursor: cursor.sort(*args)
 
 
+def _DISTINCT(*args):
+    return lambda cursor: sorted(
+        helpers.hashdict(v) if isinstance(v, dict) else v
+        for v in cursor.distinct(*args)
+    )
+
+
 def _SKIP(*args):
     return lambda cursor: cursor.skip(*args)
 
@@ -2516,6 +2524,19 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__close(self):
         # Does nothing - just make sure it exists and takes the right args
         self.cmp.do(lambda cursor: cursor.close()).find()
+
+    def test__distinct_nested_field(self):
+        self.cmp.do.insert_one({'f1': {'f2': 'v'}})
+        self.cmp.compare(_DISTINCT('f1.f2')).find()
+
+    def test__distinct_array_field(self):
+        self.cmp.do.insert_many(
+            [{'f1': ['v1', 'v2', 'v1']}, {'f1': ['v2', 'v3']}])
+        self.cmp.compare(_DISTINCT('f1')).find()
+
+    def test__distinct_array_nested_field(self):
+        self.cmp.do.insert_one({'f1': [{'f2': 'v'}, {'f2': 'w'}]})
+        self.cmp.compare(_DISTINCT('f1.f2')).find()
 
 
 class InsertedDocumentTest(TestCase):

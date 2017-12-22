@@ -49,6 +49,7 @@ from six import text_type
 from mongomock import aggregate
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
+from mongomock.filtering import iter_key_candidates
 from mongomock.filtering import resolve_key
 from mongomock.filtering import resolve_sort_key
 from mongomock import helpers
@@ -1706,17 +1707,17 @@ class Cursor(object):
         unique = set()
         unique_dict_vals = []
         for x in self._compute_results():
-            value = resolve_key(key, x)
-            if value == NOTHING:
-                continue
-            if isinstance(value, dict):
-                if any(dict_val == value for dict_val in unique_dict_vals):
+            for value in iter_key_candidates(key, x):
+                if value == NOTHING:
                     continue
-                unique_dict_vals.append(value)
-            else:
-                unique.update(
-                    value if isinstance(
-                        value, (tuple, list)) else [value])
+                if isinstance(value, dict):
+                    if any(dict_val == value for dict_val in unique_dict_vals):
+                        continue
+                    unique_dict_vals.append(value)
+                else:
+                    unique.update(
+                        value if isinstance(
+                            value, (tuple, list)) else [value])
         return list(unique) + unique_dict_vals
 
     def __getitem__(self, index):
