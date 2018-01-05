@@ -42,7 +42,6 @@ from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
 from six import itervalues
-from six import MAXSIZE
 from six import string_types
 from six import text_type
 
@@ -1641,48 +1640,27 @@ class Collection(object):
                 if field == '_id':
                     continue
                 for operator, key in iteritems(value):
-                    if operator in (
-                            '$sum',
-                            '$avg',
-                            '$min',
-                            '$max',
-                            '$first',
-                            '$last',
-                            '$addToSet',
-                            '$push'
-                    ):
-                        key_getter = functools.partial(aggregate.parse_expression, key)
-                        values = [key_getter(doc) for doc in group_list]
-
-                        if operator == '$sum':
-                            val_it = (val or 0 for val in values)
-                            doc_dict[field] = sum(val_it)
-                        elif operator == '$avg':
-                            values = [val or 0 for val in values]
-                            doc_dict[field] = sum(values) / max(len(values), 1)
-                        elif operator == '$min':
-                            val_it = (val or MAXSIZE for val in values)
-                            doc_dict[field] = min(val_it)
-                        elif operator == '$max':
-                            val_it = (val or -MAXSIZE for val in values)
-                            doc_dict[field] = max(val_it)
-                        elif operator == '$first':
-                            doc_dict[field] = values[0]
-                        elif operator == '$last':
-                            doc_dict[field] = values[-1]
-                        elif operator == '$addToSet':
-                            value = []
-                            val_it = (val or None for val in values)
-                            # Don't use set in case elt in not hashable (like dicts).
-                            for elt in val_it:
-                                if elt not in value:
-                                    value.append(elt)
-                            doc_dict[field] = value
-                        elif operator == '$push':
-                            if field not in doc_dict:
-                                doc_dict[field] = values
-                            else:
-                                doc_dict[field].extend(values)
+                    key_getter = functools.partial(aggregate.parse_expression, key)
+                    values = [key_getter(doc) for doc in group_list]
+                    if operator in aggregate.GROUPING_OPERATOR_MAP:
+                        doc_dict[field] = aggregate.GROUPING_OPERATOR_MAP[operator](values)
+                    elif operator == '$first':
+                        doc_dict[field] = values[0]
+                    elif operator == '$last':
+                        doc_dict[field] = values[-1]
+                    elif operator == '$addToSet':
+                        value = []
+                        val_it = (val or None for val in values)
+                        # Don't use set in case elt in not hashable (like dicts).
+                        for elt in val_it:
+                            if elt not in value:
+                                value.append(elt)
+                        doc_dict[field] = value
+                    elif operator == '$push':
+                        if field not in doc_dict:
+                            doc_dict[field] = values
+                        else:
+                            doc_dict[field].extend(values)
                     elif operator in group_operators:
                         raise NotImplementedError(
                             'Although %s is a valid group operator for the '

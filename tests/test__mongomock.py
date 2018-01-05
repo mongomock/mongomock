@@ -2071,6 +2071,19 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         }}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate33(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d'})
+        pipeline = [{'$project': {
+            '_id': 0,
+            'max': {'$max': [5, 9, '$a']},
+            'min': {'$min': [8, 2, 3, '$a', '$b']},
+            'avg': {'$avg': [4, 2, 3, '$a', '$b', 4]},
+            'sum': {'$sum': [4, 2, 3, '$a', '$b', {'$sum': [0, 1, '$b']}]},
+            'maxString': {'$max': [{'$literal': '$b'}, '$c']},
+        }}]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_bucket(self):
         self.cmp.do.remove()
         self.cmp.do.insert_many([
