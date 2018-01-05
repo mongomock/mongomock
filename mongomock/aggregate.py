@@ -81,6 +81,19 @@ set_operators = [
 ]
 
 
+def _avg_operation(values):
+    values_list = list(values)
+    return sum(values_list) / float(max(len(list(values_list)), 1))
+
+
+GROUPING_OPERATOR_MAP = {
+    '$sum': lambda values: sum(val or 0 for val in values),
+    '$avg': _avg_operation,
+    '$min': lambda values: min(val or six.MAXSIZE for val in values),
+    '$max': lambda values: max(val or -six.MAXSIZE for val in values),
+}
+
+
 class Parser(object):
     """Helper to parse expressions within the aggregate pipeline."""
 
@@ -159,12 +172,8 @@ class Parser(object):
                                   ' in Mongomock.' % operator)
 
     def _handle_project_operator(self, operator, values):
-        if operator == '$min':
-            if len(values) > 2:
-                raise NotImplementedError('Although %d is a valid amount of elements in '
-                                          'aggregation pipeline, it is currently not '
-                                          ' implemented in Mongomock' % len(values))
-            return min(self.parse(values[0]), self.parse(values[1]))
+        if operator in GROUPING_OPERATOR_MAP:
+            return GROUPING_OPERATOR_MAP[operator](self.parse(val) for val in values)
         if operator == '$arrayElemAt':
             key, index = values
             array = self._parse_basic_expression(key)

@@ -1959,6 +1959,20 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a.b': 1}},
             ])
 
+    def test__aggregate_project_group_operations(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d'})
+        actual = self.db.collection.aggregate([{'$project': {
+            '_id': 1,
+            'max': {'$max': [5, 9, '$a']},
+            'min': {'$min': [8, '$a', '$b']},
+            'avg': {'$avg': [4, '$a', '$b']},
+            'sum': {'$sum': [4, '$a', '$b', {'$sum': [0, 1, '$b']}]},
+            'maxString': {'$max': [{'$literal': '$b'}, '$c']},
+        }}])
+        self.assertEqual(
+            [{'_id': 1, 'max': 9, 'min': 2, 'avg': 3, 'sum': 13, 'maxString': '$d'}],
+            list(actual))
+
     def test__aggregate_unrecognized(self):
         self.db.collection.insert_one({})
         with self.assertRaises(mongomock.OperationFailure):
