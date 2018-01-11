@@ -1271,6 +1271,52 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test__aggregate_project_array_size(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'a': {
+                        '$size': '$arr'
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 2}], list(actual))
+
+    def test__aggregate_project_array_size_if_null(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        self.db.collection.insert_one({'_id': 2})
+        self.db.collection.insert_one({'_id': 3, 'arr': None})
+        actual = self.db.collection.aggregate([
+            {},
+            {
+                '$project': {
+                    '_id': False,
+                    'a': {
+                        '$size': {'$ifNull': ['$arr', []]}
+                    }
+                }
+            }
+        ])
+        self.assertEqual([{'a': 2}, {'a': 0}, {'a': 0}], list(actual))
+
+    def test__aggregate_project_if_null(self):
+        self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {
+                '$project': {
+                    '_id': False,
+                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
+                    'b': {'$ifNull': ['$elem_b', '<missing_b>']}
+                }
+            }
+        ])
+        self.assertEqual([{'a': '<present_a>', 'b': '<missing_b>'}], list(actual))
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
