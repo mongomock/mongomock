@@ -1275,7 +1275,7 @@ class Collection(object):
             '$sample'
             '$sort',
             '$geoNear',
-            '$lookup'
+            '$lookup',
             '$out',
             '$indexStats']
         group_operators = [
