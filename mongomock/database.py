@@ -13,8 +13,7 @@ class Database(object):
     def __init__(self, client, name):
         self.name = name
         self._client = client
-        self._collections = {
-            'system.indexes': Collection(self, 'system.indexes')}
+        self._collections = {}
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -29,12 +28,15 @@ class Database(object):
     def client(self):
         return self._client
 
+    def _get_created_collections(self):
+        return [name for name, col in self._collections.items() if col._is_created()]
+
     def collection_names(self, include_system_collections=True):
         if include_system_collections:
-            return list(self._collections.keys())
+            return list(self._get_created_collections())
 
         result = []
-        for name in self._collections.keys():
+        for name in self._get_created_collections():
             if not name.startswith("system."):
                 result.append(name)
 
@@ -50,17 +52,17 @@ class Database(object):
     def drop_collection(self, name_or_collection):
         try:
             if isinstance(name_or_collection, Collection):
-                for name, collection in self._collections.items():
-                    if collection is name_or_collection:
-                        collection._documents = OrderedDict()
-                        del self._collections[name]
-                        break
+                collection = next(c for c in self._collections.values() if c is name_or_collection)
+                collection._documents = OrderedDict()
+                collection._force_created = False
+                collection.drop_indexes()
             else:
                 if name_or_collection in self._collections:
                     collection = self._collections.get(name_or_collection)
                     if collection:
                         collection._documents = OrderedDict()
-                del self._collections[name_or_collection]
+                        collection._force_created = False
+                        collection.drop_indexes()
         # EAFP paradigm
         # (http://en.m.wikipedia.org/wiki/Python_syntax_and_semantics)
         except Exception:
@@ -75,7 +77,9 @@ class Database(object):
         if kwargs:
             raise NotImplementedError("Special options not supported")
 
-        return self[name]
+        col = self[name]
+        col._force_created = True
+        return col
 
     def rename_collection(self, name, new_name, dropTarget=False):
         """Changes the name of an existing collection."""

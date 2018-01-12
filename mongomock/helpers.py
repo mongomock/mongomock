@@ -1,3 +1,4 @@
+from datetime import datetime
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
@@ -219,3 +220,22 @@ def embedded_item_getter(*keys):
             return tuple(recurse_embedded(obj, item) for item in keys)
 
     return g
+
+
+def inplace_patch_datetime_awareness_in_document(doc):
+    for key in doc.keys():
+        doc[key] = patch_datetime_awareness_in_document(doc)
+
+
+def patch_datetime_awareness_in_document(value):
+    # MongoDB is supposed to stock everything as timezone naive utc date
+    # Hence we have to convert incoming datetimes to avoid errors while
+    # mixing tz aware and naive.
+    if isinstance(value, dict):
+        return {k: patch_datetime_awareness_in_document(v) for k, v in value.items()}
+    elif isinstance(value, (tuple, list)):
+        return [patch_datetime_awareness_in_document(item) for item in value]
+    elif isinstance(value, datetime) and value.tzinfo:
+        return (value - value.utcoffset()).replace(tzinfo=None)
+    else:
+        return value

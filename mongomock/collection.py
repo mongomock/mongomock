@@ -275,7 +275,11 @@ class Collection(object):
         self.full_name = "{0}.{1}".format(db.name, name)
         self.database = db
         self._documents = OrderedDict()
+        self._force_created = False
         self._uniques = []
+
+    def _is_created(self):
+        return self._documents or self._uniques or self._force_created
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -317,6 +321,11 @@ class Collection(object):
         if isinstance(data, list):
             return [self._insert(item) for item in data]
 
+        # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
+        # but we need to stick to it), so we must patch in-place the data dict
+        for key in data.keys():
+            data[key] = helpers.patch_datetime_awareness_in_document(data[key])
+
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError("Document keys must be strings")
 
@@ -330,14 +339,14 @@ class Collection(object):
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
-            raise DuplicateKeyError("Duplicate Key Error", 11000)
+            raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
                 find_kwargs[key] = data.get(key, None)
             answer = self.find(find_kwargs)
             if answer.count() > 0 and not (is_sparse and find_kwargs[key] is None):
-                raise DuplicateKeyError("Duplicate Key Error", 11000)
+                raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
         return data['_id']
@@ -386,6 +395,8 @@ class Collection(object):
 
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, **kwargs):
+        spec = helpers.patch_datetime_awareness_in_document(spec)
+        document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
         validate_is_mapping('document', document)
 
@@ -399,11 +410,17 @@ class Collection(object):
             if existing_document is None:
                 if not upsert or num_updated:
                     continue
-                _id = document.get('_id')
-                to_insert = dict(spec, _id=_id) if _id else spec
+                # For upsert operation we have first to create a fake existing_document,
+                # update it like a regular one, then finally insert it
+                if spec.get('_id') is not None:
+                    _id = spec['_id']
+                elif document.get('_id') is not None:
+                    _id = document['_id']
+                else:
+                    _id = ObjectId()
+                to_insert = dict(spec, _id=_id)
                 to_insert = self._expand_dots(to_insert)
-                upserted_id = self._insert(self._discard_operators(to_insert))
-                existing_document = self._documents[upserted_id]
+                existing_document = to_insert
                 was_insert = True
             else:
                 updated_existing = True
@@ -625,6 +642,8 @@ class Collection(object):
                 existing_document.clear()
                 if _id:
                     existing_document['_id'] = _id
+            if was_insert:
+                upserted_id = self._insert(existing_document)
             if not multi:
                 break
 
@@ -939,6 +958,9 @@ class Collection(object):
                 except ValueError:
                     pass
             elif isinstance(doc, dict):
+                if updater is _unset_updater and part not in doc:
+                    # If the parent doesn't exists, so does it child.
+                    return
                 doc = doc.setdefault(part, {})
             else:
                 return
@@ -1051,6 +1073,7 @@ class Collection(object):
         return DeleteResult(self._delete(filter, multi=True), True)
 
     def _delete(self, filter, multi=False):
+        filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
         if not isinstance(filter, collections.Mapping):
@@ -1097,6 +1120,15 @@ class Collection(object):
 
     def drop_index(self, index_or_name):
         pass
+
+    def drop_indexes(self):
+        self._uniques = []
+
+    def reindex(self):
+        pass
+
+    def list_indexes(self):
+        return {}
 
     def index_information(self):
         return {}
@@ -1360,6 +1392,7 @@ class Collection(object):
             '$second',
             '$millisecond',
             '$dateToString']
+        conditional_operators = ['$cond', '$ifNull']  # noqa
 
         def _handle_arithmetic_operator(operator, values, doc_dict):
             if operator == '$abs':
@@ -1455,6 +1488,30 @@ class Collection(object):
                     "aggregation pipeline, it is currently not implemented "
                     " in Mongomock." % operator)
 
+        def _handle_array_operator(operator, values, doc_dict):
+            out_value = _parse_expression(values, doc_dict)
+            if operator == '$size':
+                return len(out_value)
+            else:
+                raise NotImplementedError(
+                    "Although '%s' is a valid date operator for the "
+                    "aggregation pipeline, it is currently not implemented "
+                    " in Mongomock." % operator)
+
+        def _handle_conditional_operator(operator, values, doc_dict):
+            if operator == '$ifNull':
+                field, fallback = values
+                try:
+                    out_value = _parse_expression(field, doc_dict)
+                except KeyError:
+                    return fallback
+                return out_value if out_value is not None else fallback
+            else:
+                raise NotImplementedError(
+                    "Although '%s' is a valid date operator for the "
+                    "aggregation pipeline, it is currently not implemented "
+                    " in Mongomock." % operator)
+
         def _handle_project_operator(operator, values, doc_dict):
             if operator == '$min':
                 if len(values) > 2:
@@ -1494,6 +1551,10 @@ class Collection(object):
                     return _handle_comparison_operator(k, v, doc_dict)
                 elif k in date_operators:
                     return _handle_date_operator(k, v, doc_dict)
+                elif k in array_operators:
+                    return _handle_array_operator(k, v, doc_dict)
+                elif k in conditional_operators:
+                    return _handle_conditional_operator(k, v, doc_dict)
                 else:
                     value_dict[k] = _parse_expression(v, doc_dict)
 
@@ -1517,7 +1578,6 @@ class Collection(object):
                         doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
-        conditional_operators = ['$cond', '$ifNull']  # noqa
         out_collection = [doc for doc in self.find()]
         for stage in pipeline:
             for k, v in iteritems(stage):
@@ -1688,69 +1748,75 @@ class Cursor(object):
     def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0):
         super(Cursor, self).__init__()
         self.collection = collection
+        spec = helpers.patch_datetime_awareness_in_document(spec)
         self._spec = spec
         self._sort = sort
         self._projection = projection
         self._skip = skip
+        self._factory_last_generated_results = None
+        self._results = None
         self._factory = functools.partial(collection._get_dataset,
                                           spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self.rewind()
 
+    def _compute_results(self, with_limit_and_skip=False):
+        # Recompute the result only if the query has changed
+        if not self._results or self._factory_last_generated_results != self._factory:
+            results = list(self._factory())
+            self._factory_last_generated_results = self._factory
+            self._results = results
+        if with_limit_and_skip:
+            results = self._results[self._skip:]
+            if self._limit:
+                results = results[:self._limit]
+        else:
+            results = self._results
+        return results
+
     def __iter__(self):
         return self
 
     def clone(self):
-        return Cursor(self.collection,
-                      self._spec, self._sort, self._projection, self._skip, self._limit)
+        cursor = Cursor(self.collection,
+                        self._spec, self._sort, self._projection, self._skip, self._limit)
+        cursor._factory = self._factory
+        return cursor
 
     def __next__(self):
-        if self._skip and not self._skipped:
-            for i in range(self._skip):
-                next(self._dataset)
-            self._skipped = self._skip
-        if self._limit is not None and self._limit <= self._emitted:
-            raise StopIteration()
-        if self._limit is not None:
+        try:
+            doc = self._compute_results(with_limit_and_skip=True)[self._emitted]
             self._emitted += 1
-        return {k: copy.deepcopy(v) for k, v in iteritems(next(self._dataset))}
+            return doc
+        except IndexError:
+            raise StopIteration()
+
     next = __next__
 
     def rewind(self):
-        self._dataset = self._factory()
         self._emitted = 0
-        self._skipped = 0
 
     def sort(self, key_or_list, direction=None):
         if direction is None:
             direction = 1
+
+        def _make_sort_factory_layer(upper_factory, sortKey, sortDirection):
+            def layer():
+                return sorted(upper_factory(), key=lambda x: _resolve_sort_key(sortKey, x),
+                              reverse=sortDirection < 0)
+            return layer
+
         if isinstance(key_or_list, (tuple, list)):
             for sortKey, sortDirection in reversed(key_or_list):
-                self._dataset = iter(
-                    sorted(
-                        self._dataset,
-                        key=lambda x: _resolve_sort_key(
-                            sortKey,
-                            x),
-                        reverse=sortDirection < 0))
+                self._factory = _make_sort_factory_layer(self._factory, sortKey, sortDirection)
         else:
-            self._dataset = iter(
-                sorted(self._dataset,
-                       key=lambda x: _resolve_sort_key(key_or_list, x),
-                       reverse=direction < 0))
+            self._factory = _make_sort_factory_layer(self._factory, key_or_list, direction)
         return self
 
     def count(self, with_limit_and_skip=False):
-        arr = [x for x in self._dataset]
-        count = len(arr)
-        if with_limit_and_skip:
-            if self._skip:
-                count -= self._skip
-            if self._limit and count > self._limit:
-                count = self._limit
-        self._dataset = iter(arr)
-        return count
+        results = self._compute_results(with_limit_and_skip)
+        return len(results)
 
     def skip(self, count):
         self._skip = count
@@ -1771,7 +1837,7 @@ class Cursor(object):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         unique_dict_vals = []
-        for x in iter(self._dataset):
+        for x in self._compute_results():
             value = _resolve_key(key, x)
             if value == NOTHING:
                 continue
@@ -1787,17 +1853,35 @@ class Cursor(object):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            # Limit the cursor to the given slice
-            self._dataset = (x for x in list(self._dataset)[index])
+            if index.step is not None:
+                raise IndexError("Cursor instances do not support slice steps")
+
+            skip = 0
+            if index.start is not None:
+                if index.start < 0:
+                    raise IndexError("Cursor instances do not support"
+                                     "negative indices")
+                skip = index.start
+
+            if index.stop is not None:
+                limit = index.stop - skip
+                if limit < 0:
+                    raise IndexError("stop index must be greater than start"
+                                     "index for slice %r" % index)
+                if limit == 0:
+                    self.__empty = True
+            else:
+                limit = 0
+
+            self._skip = skip
+            self._limit = limit
             return self
         elif not isinstance(index, int):
             raise TypeError("index '%s' cannot be applied to Cursor instances" % index)
         elif index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
         else:
-            arr = list(self)
-            self._dataset = iter(arr)
-            return arr[index]
+            return self._compute_results(with_limit_and_skip=True)[index]
 
 
 def _set_updater(doc, field_name, value):

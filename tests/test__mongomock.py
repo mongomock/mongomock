@@ -40,6 +40,10 @@ class InterfaceTest(TestCase):
     def test__can_create_db_with_path(self):
         self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
 
+    def test__can_create_db_with_multiple_pathes(self):
+        hostnames = ['mongodb://localhost:27017', 'mongodb://localhost:27018']
+        self.assertIsNotNone(mongomock.MongoClient(hostnames))
+
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
@@ -101,6 +105,22 @@ class DatabaseGettingTest(TestCase):
         result = collection.find({"_id": doc_id})
         self.assertEqual(result.count(), 0)
 
+    def test__drop_database_indexes(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.create_index('simple')
+        collection.create_index([("value", 1)], unique=True)
+        collection.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+
+        self.client.drop_database("somedb")
+
+        # Make sure indexes' rules no longer apply
+        collection.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
+        collection.insert({'value': 'not_unique_but_ok'})
+        collection.insert({'sparsed': 'not_unique_but_ok'})
+        result = collection.find({})
+        self.assertEqual(result.count(), 3)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
@@ -136,6 +156,8 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
                      "admin%3F?authMechanism=MONGODB-CR")
         self.assertIs(db, c['admin?'])
+        c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
+        self.assertIs(db, c['foo'])
 
     def test__getting_default_database_invalid(self):
         def client(uri):
