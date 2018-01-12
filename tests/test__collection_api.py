@@ -388,6 +388,10 @@ class CollectionAPITest(TestCase):
             upsert=True, return_document=ReturnDocument.BEFORE)
         self.assertEqual(ret, {'_id': 0, 'counter': 1})
 
+    def test__find_and_modify_no_projection_kwarg(self):
+        with self.assertRaises(TypeError):  # unlike pymongo, we warn about this
+            self.db.collection.find_and_modify({"a": 2}, {"a": 3}, projection=['a'])
+
     def test__find_one_and_delete(self):
         documents = [
             {'x': 1, 's': 0},

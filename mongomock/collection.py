@@ -255,15 +255,15 @@ class BulkOperationBuilder(object):
     def add_insert(self, doc):
         self.insert(doc)
 
-    def add_update(self, selector, doc, multi, upsert):
+    def add_update(self, selector, doc, multi, upsert, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.register_update_op(doc, multi)
 
-    def add_replace(self, selector, doc, upsert):
+    def add_replace(self, selector, doc, upsert, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.replace_one(doc)
 
-    def add_delete(self, selector, just_one):
+    def add_delete(self, selector, just_one, collation=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=False)
         write_operation.register_remove_op(not just_one)
 
@@ -1012,12 +1012,14 @@ class Collection(object):
                                      sort, return_document, **kwargs)
 
     def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
-                        full_response=False, manipulate=False, **kwargs):
+                        full_response=False, manipulate=False, fields=None, **kwargs):
         warnings.warn("find_and_modify is deprecated, use find_one_and_delete"
                       ", find_one_and_replace, or find_one_and_update instead",
                       DeprecationWarning, stacklevel=2)
+        if 'projection' in kwargs:
+            raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
         return self._find_and_modify(query, update=update, upsert=upsert,
-                                     sort=sort, **kwargs)
+                                     sort=sort, projection=fields, **kwargs)
 
     def _find_and_modify(self, query, projection=None, update=None,
                          upsert=False, sort=None,
@@ -1307,7 +1309,7 @@ class Collection(object):
             '$sample'
             '$sort',
             '$geoNear',
-            '$lookup'
+            '$lookup',
             '$out',
             '$indexStats']
         group_operators = [
