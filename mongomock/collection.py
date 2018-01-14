@@ -523,14 +523,15 @@ class Collection(object):
                             if not isinstance(arr, list):
                                 continue
 
+                            arr_copy = copy.deepcopy(arr)
                             if isinstance(value, dict):
-                                for idx, obj in enumerate(arr):
+                                for obj in arr_copy:
                                     if filter_applies(value, obj):
-                                        del arr[idx]
+                                        arr.remove(obj)
                             else:
-                                for idx, obj in enumerate(arr):
+                                for obj in arr_copy:
                                     if value == obj:
-                                        del arr[idx]
+                                        arr.remove(obj)
                 elif k == '$pullAll':
                     for field, value in iteritems(v):
                         nested_field_list = field.rsplit('.')

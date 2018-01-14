@@ -1083,7 +1083,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
         self.cmp.do.remove()
-        self.cmp.do.insert({'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 10}]}})
+        self.cmp.do.insert(
+            {'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 8}, {'size': 10}]}}
+        )
         self.cmp.do.update(
             {'name': 'bob'}, {'$pull': {'hat.sizes': {'size': {'$gt': 6}}}})
         self.cmp.compare.find({'name': 'bob'})
