@@ -1884,6 +1884,12 @@ class Cursor(object):
         else:
             return self._compute_results(with_limit_and_skip=True)[index]
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 
 def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
