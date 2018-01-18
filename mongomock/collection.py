@@ -344,8 +344,8 @@ class Collection(object):
             find_kwargs = {}
             for key, direction in unique:
                 find_kwargs[key] = data.get(key, None)
-            answer = self.find(find_kwargs)
-            if answer.count() > 0 and not (is_sparse and find_kwargs[key] is None):
+            answer_count = len(list(self._iter_documents(find_kwargs)))
+            if answer_count > 0 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
@@ -1107,7 +1107,7 @@ class Collection(object):
         if filter is None:
             return len(self._documents)
         else:
-            return self.find(filter).count()
+            return len(list(self._iter_documents(filter)))
 
     def drop(self):
         self.database.drop_collection(self.name)
