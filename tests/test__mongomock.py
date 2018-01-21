@@ -595,6 +595,21 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 3}]})
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
 
+    def test__find_sets_regex(self):
+        self.cmp.do.insert([
+            {'x': '123'},
+            {'x': ['abc', 'abd']},
+        ])
+        digits_pat = re.compile(r'^\d+')
+        str_pat = re.compile(r'^ab[cd]')
+        non_existing_pat = re.compile(r'^lll')
+        self.cmp.compare_ignore_order.find({'x': {'$in': [digits_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat, '123']}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [non_existing_pat]}})
+
     def test__find_and_modify_remove(self):
         self.cmp.do.insert([{"a": x, "junk": True} for x in range(10)])
         self.cmp.compare.find_and_modify({"a": 2}, remove=True, fields={'_id': False, 'a': True})
