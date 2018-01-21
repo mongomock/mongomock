@@ -347,8 +347,6 @@ class CollectionAPITest(TestCase):
             {'as_class': dict},
             {'network_timeout': 10},
             {'secondary_acceptable_latency_ms': 10},
-            {'max_scan': 10},
-            {'snapshot': True},
             {'tailable': True},
             {'await_data': True},
             {'exhaust': True},
