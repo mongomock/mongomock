@@ -159,6 +159,11 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
         self.assertIs(db, c['foo'])
 
+        # As of pymongo 3.5, get_database() is equivalent to
+        # the old behavior of get_default_database()
+        client = mongomock.MongoClient('mongodb://host1/foo')
+        self.assertIs(client.get_database(), client['foo'])
+
     def test__getting_default_database_invalid(self):
         def client(uri):
             return mongomock.MongoClient(uri)

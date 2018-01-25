@@ -81,8 +81,11 @@ class MongoClient(object):
             db = self._databases[name_or_db]
             drop_collections_for_db(db)
 
-    def get_database(self, name, codec_options=None, read_preference=None,
+    def get_database(self, name=None, codec_options=None, read_preference=None,
                      write_concern=None):
+        if name is None:
+            return self.get_default_database()
+
         db = self._databases.get(name)
         if db is None:
             db = self._databases[name] = Database(self, name)
