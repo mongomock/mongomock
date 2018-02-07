@@ -1,9 +1,10 @@
-
-.. container::
-
-   .. image:: http://vmalloc.github.io/mongomock/mongomock-small.png
-
 |travis| |pypi_version| |pypi_license| |pypi_wheel|
+
+
+Looking for Maintainers
+-----------------------
+
+We are currently looking for maintainers for Mongomock who will help advance the project, as the original authors have moved to other projects requiring all of their attention. Anyone interested, please ping @vmalloc.
 
 
 What is this?
@@ -82,6 +83,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
 .. code-block:: bash
 
  git clone git@github.com:vmalloc/mongomock.git
+ pip install tox
  cd mongomock
  tox
 
@@ -122,7 +124,7 @@ the legacy 2.x branch than your pull request should go into the `support/2.x` br
 Acknowledgements
 ----------------
 
-Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ and `Srinivas Reddy Thatiparthy <https://github.com/srinivasreddy>`_.
+Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ .
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing bugs:
 
@@ -165,7 +167,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Scott Sexton
 * Srinivas Reddy Thatiparthy
 * Taras Boiko
-* Todd Tomkinson 
+* Todd Tomkinson
 * Zachary Carter
 * catty (ca77y _at_ live.com)
 * emosenkis
@@ -182,8 +184,8 @@ Also, many thanks go to the following people for helping out, contributing pull 
 .. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
 
-.. |travis| image:: https://img.shields.io/travis/vmalloc/mongomock/master.svg
-    :target: https://travis-ci.org/vmalloc/mongomock
+.. |travis| image:: https://travis-ci.org/mongomock/mongomock.svg?branch=develop
+    :target: https://travis-ci.org/mongomock/mongomock
     :alt: Travis CI build
 
 .. |pypi_version| image:: https://img.shields.io/pypi/v/mongomock.svg
