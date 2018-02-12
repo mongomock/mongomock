@@ -15,6 +15,7 @@ try:
     from bson.errors import InvalidDocument
     import pymongo
     from pymongo import ReturnDocument
+    from pymongo.collation import Collation
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.collection import ReturnDocument
@@ -339,6 +340,13 @@ class CollectionAPITest(TestCase):
         self.assertEqual(type(collection.find()).__name__, "Cursor")
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__find_with_collation(self):
+        collection = self.db.collection
+        collation = Collation("fr")
+        cursor = collection.find({}, collation=collation)
+        self.assertEqual(cursor._collation, collation)
 
     def test__find_removed_and_changed_options(self):
         """Test that options that have been removed are rejected."""
