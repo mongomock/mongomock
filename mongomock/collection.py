@@ -721,12 +721,12 @@ class Collection(object):
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True):
+             batch_size=0, manipulate=True, collation=None):
         spec = filter
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
-        return Cursor(self, spec, sort, projection, skip, limit)
+        return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = (self._copy_only_fields(document, fields, as_class)
@@ -1746,7 +1746,8 @@ def _resolve_sort_key(key, doc):
 
 class Cursor(object):
 
-    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0):
+    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
+                 collation=None):
         super(Cursor, self).__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)
@@ -1760,6 +1761,7 @@ class Cursor(object):
                                           spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
+        self._collation = collation
         self.rewind()
 
     def _compute_results(self, with_limit_and_skip=False):
