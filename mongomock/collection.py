@@ -1746,7 +1746,8 @@ def _resolve_sort_key(key, doc):
 
 class Cursor(object):
 
-    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0, collation=None):
+    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
+                 collation=None):
         super(Cursor, self).__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)

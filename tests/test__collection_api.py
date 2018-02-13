@@ -14,8 +14,8 @@ import mongomock
 try:
     from bson.errors import InvalidDocument
     import pymongo
-    from pymongo import ReturnDocument
     from pymongo.collation import Collation
+    from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.collection import ReturnDocument
