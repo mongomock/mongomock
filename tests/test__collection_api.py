@@ -1098,6 +1098,53 @@ class CollectionAPITest(TestCase):
         self.db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
         self.assert_document_count(0)
 
+    def test__configure_client_tz_aware(self):
+        for tz_awarness in (True, False):
+            client = mongomock.MongoClient(tz_aware=tz_awarness)
+            db = client['somedb']
+
+            class TZ(tzinfo):
+                def fromutc(self, dt):
+                    return dt + self.utcoffset()
+
+                def tzname(self, *args, **kwargs):
+                    return '<dummy UTC+2>'
+
+                def utcoffset(self, dt):
+                    return timedelta(seconds=2 * 3600)
+
+            utc2tz = TZ()
+            naive = datetime(2000, 1, 1, 2, 0, 0)
+            aware = datetime(2000, 1, 1, 4, 0, 0, tzinfo=utc2tz)
+            if tz_awarness:
+                returned = datetime(2000, 1, 1, 2, 0, 0, tzinfo=mongomock.helpers.utc)
+            else:
+                returned = datetime(2000, 1, 1, 2, 0, 0)
+            objid = db.collection.insert({'date_aware': aware, 'date_naive': naive})
+
+            objs = list(db.collection.find())
+            assert objs == [{'_id': objid, 'date_aware': returned, 'date_naive': returned}]
+
+            # Given both date are equivalent, we can mix them
+            db.collection.update_one(
+                {'date_aware': naive, 'date_naive': aware},
+                {'$set': {'new_aware': aware, 'new_naive': naive}},
+                upsert=True
+            )
+
+            objs = list(db.collection.find())
+            assert objs == [
+                {'_id': objid, 'date_aware': returned, 'date_naive': returned,
+                 'new_aware': returned, 'new_naive': returned}
+            ]
+
+            ret = db.collection.find_one({'new_aware': naive, 'new_naive': aware})
+            assert ret == objs[0]
+
+            db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
+            objs = list(db.collection.find())
+            assert not objs
+
     # should be removed once Timestamp supported or implemented
     def test__current_date_timestamp_is_not_supported_yet(self):
         with self.assertRaises(NotImplementedError):

@@ -1767,7 +1767,11 @@ class Cursor(object):
     def _compute_results(self, with_limit_and_skip=False):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
-            results = list(self._factory())
+            if self.collection.database.client._tz_aware:
+                results = [helpers.make_datetime_timezone_aware_in_document(x)
+                           for x in self._factory()]
+            else:
+                results = list(self._factory())
             self._factory_last_generated_results = self._factory
             self._results = results
         if with_limit_and_skip:
