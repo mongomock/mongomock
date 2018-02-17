@@ -7,8 +7,8 @@ import warnings
 
 
 try:
-    from bson import (ObjectId, RE_TYPE)
-    from bson.tz_util import utc
+    from bson import (ObjectId, RE_TYPE, tz_util)
+    utc = tz_util.utc
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
     RE_TYPE = re._pattern_type
