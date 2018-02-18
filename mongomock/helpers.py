@@ -231,11 +231,17 @@ def patch_datetime_awareness_in_document(value):
     # MongoDB is supposed to stock everything as timezone naive utc date
     # Hence we have to convert incoming datetimes to avoid errors while
     # mixing tz aware and naive.
+    # On top of that, MongoDB date precision is up to millisecond, where Python
+    # datetime use microsecond, so we must lower the precision to mimic mongo.
     if isinstance(value, dict):
         return {k: patch_datetime_awareness_in_document(v) for k, v in value.items()}
     elif isinstance(value, (tuple, list)):
         return [patch_datetime_awareness_in_document(item) for item in value]
-    elif isinstance(value, datetime) and value.tzinfo:
-        return (value - value.utcoffset()).replace(tzinfo=None)
+    elif isinstance(value, datetime):
+        mongo_us = (value.microsecond // 1000) * 1000
+        if value.tzinfo:
+            return (value - value.utcoffset()).replace(tzinfo=None, microsecond=mongo_us)
+        else:
+            return value.replace(microsecond=mongo_us)
     else:
         return value

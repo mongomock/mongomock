@@ -1072,6 +1072,31 @@ class CollectionAPITest(TestCase):
             self.assertIsInstance(
                 self.db.collection.find_one({})['updated_at'], datetime)
 
+    def test_datetime_precision(self):
+        too_precise_dt = datetime(2000, 1, 1, 12, 30, 30, 123456)
+        mongo_dt = datetime(2000, 1, 1, 12, 30, 30, 123000)
+        objid = self.db.collection.insert({'date_too_precise': too_precise_dt, 'date': mongo_dt})
+        self.assert_document_count(1)
+        # Given both date are equivalent, we can mix them
+        self.db.collection.update_one(
+            {'date_too_precise': mongo_dt, 'date': too_precise_dt},
+            {'$set': {'new_date_too_precise': too_precise_dt, 'new_date': mongo_dt}},
+            upsert=True
+        )
+        self.assert_document_count(1)
+        doc = self.db.collection.find_one({
+            'new_date_too_precise': mongo_dt, 'new_date': too_precise_dt})
+        assert doc == {
+            '_id': objid,
+            'date_too_precise': mongo_dt,
+            'date': mongo_dt,
+            'new_date_too_precise': mongo_dt,
+            'new_date': mongo_dt
+        }
+        self.db.collection.delete_one({
+            'new_date_too_precise': mongo_dt, 'new_date': too_precise_dt})
+        self.assert_document_count(0)
+
     def test__mix_tz_naive_aware(self):
         class TZ(tzinfo):
             def fromutc(self, dt):
