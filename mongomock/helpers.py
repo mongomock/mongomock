@@ -7,12 +7,18 @@ import warnings
 
 
 try:
-    from bson import (ObjectId, RE_TYPE, tz_util)
-    utc = tz_util.utc
+    from bson import ObjectId
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
+
+try:
+    from bson import RE_TYPE
+except ImportError:
     RE_TYPE = re._pattern_type
 
+try:
+    from bson.tz_util import utc
+except ImportError:
     class FixedOffset(tzinfo):
 
         def __init__(self, offset, name):
