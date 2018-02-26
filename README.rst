@@ -1,6 +1,12 @@
 |travis| |pypi_version| |pypi_license| |pypi_wheel|
 
 
+Looking for Maintainers
+-----------------------
+
+We are currently looking for maintainers for Mongomock who will help advance the project, as the original authors have moved to other projects requiring all of their attention. Anyone interested, please ping @vmalloc.
+
+
 What is this?
 -------------
 Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
@@ -77,6 +83,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
 .. code-block:: bash
 
  git clone git@github.com:vmalloc/mongomock.git
+ pip install tox
  cd mongomock
  tox
 
@@ -117,7 +124,7 @@ the legacy 2.x branch than your pull request should go into the `support/2.x` br
 Acknowledgements
 ----------------
 
-Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ and `Srinivas Reddy Thatiparthy <https://github.com/srinivasreddy>`_.
+Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_. It is currently being developed and maintained by `Martin Domke <https://github.com/mdomke>`_ .
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing bugs:
 

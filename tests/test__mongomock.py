@@ -40,6 +40,10 @@ class InterfaceTest(TestCase):
     def test__can_create_db_with_path(self):
         self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
 
+    def test__can_create_db_with_multiple_pathes(self):
+        hostnames = ['mongodb://localhost:27017', 'mongodb://localhost:27018']
+        self.assertIsNotNone(mongomock.MongoClient(hostnames))
+
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
@@ -101,6 +105,22 @@ class DatabaseGettingTest(TestCase):
         result = collection.find({"_id": doc_id})
         self.assertEqual(result.count(), 0)
 
+    def test__drop_database_indexes(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.create_index('simple')
+        collection.create_index([("value", 1)], unique=True)
+        collection.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+
+        self.client.drop_database("somedb")
+
+        # Make sure indexes' rules no longer apply
+        collection.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
+        collection.insert({'value': 'not_unique_but_ok'})
+        collection.insert({'sparsed': 'not_unique_but_ok'})
+        result = collection.find({})
+        self.assertEqual(result.count(), 3)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
@@ -136,6 +156,13 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
                      "admin%3F?authMechanism=MONGODB-CR")
         self.assertIs(db, c['admin?'])
+        c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
+        self.assertIs(db, c['foo'])
+
+        # As of pymongo 3.5, get_database() is equivalent to
+        # the old behavior of get_default_database()
+        client = mongomock.MongoClient('mongodb://host1/foo')
+        self.assertIs(client.get_database(), client['foo'])
 
     def test__getting_default_database_invalid(self):
         def client(uri):
@@ -573,9 +600,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 3}]})
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
 
+    def test__find_sets_regex(self):
+        self.cmp.do.insert([
+            {'x': '123'},
+            {'x': ['abc', 'abd']},
+        ])
+        digits_pat = re.compile(r'^\d+')
+        str_pat = re.compile(r'^ab[cd]')
+        non_existing_pat = re.compile(r'^lll')
+        self.cmp.compare_ignore_order.find({'x': {'$in': [digits_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat, '123']}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [non_existing_pat]}})
+
     def test__find_and_modify_remove(self):
-        self.cmp.do.insert([{"a": x} for x in range(10)])
-        self.cmp.do.find_and_modify({"a": 2}, remove=True)
+        self.cmp.do.insert([{"a": x, "junk": True} for x in range(10)])
+        self.cmp.compare.find_and_modify({"a": 2}, remove=True, fields={'_id': False, 'a': True})
         self.cmp.compare_ignore_order.find()
 
     def test__find_one_and_delete(self):
@@ -1073,7 +1115,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
         self.cmp.do.remove()
-        self.cmp.do.insert({'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 10}]}})
+        self.cmp.do.insert(
+            {'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 8}, {'size': 10}]}}
+        )
         self.cmp.do.update(
             {'name': 'bob'}, {'$pull': {'hat.sizes': {'size': {'$gt': 6}}}})
         self.cmp.compare.find({'name': 'bob'})

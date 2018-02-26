@@ -8,6 +8,8 @@ import re
 from sentinels import NOTHING
 from six import iteritems, string_types
 
+COMPILED_RE_TYPE = type(re.compile('a'))
+
 
 def filter_applies(search_filter, document):
     """Applies given filter
@@ -133,6 +135,17 @@ def _all_op(doc_val, search_val):
     return all(matches)
 
 
+def _in_op(doc_val, search_val):
+    doc_val = _force_list(doc_val)
+    is_regex_list = [isinstance(x, COMPILED_RE_TYPE) for x in search_val]
+    if not any(is_regex_list):
+        return any(x in search_val for x in doc_val)
+    for x, is_regex in zip(search_val, is_regex_list):
+        if (is_regex and _regex(doc_val, x)) or (x in doc_val):
+            return True
+    return False
+
+
 def _not_op(d, k, s):
     if isinstance(s, dict):
         for key in s.keys():
@@ -192,8 +205,8 @@ OPERATOR_MAP = {
     '$lt': _not_nothing_and(operator.lt),
     '$lte': _not_nothing_and(operator.le),
     '$all': _all_op,
-    '$in': lambda dv, sv: any(x in sv for x in _force_list(dv)),
-    '$nin': lambda dv, sv: all(x not in sv for x in _force_list(dv)),
+    '$in': _in_op,
+    '$nin': lambda dv, sv: not _in_op(dv, sv),
     '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
     '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
     '$elemMatch': _elem_match_op,
