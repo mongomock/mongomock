@@ -1858,6 +1858,22 @@ class Cursor(object):
                         value, (tuple, list)) else [value])
         return list(unique) + unique_dict_vals
 
+    def hint(self, hint):
+        # we don't need to do anything but verify that the hint was provided in a list of tuples
+        if not isinstance(hint, list):
+            raise TypeError('Hint must be a list of tuples.')
+
+        for tup in hint:
+            if not isinstance(tup, tuple):
+                raise TypeError('Each element of the hint list must be a tuple.')
+            if not isinstance(tup[0], basestring):
+                raise TypeError('The first element of a hint tuple must be a string.')
+            if tup[1] != 1 and tup[1] != -1:
+                raise ValueError('The second element of a hint tuple must be 1 or -1.')
+            if len(tup) != 2:
+                raise ValueError('The tuple must be 2 elements long: field, sort order')
+        return self
+
     def __getitem__(self, index):
         if isinstance(index, slice):
             if index.step is not None:
