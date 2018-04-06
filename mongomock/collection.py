@@ -9,6 +9,7 @@ import json
 import math
 import threading
 import time
+import types
 import warnings
 
 try:
@@ -318,7 +319,7 @@ class Collection(object):
             raise BulkWriteError('batch op errors occurred')
 
     def _insert(self, data):
-        if isinstance(data, list):
+        if isinstance(data, list) or isinstance(data, types.GeneratorType):
             return [self._insert(item) for item in data]
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,

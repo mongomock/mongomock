@@ -316,6 +316,14 @@ class CollectionAPITest(TestCase):
         for i, doc_id in enumerate(result.inserted_ids):
             self.assert_document_stored(doc_id, documents[i])
 
+    def test__insert_many_with_generator(self):
+        documents = (doc for doc in [{'a': 1}, {'b': 2}])
+        result = self.db.collection.insert_many(documents)
+        self.assertIsInstance(result.inserted_ids, list)
+
+        for i, doc_id in enumerate(result.inserted_ids):
+            self.assert_document_stored(doc_id, documents[i])
+
     def test__insert_many_type_error(self):
         with self.assertRaises(TypeError):
             self.db.collection.insert_many({'a': 1})
