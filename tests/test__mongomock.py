@@ -586,9 +586,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert([
             dict(x=single),
             dict(x=even),
-            dict(x=prime)])
+            dict(x=prime),
+            dict()])
         self.cmp.compare_ignore_order.find({'x': {'$in': [7, 8]}})
         self.cmp.compare_ignore_order.find({'x': {'$in': [4, 5]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [4, None]}})
         self.cmp.compare_ignore_order.find({'x': {'$nin': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [7, 8]}})
