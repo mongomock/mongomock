@@ -136,6 +136,8 @@ def _all_op(doc_val, search_val):
 
 
 def _in_op(doc_val, search_val):
+    if doc_val is NOTHING and None in search_val:
+        return True
     doc_val = _force_list(doc_val)
     is_regex_list = [isinstance(x, COMPILED_RE_TYPE) for x in search_val]
     if not any(is_regex_list):
