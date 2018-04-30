@@ -35,13 +35,13 @@ def filter_applies(search_filter, document):
 
         for doc_val in iter_key_candidates(key, document):
             if isinstance(search, dict):
-                is_match = all(
+                is_match = (all(
                     operator_string in OPERATOR_MAP and
                     OPERATOR_MAP[operator_string](doc_val, search_val) or
                     operator_string == '$not' and
                     _not_op(document, key, search_val)
                     for operator_string, search_val in iteritems(search)
-                ) or doc_val == search
+                ) and search) or doc_val == search
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
             elif key in LOGICAL_OPERATOR_MAP:
@@ -136,6 +136,8 @@ def _all_op(doc_val, search_val):
 
 
 def _in_op(doc_val, search_val):
+    if doc_val is NOTHING and None in search_val:
+        return True
     doc_val = _force_list(doc_val)
     is_regex_list = [isinstance(x, COMPILED_RE_TYPE) for x in search_val]
     if not any(is_regex_list):

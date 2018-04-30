@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
@@ -7,10 +7,40 @@ import warnings
 
 
 try:
-    from bson import (ObjectId, RE_TYPE)
+    from bson import ObjectId
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
+
+try:
+    from bson import RE_TYPE
+except ImportError:
     RE_TYPE = re._pattern_type
+
+try:
+    from bson.tz_util import utc
+except ImportError:
+    class FixedOffset(tzinfo):
+
+        def __init__(self, offset, name):
+            if isinstance(offset, timedelta):
+                self.__offset = offset
+            else:
+                self.__offset = timedelta(minutes=offset)
+            self.__name = name
+
+        def __getinitargs__(self):
+            return self.__offset, self.__name
+
+        def utcoffset(self, dt):
+            return self.__offset
+
+        def tzname(self, dt):
+            return self.__name
+
+        def dst(self, dt):
+            return timedelta(0)
+    utc = FixedOffset(0, "UTC")
+
 
 # for Python 3 compatibility
 if PY2:
@@ -231,11 +261,31 @@ def patch_datetime_awareness_in_document(value):
     # MongoDB is supposed to stock everything as timezone naive utc date
     # Hence we have to convert incoming datetimes to avoid errors while
     # mixing tz aware and naive.
+    # On top of that, MongoDB date precision is up to millisecond, where Python
+    # datetime use microsecond, so we must lower the precision to mimic mongo.
     if isinstance(value, dict):
         return {k: patch_datetime_awareness_in_document(v) for k, v in value.items()}
     elif isinstance(value, (tuple, list)):
         return [patch_datetime_awareness_in_document(item) for item in value]
-    elif isinstance(value, datetime) and value.tzinfo:
-        return (value - value.utcoffset()).replace(tzinfo=None)
+    elif isinstance(value, datetime):
+        mongo_us = (value.microsecond // 1000) * 1000
+        if value.tzinfo:
+            return (value - value.utcoffset()).replace(tzinfo=None, microsecond=mongo_us)
+        else:
+            return value.replace(microsecond=mongo_us)
+    else:
+        return value
+
+
+def make_datetime_timezone_aware_in_document(value):
+    # MongoClient support tz_aware=True parameter to return timezone-aware
+    # datetime objects. Given the date is stored internally without timezone
+    # information, all returned datetime have utc as timezone.
+    if isinstance(value, dict):
+        return {k: make_datetime_timezone_aware_in_document(v) for k, v in value.items()}
+    elif isinstance(value, (tuple, list)):
+        return [make_datetime_timezone_aware_in_document(item) for item in value]
+    elif isinstance(value, datetime):
+        return value.replace(tzinfo=utc)
     else:
         return value

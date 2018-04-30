@@ -14,6 +14,7 @@ import mongomock
 try:
     from bson.errors import InvalidDocument
     import pymongo
+    from pymongo.collation import Collation
     from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
 except ImportError:
@@ -315,6 +316,14 @@ class CollectionAPITest(TestCase):
         for i, doc_id in enumerate(result.inserted_ids):
             self.assert_document_stored(doc_id, documents[i])
 
+    def test__insert_many_with_generator(self):
+        documents = (doc for doc in [{'a': 1}, {'b': 2}])
+        result = self.db.collection.insert_many(documents)
+        self.assertIsInstance(result.inserted_ids, list)
+
+        for i, doc_id in enumerate(result.inserted_ids):
+            self.assert_document_stored(doc_id, documents[i])
+
     def test__insert_many_type_error(self):
         with self.assertRaises(TypeError):
             self.db.collection.insert_many({'a': 1})
@@ -339,6 +348,13 @@ class CollectionAPITest(TestCase):
         self.assertEqual(type(collection.find()).__name__, "Cursor")
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__find_with_collation(self):
+        collection = self.db.collection
+        collation = Collation("fr")
+        cursor = collection.find({}, collation=collation)
+        self.assertEqual(cursor._collation, collation)
 
     def test__find_removed_and_changed_options(self):
         """Test that options that have been removed are rejected."""
@@ -1064,6 +1080,31 @@ class CollectionAPITest(TestCase):
             self.assertIsInstance(
                 self.db.collection.find_one({})['updated_at'], datetime)
 
+    def test_datetime_precision(self):
+        too_precise_dt = datetime(2000, 1, 1, 12, 30, 30, 123456)
+        mongo_dt = datetime(2000, 1, 1, 12, 30, 30, 123000)
+        objid = self.db.collection.insert({'date_too_precise': too_precise_dt, 'date': mongo_dt})
+        self.assert_document_count(1)
+        # Given both date are equivalent, we can mix them
+        self.db.collection.update_one(
+            {'date_too_precise': mongo_dt, 'date': too_precise_dt},
+            {'$set': {'new_date_too_precise': too_precise_dt, 'new_date': mongo_dt}},
+            upsert=True
+        )
+        self.assert_document_count(1)
+        doc = self.db.collection.find_one({
+            'new_date_too_precise': mongo_dt, 'new_date': too_precise_dt})
+        assert doc == {
+            '_id': objid,
+            'date_too_precise': mongo_dt,
+            'date': mongo_dt,
+            'new_date_too_precise': mongo_dt,
+            'new_date': mongo_dt
+        }
+        self.db.collection.delete_one({
+            'new_date_too_precise': mongo_dt, 'new_date': too_precise_dt})
+        self.assert_document_count(0)
+
     def test__mix_tz_naive_aware(self):
         class TZ(tzinfo):
             def fromutc(self, dt):
@@ -1089,6 +1130,53 @@ class CollectionAPITest(TestCase):
         self.db.collection.find_one({'new_aware': naive, 'new_naive': aware})
         self.db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
         self.assert_document_count(0)
+
+    def test__configure_client_tz_aware(self):
+        for tz_awarness in (True, False):
+            client = mongomock.MongoClient(tz_aware=tz_awarness)
+            db = client['somedb']
+
+            class TZ(tzinfo):
+                def fromutc(self, dt):
+                    return dt + self.utcoffset()
+
+                def tzname(self, *args, **kwargs):
+                    return '<dummy UTC+2>'
+
+                def utcoffset(self, dt):
+                    return timedelta(seconds=2 * 3600)
+
+            utc2tz = TZ()
+            naive = datetime(2000, 1, 1, 2, 0, 0)
+            aware = datetime(2000, 1, 1, 4, 0, 0, tzinfo=utc2tz)
+            if tz_awarness:
+                returned = datetime(2000, 1, 1, 2, 0, 0, tzinfo=mongomock.helpers.utc)
+            else:
+                returned = datetime(2000, 1, 1, 2, 0, 0)
+            objid = db.collection.insert({'date_aware': aware, 'date_naive': naive})
+
+            objs = list(db.collection.find())
+            assert objs == [{'_id': objid, 'date_aware': returned, 'date_naive': returned}]
+
+            # Given both date are equivalent, we can mix them
+            db.collection.update_one(
+                {'date_aware': naive, 'date_naive': aware},
+                {'$set': {'new_aware': aware, 'new_naive': naive}},
+                upsert=True
+            )
+
+            objs = list(db.collection.find())
+            assert objs == [
+                {'_id': objid, 'date_aware': returned, 'date_naive': returned,
+                 'new_aware': returned, 'new_naive': returned}
+            ]
+
+            ret = db.collection.find_one({'new_aware': naive, 'new_naive': aware})
+            assert ret == objs[0]
+
+            db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
+            objs = list(db.collection.find())
+            assert not objs
 
     # should be removed once Timestamp supported or implemented
     def test__current_date_timestamp_is_not_supported_yet(self):

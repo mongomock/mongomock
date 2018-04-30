@@ -17,6 +17,7 @@ class MongoClient(object):
         else:
             self.host = self.HOST
         self.port = port or self.PORT
+        self._tz_aware = tz_aware
         self._databases = {}
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class

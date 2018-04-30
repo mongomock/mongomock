@@ -9,6 +9,7 @@ import json
 import math
 import threading
 import time
+import types
 import warnings
 
 try:
@@ -318,7 +319,7 @@ class Collection(object):
             raise BulkWriteError('batch op errors occurred')
 
     def _insert(self, data):
-        if isinstance(data, list):
+        if isinstance(data, list) or isinstance(data, types.GeneratorType):
             return [self._insert(item) for item in data]
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
@@ -721,12 +722,12 @@ class Collection(object):
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True):
+             batch_size=0, manipulate=True, collation=None):
         spec = filter
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
-        return Cursor(self, spec, sort, projection, skip, limit)
+        return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = (self._copy_only_fields(document, fields, as_class)
@@ -1746,7 +1747,8 @@ def _resolve_sort_key(key, doc):
 
 class Cursor(object):
 
-    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0):
+    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
+                 collation=None):
         super(Cursor, self).__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)
@@ -1760,12 +1762,17 @@ class Cursor(object):
                                           spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
+        self._collation = collation
         self.rewind()
 
     def _compute_results(self, with_limit_and_skip=False):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
-            results = list(self._factory())
+            if self.collection.database.client._tz_aware:
+                results = [helpers.make_datetime_timezone_aware_in_document(x)
+                           for x in self._factory()]
+            else:
+                results = list(self._factory())
             self._factory_last_generated_results = self._factory
             self._results = results
         if with_limit_and_skip:
