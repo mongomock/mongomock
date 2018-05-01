@@ -599,9 +599,12 @@ class Collection(object):
                             # create nested attributes if they do not exist
                             subdocument = existing_document
                             for field in nested_field_list[:-1]:
-                                if field not in subdocument:
-                                    subdocument[field] = {}
-                                subdocument = subdocument[field]
+                                if isinstance(subdocument, dict):
+                                    if field not in subdocument:
+                                        subdocument[field] = {}
+                                    subdocument = subdocument[field]
+                                else:
+                                    subdocument = subdocument[int(field)]
 
                             # we're pushing a list
                             push_results = []

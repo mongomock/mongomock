@@ -1246,6 +1246,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                [{'size': 'M', 'quantity': 6}, {'size': 'S', 'quantity': 1}]}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_nested_dict_in_list(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({
+            'name': 'bob',
+            'hat': [
+                {'name': 'derby',
+                 'sizes': [{'size': 'L', 'quantity': 3},
+                           {'size': 'XL', 'quantity': 4}],
+                 'colors': ['green', 'blue']},
+                {'name': 'cap',
+                 'sizes': [{'size': 'S', 'quantity': 10},
+                           {'size': 'L', 'quantity': 5}],
+                 'colors': ['blue']}]})
+        self.cmp.do.update(
+            {'name': 'bob'},
+            {'$push': {'hat.1.sizes': {'size': 'M', 'quantity': 6}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_nested_list_each(self):
         self.cmp.do.remove()
         self.cmp.do.insert({
