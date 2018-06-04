@@ -325,11 +325,11 @@ class Collection(object):
         validate_write_concern_params(**kwargs)
         return self._insert(data)
 
-    def insert_one(self, document, bypass_document_validation=False, session=None):
+    def insert_one(self, document, session=None):
         validate_is_mutable_mapping('document', document)
         return InsertOneResult(self._insert(document), acknowledged=True)
 
-    def insert_many(self, documents, ordered=True, bypass_document_validation=False, session=None):
+    def insert_many(self, documents, ordered=True, session=None):
         if not isinstance(documents, collections.Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         for document in documents:
@@ -395,21 +395,18 @@ class Collection(object):
             sub_doc = sub_doc[part]
         del sub_doc[key_parts[-1]]
 
-    def update_one(self, filter, update, upsert=False, bypass_document_validation=False,
-                   collation=None, array_filters=None, session=None):
+    def update_one(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert),
                             acknowledged=True)
 
-    def update_many(self, filter, update, upsert=False, bypass_document_validation=False,
-                    collation=None, session=None):
+    def update_many(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert,
                                          multi=True),
                             acknowledged=True)
 
-    def replace_one(self, filter, replacement, upsert=False,
-                    bypass_document_validation=False, collation=None, session=None):
+    def replace_one(self, filter, replacement, upsert=False, session=None):
         validate_ok_for_replace(replacement)
         return UpdateResult(self._update(filter, replacement, upsert=upsert),
                             acknowledged=True)
@@ -1096,11 +1093,11 @@ class Collection(object):
                          manipulate, check_keys=True, **kwargs)
             return to_save.get("_id", None)
 
-    def delete_one(self, filter, collation=None, session=None):
+    def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter), True)
 
-    def delete_many(self, filter, collation=None, session=None):
+    def delete_many(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter, multi=True), True)
 
