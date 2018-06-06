@@ -861,6 +861,32 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__ensure_uniq_idxs_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True)
+
+        self.db.collection.insert({"a": 1})
+        self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"a": {"b": 1}})
+
+        self.assertEqual(self.db.collection.find({}).count(), 2)
+
+    def test__ensure_sparse_uniq_idxs_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True, sparse=True)
+        self.db.collection.ensure_index([("c", 1)], unique=True, sparse=True)
+
+        self.db.collection.insert({})
+        self.db.collection.insert({})
+        self.db.collection.insert({"c": 1})
+        self.db.collection.insert({"a": 1})
+        self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"c": 1})
+
+        self.assertEqual(self.db.collection.find({}).count(), 5)
+
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.ensure_index([("value", 1)], unique=True)
 

@@ -365,7 +365,10 @@ class Collection(object):
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                find_kwargs[key] = data.get(key, None)
+                try:
+                    find_kwargs[key] = get_value_by_dot(data, key)
+                except KeyError:
+                    find_kwargs[key] = None
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 0 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
