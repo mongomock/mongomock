@@ -95,20 +95,41 @@ def validate_write_concern_params(**params):
 def get_value_by_dot(doc, key):
     """Get dictionary value using dotted key"""
     result = doc
-    for i in key.split('.'):
-        result = result[i]
+    for key_item in key.split('.'):
+        if isinstance(result, dict):
+            result = result[key_item]
+
+        elif isinstance(result, (list, tuple)):
+            try:
+                result = result[int(key_item)]
+            except (ValueError, IndexError):
+                raise KeyError()
+
+        else:
+            raise KeyError()
+
     return result
 
 
 def set_value_by_dot(doc, key, value):
     """Set dictionary value using dotted key"""
-    result = doc
-    keys = key.split('.')
-    for i in keys[:-1]:
-        if i not in result:
-            result[i] = {}
-        result = result[i]
-    result[keys[-1]] = value
+    try:
+        parent_key, child_key = key.rsplit('.', 1)
+        parent = get_value_by_dot(doc, parent_key)
+    except ValueError:
+        child_key = key
+        parent = doc
+
+    if isinstance(parent, dict):
+        parent[child_key] = value
+    elif isinstance(parent, (list, tuple)):
+        try:
+            parent[int(child_key)] = value
+        except (ValueError, IndexError):
+            raise KeyError()
+    else:
+        raise KeyError()
+
     return doc
 
 
@@ -344,7 +365,10 @@ class Collection(object):
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                find_kwargs[key] = data.get(key, None)
+                try:
+                    find_kwargs[key] = get_value_by_dot(data, key)
+                except KeyError:
+                    find_kwargs[key] = None
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 0 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
@@ -354,22 +378,6 @@ class Collection(object):
 
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in iteritems(d)}
-
-    def _has_key(self, doc, key):
-        key_parts = key.split('.')
-        sub_doc = doc
-        for part in key_parts:
-            if part not in sub_doc:
-                return False
-            sub_doc = sub_doc[part]
-        return True
-
-    def _remove_key(self, doc, key):
-        key_parts = key.split('.')
-        sub_doc = doc
-        for part in key_parts[:-1]:
-            sub_doc = sub_doc[part]
-        del sub_doc[key_parts[-1]]
 
     def update_one(self, filter, update, upsert=False):
         validate_ok_for_update(update)
