@@ -325,11 +325,11 @@ class Collection(object):
         validate_write_concern_params(**kwargs)
         return self._insert(data)
 
-    def insert_one(self, document):
+    def insert_one(self, document, session=None):
         validate_is_mutable_mapping('document', document)
         return InsertOneResult(self._insert(document), acknowledged=True)
 
-    def insert_many(self, documents, ordered=True):
+    def insert_many(self, documents, ordered=True, session=None):
         if not isinstance(documents, collections.Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         for document in documents:
@@ -379,18 +379,34 @@ class Collection(object):
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in iteritems(d)}
 
-    def update_one(self, filter, update, upsert=False):
+    def _has_key(self, doc, key):
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts:
+            if part not in sub_doc:
+                return False
+            sub_doc = sub_doc[part]
+        return True
+
+    def _remove_key(self, doc, key):
+        key_parts = key.split('.')
+        sub_doc = doc
+        for part in key_parts[:-1]:
+            sub_doc = sub_doc[part]
+        del sub_doc[key_parts[-1]]
+
+    def update_one(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert),
                             acknowledged=True)
 
-    def update_many(self, filter, update, upsert=False):
+    def update_many(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert,
                                          multi=True),
                             acknowledged=True)
 
-    def replace_one(self, filter, replacement, upsert=False):
+    def replace_one(self, filter, replacement, upsert=False, session=None):
         validate_ok_for_replace(replacement)
         return UpdateResult(self._update(filter, replacement, upsert=upsert),
                             acknowledged=True)
@@ -733,7 +749,7 @@ class Collection(object):
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True, collation=None):
+             batch_size=0, manipulate=True, collation=None, session=None):
         spec = filter
         if spec is None:
             spec = {}
@@ -1077,11 +1093,11 @@ class Collection(object):
                          manipulate, check_keys=True, **kwargs)
             return to_save.get("_id", None)
 
-    def delete_one(self, filter):
+    def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter), True)
 
-    def delete_many(self, filter):
+    def delete_many(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter, multi=True), True)
 
@@ -1310,7 +1326,7 @@ class Collection(object):
         ret_array = ret_array_copy
         return ret_array
 
-    def aggregate(self, pipeline, **kwargs):
+    def aggregate(self, pipeline, session=None, **kwargs):
         pipeline_operators = [
             '$project',
             '$match',
