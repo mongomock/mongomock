@@ -1618,7 +1618,7 @@ class Collection(object):
                     _id = stage['$group']['_id']
                     if _id:
                         key_getter = functools.partial(_parse_expression, _id)
-                        out_collection = sorted(out_collection, key=key_getter)
+                        out_collection = sorted(out_collection, key=lambda x: str(key_getter(x)))
                         grouped = itertools.groupby(out_collection, key_getter)
                     else:
                         grouped = [(None, out_collection)]
