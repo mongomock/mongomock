@@ -23,6 +23,7 @@ class Foreach(object):
         self.___compare = compare
         self.___ignore_order = ignore_order
         self.___decorators = list(method_result_decorators)
+        self.___sort_by = None
 
     def __getattr__(self, method_name):
         return ForeachMethod(
@@ -30,7 +31,12 @@ class Foreach(object):
             self.___compare,
             self.___ignore_order,
             method_name,
-            self.___decorators)
+            self.___decorators,
+            self.___sort_by)
+
+    def sort_by(self, fun):
+        self.___sort_by = fun
+        return self
 
     def __call__(self, *decorators):
         return Foreach(
@@ -42,12 +48,13 @@ class Foreach(object):
 
 class ForeachMethod(object):
 
-    def __init__(self, objs, compare, ignore_order, method_name, decorators):
+    def __init__(self, objs, compare, ignore_order, method_name, decorators, sort_by):
         self.___objs = objs
         self.___compare = compare
         self.___ignore_order = ignore_order
         self.___method_name = method_name
         self.___decorators = decorators
+        self.___sort_by = sort_by
 
     def __call__(self, *args, **kwargs):
         results = dict(
@@ -59,7 +66,7 @@ class ForeachMethod(object):
             for name, obj in self.___objs.items()
         )
         if self.___compare:
-            _assert_no_diff(results, ignore_order=self.___ignore_order)
+            _assert_no_diff(results, ignore_order=self.___ignore_order, sort_by=self.___sort_by)
         return results
 
     def ___apply_decorators(self, obj):
@@ -68,9 +75,13 @@ class ForeachMethod(object):
         return obj
 
 
-def _assert_no_diff(results, ignore_order):
+def _assert_no_diff(results, ignore_order, sort_by):
     if _result_is_cursor(results) or _result_is_command_cursor(results):
-        value_processor = functools.partial(_expand_cursor, sort=ignore_order)
+        # If we were given a sort function, use that.
+        if sort_by is not None:
+            value_processor = functools.partial(_expand_cursor, sort=ignore_order, by=sort_by)
+        else:
+            value_processor = functools.partial(_expand_cursor, sort=ignore_order)
     else:
         assert not ignore_order
         value_processor = None
@@ -94,11 +105,14 @@ def _result_is_command_cursor(results):
                for result in results.values())
 
 
-def _expand_cursor(cursor, sort):
+def by_id(document):
+    return str(document.get('_id', str(document)))
+
+
+def _expand_cursor(cursor, sort, by=by_id):
     returned = [result.copy() for result in cursor]
     if sort:
-        returned.sort(
-            key=lambda document: str(document.get('_id', str(document))))
+        returned.sort(key=by)
     for result in returned:
         result.pop("_id", None)
     return returned
