@@ -362,19 +362,28 @@ class Collection(object):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+        with lock:
+            self._documents[object_id] = self._internalize_dict(data)
+        try:
+            self._ensure_uniques(data)
+        except DuplicateKeyError:
+            # Rollback
+            del self._documents[object_id]
+            raise
+        return data['_id']
+
+    def _ensure_uniques(self, new_data):
+        # Note we consider new_data is already inserted in db
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
                 try:
-                    find_kwargs[key] = get_value_by_dot(data, key)
+                    find_kwargs[key] = get_value_by_dot(new_data, key)
                 except KeyError:
                     find_kwargs[key] = None
             answer_count = len(list(self._iter_documents(find_kwargs)))
-            if answer_count > 0 and not (is_sparse and find_kwargs[key] is None):
+            if answer_count > 1 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
-        with lock:
-            self._documents[object_id] = self._internalize_dict(data)
-        return data['_id']
 
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in iteritems(d)}
@@ -448,6 +457,7 @@ class Collection(object):
                 existing_document = to_insert
                 was_insert = True
             else:
+                original_document_snapshot = copy.deepcopy(existing_document)
                 updated_existing = True
             num_updated += 1
             first = True
@@ -671,8 +681,19 @@ class Collection(object):
                 existing_document.clear()
                 if _id:
                     existing_document['_id'] = _id
+
             if was_insert:
                 upserted_id = self._insert(existing_document)
+            else:
+                # Document has been modified in-place, last thing is to make sure it
+                # still respect the unique indexes and if not to revert modifications
+                try:
+                    self._ensure_uniques(existing_document)
+                except DuplicateKeyError:
+                    # Rollback
+                    self._documents[original_document_snapshot['_id']] = original_document_snapshot
+                    raise
+
             if not multi:
                 break
 

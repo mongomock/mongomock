@@ -940,6 +940,24 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.update({'_id': 2}, {'$set': {'value': 1}}, upsert=True)
 
+    def test_unique_index_with_update(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.save({'_id': 1, 'value': 1})
+        self.db.collection.save({'_id': 2, 'value': 2})
+
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'value': 1}, {'value': 2})
+
+    def test_unique_index_with_update_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True)
+
+        self.db.collection.save({'_id': 1, 'a': {'b': 1}})
+        self.db.collection.save({'_id': 2, 'a': {'b': 2}})
+
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'_id': 1}, {'$set': {'a.b': 2}})
+
     def test_sparse_unique_index_dup(self):
         self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
 
