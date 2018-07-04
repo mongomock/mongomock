@@ -14,7 +14,10 @@ try:
     from pymongo.errors import BulkWriteError
 except ImportError:
     class BulkWriteError(PyMongoError):
-        pass
+
+        def __str__(self):
+            return 'batch op errors occurred'
+
 
 try:
     from pymongo.errors import OperationFailure

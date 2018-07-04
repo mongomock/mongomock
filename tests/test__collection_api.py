@@ -1652,6 +1652,18 @@ class CollectionAPITest(TestCase):
         self.assertEqual(str(cm.exception), 'batch op errors occurred')
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_many_bulk_write_error_details(self):
+        collection = self.db.collection
+        with self.assertRaises(mongomock.BulkWriteError) as cm:
+            collection.insert_many([
+                {'_id': 1},
+                {'_id': 1}
+            ])
+        self.assertEqual(65, cm.exception.code)
+        write_errors = cm.exception.details['writeErrors']
+        self.assertEqual([11000], [error.get('code') for error in write_errors])
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test_insert_bson_validation(self):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
