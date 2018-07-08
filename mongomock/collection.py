@@ -334,14 +334,25 @@ class Collection(object):
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        try:
-            return InsertManyResult(self._insert(documents), acknowledged=True)
-        except DuplicateKeyError:
-            raise BulkWriteError('batch op errors occurred')
+        return InsertManyResult(self._insert(documents), acknowledged=True)
 
     def _insert(self, data):
         if isinstance(data, list) or isinstance(data, types.GeneratorType):
-            return [self._insert(item) for item in data]
+            results = []
+            for index, item in enumerate(data):
+                try:
+                    results.append(self._insert(item))
+                except DuplicateKeyError:
+                    raise BulkWriteError({
+                        'writeErrors': [{
+                            'index': index,
+                            'code': 11000,
+                            'errmsg': 'E11000 duplicate key error',
+                            'op': item,
+                        }],
+                        'nInserted': index,
+                    })
+            return results
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
