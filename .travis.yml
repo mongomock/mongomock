@@ -6,12 +6,14 @@ python:
 env:
   - TOX_ENV=py27-pymongo
   - TOX_ENV=py27-pyexecjs
-  - TOX_ENV=py33-pymongo
-  - TOX_ENV=py33-pyexecjs
   - TOX_ENV=py34-pymongo
   - TOX_ENV=py34-pyexecjs
   - TOX_ENV=py35-pymongo
   - TOX_ENV=py35-pyexecjs
+  - TOX_ENV=py36-pymongo
+  - TOX_ENV=py36-pyexecjs
+  - TOX_ENV=py37-pymongo
+  - TOX_ENV=py37-pyexecjs
   - TOX_ENV=pypy-pymongo
   - TOX_ENV=pypy-pyexecjs
   - TOX_ENV=pep8
