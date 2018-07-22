@@ -15,7 +15,7 @@ except ImportError:
 try:
     from bson import RE_TYPE
 except ImportError:
-    if sys.version_info[0] > 2 and sys.version_info[1] > 6:
+    if sys.version_info > (3, 7):
         # for python3.7+
         RE_TYPE = re.Pattern
     else:
