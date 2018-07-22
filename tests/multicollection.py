@@ -1,7 +1,7 @@
 from .diff import diff
 import copy
 import functools
-import re
+from mongomock.helpers import RE_TYPE
 
 
 class MultiCollection(object):
@@ -131,7 +131,7 @@ def _format_diff_message(a_name, b_name, diff):
 
 def _deepcopy(x):
     """Deepcopy, but ignore regex objects..."""
-    if isinstance(x, re._pattern_type):
+    if isinstance(x, RE_TYPE):
         return x
     if isinstance(x, list) or isinstance(x, tuple):
         return type(x)(_deepcopy(y) for y in x)
