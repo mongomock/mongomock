@@ -24,11 +24,29 @@ matrix:
           python: pypy-5.4.1
         - env: TOX_ENV=pypy-pyexecjs
           python: pypy-5.4.1
+        - env: TOX_ENV=py36-pymongo
+          python: 3.6
+        - env: TOX_ENV=py36-pyexecjs
+          python: 3.6
+        - env: TOX_ENV=py37-pymongo
+          python: 3.7
+          dist: xenial
+        - env: TOX_ENV=py37-pyexecjs
+          python: 3.7
+          dist: xenial
     exclude:
         - python: 3.5
           env: TOX_ENV=pypy-pymongo
         - python: 3.5
           env: TOX_ENV=pypy-pyexecjs
+        - python: 3.5
+          env: TOX_ENV=py36-pymongo
+        - python: 3.5
+          env: TOX_ENV=py36-pyexecjs
+        - python: 3.5
+          env: TOX_ENV=py37-pymongo
+        - python: 3.5
+          env: TOX_ENV=py37-pyexecjs
 services:
   - mongodb
 script:
