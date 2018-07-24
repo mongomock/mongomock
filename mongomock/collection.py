@@ -1578,9 +1578,11 @@ class Collection(object):
                 field, fallback = values
                 try:
                     out_value = _parse_expression(field, doc_dict)
+                    if out_value is not None:
+                        return out_value
                 except KeyError:
-                    return fallback
-                return out_value if out_value is not None else fallback
+                    pass
+                return _parse_expression(fallback, doc_dict)
             else:
                 raise NotImplementedError(
                     "Although '%s' is a valid date operator for the "
