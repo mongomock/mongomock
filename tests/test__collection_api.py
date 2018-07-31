@@ -1407,6 +1407,51 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test__aggregate_lookup(self):
+        self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
+        self.db.b.insert_many([
+            {'_id': 2, 'should': 'include'},
+            {'_id': 3, 'should': 'skip'},
+            {'_id': 4, 'should': 'include'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': 'arr',
+                'foreignField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'arr': [2, 4],
+            'b': [
+                {'_id': 2, 'should': 'include'},
+                {'_id': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_lookup_reverse(self):
+        self.db.a.insert_many([
+            {'_id': 1},
+            {'_id': 2},
+            {'_id': 3}
+        ])
+        self.db.b.insert_one({'_id': 4, 'arr': [1, 3]})
+        actual = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': '_id',
+                'foreignField': 'arr',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([
+            {'_id': 1, 'b': [{'_id': 4, 'arr': [1, 3]}]},
+            {'_id': 2, 'b': []},
+            {'_id': 3, 'b': [{'_id': 4, 'arr': [1, 3]}]}
+        ], list(actual))
+
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
