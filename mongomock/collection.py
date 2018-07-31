@@ -1649,6 +1649,18 @@ class Collection(object):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection
                                       if filter_applies(v, doc)]
+                elif k == '$lookup':
+                    foreign_name = stage['$lookup']['from']
+                    local_field = stage['$lookup']['localField']
+                    foreign_field = stage['$lookup']['foreignField']
+                    local_name = stage['$lookup']['as']
+                    foreign_collection = self.database.get_collection(foreign_name)
+                    for doc in out_collection:
+                        query = doc[local_field]
+                        if type(doc[local_field]) is list:
+                            query = {'$in': query}
+                        matches = foreign_collection.find({foreign_field: query})
+                        doc[local_name] = [foreign_doc for foreign_doc in matches]
                 elif k == '$group':
                     grouped_collection = []
                     _id = stage['$group']['_id']
