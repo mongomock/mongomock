@@ -1532,6 +1532,45 @@ class CollectionAPITest(TestCase):
         self.assertEqual(expect, new_actual)
         self.assertEqual(expect, list(old_actual))
 
+    def test__aggregate_project_include_in_exclusion(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$match': {'_id': 1}},
+                {'$project': {
+                    'a': False,
+                    'b': True
+                }}
+            ])
+        self.assertIn("Bad projection specification", str(err.exception))
+
+    def test__aggregate_project_exclude_in_inclusion(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$match': {'_id': 1}},
+                {'$project': {
+                    'a': True,
+                    'b': False
+                }}
+            ])
+        self.assertIn("Bad projection specification", str(err.exception))
+
+    def test__aggregate_project_id_can_always_be_excluded(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': {
+                'a': True,
+                'b': True,
+                '_id': False
+            }}
+        ])
+        self.assertEqual(
+            [{'a': 2, 'b': 3}],
+            list(actual)
+        )
+
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
