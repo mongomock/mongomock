@@ -1271,8 +1271,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__rename(self):
         input_ = {'_id': 1, 'foo': 'bar'}
-        expected = {'_id': 1, 'bar': 'bar'}
-        insert_result = self.cmp.do.insert_one(input_)
+        self.cmp.do.insert_one(input_)
 
         query = {'_id': 1}
         update = {'$rename': {'foo': 'bar'}}
