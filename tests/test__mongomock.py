@@ -1275,7 +1275,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
         query = {'_id': 1}
         update = {'$rename': {'foo': 'bar'}}
-        update_result = self.cmp.do.update_one(query, update=update)
+        self.cmp.do.update_one(query, update=update)
 
         self.cmp.compare.find()
 
