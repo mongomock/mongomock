@@ -1269,6 +1269,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             except Exception as e:
                 assert isinstance(e, mongomock.OperationFailure)
 
+    def test__rename(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        expected = {'_id': 1, 'bar': 'bar'}
+        insert_result = self.cmp.do.insert_one(input_)
+
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'bar'}}
+        update_result = self.cmp.do.update_one(query, update=update)
+
+        self.cmp.compare.find()
+
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
