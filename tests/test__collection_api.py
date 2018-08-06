@@ -476,6 +476,16 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, expected)
 
+    def test__rename_unsupported(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        insert_result = self.db.collection.insert_one(input_)
+        self.assert_document_stored(insert_result.inserted_id, input_)
+
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'f.o.o.'}}
+        self.assertRaises(NotImplementedError,
+                          self.db.collection.update_one, query, update=update)
+
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(

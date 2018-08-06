@@ -418,6 +418,8 @@ class Collection(object):
 
                 elif k == '$rename':
                     for src, dst in iteritems(v):
+                        if '.' in src or '.' in dst:
+                            raise NotImplementedError('renaming with dots not supported yet')
                         if self._has_key(existing_document, src):
                             existing_document[dst] = existing_document.pop(src)
 
