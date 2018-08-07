@@ -1788,9 +1788,9 @@ class Collection(object):
     def rename(self, new_name, **kwargs):
         self.database.rename_collection(self.name, new_name, **kwargs)
 
-    def bulk_write(self, operations, ordered=True, bypass_document_validation=False, session=None):
+    def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
         bulk = BulkOperationBuilder(self)
-        for operation in operations:
+        for operation in requests:
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)
 
