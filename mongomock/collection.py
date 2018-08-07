@@ -1757,7 +1757,8 @@ class Collection(object):
                     filter_list = []
                     method = None
                     include_id = v.get('_id')
-
+                    if not v:
+                        method = 'include' if include_id else 'exclude'
                     for field, value in iteritems(v):
                         if field == '_id':
                             continue
@@ -1767,7 +1768,7 @@ class Collection(object):
                                 raise ValueError(
                                     "Bad projection specification, cannot include fields "
                                     "or add computed fields during an exclusion projection: %s" % v)
-                        elif method == 'include' and not value and field != '_id':
+                        elif method == 'include' and not value:
                             raise ValueError(
                                 "Bad projection specification, cannot exclude fields "
                                 "other than '_id' in an inclusion projection: %s" % v)
