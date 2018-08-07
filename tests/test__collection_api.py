@@ -1452,6 +1452,72 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'b': [{'_id': 4, 'arr': [1, 3]}]}
         ], list(actual))
 
+    def test__aggregate_lookup_not_implemented_operators(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'let': '_id'
+                }}
+            ])
+        self.assertIn(
+            "Although 'let' is a valid lookup operator for the",
+            str(err.exception))
+
+    def test__aggregate_lookup_missing_operator(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'localField': '_id',
+                    'foreignField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Must specify 'from' field for a $lookup",
+            str(err.exception))
+
+    def test__aggregate_lookup_operator_not_string(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'from': 'b',
+                    'localField': 1,
+                    'foreignField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            'Arguments to $lookup must be strings',
+            str(err.exception))
+
+        def test__aggregate_lookup_dot_in_local_field(self):
+            with self.assertRaises(NotImplementedError) as err:
+                self.db.a.aggregate([
+                    {'$lookup': {
+                        'from': 'b',
+                        'localField': 'should.fail',
+                        'foreignField': 'arr',
+                        'as': 'b'
+                    }}
+                ])
+            self.assertIn(
+                "Although '.' is valid in the 'localField' and 'as' parameters",
+                str(err.exception))
+
+    def test__aggregate_lookup_dot_in_as(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'from': 'b',
+                    'localField': '_id',
+                    'foreignField': 'arr',
+                    'as': 'should.fail'
+                }}
+            ])
+        self.assertIn(
+            "Although '.' is valid in the 'localField' and 'as' parameters ",
+            str(err.exception))
+
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([

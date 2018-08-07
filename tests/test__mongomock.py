@@ -1817,6 +1817,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate27(self):
+        # test $lookup stage
+        pipeline = [
+            {'$lookup': {
+                'from': self.collection_name,
+                'localField': 'a',
+                'foreignField': 'b',
+                'as': 'lookup'
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
