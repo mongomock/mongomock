@@ -1757,18 +1757,10 @@ class Collection(object):
                     filter_list = []
                     method = None
                     include_id = v.get('_id')
-                    if not v:
-                        method = 'include' if include_id else 'exclude'
                     for field, value in iteritems(v):
-                        if field == '_id':
-                            continue
-                        if method is None:
+                        if method is None and (field != '_id' or value):
                             method = 'include' if value else 'exclude'
-                            if method == 'exclude' and include_id:
-                                raise ValueError(
-                                    "Bad projection specification, cannot include fields "
-                                    "or add computed fields during an exclusion projection: %s" % v)
-                        elif method == 'include' and not value:
+                        elif method == 'include' and not value and field != '_id':
                             raise ValueError(
                                 "Bad projection specification, cannot exclude fields "
                                 "other than '_id' in an inclusion projection: %s" % v)
@@ -1776,11 +1768,10 @@ class Collection(object):
                             raise ValueError(
                                 "Bad projection specification, cannot include fields "
                                 "or add computed fields during an exclusion projection: %s" % v)
-                        filter_list.append(field)
-                        if value:
-                            out_collection = _extend_collection(out_collection, field, value)
-                    if (method == 'include' and include_id is not False) or \
-                            (method == 'exclude' and include_id is False):
+                        out_collection = _extend_collection(out_collection, field, value)
+                        if field != '_id':
+                            filter_list.append(field)
+                    if (method == 'include') == (include_id is not False):
                         filter_list.append('_id')
                     out_collection = [
                         {

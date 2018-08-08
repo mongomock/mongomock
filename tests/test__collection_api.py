@@ -1411,14 +1411,10 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$size': '$arr'
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$size': '$arr'})
+            ])}
         ])
         self.assertEqual([{'a': 2}], list(actual))
 
@@ -1427,15 +1423,10 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 2})
         self.db.collection.insert_one({'_id': 3, 'arr': None})
         actual = self.db.collection.aggregate([
-            {},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$size': {'$ifNull': ['$arr', []]}
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$size': {'$ifNull': ['$arr', []]}})
+            ])}
         ])
         self.assertEqual([{'a': 2}, {'a': 0}, {'a': 0}], list(actual))
 
@@ -1443,28 +1434,22 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
-                    'b': {'$ifNull': ['$elem_b', '<missing_b>']}
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$ifNull': ['$elem_a', '<missing_a>']}),
+                ('b', {'$ifNull': ['$elem_b', '<missing_b>']})
+            ])}
         ])
         self.assertEqual([{'a': '<present_a>', 'b': '<missing_b>'}], list(actual))
 
-    def test__aggregate_project_array_element_at(self):
+    def test__aggregate_project_array_elem_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$arrayElemAt': ['$arr', 1]
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$arrayElemAt': ['$arr', 1]})
+            ])}
         ])
         self.assertEqual([{'a': 3}], list(actual))
 
@@ -1472,57 +1457,43 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_id': '$_id',
-                    'a': {
-                        '$arrayElemAt': ['$arr', 1]
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_id', '$_id')
+            ])}
         ])
-        self.assertEqual([{'a': 3, 'rename_id': 1}],
-                         list(actual))
+        self.assertEqual([{'rename_id': 1}], list(actual))
 
     def test__aggregate_project_rename_dot_fields(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_dot': '$arr.a'
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_dot', '$arr.a')
+            ])}
         ])
-        self.assertEqual([{'rename_dot': 2}],
-                         list(actual))
+        self.assertEqual([{'rename_dot': 2}], list(actual))
 
     def test__aggregate_project_missing_fields(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_dot': '$arr.c'
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_dot', '$arr.c')
+            ])}
         ])
-        self.assertEqual([{}],
-                         list(actual))
+        self.assertEqual([{}], list(actual))
 
     def test__aggregate_project_out(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
         old_actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    'rename_dot': '$arr.a'
-                }
-            },
+            {'$project': OrderedDict([
+                ('rename_dot', '$arr.a')
+            ])},
             {'$out': 'new_collection'}
         ])
         new_collection = self.db.get_collection('new_collection')
@@ -1536,7 +1507,6 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         with self.assertRaises(ValueError) as err:
             self.db.collection.aggregate([
-                {'$match': {'_id': 1}},
                 {'$project': OrderedDict([
                     ('a', False),
                     ('b', True)
@@ -1548,7 +1518,6 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         with self.assertRaises(ValueError) as err:
             self.db.collection.aggregate([
-                {'$match': {'_id': 1}},
                 {'$project': OrderedDict([
                     ('a', True),
                     ('b', False)
@@ -1559,12 +1528,25 @@ class CollectionAPITest(TestCase):
     def test__aggregate_project_id_can_always_be_excluded(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         actual = self.db.collection.aggregate([
-            {'$match': {'_id': 1}},
             {'$project': OrderedDict([
                 ('a', True),
                 ('b', True),
                 ('_id', False)
             ])}
+        ])
+        self.assertEqual([{'a': 2, 'b': 3}], list(actual))
+
+    def test__aggregate_project_inclusion_with_only_id(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': True}}
+        ])
+        self.assertEqual([{'_id': 1}], list(actual))
+
+    def test__aggregate_project_exclusion_with_only_id(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': False}}
         ])
         self.assertEqual([{'a': 2, 'b': 3}], list(actual))
 
