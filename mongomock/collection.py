@@ -419,7 +419,10 @@ class Collection(object):
                 elif k == '$rename':
                     for src, dst in iteritems(v):
                         if '.' in src or '.' in dst:
-                            raise NotImplementedError('renaming with dots not supported yet')
+                            raise NotImplementedError(
+                                'Using the $rename operator with dots is a valid MongoDB '
+                                'operation, but it is not yet supported by mongomock'
+                            )
                         if self._has_key(existing_document, src):
                             existing_document[dst] = existing_document.pop(src)
 
