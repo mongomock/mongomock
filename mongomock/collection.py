@@ -483,6 +483,16 @@ class Collection(object):
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, updater, subdocument)
 
+                elif k == '$rename':
+                    for src, dst in iteritems(v):
+                        if '.' in src or '.' in dst:
+                            raise NotImplementedError(
+                                'Using the $rename operator with dots is a valid MongoDB '
+                                'operation, but it is not yet supported by mongomock'
+                            )
+                        if self._has_key(existing_document, src):
+                            existing_document[dst] = existing_document.pop(src)
+
                 elif k == '$setOnInsert':
                     if not was_insert:
                         continue
