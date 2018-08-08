@@ -1789,6 +1789,18 @@ class Collection(object):
         self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
+        if not ordered:
+            raise NotImplementedError(
+                'Unordered mode is a valid MongoDB operation; however Mongomock'
+                ' does not support it yet.')
+        if bypass_document_validation:
+            raise NotImplementedError(
+                'Skipping document validation is a valid MongoDB operation;'
+                ' however Mongomock does not support it yet.')
+        if session:
+            raise NotImplementedError(
+                'Sessions are valid in MongoDB 3.6 and newer; however Mongomock'
+                ' does not support them yet.')
         bulk = BulkOperationBuilder(self)
         for operation in requests:
             operation._add_to_bulk(bulk)
