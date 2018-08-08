@@ -52,7 +52,8 @@ class Database(object):
                        write_concern=None):
         collection = self._collections.get(name)
         if collection is None:
-            collection = self._collections[name] = Collection(self, name)
+            collection = self._collections[name] = \
+                Collection(self, name, write_concern=write_concern)
         return collection
 
     def drop_collection(self, name_or_collection, session=None):

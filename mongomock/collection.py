@@ -378,12 +378,13 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, db, name):
+    def __init__(self, database, name, create=False, write_concern=None):
         self.name = name
-        self.full_name = "{0}.{1}".format(db.name, name)
-        self.database = db
+        self.full_name = "{0}.{1}".format(database.name, name)
+        self.database = database
         self._documents = OrderedDict()
-        self._force_created = False
+        self._force_created = create
+        self._write_concern = write_concern or WriteConcern()
         self._uniques = []
 
     def _is_created(self):
@@ -397,6 +398,10 @@ class Collection(object):
 
     def __getattr__(self, name):
         return self.__getitem__(name)
+
+    @property
+    def write_concern(self):
+        return self._write_concern
 
     def initialize_unordered_bulk_op(self):
         return BulkOperationBuilder(self, ordered=False)
@@ -2120,8 +2125,17 @@ class Collection(object):
                             "for a complete list of valid operators." % k)
         return CommandCursor(out_collection)
 
-    def with_options(
-            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+    def with_options(self, **kwargs):
+        keys = {'codec_options', 'read_preference', 'write_concern', 'read_concern'}
+        forbidden_kwargs = set(kwargs.keys()) - keys
+        if forbidden_kwargs:
+            raise TypeError(
+                "with_options() got an unexpected keyword argument '%s'" % forbidden_kwargs.pop())
+        for key in keys:
+            if kwargs.get(key) is not None:
+                raise NotImplementedError(
+                    "%s is a valid parameter for with_options but it is currently not implemented "
+                    "in Mongomock" % key)
         return self
 
     def rename(self, new_name, session=None, **kwargs):

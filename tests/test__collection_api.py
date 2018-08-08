@@ -10,6 +10,7 @@ from unittest import TestCase, skipIf
 import warnings
 
 import mongomock
+from mongomock.write_concern import WriteConcern
 
 try:
     from bson.errors import InvalidDocument
@@ -1230,6 +1231,14 @@ class CollectionAPITest(TestCase):
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
 
+    def test__with_options_wrong_kwarg(self):
+        self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
+
+    def test__with_options_not_implemented(self):
+        self.assertRaises(
+            NotImplementedError,
+            self.db.collection.with_options, write_concern=WriteConcern(j=True))
+
     def test__update_current_date(self):
         for type_specification in [True, {'$type': 'date'}]:
             self.db.collection.update_one(
@@ -2409,3 +2418,26 @@ class CollectionAPITest(TestCase):
         for option in options:
             with self.assertRaises(mongomock.OperationFailure, msg=option):
                 self.db.collection.aggregate([{'$bucket': option}])
+
+    def test__write_concern(self):
+        self.assertEqual({}, self.db.collection.write_concern.document)
+        self.assertTrue(self.db.collection.write_concern.is_server_default)
+        self.assertTrue(self.db.collection.write_concern.acknowledged)
+
+        collection = self.db.get_collection('a', write_concern=WriteConcern(
+            w=2, wtimeout=100, j=True, fsync=False))
+        self.assertEqual({
+            'fsync': False,
+            'j': True,
+            'w': 2,
+            'wtimeout': 100,
+        }, collection.write_concern.document)
+
+        # http://api.mongodb.com/python/current/api/pymongo/write_concern.html#pymongo.write_concern.WriteConcern.document
+        collection.write_concern.document.pop('wtimeout')
+        self.assertEqual({
+            'fsync': False,
+            'j': True,
+            'w': 2,
+            'wtimeout': 100,
+        }, collection.write_concern.document, msg='Write concern is immutable')
