@@ -1764,15 +1764,32 @@ class Collection(object):
                                 unwound_collection[-1], v[1:], field_item)
                     out_collection = unwound_collection
                 elif k == '$project':
-                    filter_list = ['_id']
+                    filter_list = []
+                    method = None
+                    include_id = v.get('_id')
                     for field, value in iteritems(v):
-                        if field == '_id' and not value:
-                            filter_list.remove('_id')
-                        elif value:
+                        if method is None and (field != '_id' or value):
+                            method = 'include' if value else 'exclude'
+                        elif method == 'include' and not value and field != '_id':
+                            raise ValueError(
+                                "Bad projection specification, cannot exclude fields "
+                                "other than '_id' in an inclusion projection: %s" % v)
+                        elif method == 'exclude' and value:
+                            raise ValueError(
+                                "Bad projection specification, cannot include fields "
+                                "or add computed fields during an exclusion projection: %s" % v)
+                        out_collection = _extend_collection(out_collection, field, value)
+                        if field != '_id':
                             filter_list.append(field)
-                            out_collection = _extend_collection(out_collection, field, value)
-                    out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
-                                      for x in out_collection]
+                    if (method == 'include') == (include_id is not False):
+                        filter_list.append('_id')
+                    out_collection = [
+                        {
+                            k: v for (k, v) in x.items()
+                            if (method == 'include') == (k in filter_list)
+                        }
+                        for x in out_collection
+                    ]
                 elif k == '$out':
                     # TODO(MetrodataTeam): should leave the origin collection unchanged
                     collection = self.database.get_collection(v)

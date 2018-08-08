@@ -1748,15 +1748,21 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate15(self):
+    def test__aggregate_project_include_in_inclusion(self):
         pipeline = [
-            {'$project': {'_id': 1, 'a': 1}}
+            {'$project': {'a': 1, 'b': 1}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate16(self):
+    def test__aggregate_project_exclude_in_exclusion(self):
         pipeline = [
-            {'$project': {'_id': 0, 'a': 1}}
+            {'$project': {'a': 0, 'b': 0}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_project_exclude_id_in_inclusion(self):
+        pipeline = [
+            {'$project': {'a': 1, '_id': 0}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
