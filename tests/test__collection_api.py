@@ -1910,6 +1910,58 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find(filters)
         self.assertEqual([doc["_id"] for doc in results], [7, 8])
 
+    def test__filter_objects_comparison(self):
+        collection = self.db.collection
+        query = {'counts': {'$gt': {'circles': 1}}}
+        collection.insert_many([
+            # Document kept: circles' value 3 is greater than 1.
+            {'_id': 1, 'counts': {'circles': 3}},
+            # Document kept: the first key, squares, is greater than circles.
+            {'_id': 2, 'counts': {'squares': 0}},
+            # Document dropped: the first key, arrows, is smaller than circles.
+            {'_id': 3, 'counts': {'arrows': 15}},
+            # Document dropped: the dicts are equal.
+            {'_id': 4, 'counts': {'circles': 1}},
+            # Document kept: the first item is equal, and there is an additional item.
+            {'_id': 5, 'counts': OrderedDict([
+                ('circles', 1),
+                ('arrows', 15),
+            ])},
+            # Document dropped: same as above, but order matters.
+            {'_id': 6, 'counts': OrderedDict([
+                ('arrows', 15),
+                ('circles', 1),
+            ])},
+            # Document dropped: the value is missing.
+            {'_id': 7},
+            # Document dropped: there is less items.
+            {'_id': 8, 'counts': {}},
+            # Document kept: strings are greater than numbers.
+            {'_id': 9, 'counts': {'circles': 'three'}},
+            # Document dropped: None is less than numbers.
+            {'_id': 10, 'counts': {'circles': None}},
+        ])
+        results = collection.find(query)
+        self.assertEqual({1, 2, 5, 9}, {doc['_id'] for doc in results})
+
+    def test__filter_objects_nested_comparison(self):
+        collection = self.db.collection
+        query = {'counts': {'$gt': {'circles': {'blue': 1}}}}
+        collection.insert_many([
+            # Document kept: circles' value {'blue': 3} is greater than {'blue': 1}.
+            {'_id': 1, 'counts': {'circles': {'blue': 3}}},
+            # Document kept: the first key, squares, is greater than circles.
+            {'_id': 2, 'counts': {'squares': {}}},
+            # Document dropped: the first key, arrows, is smaller than circles.
+            {'_id': 3, 'counts': {'arrows': {'blue': 2}}},
+            # Document dropped: circles' value {} is less than {'blue': 1}.
+            {'_id': 4, 'counts': {'circles': {}}},
+            # Document kept: the first value type is greater than the type of {'blue' : 1}.
+            {'_id': 5, 'counts': {'arrows': True}},
+        ])
+        results = collection.find(query)
+        self.assertEqual({1, 2, 5}, {doc['_id'] for doc in results})
+
     def test_insert_many_bulk_write_error(self):
         collection = self.db.collection
         with self.assertRaises(mongomock.BulkWriteError) as cm:
