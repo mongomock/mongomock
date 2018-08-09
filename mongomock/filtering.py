@@ -3,10 +3,15 @@ from datetime import datetime
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
 
+import numbers
 import operator
 import re
 from sentinels import NOTHING
 from six import iteritems, string_types
+try:
+    from types import NoneType
+except ImportError:
+    NoneType = type(None)
 
 COMPILED_RE_TYPE = type(re.compile('a'))
 
@@ -167,6 +172,71 @@ def _not_nothing_and(f):
     return lambda v, l: v is not NOTHING and f(v, l)
 
 
+def _compare_objects(op):
+    """Wrap an operator to also compare objects following BSON comparison.
+
+    See https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#objects
+    """
+    def _wrapped(a, b):
+        # Do not compare uncomparable types, see Type Bracketing:
+        # https://docs.mongodb.com/manual/reference/method/db.collection.find/#type-bracketing
+        return _bson_compare(op, a, b, can_compare_types=False)
+
+    return _wrapped
+
+
+def _bson_compare(op, a, b, can_compare_types=True):
+    a_type = _get_compare_type(a)
+    b_type = _get_compare_type(b)
+    if a_type != b_type:
+        return can_compare_types and op(a_type, b_type)
+
+    if isinstance(a, dict):
+        # MongoDb server compares the type before comparing the keys
+        # https://github.com/mongodb/mongo/blob/f10f214/src/mongo/bson/bsonelement.cpp#L516
+        # even though the documentation does not say anything about that.
+        a = [(_get_compare_type(v), k, v) for k, v in iteritems(a)]
+        b = [(_get_compare_type(v), k, v) for k, v in iteritems(b)]
+
+    if isinstance(a, (tuple, list)):
+        for item_a, item_b in zip(a, b):
+            if item_a != item_b:
+                return _bson_compare(op, item_a, item_b)
+        return _bson_compare(op, len(a), len(b))
+
+    return op(a, b)
+
+
+def _get_compare_type(val):
+    """Get a number representing the base type of the value used for comparison.
+
+    See https://docs.mongodb.com/manual/reference/bson-type-comparison-order/
+    also https://github.com/mongodb/mongo/blob/46b28bb/src/mongo/bson/bsontypes.h#L175
+    for canonical values.
+    """
+    if isinstance(val, NoneType):
+        return 5
+    if isinstance(val, bool):
+        return 40
+    if isinstance(val, numbers.Number):
+        return 10
+    if isinstance(val, string_types):
+        return 15
+    if isinstance(val, dict):
+        return 20
+    if isinstance(val, (tuple, list)):
+        return 25
+    if isinstance(val, ObjectId):
+        return 35
+    if isinstance(val, datetime):
+        return 45
+    if isinstance(val, re.Pattern):
+        return 50
+    raise NotImplementedError(
+        "Mongomock does not know how to sort '%s' of type '%s'" %
+        (val, type(val)))
+
+
 def _elem_match_op(doc_val, query):
     if not isinstance(doc_val, list):
         return False
@@ -216,10 +286,10 @@ def operator_eq(doc_val, search_val):
 OPERATOR_MAP = {
     '$eq': operator_eq,
     '$ne': operator.ne,
-    '$gt': _not_nothing_and(_list_expand(operator.gt)),
-    '$gte': _not_nothing_and(_list_expand(operator.ge)),
-    '$lt': _not_nothing_and(_list_expand(operator.lt)),
-    '$lte': _not_nothing_and(_list_expand(operator.le)),
+    '$gt': _not_nothing_and(_list_expand(_compare_objects(operator.gt))),
+    '$gte': _not_nothing_and(_list_expand(_compare_objects(operator.ge))),
+    '$lt': _not_nothing_and(_list_expand(_compare_objects(operator.lt))),
+    '$lte': _not_nothing_and(_list_expand(_compare_objects(operator.le))),
     '$all': _all_op,
     '$in': _in_op,
     '$nin': lambda dv, sv: not _in_op(dv, sv),

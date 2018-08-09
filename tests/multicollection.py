@@ -136,8 +136,6 @@ def _deepcopy(x):
         return x
     if isinstance(x, list) or isinstance(x, tuple):
         return type(x)(_deepcopy(y) for y in x)
-    if isinstance(x, OrderedDict):
-        return OrderedDict((_deepcopy(k), _deepcopy(v)) for k, v in x.items())
-    if isinstance(x, dict):
-        return {_deepcopy(k): _deepcopy(v) for k, v in x.items()}
+    if isinstance(x, (dict, OrderedDict)):
+        return type(x)((_deepcopy(k), _deepcopy(v)) for k, v in x.items())
     return copy.deepcopy(x)

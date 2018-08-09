@@ -270,10 +270,8 @@ def patch_datetime_awareness_in_document(value):
     # mixing tz aware and naive.
     # On top of that, MongoDB date precision is up to millisecond, where Python
     # datetime use microsecond, so we must lower the precision to mimic mongo.
-    if isinstance(value, OrderedDict):
-        return OrderedDict((k, patch_datetime_awareness_in_document(v)) for k, v in value.items())
-    if isinstance(value, dict):
-        return {k: patch_datetime_awareness_in_document(v) for k, v in value.items()}
+    if isinstance(value, (dict, OrderedDict)):
+        return type(value)((k, patch_datetime_awareness_in_document(v)) for k, v in value.items())
     elif isinstance(value, (tuple, list)):
         return [patch_datetime_awareness_in_document(item) for item in value]
     elif isinstance(value, datetime):

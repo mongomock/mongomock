@@ -607,13 +607,45 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             self.fake_collection.find({'name': {'$not': ''}}).count()
 
     def test__find_compare(self):
-        self.cmp.do.insert(dict(noise="longhorn"))
+        self.cmp.do.insert(dict(noise="longhorn", sqrd="non numeric"))
         for x in range(10):
             self.cmp.do.insert(dict(num=x, sqrd=x * x))
         self.cmp.compare_ignore_order.find({'sqrd': {'$lte': 4}})
         self.cmp.compare_ignore_order.find({'sqrd': {'$lt': 4}})
         self.cmp.compare_ignore_order.find({'sqrd': {'$gte': 64}})
         self.cmp.compare_ignore_order.find({'sqrd': {'$gte': 25, '$lte': 36}})
+
+    def test__find_compare_objects(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'counts': {'circles': 3}},
+            {'_id': 2, 'counts': {'squares': 0}},
+            {'_id': 3, 'counts': {'arrows': 15}},
+            {'_id': 4, 'counts': {'circles': 1}},
+            {'_id': 5, 'counts': OrderedDict([
+                ('circles', 1),
+                ('arrows', 15),
+            ])},
+            {'_id': 6, 'counts': OrderedDict([
+                ('arrows', 15),
+                ('circles', 1),
+            ])},
+            {'_id': 7},
+            {'_id': 8, 'counts': {}},
+            {'_id': 9, 'counts': {'circles': 'three'}},
+            {'_id': 10, 'counts': {'circles': None}},
+        ])
+        self.cmp.compare_ignore_order.find({'counts': {'$gt': {'circles': 1}}})
+
+    def test__find_compare_nested_objects(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'counts': {'circles': {'blue': 3}}},
+            {'_id': 2, 'counts': {'squares': 0}},
+            {'_id': 3, 'counts': {'arrows': {'blue': 2}}},
+            {'_id': 4, 'counts': {'circles': {}}},
+            {'_id': 5, 'counts': {'arrows': True}},
+        ])
+        self.cmp.compare_ignore_order.find(
+            {'counts': {'$gt': {'circles': {'blue': 1}}}})
 
     def test__find_sets(self):
         single = 4
