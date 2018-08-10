@@ -689,6 +689,9 @@ class Collection(object):
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
+                        if BSON:
+                            # bson validation
+                            BSON.encode(document, check_keys=True)
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
@@ -2004,6 +2007,9 @@ def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
     if isinstance(doc, dict):
+        if BSON:
+            # bson validation
+            BSON.encode({field_name: value}, check_keys=True)
         doc[field_name] = value
 
 
