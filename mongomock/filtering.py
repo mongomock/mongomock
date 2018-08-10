@@ -176,7 +176,9 @@ def _elem_match_op(doc_val, query):
 def _regex(doc_val, regex):
     if not (isinstance(doc_val, (string_types, list)) or isinstance(doc_val, RE_TYPE)):
         return False
-    return any(regex.search(item) for item in _force_list(doc_val))
+    return any(
+        regex.search(item) for item in _force_list(doc_val)
+        if isinstance(item, string_types))
 
 
 def _size_op(doc_val, search_val):
