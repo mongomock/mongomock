@@ -1572,6 +1572,17 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 2, 'b': 3}], list(actual))
 
+    def test__aggregate_project_subfield(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': {'b': 3}, 'other': 1},
+            {'_id': 2, 'a': {'c': 3}},
+            {'_id': 3, 'b': {'c': 3}},
+        ])
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a.b': 1}},
+            ])
+
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
