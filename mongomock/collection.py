@@ -1666,7 +1666,10 @@ class Collection(object):
                     _id = stage['$group']['_id']
                     if _id:
                         key_getter = functools.partial(_parse_expression, _id)
-                        out_collection = sorted(out_collection, key=key_getter)
+                        sort_key_getter = _fix_sort_key(key_getter)
+                        # Sort the collection only for the itertools.groupby.
+                        # $group does not order its output document.
+                        out_collection = sorted(out_collection, key=sort_key_getter)
                         grouped = itertools.groupby(out_collection, key_getter)
                     else:
                         grouped = [(None, out_collection)]
@@ -1847,6 +1850,16 @@ def _resolve_sort_key(key, doc):
         return 0, value
 
     return 1, value
+
+
+def _fix_sort_key(key_getter):
+    def fixed_getter(doc):
+        key = key_getter(doc)
+        # Convert dictionaries to make sorted() work in Python 3.
+        if isinstance(key, dict):
+            return [(k, v) for (k, v) in sorted(key.items())]
+        return key
+    return fixed_getter
 
 
 class Cursor(object):
