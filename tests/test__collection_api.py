@@ -2133,7 +2133,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_include_in_exclusion(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
-        with self.assertRaises(ValueError) as err:
+        with self.assertRaises(mongomock.OperationFailure) as err:
             self.db.collection.aggregate([
                 {'$project': OrderedDict([
                     ('a', False),
@@ -2144,12 +2144,20 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_exclude_in_inclusion(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
-        with self.assertRaises(ValueError) as err:
+        with self.assertRaises(mongomock.OperationFailure) as err:
             self.db.collection.aggregate([
                 {'$project': OrderedDict([
                     ('a', True),
                     ('b', False)
                 ])}
+            ])
+        self.assertIn('Bad projection specification', str(err.exception))
+
+    def test__aggregate_project_computed_field_in_exclusion(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'a': 0, 'b': '$a'}},
             ])
         self.assertIn('Bad projection specification', str(err.exception))
 
@@ -2264,6 +2272,13 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([
                 {'$project': {'a': {'$setUnion': [[2], [1, 2, 3]]}}},
             ])
+
+    def test__aggregate_project_rotate(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 1, 'b': 2, 'c': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': {'a': '$b', 'b': '$a', 'c': 1}},
+        ])
+        self.assertEqual([{'_id': 1, 'a': 2, 'b': 1, 'c': 3}], list(actual))
 
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})

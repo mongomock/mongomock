@@ -2262,6 +2262,12 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'default': 'Other',
         }}])
 
+    def test__aggregate_project_rotate(self):
+        self.cmp.do.insert_one({'_id': 1, 'a': 1, 'b': 2, 'c': 3})
+        self.cmp.compare.aggregate([
+            {'$project': {'a': '$b', 'b': '$a', 'c': 1}},
+        ])
+
     def test__aggregate_unwind_options(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
