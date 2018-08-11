@@ -1806,3 +1806,37 @@ class CollectionAPITest(TestCase):
                 '_id': 'ooo'
             }]
         self.assertEqual(expect, list(actual))
+
+    def test__aggregate_group_scalar_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'a': 2, 'b': 3, 'c': 4},
+                {'a': 2, 'b': 3, 'c': 5},
+                {'a': 1, 'b': 1, 'c': 1},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$a'}},
+        ])
+        self.assertEqual(
+            [{'_id': 1}, {'_id': 2}],
+            list(actual)
+        )
+
+    def test__aggregate_group_dict_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'a': 2, 'b': 3, 'c': 4},
+                {'a': 2, 'b': 3, 'c': 5},
+                {'a': 1, 'b': 1, 'c': 1},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': {'a': '$a', 'b': '$b'}}},
+        ])
+        self.assertEqual(
+            [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
+            list(actual)
+        )
