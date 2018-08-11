@@ -1665,6 +1665,8 @@ class Collection(object):
                     if _id:
                         key_getter = functools.partial(_parse_expression, _id)
                         sort_key_getter = _fix_sort_key(key_getter)
+                        # Sort the collection only for the itertools.groupby.
+                        # $group does not order its output document.
                         out_collection = sorted(out_collection, key=sort_key_getter)
                         grouped = itertools.groupby(out_collection, key_getter)
                     else:
