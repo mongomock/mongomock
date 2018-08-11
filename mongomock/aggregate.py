@@ -330,23 +330,16 @@ def _parse_expression(expression, doc_dict):
     return _Parser(doc_dict).parse(expression)
 
 
-def _extend_collection(out_collection, field, expression):
-    field_exists = False
-    for doc in out_collection:
-        if field in doc:
-            field_exists = True
-            break
-    if not field_exists:
-        for doc in out_collection:
-            if isinstance(expression, six.string_types) and expression.startswith('$'):
-                try:
-                    doc[field] = helpers.get_value_by_dot(doc, expression.lstrip('$'))
-                except KeyError:
-                    pass
-            else:
-                # verify expression has operator as first
-                doc[field] = _parse_expression(expression.copy(), doc)
-    return out_collection
+def _extend_collection(in_collection, out_collection, field, expression):
+    for in_doc, out_doc in zip(in_collection, out_collection):
+        if isinstance(expression, six.string_types) and expression.startswith('$'):
+            try:
+                out_doc[field] = helpers.get_value_by_dot(in_doc, expression.lstrip('$'))
+            except KeyError:
+                pass
+        else:
+            # Verify expression has operator as first.
+            out_doc[field] = _parse_expression(expression.copy(), in_doc)
 
 
 def _accumulate_group(output_fields, group_list):
@@ -607,6 +600,9 @@ def _handle_project_stage(in_collection, unused_database, options):
     filter_list = []
     method = None
     include_id = options.get('_id')
+    # Compute new values for each field, except inclusion/exclusions that are
+    # handled in one final step.
+    new_fields_collection = None
     for field, value in six.iteritems(options):
         if '.' in field:
             raise NotImplementedError(
@@ -615,26 +611,42 @@ def _handle_project_stage(in_collection, unused_database, options):
         if method is None and (field != '_id' or value):
             method = 'include' if value else 'exclude'
         elif method == 'include' and not value and field != '_id':
-            raise ValueError(
+            raise OperationFailure(
                 'Bad projection specification, cannot exclude fields '
                 "other than '_id' in an inclusion projection: %s" % options)
         elif method == 'exclude' and value:
-            raise ValueError(
+            raise OperationFailure(
                 'Bad projection specification, cannot include fields '
                 'or add computed fields during an exclusion projection: %s' % options)
-        # TODO(pascal): Do not modify input collection.
-        out_collection = _extend_collection(in_collection, field, value)
-        if field != '_id':
+        if field == '_id':
+            continue
+        if value in (0, 1, True, False):
             filter_list.append(field)
+            continue
+        if not new_fields_collection:
+            new_fields_collection = [{} for unused_doc in in_collection]
+        _extend_collection(in_collection, new_fields_collection, field, value)
     if (method == 'include') == (include_id is not False):
         filter_list.append('_id')
-    return [
+
+    if not filter_list:
+        return new_fields_collection
+
+    # Final steps: include or exclude fields and merge with
+    # newly created fields.
+    out_collection = [
         {
             k: v for (k, v) in x.items()
             if (method == 'include') == (k in filter_list)
         }
-        for x in out_collection
+        for x in in_collection
     ]
+    if new_fields_collection:
+        return [
+            dict(a, **b)
+            for a, b in zip(out_collection, new_fields_collection)
+        ]
+    return out_collection
 
 
 def _handle_out_stage(in_collection, database, options):
