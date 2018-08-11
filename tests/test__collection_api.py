@@ -1464,7 +1464,24 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': '<present_a>', 'b': '<missing_b>'}], list(actual))
 
-    def test__aggregate_project_array_elem_at(self):
+    def test__aggregate_project_if_null_expression(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'description': 'Description 1', 'title': 'Title 1'},
+            {'_id': 2, 'title': 'Title 2'},
+            {'_id': 3, 'description': None, 'title': 'Title 3'},
+        ])
+        actual = self.db.collection.aggregate([{
+            '$project': {
+                'full_description': {'$ifNull': ['$description', '$title']},
+            }
+        }])
+        self.assertEqual([
+            {'_id': 1, 'full_description': 'Description 1'},
+            {'_id': 2, 'full_description': 'Title 2'},
+            {'_id': 3, 'full_description': 'Title 3'},
+        ], list(actual))
+
+    def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
