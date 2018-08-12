@@ -1776,6 +1776,10 @@ class Collection(object):
                     method = None
                     include_id = v.get('_id')
                     for field, value in iteritems(v):
+                        if '.' in field:
+                            raise NotImplementedError(
+                                'Using subfield "%s" in $project is a valid MongoDB operation; '
+                                "however Mongomock does not support it yet." % field)
                         if method is None and (field != '_id' or value):
                             method = 'include' if value else 'exclude'
                         elif method == 'include' and not value and field != '_id':
