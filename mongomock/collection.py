@@ -1663,7 +1663,7 @@ class Collection(object):
                         if not isinstance(stage['$lookup'][operator], str):
                             raise OperationFailure(
                                 'Arguments to $lookup must be strings')
-                        if operator in ('localField', 'foreignField') and \
+                        if operator in ('as', 'localField', 'foreignField') and \
                                 stage['$lookup'][operator].startswith('$'):
                             raise OperationFailure(
                                 "FieldPath field names may not start with '$'")
@@ -1681,7 +1681,7 @@ class Collection(object):
                     foreign_collection = self.database.get_collection(foreign_name)
                     for doc in out_collection:
                         query = doc.get(local_field)
-                        if type(doc[local_field]) is list:
+                        if isinstance(query, list):
                             query = {'$in': query}
                         matches = foreign_collection.find({foreign_field: query})
                         doc[local_name] = [foreign_doc for foreign_doc in matches]
