@@ -152,6 +152,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Jeff Browning
 * Jeff McGee
 * Joël Franusic
+* `Jonathan Hedén <https://github.com/jheden/>`_
 * Julian Hille
 * Krzysztof Płocharz
 * Lyon Zhang

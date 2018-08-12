@@ -1664,6 +1664,42 @@ class Collection(object):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection
                                       if filter_applies(v, doc)]
+                elif k == '$lookup':
+                    for operator in ('let', 'pipeline'):
+                        if operator in stage['$lookup']:
+                            raise NotImplementedError(
+                                "Although '%s' is a valid lookup operator for the "
+                                "aggregation pipeline, it is currently not "
+                                "implemented in Mongomock." % operator)
+                    for operator in ('from', 'localField', 'foreignField', 'as'):
+                        if operator not in stage['$lookup']:
+                            raise OperationFailure(
+                                "Must specify '%s' field for a $lookup" % operator)
+                        if not isinstance(stage['$lookup'][operator], str):
+                            raise OperationFailure(
+                                'Arguments to $lookup must be strings')
+                        if operator in ('as', 'localField', 'foreignField') and \
+                                stage['$lookup'][operator].startswith('$'):
+                            raise OperationFailure(
+                                "FieldPath field names may not start with '$'")
+                        if operator in ('localField', 'as') and \
+                                '.' in stage['$lookup'][operator]:
+                            raise NotImplementedError(
+                                "Although '.' is valid in the 'localField' and 'as' "
+                                "parameters for the lookup stage of the aggregation "
+                                "pipeline, it is currently not implemented in Mongomock.")
+
+                    foreign_name = stage['$lookup']['from']
+                    local_field = stage['$lookup']['localField']
+                    foreign_field = stage['$lookup']['foreignField']
+                    local_name = stage['$lookup']['as']
+                    foreign_collection = self.database.get_collection(foreign_name)
+                    for doc in out_collection:
+                        query = doc.get(local_field)
+                        if isinstance(query, list):
+                            query = {'$in': query}
+                        matches = foreign_collection.find({foreign_field: query})
+                        doc[local_name] = [foreign_doc for foreign_doc in matches]
                 elif k == '$group':
                     grouped_collection = []
                     _id = stage['$group']['_id']
