@@ -8,7 +8,7 @@ class _NO_VALUE(object):
 NO_VALUE = _NO_VALUE()
 
 _SUPPORTED_TYPES = set([
-    int, float, bool, str, datetime.datetime
+    int, float, bool, str, datetime.datetime, type(None),
 ])
 
 dict_type = dict
@@ -30,6 +30,10 @@ def diff(a, b, path=None):
         a = str(a)
     if type(b).__name__ == "ObjectId":
         b = str(b)
+    if type(a).__name__ == "Int64":
+        a = int(a)
+    if type(b).__name__ == "Int64":
+        b = int(b)
     if type(a) not in _SUPPORTED_TYPES:
         raise NotImplementedError(
             "Unsupported diff type: {0}".format(type(a)))  # pragma: no cover
