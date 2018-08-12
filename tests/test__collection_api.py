@@ -1740,6 +1740,20 @@ class CollectionAPITest(TestCase):
             collection.insert({"$foo": "bar"})
         self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
 
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__update_invalid_encode_type(self):
+        self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
+
+        with self.assertRaises(InvalidDocument):
+            self.db.collection.update_one({}, {'$set': {'foo': {'bar'}}})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__replace_invalid_encode_type(self):
+        self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
+
+        with self.assertRaises(InvalidDocument):
+            self.db.collection.replace_one({}, {'foo': {'bar'}})
+
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection
         collection.insert_many(
