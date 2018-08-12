@@ -12,8 +12,12 @@ class MongoClient(object):
 
     def __init__(self, host=None, port=None, document_class=dict,
                  tz_aware=False, connect=True, **kwargs):
-        self.host = host or self.HOST
+        if host:
+            self.host = host[0] if isinstance(host, (list, tuple)) else host
+        else:
+            self.host = self.HOST
         self.port = port or self.PORT
+        self._tz_aware = tz_aware
         self._databases = {}
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class
@@ -36,6 +40,14 @@ class MongoClient(object):
 
     def close(self):
         pass
+
+    @property
+    def is_mongos(self):
+        return True
+
+    @property
+    def is_primary(self):
+        return True
 
     @property
     def address(self):
@@ -62,22 +74,19 @@ class MongoClient(object):
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):
-            databases_keys = list(self._databases.keys())
-            for database_name in databases_keys:
-                tmp_database = self._databases.get(database_name)
-                if tmp_database is name_or_db:
-                    if tmp_database:
-                        drop_collections_for_db(tmp_database)
-                    del self._databases[database_name]
-                    break
+            db = next(db for db in self._databases.values() if db is name_or_db)
+            if db:
+                drop_collections_for_db(db)
 
         elif name_or_db in self._databases:
             db = self._databases[name_or_db]
             drop_collections_for_db(db)
-            del self._databases[name_or_db]
 
-    def get_database(self, name, codec_options=None, read_preference=None,
+    def get_database(self, name=None, codec_options=None, read_preference=None,
                      write_concern=None):
+        if name is None:
+            return self.get_default_database()
+
         db = self._databases.get(name)
         if db is None:
             db = self._databases[name] = Database(self, name)

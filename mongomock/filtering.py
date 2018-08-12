@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
 
@@ -5,6 +7,8 @@ import operator
 import re
 from sentinels import NOTHING
 from six import iteritems, string_types
+
+COMPILED_RE_TYPE = type(re.compile('a'))
 
 
 def filter_applies(search_filter, document):
@@ -26,16 +30,18 @@ def filter_applies(search_filter, document):
                 ('$ne' in search or search == {'$exists': False})
                 and len(iter_key_candidates(key, document)) == 0):
             continue
+        if key == '$comment':
+            continue
 
         for doc_val in iter_key_candidates(key, document):
             if isinstance(search, dict):
-                is_match = all(
+                is_match = (all(
                     operator_string in OPERATOR_MAP and
                     OPERATOR_MAP[operator_string](doc_val, search_val) or
                     operator_string == '$not' and
                     _not_op(document, key, search_val)
                     for operator_string, search_val in iteritems(search)
-                ) or doc_val == search
+                ) and search) or doc_val == search
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
             elif key in LOGICAL_OPERATOR_MAP:
@@ -120,7 +126,26 @@ def _force_list(v):
 
 def _all_op(doc_val, search_val):
     dv = _force_list(doc_val)
-    return all(x in dv for x in search_val)
+    matches = []
+    for x in search_val:
+        if isinstance(x, dict) and '$elemMatch' in x:
+            matches.append(_elem_match_op(doc_val, x['$elemMatch']))
+        else:
+            matches.append(x in dv)
+    return all(matches)
+
+
+def _in_op(doc_val, search_val):
+    if doc_val is NOTHING and None in search_val:
+        return True
+    doc_val = _force_list(doc_val)
+    is_regex_list = [isinstance(x, COMPILED_RE_TYPE) for x in search_val]
+    if not any(is_regex_list):
+        return any(x in search_val for x in doc_val)
+    for x, is_regex in zip(search_val, is_regex_list):
+        if (is_regex and _regex(doc_val, x)) or (x in doc_val):
+            return True
+    return False
 
 
 def _not_op(d, k, s):
@@ -151,7 +176,9 @@ def _elem_match_op(doc_val, query):
 def _regex(doc_val, regex):
     if not (isinstance(doc_val, (string_types, list)) or isinstance(doc_val, RE_TYPE)):
         return False
-    return any(regex.search(item) for item in _force_list(doc_val))
+    return any(
+        regex.search(item) for item in _force_list(doc_val)
+        if isinstance(item, string_types))
 
 
 def _size_op(doc_val, search_val):
@@ -171,20 +198,34 @@ def _list_expand(f):
             return f(doc_val, search_val)
     return func
 
+def _type_op(doc_val, search_val):
+    if search_val not in TYPE_MAP:
+        raise OperationFailure('%r is not a valid $type' % search_val)
+    elif TYPE_MAP[search_val] is None:
+        raise OperationFailure('%s is a valid $type but not implemented' % search_val)
+    return isinstance(doc_val, TYPE_MAP[search_val])
+
+
+def operator_eq(doc_val, search_val):
+    if doc_val is NOTHING and search_val is None:
+        return True
+    return operator.eq(doc_val, search_val)
+
 OPERATOR_MAP = {
-    '$eq': operator.eq,
+    '$eq': operator_eq,
     '$ne': operator.ne,
     '$gt': _not_nothing_and(_list_expand(operator.gt)),
     '$gte': _not_nothing_and(_list_expand(operator.ge)),
     '$lt': _not_nothing_and(_list_expand(operator.lt)),
     '$lte': _not_nothing_and(_list_expand(operator.le)),
     '$all': _all_op,
-    '$in': lambda dv, sv: any(x in sv for x in _force_list(dv)),
-    '$nin': lambda dv, sv: all(x not in sv for x in _force_list(dv)),
+    '$in': _in_op,
+    '$nin': lambda dv, sv: not _in_op(dv, sv),
     '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
     '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
     '$elemMatch': _elem_match_op,
     '$size': _size_op,
+    '$type': _type_op
 }
 
 
@@ -192,4 +233,28 @@ LOGICAL_OPERATOR_MAP = {
     '$or': lambda d, subq: any(filter_applies(q, d) for q in subq),
     '$and': lambda d, subq: all(filter_applies(q, d) for q in subq),
     '$nor': lambda d, subq: all(not filter_applies(q, d) for q in subq),
+}
+
+TYPE_MAP = {
+    'double': (float,),
+    'string': (str,),
+    'object': (dict,),
+    'array': (list,),
+    'binData': (bytes,),
+    'undefined': None,
+    'objectId': (ObjectId,),
+    'bool': (bool,),
+    'date': (datetime,),
+    'null': None,
+    'regex': None,
+    'dbPointer': None,
+    'javascript': None,
+    'symbol': None,
+    'javascriptWithScope': None,
+    'int': (int,),
+    'timestamp': None,
+    'long': (float,),
+    'decimal': (float,),
+    'minKey': None,
+    'maxKey': None,
 }

@@ -40,6 +40,10 @@ class InterfaceTest(TestCase):
     def test__can_create_db_with_path(self):
         self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
 
+    def test__can_create_db_with_multiple_pathes(self):
+        hostnames = ['mongodb://localhost:27017', 'mongodb://localhost:27018']
+        self.assertIsNotNone(mongomock.MongoClient(hostnames))
+
     def test__repr(self):
         self.assertEqual(repr(mongomock.MongoClient()),
                          "mongomock.MongoClient('localhost', 27017)")
@@ -101,6 +105,22 @@ class DatabaseGettingTest(TestCase):
         result = collection.find({"_id": doc_id})
         self.assertEqual(result.count(), 0)
 
+    def test__drop_database_indexes(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.create_index('simple')
+        collection.create_index([("value", 1)], unique=True)
+        collection.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+
+        self.client.drop_database("somedb")
+
+        # Make sure indexes' rules no longer apply
+        collection.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
+        collection.insert({'value': 'not_unique_but_ok'})
+        collection.insert({'sparsed': 'not_unique_but_ok'})
+        result = collection.find({})
+        self.assertEqual(result.count(), 3)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
@@ -136,6 +156,13 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
                      "admin%3F?authMechanism=MONGODB-CR")
         self.assertIs(db, c['admin?'])
+        c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
+        self.assertIs(db, c['foo'])
+
+        # As of pymongo 3.5, get_database() is equivalent to
+        # the old behavior of get_default_database()
+        client = mongomock.MongoClient('mongodb://host1/foo')
+        self.assertIs(client.get_database(), client['foo'])
 
     def test__getting_default_database_invalid(self):
         def client(uri):
@@ -185,12 +212,16 @@ class _CollectionComparisonTest(TestCase):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient()
+                return PymongoClient(maxPoolSize=1)
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
                 if "connection refused" not in e.message.lower():
                     raise
+
+    def tearDown(self):
+        super(_CollectionComparisonTest, self).tearDown()
+        self.mongo_conn.close()
 
 
 class MongoClientCollectionTest(_CollectionComparisonTest):
@@ -279,7 +310,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         id1 = ObjectId()
         self.cmp.do.insert({"_id": id1, "name": "new"})
         self.cmp.do.insert({"name": "another new"})
-        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.sort_by(lambda doc: str(doc.get("name", str(doc)))).find()
         self.cmp.compare.find({"_id": id1})
 
     def test__find_by_document(self):
@@ -288,6 +319,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"doc": {"key": "val"}})
         self.cmp.compare.find({"doc": {"key": {'$eq': 'val'}}})
+
+    def test__find_by_empty_document(self):
+        self.cmp.do.insert({"doc": {"data": "val"}})
+        self.cmp.do.insert({"doc": {}})
+        self.cmp.do.insert({"doc": None})
+        self.cmp.compare.find({"doc": {}})
 
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
@@ -353,6 +390,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({
             '_id': id,
             'test': 1
+        })
+        self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
+
+    def test__regex_match_non_string_in_list(self):
+        id = ObjectId()
+        self.cmp.do.insert_one({
+            '_id': id,
+            'test': [3, 2, 1]
         })
         self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
 
@@ -559,9 +604,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert([
             dict(x=single),
             dict(x=even),
-            dict(x=prime)])
+            dict(x=prime),
+            dict()])
         self.cmp.compare_ignore_order.find({'x': {'$in': [7, 8]}})
         self.cmp.compare_ignore_order.find({'x': {'$in': [4, 5]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [4, None]}})
         self.cmp.compare_ignore_order.find({'x': {'$nin': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [7, 8]}})
@@ -581,9 +628,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'x': {'$gte': 1100, '$lte': 1250}})
         self.cmp.compare_ignore_order.find({'x': {'$gt': 300, '$lt': 400}})
 
+    def test__find_sets_regex(self):
+        self.cmp.do.insert([
+            {'x': '123'},
+            {'x': ['abc', 'abd']},
+        ])
+        digits_pat = re.compile(r'^\d+')
+        str_pat = re.compile(r'^ab[cd]')
+        non_existing_pat = re.compile(r'^lll')
+        self.cmp.compare_ignore_order.find({'x': {'$in': [digits_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [non_existing_pat, '123']}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [str_pat]}})
+        self.cmp.compare_ignore_order.find({'x': {'$nin': [non_existing_pat]}})
+
     def test__find_and_modify_remove(self):
-        self.cmp.do.insert([{"a": x} for x in range(10)])
-        self.cmp.do.find_and_modify({"a": 2}, remove=True)
+        self.cmp.do.insert([{"a": x, "junk": True} for x in range(10)])
+        self.cmp.compare.find_and_modify({"a": 2}, remove=True, fields={'_id': False, 'a': True})
         self.cmp.compare_ignore_order.find()
 
     def test__find_one_and_delete(self):
@@ -1069,7 +1131,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
         self.cmp.do.remove()
-        self.cmp.do.insert({'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 10}]}})
+        self.cmp.do.insert(
+            {'name': 'bob', 'hat': {'sizes': [{'size': 5}, {'size': 8}, {'size': 10}]}}
+        )
         self.cmp.do.update(
             {'name': 'bob'}, {'$pull': {'hat.sizes': {'size': {'$gt': 6}}}})
         self.cmp.compare.find({'name': 'bob'})
@@ -1202,6 +1266,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                [{'size': 'M', 'quantity': 6}, {'size': 'S', 'quantity': 1}]}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_nested_dict_in_list(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({
+            'name': 'bob',
+            'hat': [
+                {'name': 'derby',
+                 'sizes': [{'size': 'L', 'quantity': 3},
+                           {'size': 'XL', 'quantity': 4}],
+                 'colors': ['green', 'blue']},
+                {'name': 'cap',
+                 'sizes': [{'size': 'S', 'quantity': 10},
+                           {'size': 'L', 'quantity': 5}],
+                 'colors': ['blue']}]})
+        self.cmp.do.update(
+            {'name': 'bob'},
+            {'$push': {'hat.1.sizes': {'size': 'M', 'quantity': 6}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_nested_list_each(self):
         self.cmp.do.remove()
         self.cmp.do.insert({
@@ -1277,6 +1359,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             except Exception as e:
                 assert isinstance(e, mongomock.OperationFailure)
 
+    def test__rename(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        self.cmp.do.insert_one(input_)
+
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'bar'}}
+        self.cmp.do.update_one(query, update=update)
+
+        self.cmp.compare.find()
+
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
 @skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
@@ -1339,7 +1431,7 @@ class CollectionMapReduceTest(TestCase):
             out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
         self.assertTrue(isinstance(result, mongomock.Collection))
         self.assertEqual(result.name, 'results')
-        self.assertEqual(result._database.name, 'map_reduce_son_test')
+        self.assertEqual(result.database.name, 'map_reduce_son_test')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
             self.assertIn(doc, self.expected_results)
@@ -1431,6 +1523,45 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.count(), 2)
         for doc in result.find():
             self.assertIn(doc, expected_results)
+
+    def test_mongomock_map_reduce(self):
+        # Arrange
+        fake_etap = mongomock.MongoClient().db
+        fake_statuses_collection = fake_etap.create_collection('statuses')
+        fake_config_id = "this_is_config_id"
+        test_name = "this_is_test_name"
+        fake_statuses_objects = [
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8392,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8393,
+                "configID": fake_config_id
+            },
+            {
+                "testID": test_name,
+                "kind": "Test",
+                "duration": 8394,
+                "configID": fake_config_id
+            }
+        ]
+        fake_statuses_collection.insert_many(fake_statuses_objects)
+
+        map_function = Code("function(){emit(this._id, this.duration);}")
+        reduce_function = Code("function() {}")
+        search_query = {'configID': fake_config_id, 'kind': 'Test', 'testID': test_name}
+
+        # Act
+        result = fake_etap.statuses.map_reduce(
+            map_function, reduce_function, "my_collection", query=search_query)
+
+        # Assert
+        self.assertEqual(result.count(), 3)
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
@@ -1633,15 +1764,21 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate15(self):
+    def test__aggregate_project_include_in_inclusion(self):
         pipeline = [
-            {'$project': {'_id': 1, 'a': 1}}
+            {'$project': {'a': 1, 'b': 1}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate16(self):
+    def test__aggregate_project_exclude_in_exclusion(self):
         pipeline = [
-            {'$project': {'_id': 0, 'a': 1}}
+            {'$project': {'a': 0, 'b': 0}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_project_exclude_id_in_inclusion(self):
+        pipeline = [
+            {'$project': {'a': 1, '_id': 0}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
@@ -1712,6 +1849,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate27(self):
+        # test $lookup stage
+        pipeline = [
+            {'$lookup': {
+                'from': self.collection_name,
+                'localField': 'a',
+                'foreignField': 'b',
+                'as': 'lookup'
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
@@ -1733,6 +1882,9 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
 
     def test__skip(self):
         self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
+
+    def test__skipped_find(self):
+        self.cmp.compare(_SORT("index", 1)).find(skip=10)
 
     def test__limit(self):
         self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
