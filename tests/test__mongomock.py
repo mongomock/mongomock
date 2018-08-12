@@ -2,6 +2,7 @@ from collections import OrderedDict
 import copy
 import datetime
 import re
+from six import assertCountEqual
 import time
 from unittest import TestCase, skipIf
 
@@ -1949,10 +1950,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         result = list(aggregations["fake"])
         self.assertEqual(len(result), len(expected))
         for expected_elt, result_elt in zip(expected, result):
-            self.assertEqual(expected_elt.keys(), result_elt.keys())
+            assertCountEqual(self, expected_elt.keys(), result_elt.keys())
             for key in result_elt:
                 if isinstance(result_elt[key], list):
-                    self.assertCountEqual(result_elt[key], expected_elt[key], msg=key)
+                    assertCountEqual(self, result_elt[key], expected_elt[key], msg=key)
                 else:
                     self.assertEqual(result_elt[key], expected_elt[key], msg=key)
 

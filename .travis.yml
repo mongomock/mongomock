@@ -4,49 +4,48 @@ cache: pip
 python:
   - 3.5
 env:
-  - TOX_ENV=py27-pymongo
-  - TOX_ENV=py27-pyexecjs
-  - TOX_ENV=py34-pymongo
-  - TOX_ENV=py34-pyexecjs
-  - TOX_ENV=py35-pymongo
-  - TOX_ENV=py35-pyexecjs
-  - TOX_ENV=py36-pymongo
-  - TOX_ENV=py36-pyexecjs
+  - TOX_ENV=py27-pymongo-pyexecjs
+  - TOX_ENV=py34-pymongo-pyexecjs
+  - TOX_ENV=py35-pymongo-pyexecjs
+  - TOX_ENV=py36-pymongo-pyexecjs
+  - TOX_ENV=py37
   - TOX_ENV=py37-pymongo
   - TOX_ENV=py37-pyexecjs
-  - TOX_ENV=pypy-pymongo
-  - TOX_ENV=pypy-pyexecjs
+  - TOX_ENV=py37-pymongo-pyexecjs
+  - TOX_ENV=pypy-pymongo-pyexecjs
   - TOX_ENV=pep8
 matrix:
     # Run all under 3.5 and pypy under pypy, temporary, to be rolled back once trusty fixes it
     include:
-        - env: TOX_ENV=pypy-pymongo
+        - env: TOX_ENV=pypy-pymongo-pyexecjs
           python: pypy-5.4.1
-        - env: TOX_ENV=pypy-pyexecjs
-          python: pypy-5.4.1
-        - env: TOX_ENV=py36-pymongo
+        - env: TOX_ENV=py36-pymongo-pyexecjs
           python: 3.6
-        - env: TOX_ENV=py36-pyexecjs
-          python: 3.6
+        - env: TOX_ENV=py37
+          python: 3.7
+          dist: xenial
         - env: TOX_ENV=py37-pymongo
           python: 3.7
           dist: xenial
         - env: TOX_ENV=py37-pyexecjs
           python: 3.7
           dist: xenial
+        - env: TOX_ENV=py37-pymongo-pyexecjs
+          python: 3.7
+          dist: xenial
     exclude:
         - python: 3.5
-          env: TOX_ENV=pypy-pymongo
+          env: TOX_ENV=pypy-pymongo-pyexecjs
         - python: 3.5
-          env: TOX_ENV=pypy-pyexecjs
+          env: TOX_ENV=py36-pymongo-pyexecjs
         - python: 3.5
-          env: TOX_ENV=py36-pymongo
-        - python: 3.5
-          env: TOX_ENV=py36-pyexecjs
+          env: TOX_ENV=py37
         - python: 3.5
           env: TOX_ENV=py37-pymongo
         - python: 3.5
           env: TOX_ENV=py37-pyexecjs
+        - python: 3.5
+          env: TOX_ENV=py37-pymongo-pyexecjs
 services:
   - mongodb
 script:
