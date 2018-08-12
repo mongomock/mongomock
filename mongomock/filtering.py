@@ -188,6 +188,18 @@ def _size_op(doc_val, search_val):
         return search_val == 1 if doc_val else 0
 
 
+def _list_expand(f):
+    def func(doc_val, search_val):
+        if isinstance(doc_val, list):
+            for val in doc_val:
+                if f(val, search_val):
+                    return True
+            return False
+        else:
+            return f(doc_val, search_val)
+    return func
+
+
 def _type_op(doc_val, search_val):
     if search_val not in TYPE_MAP:
         raise OperationFailure('%r is not a valid $type' % search_val)
@@ -204,10 +216,10 @@ def operator_eq(doc_val, search_val):
 OPERATOR_MAP = {
     '$eq': operator_eq,
     '$ne': operator.ne,
-    '$gt': _not_nothing_and(operator.gt),
-    '$gte': _not_nothing_and(operator.ge),
-    '$lt': _not_nothing_and(operator.lt),
-    '$lte': _not_nothing_and(operator.le),
+    '$gt': _not_nothing_and(_list_expand(operator.gt)),
+    '$gte': _not_nothing_and(_list_expand(operator.ge)),
+    '$lt': _not_nothing_and(_list_expand(operator.lt)),
+    '$lte': _not_nothing_and(_list_expand(operator.le)),
     '$all': _all_op,
     '$in': _in_op,
     '$nin': lambda dv, sv: not _in_op(dv, sv),
