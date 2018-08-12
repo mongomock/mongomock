@@ -187,6 +187,7 @@ def _size_op(doc_val, search_val):
     else:
         return search_val == 1 if doc_val else 0
 
+
 def _list_expand(f):
     def func(doc_val, search_val):
         if isinstance(doc_val, list):
@@ -197,6 +198,7 @@ def _list_expand(f):
         else:
             return f(doc_val, search_val)
     return func
+
 
 def _type_op(doc_val, search_val):
     if search_val not in TYPE_MAP:
