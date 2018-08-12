@@ -656,6 +656,15 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, {'a': 1, 'b': [{'d': 3}]})
 
+    def test__update_one_no_change(self):
+        self.db.collection.insert_one({'a': 1})
+        update_result = self.db.collection.update_one(
+            filter={'a': 1},
+            update={'$set': {'a': 1}}
+        )
+        self.assertEqual(update_result.matched_count, 1)
+        self.assertEqual(update_result.modified_count, 0)
+
     def test__rename_one_foo_to_bar(self):
         input_ = {'_id': 1, 'foo': 'bar'}
         expected = {'_id': 1, 'bar': 'bar'}

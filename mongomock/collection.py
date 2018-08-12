@@ -561,12 +561,13 @@ class Collection(object):
         updated_existing = False
         upserted_id = None
         num_updated = 0
+        num_matched = 0
         for existing_document in itertools.chain(self._iter_documents(spec), [None]):
             # we need was_insert for the setOnInsert update operation
             was_insert = False
             # the sentinel document means we should do an upsert
             if existing_document is None:
-                if not upsert or num_updated:
+                if not upsert or num_matched:
                     continue
                 # For upsert operation we have first to create a fake existing_document,
                 # update it like a regular one, then finally insert it
@@ -584,7 +585,7 @@ class Collection(object):
             else:
                 original_document_snapshot = copy.deepcopy(existing_document)
                 updated_existing = True
-            num_updated += 1
+            num_matched += 1
             first = True
             subdocument = None
             for k, v in iteritems(document):
@@ -834,11 +835,13 @@ class Collection(object):
 
             if was_insert:
                 upserted_id = self._insert(existing_document)
-            else:
+                num_updated += 1
+            elif existing_document != original_document_snapshot:
                 # Document has been modified in-place, last thing is to make sure it
                 # still respect the unique indexes and if not to revert modifications
                 try:
                     self._ensure_uniques(existing_document)
+                    num_updated += 1
                 except DuplicateKeyError:
                     # Rollback
                     self._documents[original_document_snapshot['_id']] = original_document_snapshot
@@ -850,7 +853,7 @@ class Collection(object):
         return {
             text_type('connectionId'): self.database.client._id,
             text_type('err'): None,
-            text_type('n'): num_updated,
+            text_type('n'): num_matched,
             text_type('nModified'): num_updated if updated_existing else 0,
             text_type('ok'): 1,
             text_type('upserted'): upserted_id,
