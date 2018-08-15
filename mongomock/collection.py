@@ -1586,9 +1586,22 @@ class Collection(object):
                 except KeyError:
                     pass
                 return _parse_expression(fallback, doc_dict)
+            elif operator == '$cond':
+                if isinstance(values, list):
+                    condition, true_case, false_case = values
+                elif isinstance(values, dict):
+                    condition = values['if']
+                    true_case = values['then']
+                    false_case = values['else']
+                try:
+                    condition_value = _parse_expression(condition, doc_dict)
+                except KeyError:
+                    condition_value = False
+                expression = true_case if condition_value else false_case
+                return _parse_expression(expression, doc_dict)
             else:
                 raise NotImplementedError(
-                    "Although '%s' is a valid date operator for the "
+                    "Although '%s' is a valid conditional operator for the "
                     "aggregation pipeline, it is currently not implemented "
                     " in Mongomock." % operator)
 

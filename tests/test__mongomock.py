@@ -1861,6 +1861,13 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate28(self):
+        pipeline = [{"$group": {
+            "_id": "$b",
+            "total2015": {"$sum": {"$cond": [{"$eq": [{'$year': '$date'}, 2015]}, 1, 0]}},
+        }}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

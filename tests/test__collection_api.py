@@ -1991,3 +1991,30 @@ class CollectionAPITest(TestCase):
             [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
             list(actual)
         )
+
+    def test_aggregate_group_sum(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'group': 'one'},
+            {'group': 'one'},
+            {'group': 'one'},
+            {'group': 'one', 'data': [1, 2]},
+            {'group': 'one', 'data': [3, 4]},
+        ])
+        actual = collection.aggregate([{'$group': {
+            '_id': '$group',
+            'count': {'$sum': 1},
+            'countData': {'$sum': {'$cond': ['$data', 1, 0]}},
+            'countNoData': {'$sum': {'$cond': {
+                'if': '$data',
+                'then': 0,
+                'else': 1,
+            }}},
+        }}])
+        expect = [{
+            '_id': 'one',
+            'count': 5,
+            'countData': 2,
+            'countNoData': 3,
+        }]
+        self.assertEqual(expect, list(actual))
