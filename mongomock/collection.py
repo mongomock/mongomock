@@ -1117,13 +1117,7 @@ class Collection(object):
             else:
                 return
         field_name = field_name_parts[-1]
-        if isinstance(doc, list):
-            try:
-                doc[int(field_name)] = field_value
-            except IndexError:
-                pass
-        else:
-            updater(doc, field_name, field_value)
+        updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter=None):
         return (document for document in list(itervalues(self._documents))
@@ -2160,11 +2154,19 @@ class Cursor(object):
 def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
+    if BSON:
+        # bson validation
+        BSON.encode({field_name: value}, check_keys=True)
     if isinstance(doc, dict):
-        if BSON:
-            # bson validation
-            BSON.encode({field_name: value}, check_keys=True)
         doc[field_name] = value
+    if isinstance(doc, list):
+        field_index = int(field_name)
+        if field_index < 0:
+            raise WriteError('Negative index provided')
+        len_diff = field_index - (len(doc) - 1)
+        if len_diff > 0:
+            doc += [None] * len_diff
+        doc[field_index] = value
 
 
 def _unset_updater(doc, field_name, value):
@@ -2175,6 +2177,17 @@ def _unset_updater(doc, field_name, value):
 def _inc_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
+
+    if isinstance(doc, list):
+        field_index = int(field_name)
+        if field_index < 0:
+            raise WriteError('Negative index provided')
+        try:
+            doc[field_index] += value
+        except IndexError:
+            len_diff = field_index - (len(doc) - 1)
+            doc += [None] * len_diff
+            doc[field_index] = value
 
 
 def _max_updater(doc, field_name, value):
