@@ -1895,8 +1895,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {"a": {"c": "3", "d": 3}, "b": {"c": "4", "d": 4}, "nb": 1},
             {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}, "nb": 2}
         ]
-        for item in data:
-            self.cmp.do.insert(item)
+        self.cmp.do.insert_many(data)
         pipeline = [
             {'$group': {"_id": "a.c", "nb": {"$addToSet": "b"}}},
         ]
