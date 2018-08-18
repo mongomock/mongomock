@@ -1891,9 +1891,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         # group addToSet dict element
         self.cmp.do.remove()
         data = [
-            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}, "nb": 1},
-            {"a": {"c": "3", "d": 3}, "b": {"c": "4", "d": 4}, "nb": 1},
-            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}, "nb": 2}
+            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}},
+            {"a": {"c": "1", "d": 3}, "b": {"c": "4", "d": 4}},
+            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}},
+            {"a": {"c": "5", "d": 2}, "b": {"c": "6", "d": 6}}
         ]
         self.cmp.do.insert_many(data)
         pipeline = [
