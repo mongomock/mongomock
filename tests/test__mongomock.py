@@ -11,7 +11,7 @@ from mongomock import Database
 from mongomock import InvalidURI
 from mongomock import OperationFailure
 
-from .utils import DBRef
+from tests.utils import DBRef
 
 try:
     from bson.objectid import ObjectId

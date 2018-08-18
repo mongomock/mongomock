@@ -1766,7 +1766,7 @@ class Collection(object):
                                     elif operator == "$addToSet":
                                         doc_dict[field] = []
                                         val_it = (val or None for val in values)
-                                        # don't use set in case elt in not hashable (like dicts)
+                                        # Don't use set in case elt in not hashable (like dicts).
                                         for elt in val_it:
                                             if elt not in doc_dict[field]:
                                                 doc_dict[field].append(elt)
