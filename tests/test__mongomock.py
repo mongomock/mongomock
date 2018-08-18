@@ -1879,12 +1879,13 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         expected = list(aggregations["real"])
         result = list(aggregations["fake"])
         self.assertEqual(len(result), len(expected))
-        for i, elt in enumerate(result):
-            for k, v in elt.items():
-                if type(v) is list:
-                    self.assertEqual(set(v), (result[i][k]))
+        for expected_elt, result_elt in zip(expected, result):
+            self.assertEqual(expected_elt.keys(), result_elt.keys())
+            for key in result_elt:
+                if isinstance(result_elt[key], list):
+                    self.assertCountEqual(result_elt[key], expected_elt[key], msg=key)
                 else:
-                    self.assertEqual(v, result[i][k])
+                    self.assertEqual(result_elt[key], expected_elt[key], msg=key)
 
     def test__aggregate30(self):
         # group addToSet dict element
