@@ -1878,13 +1878,13 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         aggregations = self.cmp.do.aggregate(pipeline)
         expected = list(aggregations["real"])
         result = list(aggregations["fake"])
-        assert len(result) == len(expected)
+        self.assertEqual(len(result), len(expected))
         for i, elt in enumerate(result):
             for k, v in elt.items():
                 if type(v) is list:
-                    assert set(v) == set(result[i][k])
+                    self.assertEqual(set(v), (result[i][k]))
                 else:
-                    assert v == result[i][k]
+                    self.assertEqual(v, result[i][k])
 
     def test__aggregate30(self):
         # group addToSet dict element
