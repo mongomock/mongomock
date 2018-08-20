@@ -1631,6 +1631,26 @@ class CollectionAPITest(TestCase):
             "Although '.' is valid in the 'localField' and 'as' parameters ",
             str(err.exception))
 
+    def test__aggregate_sample(self):
+        self.db.a.insert_many([
+            {'_id': i}
+            for i in range(5)
+        ])
+        actual = list(self.db.a.aggregate([{'$sample': {'size': 2}}]))
+        self.assertEqual(2, len(actual))
+        self.assertLessEqual({doc.get('_id') for doc in actual}, {0, 1, 2, 3, 4})
+
+    def test__aggregate_sample_errors(self):
+        self.db.a.insert_many([
+            {'_id': i}
+            for i in range(5)
+        ])
+        # Many cases for '$sample' options that should raise an operation failure.
+        cases = (None, 3, {}, {'size': 2, 'otherUnknownOption': 3})
+        for case in cases:
+            with self.assertRaises(mongomock.OperationFailure):
+                self.db.a.aggregate([{'$sample': case}])
+
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
