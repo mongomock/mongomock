@@ -8,6 +8,7 @@ import functools
 import itertools
 import json
 import math
+import random
 import threading
 import time
 import types
@@ -55,6 +56,7 @@ from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 
 lock = threading.RLock()
+_random = random.Random()
 
 
 def validate_is_mapping(option, value):
@@ -1998,6 +2000,16 @@ class Collection(object):
                         doc_dict = _accumulate_group(output_fields, group_list)
                         doc_dict['_id'] = doc_id
                         out_collection.append(doc_dict)
+
+                elif k == '$sample':
+                    if not isinstance(v, dict):
+                        raise OperationFailure('the $sample stage specification must be an object')
+                    size = v.pop('size', None)
+                    if size is None:
+                        raise OperationFailure('$sample stage must specify a size')
+                    if v:
+                        raise OperationFailure('unrecognized option to $sample: %s' % set(v).pop())
+                    out_collection = [_random.choice(out_collection) for i in range(size)]
 
                 elif k == '$sort':
                     sort_array = []
