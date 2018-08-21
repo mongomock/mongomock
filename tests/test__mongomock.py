@@ -295,6 +295,23 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count()
         self.cmp.compare.count({"a": 1})
 
+    def test__count_documents(self):
+        self.cmp.compare.count_documents({})
+        self.cmp.do.insert_one({"a": 1})
+        self.cmp.compare.count_documents({})
+        self.cmp.do.insert_one({"a": 0})
+        self.cmp.compare.count_documents({})
+        self.cmp.compare.count_documents({"a": 1})
+
+    def test__estimated_document_count(self):
+        self.cmp.compare.estimated_document_count()
+        self.cmp.do.insert({"a": 1})
+        self.cmp.compare.estimated_document_count()
+        self.cmp.do.insert({"a": 0})
+        self.cmp.compare.estimated_document_count()
+        self.cmp.compare.estimated_document_count(skip=2)
+        self.cmp.compare.estimated_document_count(filter={"a": 1})
+
     def test__find_one(self):
         self.cmp.do.insert({"_id": "id1", "name": "new"})
         self.cmp.compare.find_one({"_id": "id1"})
