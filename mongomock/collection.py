@@ -905,8 +905,9 @@ class Collection(object):
                     doc_copy = container()
                 else:
                     doc_copy = self._copy_field(doc, container)
-            # if 1 was passed in as the field values, include those fields
-            elif list(fields.values())[0] == 1:
+            # if a truthy value was passed in as the field values, include
+            # those fields
+            elif list(fields.values())[0]:
                 doc_copy = container()
                 for key in fields:
                     key_parts = key.split('.')
