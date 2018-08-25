@@ -31,7 +31,9 @@ class Database(object):
     def _get_created_collections(self):
         return [name for name, col in self._collections.items() if col._is_created()]
 
-    def collection_names(self, include_system_collections=True):
+    def collection_names(self, include_system_collections=True, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if include_system_collections:
             return list(self._get_created_collections())
 
@@ -49,7 +51,9 @@ class Database(object):
             collection = self._collections[name] = Collection(self, name)
         return collection
 
-    def drop_collection(self, name_or_collection):
+    def drop_collection(self, name_or_collection, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         try:
             if isinstance(name_or_collection, Collection):
                 collection = next(c for c in self._collections.values() if c is name_or_collection)
@@ -107,7 +111,9 @@ class Database(object):
         collection.name = new_name
         self._collections[new_name] = collection
 
-    def dereference(self, dbref):
+    def dereference(self, dbref, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
 
         if not dbref.collection or not dbref.id:
             raise TypeError("cannot dereference a %s" % type(dbref))
