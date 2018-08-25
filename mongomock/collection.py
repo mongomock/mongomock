@@ -39,7 +39,7 @@ from six import text_type
 
 
 from mongomock.command_cursor import CommandCursor
-from mongomock import DuplicateKeyError, BulkWriteError
+from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
 from mongomock import helpers
@@ -392,16 +392,18 @@ class Collection(object):
 
     def insert_one(self, document, session=None):
         validate_is_mutable_mapping('document', document)
-        return InsertOneResult(self._insert(document), acknowledged=True)
+        return InsertOneResult(self._insert(document, session), acknowledged=True)
 
     def insert_many(self, documents, ordered=True, session=None):
         if not isinstance(documents, collections.Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        return InsertManyResult(self._insert(documents), acknowledged=True)
+        return InsertManyResult(self._insert(documents, session), acknowledged=True)
 
-    def _insert(self, data):
+    def _insert(self, data, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if isinstance(data, list) or isinstance(data, types.GeneratorType):
             results = []
             for index, item in enumerate(data):
@@ -482,18 +484,18 @@ class Collection(object):
 
     def update_one(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
-        return UpdateResult(self._update(filter, update, upsert=upsert),
+        return UpdateResult(self._update(filter, update, upsert=upsert, session=session),
                             acknowledged=True)
 
     def update_many(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert,
-                                         multi=True),
+                                         multi=True, session=session),
                             acknowledged=True)
 
     def replace_one(self, filter, replacement, upsert=False, session=None):
         validate_ok_for_replace(replacement)
-        return UpdateResult(self._update(filter, replacement, upsert=upsert),
+        return UpdateResult(self._update(filter, replacement, upsert=upsert, session=session),
                             acknowledged=True)
 
     def update(self, spec, document, upsert=False, manipulate=False,
@@ -504,7 +506,9 @@ class Collection(object):
                             check_keys, **kwargs)
 
     def _update(self, spec, document, upsert=False, manipulate=False,
-                multi=False, check_keys=False, **kwargs):
+                multi=False, check_keys=False, session=None, **kwargs):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
@@ -1138,7 +1142,9 @@ class Collection(object):
 
     def _find_and_modify(self, query, projection=None, update=None,
                          upsert=False, sort=None,
-                         return_document=ReturnDocument.BEFORE, **kwargs):
+                         return_document=ReturnDocument.BEFORE, session=None, **kwargs):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         remove = kwargs.get("remove", False)
         if kwargs.get("new", False) and remove:
             # message from mongodb
@@ -1181,13 +1187,15 @@ class Collection(object):
 
     def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
-        return DeleteResult(self._delete(filter), True)
+        return DeleteResult(self._delete(filter, session=session), True)
 
     def delete_many(self, filter, session=None):
         validate_is_mapping('filter', filter)
-        return DeleteResult(self._delete(filter, multi=True), True)
+        return DeleteResult(self._delete(filter, multi=True, session=session), True)
 
-    def _delete(self, filter, multi=False):
+    def _delete(self, filter, multi=False, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
@@ -1224,6 +1232,8 @@ class Collection(object):
             "by $expr, $near must be replaced by $geoWithin with $center, and "
             "$nearSphere must be replaced by $geoWithin with $centerSphere",
             DeprecationWarning, stacklevel=2)
+        if kwargs.pop('session', None):
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if filter is None:
             return len(self._documents)
         else:
@@ -1234,6 +1244,8 @@ class Collection(object):
             raise NotImplementedError(
                 "The collation argument of count_documents is valid but has not been "
                 "implemented in mongomock yet")
+        if kwargs.pop('session', None):
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         skip = kwargs.pop('skip', 0)
         if 'limit' in kwargs:
             limit = kwargs.pop('limit')
@@ -1254,6 +1266,8 @@ class Collection(object):
         return min(count - skip, limit)
 
     def estimated_document_count(self, **kwargs):
+        if kwargs.pop('session', None):
+            raise ConfigurationError('estimated_document_count does not support sessions')
         # Only some kwargs are recognized by this method, however the others
         # are ignored silently by pymongo.
         fwd_kwargs = {
@@ -1262,13 +1276,17 @@ class Collection(object):
         }
         return self.count_documents({}, **fwd_kwargs)
 
-    def drop(self):
+    def drop(self, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         self.database.drop_collection(self.name)
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
         self.create_index(key_or_list, cache_for, **kwargs)
 
-    def create_index(self, key_or_list, cache_for=300, **kwargs):
+    def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if not kwargs.pop('unique', False):
             return
 
@@ -1293,28 +1311,39 @@ class Collection(object):
 
         self._uniques.append((unique, is_sparse))
 
-    def drop_index(self, index_or_name):
-        pass
+    def drop_index(self, index_or_name, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
 
-    def drop_indexes(self):
+    def drop_indexes(self, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         self._uniques = []
 
-    def reindex(self):
+    def reindex(self, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         pass
 
-    def list_indexes(self):
+    def list_indexes(self, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         return {}
 
-    def index_information(self):
+    def index_information(self, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         return {}
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False,
-                   query=None, limit=0):
+                   query=None, limit=0, session=None):
         if execjs is None:
             raise NotImplementedError(
                 "PyExecJS is required in order to run Map-Reduce. "
                 "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
             )
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if limit == 0:
             limit = None
         start_time = time.clock()
@@ -1405,9 +1434,9 @@ class Collection(object):
         return ret_val
 
     def inline_map_reduce(self, map_func, reduce_func, full_response=False,
-                          query=None, limit=0):
+                          query=None, limit=0, session=None):
         return self.map_reduce(
-            map_func, reduce_func, {'inline': 1}, full_response, query, limit)
+            map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session)
 
     def distinct(self, key, filter=None):
         return self.find(filter).distinct(key)
@@ -1473,6 +1502,8 @@ class Collection(object):
         return ret_array
 
     def aggregate(self, pipeline, session=None, **kwargs):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         pipeline_operators = [
             '$addFields',
             '$bucket',
@@ -2057,7 +2088,9 @@ class Collection(object):
             self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
         return self
 
-    def rename(self, new_name, **kwargs):
+    def rename(self, new_name, session=None, **kwargs):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
@@ -2197,7 +2230,9 @@ class Cursor(object):
     def close(self):
         pass
 
-    def distinct(self, key):
+    def distinct(self, key, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         if not isinstance(key, helpers.basestring):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
