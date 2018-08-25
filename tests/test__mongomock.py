@@ -11,7 +11,7 @@ from mongomock import Database
 from mongomock import InvalidURI
 from mongomock import OperationFailure
 
-from .utils import DBRef
+from tests.utils import DBRef
 
 try:
     from bson.objectid import ObjectId
@@ -1867,6 +1867,58 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             "total2015": {"$sum": {"$cond": [{"$eq": [{'$year': '$date'}, 2015]}, 1, 0]}},
         }}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate29(self):
+        # group addToSet
+        pipeline = [
+            {"$group": {"_id": "$a", "nb": {"$addToSet": "$count"}}},
+            {"$sort": {"_id": 1}}
+        ]
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        self.assertEqual(len(result), len(expected))
+        for expected_elt, result_elt in zip(expected, result):
+            self.assertEqual(expected_elt.keys(), result_elt.keys())
+            for key in result_elt:
+                if isinstance(result_elt[key], list):
+                    self.assertCountEqual(result_elt[key], expected_elt[key], msg=key)
+                else:
+                    self.assertEqual(result_elt[key], expected_elt[key], msg=key)
+
+    def test__aggregate30(self):
+        # group addToSet dict element
+        self.cmp.do.remove()
+        data = [
+            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}},
+            {"a": {"c": "1", "d": 3}, "b": {"c": "4", "d": 4}},
+            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}},
+            {"a": {"c": "5", "d": 2}, "b": {"c": "6", "d": 6}}
+        ]
+        self.cmp.do.insert_many(data)
+        pipeline = [
+            {'$group': {"_id": "a.c", "nb": {"$addToSet": "b"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate31(self):
+        # group addToSet creating dict
+        pipeline = [
+            {'$group': {"_id": "$count", "set": {"$addToSet": {"a": "$a", "b": "$b"}}}},
+        ]
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        self.assertEqual(len(result), len(expected))
+        set_expected = set([
+            tuple(sorted(e.items())) for elt in expected for e in elt['set']
+        ])
+        set_result = set([
+            tuple(sorted(e.items())) for elt in result for e in elt['set']
+        ])
+        self.assertEqual(set_result, set_expected)
 
 
 def _LIMIT(*args):
