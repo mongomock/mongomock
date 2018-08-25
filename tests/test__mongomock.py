@@ -1907,7 +1907,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {'$group': {"_id": "$count", "set": {"$addToSet": {"a": "$a", "b": "$b"}}}},
         ]
-        self.cmp.compare_ignore_order.aggregate(pipeline)
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        self.assertEqual(len(result), len(expected))
+        set_expected = set([
+            tuple(sorted(e.items())) for elt in expected for e in elt['set']
+        ])
+        set_result = set([
+            tuple(sorted(e.items())) for elt in result for e in elt['set']
+        ])
+        self.assertEqual(set_result, set_expected)
 
 
 def _LIMIT(*args):

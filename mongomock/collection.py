@@ -1771,7 +1771,6 @@ class Collection(object):
                                             if elt not in value:
                                                 value.append(elt)
                                         doc_dict[field] = value
-                                        doc_dict[field].reverse()
                                     elif operator == '$push':
                                         if field not in doc_dict:
                                             doc_dict[field] = []
