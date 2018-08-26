@@ -930,7 +930,13 @@ class Collection(object):
                             subdocument = [{last_key: x[last_key]}
                                            for x in subdocument if last_key in x]
                             if subdocument:
-                                last_copy[key_parts[-2]] = subdocument
+                                if last_copy.get(key_parts[-2]):
+                                    # key_parts[-2] was already used - needed when only-fields are used on the same
+                                    # dict. e.g. Book.objects().only('book.name', 'book.length')
+                                    last_copy[key_parts[-2]][0].update(subdocument[0])
+                                else:
+                                    last_copy[key_parts[-2]] = subdocument
+
             # otherwise, exclude the fields passed in
             else:
                 doc_copy = self._copy_field(doc, container)
