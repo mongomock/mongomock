@@ -19,6 +19,10 @@ class Database(object):
         return self.get_collection(coll_name)
 
     def __getattr__(self, attr):
+        if attr.startswith('_'):
+            raise AttributeError(
+                "%s has no attribute '%s'. To access the %s collection, use database['%s']." %
+                (self.__class__.__name__, attr, attr, attr))
         return self[attr]
 
     def __repr__(self):
