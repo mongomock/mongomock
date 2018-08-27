@@ -1182,10 +1182,49 @@ class Collection(object):
         return self._delete(spec_or_id, multi=multi)
 
     def count(self, filter=None, **kwargs):
+        warnings.warn(
+            "count is deprecated. Use estimated_document_count or "
+            "count_documents instead. Please note that $where must be replaced "
+            "by $expr, $near must be replaced by $geoWithin with $center, and "
+            "$nearSphere must be replaced by $geoWithin with $centerSphere",
+            DeprecationWarning, stacklevel=2)
         if filter is None:
             return len(self._documents)
         else:
             return len(list(self._iter_documents(filter)))
+
+    def count_documents(self, filter, **kwargs):
+        if kwargs.pop('collation', None):
+            raise NotImplementedError(
+                "The collation argument of count_documents is valid but has not been "
+                "implemented in mongomock yet")
+        skip = kwargs.pop('skip', 0)
+        if 'limit' in kwargs:
+            limit = kwargs.pop('limit')
+            if not isinstance(limit, (int, float)):
+                raise OperationFailure("the limit must be specified as a number")
+            if limit <= 0:
+                raise OperationFailure("the limit must be positive")
+            limit = math.floor(limit)
+        else:
+            limit = None
+        unknown_kwargs = set(kwargs) - {'maxTimeMS', 'hint'}
+        if unknown_kwargs:
+            raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
+
+        count = len(list(self._iter_documents(filter)))
+        if limit is None:
+            return count - skip
+        return min(count - skip, limit)
+
+    def estimated_document_count(self, **kwargs):
+        # Only some kwargs are recognized by this method, however the others
+        # are ignored silently by pymongo.
+        fwd_kwargs = {
+            k: v for k, v in iteritems(kwargs)
+            if k in {'skip', 'limit', 'maxTimeMS', 'hint'}
+        }
+        return self.count_documents({}, **fwd_kwargs)
 
     def drop(self):
         self.database.drop_collection(self.name)

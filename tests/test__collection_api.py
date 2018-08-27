@@ -343,6 +343,32 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.collection.count({'s': 0}), 2)
         self.assertEqual(self.db.collection.count({'s': 1}), 1)
 
+    def test__count_documents(self):
+        self.db.collection.insert_many([
+            {'a': 1, 's': 0},
+            {'a': 2, 's': 0},
+            {'a': 3, 's': 1}
+        ])
+        self.assertEqual(3, self.db.collection.count_documents({}))
+        self.assertEqual(2, self.db.collection.count_documents({'s': 0}))
+        self.assertEqual(1, self.db.collection.count_documents({'s': 1}))
+
+        self.assertEqual(2, self.db.collection.count_documents({}, skip=1))
+        self.assertEqual(1, self.db.collection.count_documents({}, skip=1, limit=1))
+
+        error_kwargs = [
+            {'unknownKwarg': None},
+            {'limit': 'one'},
+            {'limit': -1},
+            {'limit': 0},
+        ]
+        for error_kwarg in error_kwargs:
+            with self.assertRaises(mongomock.OperationFailure):
+                self.db.collection.count_documents({}, **error_kwarg)
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.count_documents({}, collation="fr")
+
     def test__find_returns_cursors(self):
         collection = self.db.collection
         self.assertEqual(type(collection.find()).__name__, "Cursor")
