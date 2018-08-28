@@ -205,19 +205,22 @@ def _combine_projection_spec(projection_fields_spec):
     e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
     """
 
-    tmp_spec = defaultdict(dict)
+    tmp_spec = defaultdict(OrderedDict)
     for f, v in iteritems(projection_fields_spec):
         if '.' not in f:
-            tmp_spec.setdefault(f, v)
+            if isinstance(tmp_spec.get(f), dict) and not v:
+                raise NotImplementedError(
+                    'Mongomock does not support overriding excluding projection: %s' %
+                    projection_fields_spec)
+            tmp_spec[f] = v
         else:
             split_field = f.split('.', 1)
             base_field, new_field = tuple(split_field)
-            if isinstance(tmp_spec.get(base_field), dict):
-                tmp_spec[base_field][new_field] = v
-            else:
-                tmp_spec[base_field] = {new_field: v}
+            if not isinstance(tmp_spec.get(base_field), dict):
+                tmp_spec[base_field] = OrderedDict()
+            tmp_spec[base_field][new_field] = v
 
-    combined_spec = {}
+    combined_spec = OrderedDict()
     for f, v in iteritems(tmp_spec):
         if isinstance(v, dict):
             combined_spec[f] = _combine_projection_spec(v)
@@ -251,7 +254,7 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
             if is_include:
                 doc_copy[key] = doc[key]
             else:
-                doc_copy.pop(key)
+                doc_copy.pop(key, None)
 
     return doc_copy
 

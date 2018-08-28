@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 import datetime
 import re
@@ -740,12 +741,19 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'a': 1, 'b': [{'c': 3, 'd': 4}, {'c': 5, 'd': 6}]})
 
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b': 1})
+        self.cmp.compare.find_one(
+            {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
+        self.cmp.compare.find_one(
+            {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b.c', 1), ('b', 1)]))
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c': 1})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c.e': 1})
-        # This case should work (at least on mongodb version 3.4.1+), but
-        # currently fails in the Travis-CI:
-        self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0, 'b.c.e': 0})
+        self.cmp.compare.find_one(
+            {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b.c.e', 0)]))
+
+        # This one is not implemented in mongmock yet.
+        # self.cmp.compare.find_one(
+        #     {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c.e', 0), ('b.c', 0)]))
 
     # def test__as_class(self):
     #     class MyDict(dict):

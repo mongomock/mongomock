@@ -1172,8 +1172,27 @@ class CollectionAPITest(TestCase):
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c.f': 1})
         self.assertEqual(result, {'a': 1, 'b': [{}, {}]})
 
-        result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0, 'b.c.f': 0})
-        self.assertEqual(result, {'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]})
+    def test__find_projection_with_subdoc_lists_refinements(self):
+        doc = {'a': 1, 'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]}
+        self.db.collection.insert_one(doc)
+
+        result = self.db.collection.find_one(
+            {'a': 1}, OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
+        self.assertEqual(result, doc)
+
+        result = self.db.collection.find_one(
+            {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
+        self.assertEqual(result, {'a': 1, 'b': [{'c': 2}, {'c': 5}]})
+
+        result = self.db.collection.find_one(
+            {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
+        self.assertEqual(result, {'b': [{'d': 3, 'e': 4}, {'d': 6, 'e': 7}]})
+
+        # This one is tricky: the refinement 'b' overrides the previous 'b.c'
+        # but it is not the equivalent of having only 'b'.
+        with self.assertRaises(NotImplementedError):
+            result = self.db.collection.find_one(
+                {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
 
     def test__find_and_project(self):
         self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other'})
