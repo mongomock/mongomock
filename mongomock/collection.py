@@ -199,6 +199,63 @@ class BulkWriteOperation(object):
         self.register_update_op(document, multi=False, remove=True)
 
 
+def _combine_projection_spec(projection_fields_spec):
+    """Re-format a projection fields spec into a nested dictionary.
+
+    e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
+    """
+
+    tmp_spec = defaultdict(dict)
+    for f, v in iteritems(projection_fields_spec):
+        if '.' not in f:
+            tmp_spec.setdefault(f, v)
+        else:
+            split_field = f.split('.', 1)
+            base_field, new_field = tuple(split_field)
+            if isinstance(tmp_spec.get(base_field), dict):
+                tmp_spec[base_field][new_field] = v
+            else:
+                tmp_spec[base_field] = {new_field: v}
+
+    combined_spec = {}
+    for f, v in iteritems(tmp_spec):
+        if isinstance(v, dict):
+            combined_spec[f] = _combine_projection_spec(v)
+        else:
+            combined_spec[f] = v
+
+    return combined_spec
+
+
+def _project_by_spec(doc, combined_projection_spec, is_include, container):
+    doc_copy = container()
+
+    if not is_include:
+        # copy only scalar values
+        for key, val in iteritems(doc):
+            if not isinstance(val, (list, tuple, dict)):
+                doc_copy[key] = val
+
+    for key, spec in iteritems(combined_projection_spec):
+        if key not in doc:
+            continue
+
+        if isinstance(spec, dict):
+            sub = doc[key]
+            if isinstance(sub, (list, tuple)):
+                doc_copy[key] = [_project_by_spec(sub_doc, spec, is_include, container)
+                                 for sub_doc in sub]
+            elif isinstance(sub, dict):
+                doc_copy[key] = _project_by_spec(sub, spec, is_include, container)
+        else:
+            if is_include:
+                doc_copy[key] = doc[key]
+            else:
+                doc_copy.pop(key)
+
+    return doc_copy
+
+
 class BulkOperationBuilder(object):
     def __init__(self, collection, ordered=False):
         self.collection = collection
@@ -906,10 +963,10 @@ class Collection(object):
                 else:
                     doc_copy = self._copy_field(doc, container)
             else:
-                doc_copy = self._project_by_spec(doc,
-                                                 self._combine_projection_spec(fields),
-                                                 is_include=list(fields.values())[0],
-                                                 container=container)
+                doc_copy = _project_by_spec(
+                    doc, _combine_projection_spec(fields),
+                    is_include=list(fields.values())[0],
+                    container=container)
 
             # set the _id value if we requested it, otherwise remove it
             if id_value == 0:
@@ -925,59 +982,6 @@ class Collection(object):
             for field, op in iteritems(projection_operators):
                 fields[field] = op
             return doc_copy
-
-    def _combine_projection_spec(self, projection_fields_spec):
-        """Re-format a projection fields spec into a nested dictionary.
-
-        e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
-        """
-
-        tmp_spec = defaultdict(dict)
-        for f, v in iteritems(projection_fields_spec):
-            if '.' not in f:
-                tmp_spec.setdefault(f, v)
-            else:
-                split_field = f.split('.', 1)
-                base_field, new_field = tuple(split_field)
-                if base_field in tmp_spec and not isinstance(tmp_spec[base_field], dict):
-                    tmp_spec[base_field] = {new_field: v}
-                else:
-                    tmp_spec[base_field][new_field] = v
-
-        combined_spec = {}
-        for f, v in iteritems(tmp_spec):
-            if not isinstance(v, dict):
-                combined_spec[f] = v
-            else:
-                combined_spec[f] = self._combine_projection_spec(v)
-
-        return combined_spec
-
-    def _project_by_spec(self, doc, combined_projection_spec, is_include, container):
-        doc_copy = container()
-
-        if not is_include:
-            # copy only scalar values
-            for key, val in iteritems(doc):
-                if not isinstance(val, (list, tuple, dict)):
-                    doc_copy[key] = val
-
-        for key, spec in iteritems(combined_projection_spec):
-            if key in doc:
-                if not isinstance(spec, dict):
-                    if is_include:
-                        doc_copy[key] = doc[key]
-                    else:
-                        doc_copy.pop(key)
-                else:
-                    sub = doc[key]
-                    if isinstance(sub, (list, tuple)):
-                        doc_copy[key] = [self._project_by_spec(sub_doc, spec, is_include, container)
-                                         for sub_doc in sub]
-                    elif isinstance(sub, dict):
-                        doc_copy[key] = self._project_by_spec(sub, spec, is_include, container)
-
-        return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
