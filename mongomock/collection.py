@@ -1,6 +1,6 @@
 from __future__ import division
 import collections
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 import copy
 from datetime import datetime
 import functools
@@ -205,7 +205,7 @@ def _combine_projection_spec(projection_fields_spec):
     e.g: {'a': 1, 'b.c': 1, 'b.d': 1} => {'a': 1, 'b': {'c': 1, 'd': 1}}
     """
 
-    tmp_spec = defaultdict(OrderedDict)
+    tmp_spec = OrderedDict()
     for f, v in iteritems(projection_fields_spec):
         if '.' not in f:
             if isinstance(tmp_spec.get(f), dict) and not v:
