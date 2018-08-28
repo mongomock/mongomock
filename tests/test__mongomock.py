@@ -11,7 +11,7 @@ from mongomock import Database
 from mongomock import InvalidURI
 from mongomock import OperationFailure
 
-from .utils import DBRef
+from tests.utils import DBRef
 
 try:
     from bson.objectid import ObjectId
@@ -212,12 +212,16 @@ class _CollectionComparisonTest(TestCase):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient()
+                return PymongoClient(maxPoolSize=1)
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
                 if "connection refused" not in e.message.lower():
                     raise
+
+    def tearDown(self):
+        super(_CollectionComparisonTest, self).tearDown()
+        self.mongo_conn.close()
 
 
 class MongoClientCollectionTest(_CollectionComparisonTest):
@@ -291,6 +295,23 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count()
         self.cmp.compare.count({"a": 1})
 
+    def test__count_documents(self):
+        self.cmp.compare.count_documents({})
+        self.cmp.do.insert_one({"a": 1})
+        self.cmp.compare.count_documents({})
+        self.cmp.do.insert_one({"a": 0})
+        self.cmp.compare.count_documents({})
+        self.cmp.compare.count_documents({"a": 1})
+
+    def test__estimated_document_count(self):
+        self.cmp.compare.estimated_document_count()
+        self.cmp.do.insert({"a": 1})
+        self.cmp.compare.estimated_document_count()
+        self.cmp.do.insert({"a": 0})
+        self.cmp.compare.estimated_document_count()
+        self.cmp.compare.estimated_document_count(skip=2)
+        self.cmp.compare.estimated_document_count(filter={"a": 1})
+
     def test__find_one(self):
         self.cmp.do.insert({"_id": "id1", "name": "new"})
         self.cmp.compare.find_one({"_id": "id1"})
@@ -306,7 +327,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         id1 = ObjectId()
         self.cmp.do.insert({"_id": id1, "name": "new"})
         self.cmp.do.insert({"name": "another new"})
-        self.cmp.compare_ignore_order.find()
+        self.cmp.compare_ignore_order.sort_by(lambda doc: str(doc.get("name", str(doc)))).find()
         self.cmp.compare.find({"_id": id1})
 
     def test__find_by_document(self):
@@ -315,6 +336,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({"doc": {"key": "val"}})
         self.cmp.compare.find({"doc": {"key": {'$eq': 'val'}}})
+
+    def test__find_by_empty_document(self):
+        self.cmp.do.insert({"doc": {"data": "val"}})
+        self.cmp.do.insert({"doc": {}})
+        self.cmp.do.insert({"doc": None})
+        self.cmp.compare.find({"doc": {}})
 
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
@@ -380,6 +407,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({
             '_id': id,
             'test': 1
+        })
+        self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
+
+    def test__regex_match_non_string_in_list(self):
+        id = ObjectId()
+        self.cmp.do.insert_one({
+            '_id': id,
+            'test': [3, 2, 1]
         })
         self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
 
@@ -586,9 +621,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert([
             dict(x=single),
             dict(x=even),
-            dict(x=prime)])
+            dict(x=prime),
+            dict()])
         self.cmp.compare_ignore_order.find({'x': {'$in': [7, 8]}})
         self.cmp.compare_ignore_order.find({'x': {'$in': [4, 5]}})
+        self.cmp.compare_ignore_order.find({'x': {'$in': [4, None]}})
         self.cmp.compare_ignore_order.find({'x': {'$nin': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [2, 5]}})
         self.cmp.compare_ignore_order.find({'x': {'$all': [7, 8]}})
@@ -599,6 +636,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'$and': [{'x': 2}, {'x': 7}]})
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 3}]})
         self.cmp.compare_ignore_order.find({'$nor': [{'x': 4}, {'x': 2}]})
+
+    def test__find_operators_in_list(self):
+        self.cmp.do.insert([
+            dict(x=4),
+            dict(x=[300, 500, 4]),
+            dict(x=[1200, 300, 1400])])
+        self.cmp.compare_ignore_order.find({'x': {'$gte': 1100, '$lte': 1250}})
+        self.cmp.compare_ignore_order.find({'x': {'$gt': 300, '$lt': 400}})
 
     def test__find_sets_regex(self):
         self.cmp.do.insert([
@@ -1250,6 +1295,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                [{'size': 'M', 'quantity': 6}, {'size': 'S', 'quantity': 1}]}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_nested_dict_in_list(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({
+            'name': 'bob',
+            'hat': [
+                {'name': 'derby',
+                 'sizes': [{'size': 'L', 'quantity': 3},
+                           {'size': 'XL', 'quantity': 4}],
+                 'colors': ['green', 'blue']},
+                {'name': 'cap',
+                 'sizes': [{'size': 'S', 'quantity': 10},
+                           {'size': 'L', 'quantity': 5}],
+                 'colors': ['blue']}]})
+        self.cmp.do.update(
+            {'name': 'bob'},
+            {'$push': {'hat.1.sizes': {'size': 'M', 'quantity': 6}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__push_nested_list_each(self):
         self.cmp.do.remove()
         self.cmp.do.insert({
@@ -1324,6 +1387,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 self.cmp.compare_ignore_order.find({operator: []})
             except Exception as e:
                 assert isinstance(e, mongomock.OperationFailure)
+
+    def test__rename(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        self.cmp.do.insert_one(input_)
+
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'bar'}}
+        self.cmp.do.update_one(query, update=update)
+
+        self.cmp.compare.find()
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
@@ -1720,15 +1793,21 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate15(self):
+    def test__aggregate_project_include_in_inclusion(self):
         pipeline = [
-            {'$project': {'_id': 1, 'a': 1}}
+            {'$project': {'a': 1, 'b': 1}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate16(self):
+    def test__aggregate_project_exclude_in_exclusion(self):
         pipeline = [
-            {'$project': {'_id': 0, 'a': 1}}
+            {'$project': {'a': 0, 'b': 0}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_project_exclude_id_in_inclusion(self):
+        pipeline = [
+            {'$project': {'a': 1, '_id': 0}}
         ]
         self.cmp.compare.aggregate(pipeline)
 
@@ -1798,6 +1877,77 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}, "total": {"$sum": "$count"}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate27(self):
+        # test $lookup stage
+        pipeline = [
+            {'$lookup': {
+                'from': self.collection_name,
+                'localField': 'a',
+                'foreignField': 'b',
+                'as': 'lookup'
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate28(self):
+        pipeline = [{"$group": {
+            "_id": "$b",
+            "total2015": {"$sum": {"$cond": [{"$eq": [{'$year': '$date'}, 2015]}, 1, 0]}},
+        }}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate29(self):
+        # group addToSet
+        pipeline = [
+            {"$group": {"_id": "$a", "nb": {"$addToSet": "$count"}}},
+            {"$sort": {"_id": 1}}
+        ]
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        self.assertEqual(len(result), len(expected))
+        for expected_elt, result_elt in zip(expected, result):
+            self.assertEqual(expected_elt.keys(), result_elt.keys())
+            for key in result_elt:
+                if isinstance(result_elt[key], list):
+                    self.assertCountEqual(result_elt[key], expected_elt[key], msg=key)
+                else:
+                    self.assertEqual(result_elt[key], expected_elt[key], msg=key)
+
+    def test__aggregate30(self):
+        # group addToSet dict element
+        self.cmp.do.remove()
+        data = [
+            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}},
+            {"a": {"c": "1", "d": 3}, "b": {"c": "4", "d": 4}},
+            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}},
+            {"a": {"c": "5", "d": 2}, "b": {"c": "6", "d": 6}}
+        ]
+        self.cmp.do.insert_many(data)
+        pipeline = [
+            {'$group': {"_id": "a.c", "nb": {"$addToSet": "b"}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate31(self):
+        # group addToSet creating dict
+        pipeline = [
+            {'$group': {"_id": "$count", "set": {"$addToSet": {"a": "$a", "b": "$b"}}}},
+        ]
+        # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
+        aggregations = self.cmp.do.aggregate(pipeline)
+        expected = list(aggregations["real"])
+        result = list(aggregations["fake"])
+        self.assertEqual(len(result), len(expected))
+        set_expected = set([
+            tuple(sorted(e.items())) for elt in expected for e in elt['set']
+        ])
+        set_result = set([
+            tuple(sorted(e.items())) for elt in result for e in elt['set']
+        ])
+        self.assertEqual(set_result, set_expected)
 
 
 def _LIMIT(*args):

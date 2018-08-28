@@ -9,6 +9,7 @@ import json
 import math
 import threading
 import time
+import types
 import warnings
 
 try:
@@ -94,20 +95,41 @@ def validate_write_concern_params(**params):
 def get_value_by_dot(doc, key):
     """Get dictionary value using dotted key"""
     result = doc
-    for i in key.split('.'):
-        result = result[i]
+    for key_item in key.split('.'):
+        if isinstance(result, dict):
+            result = result[key_item]
+
+        elif isinstance(result, (list, tuple)):
+            try:
+                result = result[int(key_item)]
+            except (ValueError, IndexError):
+                raise KeyError()
+
+        else:
+            raise KeyError()
+
     return result
 
 
 def set_value_by_dot(doc, key, value):
     """Set dictionary value using dotted key"""
-    result = doc
-    keys = key.split('.')
-    for i in keys[:-1]:
-        if i not in result:
-            result[i] = {}
-        result = result[i]
-    result[keys[-1]] = value
+    try:
+        parent_key, child_key = key.rsplit('.', 1)
+        parent = get_value_by_dot(doc, parent_key)
+    except ValueError:
+        child_key = key
+        parent = doc
+
+    if isinstance(parent, dict):
+        parent[child_key] = value
+    elif isinstance(parent, (list, tuple)):
+        try:
+            parent[int(child_key)] = value
+        except (ValueError, IndexError):
+            raise KeyError()
+    else:
+        raise KeyError()
+
     return doc
 
 
@@ -255,7 +277,11 @@ class BulkOperationBuilder(object):
     def add_insert(self, doc):
         self.insert(doc)
 
-    def add_update(self, selector, doc, multi, upsert, collation=None):
+    def add_update(self, selector, doc, multi, upsert, collation=None,
+                   array_filters=None):
+        if array_filters:
+            raise NotImplementedError(
+                'Array filters are not implemented in mongomock yet.')
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.register_update_op(doc, multi)
 
@@ -303,23 +329,34 @@ class Collection(object):
         validate_write_concern_params(**kwargs)
         return self._insert(data)
 
-    def insert_one(self, document):
+    def insert_one(self, document, session=None):
         validate_is_mutable_mapping('document', document)
         return InsertOneResult(self._insert(document), acknowledged=True)
 
-    def insert_many(self, documents, ordered=True):
+    def insert_many(self, documents, ordered=True, session=None):
         if not isinstance(documents, collections.Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        try:
-            return InsertManyResult(self._insert(documents), acknowledged=True)
-        except DuplicateKeyError:
-            raise BulkWriteError('batch op errors occurred')
+        return InsertManyResult(self._insert(documents), acknowledged=True)
 
     def _insert(self, data):
-        if isinstance(data, list):
-            return [self._insert(item) for item in data]
+        if isinstance(data, list) or isinstance(data, types.GeneratorType):
+            results = []
+            for index, item in enumerate(data):
+                try:
+                    results.append(self._insert(item))
+                except DuplicateKeyError:
+                    raise BulkWriteError({
+                        'writeErrors': [{
+                            'index': index,
+                            'code': 11000,
+                            'errmsg': 'E11000 duplicate key error',
+                            'op': item,
+                        }],
+                        'nInserted': index,
+                    })
+            return results
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -340,16 +377,28 @@ class Collection(object):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
             raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+        with lock:
+            self._documents[object_id] = self._internalize_dict(data)
+        try:
+            self._ensure_uniques(data)
+        except DuplicateKeyError:
+            # Rollback
+            del self._documents[object_id]
+            raise
+        return data['_id']
+
+    def _ensure_uniques(self, new_data):
+        # Note we consider new_data is already inserted in db
         for unique, is_sparse in self._uniques:
             find_kwargs = {}
             for key, direction in unique:
-                find_kwargs[key] = data.get(key, None)
+                try:
+                    find_kwargs[key] = get_value_by_dot(new_data, key)
+                except KeyError:
+                    find_kwargs[key] = None
             answer_count = len(list(self._iter_documents(find_kwargs)))
-            if answer_count > 0 and not (is_sparse and find_kwargs[key] is None):
+            if answer_count > 1 and not (is_sparse and find_kwargs[key] is None):
                 raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
-        with lock:
-            self._documents[object_id] = self._internalize_dict(data)
-        return data['_id']
 
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in iteritems(d)}
@@ -370,18 +419,18 @@ class Collection(object):
             sub_doc = sub_doc[part]
         del sub_doc[key_parts[-1]]
 
-    def update_one(self, filter, update, upsert=False):
+    def update_one(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert),
                             acknowledged=True)
 
-    def update_many(self, filter, update, upsert=False):
+    def update_many(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert,
                                          multi=True),
                             acknowledged=True)
 
-    def replace_one(self, filter, replacement, upsert=False):
+    def replace_one(self, filter, replacement, upsert=False, session=None):
         validate_ok_for_replace(replacement)
         return UpdateResult(self._update(filter, replacement, upsert=upsert),
                             acknowledged=True)
@@ -423,6 +472,7 @@ class Collection(object):
                 existing_document = to_insert
                 was_insert = True
             else:
+                original_document_snapshot = copy.deepcopy(existing_document)
                 updated_existing = True
             num_updated += 1
             first = True
@@ -432,6 +482,16 @@ class Collection(object):
                     updater = _updaters[k]
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, updater, subdocument)
+
+                elif k == '$rename':
+                    for src, dst in iteritems(v):
+                        if '.' in src or '.' in dst:
+                            raise NotImplementedError(
+                                'Using the $rename operator with dots is a valid MongoDB '
+                                'operation, but it is not yet supported by mongomock'
+                            )
+                        if self._has_key(existing_document, src):
+                            existing_document[dst] = existing_document.pop(src)
 
                 elif k == '$setOnInsert':
                     if not was_insert:
@@ -598,9 +658,12 @@ class Collection(object):
                             # create nested attributes if they do not exist
                             subdocument = existing_document
                             for field in nested_field_list[:-1]:
-                                if field not in subdocument:
-                                    subdocument[field] = {}
-                                subdocument = subdocument[field]
+                                if isinstance(subdocument, dict):
+                                    if field not in subdocument:
+                                        subdocument[field] = {}
+                                    subdocument = subdocument[field]
+                                else:
+                                    subdocument = subdocument[int(field)]
 
                             # we're pushing a list
                             push_results = []
@@ -626,6 +689,9 @@ class Collection(object):
                         existing_document.clear()
                         if _id:
                             existing_document['_id'] = _id
+                        if BSON:
+                            # bson validation
+                            BSON.encode(document, check_keys=True)
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
@@ -643,8 +709,19 @@ class Collection(object):
                 existing_document.clear()
                 if _id:
                     existing_document['_id'] = _id
+
             if was_insert:
                 upserted_id = self._insert(existing_document)
+            else:
+                # Document has been modified in-place, last thing is to make sure it
+                # still respect the unique indexes and if not to revert modifications
+                try:
+                    self._ensure_uniques(existing_document)
+                except DuplicateKeyError:
+                    # Rollback
+                    self._documents[original_document_snapshot['_id']] = original_document_snapshot
+                    raise
+
             if not multi:
                 break
 
@@ -721,7 +798,7 @@ class Collection(object):
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True, collation=None):
+             batch_size=0, manipulate=True, collation=None, session=None):
         spec = filter
         if spec is None:
             spec = {}
@@ -828,11 +905,10 @@ class Collection(object):
                     doc_copy = container()
                 else:
                     doc_copy = self._copy_field(doc, container)
-
             else:
                 doc_copy = self._project_by_spec(doc,
                                                  self._combine_projection_spec(fields),
-                                                 is_include=(list(fields.values())[0] == 1),
+                                                 is_include=list(fields.values())[0],
                                                  container=container)
 
             # set the _id value if we requested it, otherwise remove it
@@ -1083,11 +1159,11 @@ class Collection(object):
                          manipulate, check_keys=True, **kwargs)
             return to_save.get("_id", None)
 
-    def delete_one(self, filter):
+    def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter), True)
 
-    def delete_many(self, filter):
+    def delete_many(self, filter, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(self._delete(filter, multi=True), True)
 
@@ -1122,10 +1198,49 @@ class Collection(object):
         return self._delete(spec_or_id, multi=multi)
 
     def count(self, filter=None, **kwargs):
+        warnings.warn(
+            "count is deprecated. Use estimated_document_count or "
+            "count_documents instead. Please note that $where must be replaced "
+            "by $expr, $near must be replaced by $geoWithin with $center, and "
+            "$nearSphere must be replaced by $geoWithin with $centerSphere",
+            DeprecationWarning, stacklevel=2)
         if filter is None:
             return len(self._documents)
         else:
             return len(list(self._iter_documents(filter)))
+
+    def count_documents(self, filter, **kwargs):
+        if kwargs.pop('collation', None):
+            raise NotImplementedError(
+                "The collation argument of count_documents is valid but has not been "
+                "implemented in mongomock yet")
+        skip = kwargs.pop('skip', 0)
+        if 'limit' in kwargs:
+            limit = kwargs.pop('limit')
+            if not isinstance(limit, (int, float)):
+                raise OperationFailure("the limit must be specified as a number")
+            if limit <= 0:
+                raise OperationFailure("the limit must be positive")
+            limit = math.floor(limit)
+        else:
+            limit = None
+        unknown_kwargs = set(kwargs) - {'maxTimeMS', 'hint'}
+        if unknown_kwargs:
+            raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
+
+        count = len(list(self._iter_documents(filter)))
+        if limit is None:
+            return count - skip
+        return min(count - skip, limit)
+
+    def estimated_document_count(self, **kwargs):
+        # Only some kwargs are recognized by this method, however the others
+        # are ignored silently by pymongo.
+        fwd_kwargs = {
+            k: v for k, v in iteritems(kwargs)
+            if k in {'skip', 'limit', 'maxTimeMS', 'hint'}
+        }
+        return self.count_documents({}, **fwd_kwargs)
 
     def drop(self):
         self.database.drop_collection(self.name)
@@ -1316,7 +1431,7 @@ class Collection(object):
         ret_array = ret_array_copy
         return ret_array
 
-    def aggregate(self, pipeline, **kwargs):
+    def aggregate(self, pipeline, session=None, **kwargs):
         pipeline_operators = [
             '$project',
             '$match',
@@ -1522,12 +1637,27 @@ class Collection(object):
                 field, fallback = values
                 try:
                     out_value = _parse_expression(field, doc_dict)
+                    if out_value is not None:
+                        return out_value
                 except KeyError:
-                    return fallback
-                return out_value if out_value is not None else fallback
+                    pass
+                return _parse_expression(fallback, doc_dict)
+            elif operator == '$cond':
+                if isinstance(values, list):
+                    condition, true_case, false_case = values
+                elif isinstance(values, dict):
+                    condition = values['if']
+                    true_case = values['then']
+                    false_case = values['else']
+                try:
+                    condition_value = _parse_expression(condition, doc_dict)
+                except KeyError:
+                    condition_value = False
+                expression = true_case if condition_value else false_case
+                return _parse_expression(expression, doc_dict)
             else:
                 raise NotImplementedError(
-                    "Although '%s' is a valid date operator for the "
+                    "Although '%s' is a valid conditional operator for the "
                     "aggregation pipeline, it is currently not implemented "
                     " in Mongomock." % operator)
 
@@ -1603,12 +1733,51 @@ class Collection(object):
                 if k == '$match':
                     out_collection = [doc for doc in out_collection
                                       if filter_applies(v, doc)]
+                elif k == '$lookup':
+                    for operator in ('let', 'pipeline'):
+                        if operator in stage['$lookup']:
+                            raise NotImplementedError(
+                                "Although '%s' is a valid lookup operator for the "
+                                "aggregation pipeline, it is currently not "
+                                "implemented in Mongomock." % operator)
+                    for operator in ('from', 'localField', 'foreignField', 'as'):
+                        if operator not in stage['$lookup']:
+                            raise OperationFailure(
+                                "Must specify '%s' field for a $lookup" % operator)
+                        if not isinstance(stage['$lookup'][operator], str):
+                            raise OperationFailure(
+                                'Arguments to $lookup must be strings')
+                        if operator in ('as', 'localField', 'foreignField') and \
+                                stage['$lookup'][operator].startswith('$'):
+                            raise OperationFailure(
+                                "FieldPath field names may not start with '$'")
+                        if operator in ('localField', 'as') and \
+                                '.' in stage['$lookup'][operator]:
+                            raise NotImplementedError(
+                                "Although '.' is valid in the 'localField' and 'as' "
+                                "parameters for the lookup stage of the aggregation "
+                                "pipeline, it is currently not implemented in Mongomock.")
+
+                    foreign_name = stage['$lookup']['from']
+                    local_field = stage['$lookup']['localField']
+                    foreign_field = stage['$lookup']['foreignField']
+                    local_name = stage['$lookup']['as']
+                    foreign_collection = self.database.get_collection(foreign_name)
+                    for doc in out_collection:
+                        query = doc.get(local_field)
+                        if isinstance(query, list):
+                            query = {'$in': query}
+                        matches = foreign_collection.find({foreign_field: query})
+                        doc[local_name] = [foreign_doc for foreign_doc in matches]
                 elif k == '$group':
                     grouped_collection = []
                     _id = stage['$group']['_id']
                     if _id:
                         key_getter = functools.partial(_parse_expression, _id)
-                        out_collection = sorted(out_collection, key=key_getter)
+                        sort_key_getter = _fix_sort_key(key_getter)
+                        # Sort the collection only for the itertools.groupby.
+                        # $group does not order its output document.
+                        out_collection = sorted(out_collection, key=sort_key_getter)
                         grouped = itertools.groupby(out_collection, key_getter)
                     else:
                         grouped = [(None, out_collection)]
@@ -1651,8 +1820,13 @@ class Collection(object):
                                     elif operator == "$last":
                                         doc_dict[field] = values[-1]
                                     elif operator == "$addToSet":
+                                        value = []
                                         val_it = (val or None for val in values)
-                                        doc_dict[field] = set(val_it)
+                                        # Don't use set in case elt in not hashable (like dicts).
+                                        for elt in val_it:
+                                            if elt not in value:
+                                                value.append(elt)
+                                        doc_dict[field] = value
                                     elif operator == '$push':
                                         if field not in doc_dict:
                                             doc_dict[field] = []
@@ -1708,15 +1882,36 @@ class Collection(object):
                                 unwound_collection[-1], v[1:], field_item)
                     out_collection = unwound_collection
                 elif k == '$project':
-                    filter_list = ['_id']
+                    filter_list = []
+                    method = None
+                    include_id = v.get('_id')
                     for field, value in iteritems(v):
-                        if field == '_id' and not value:
-                            filter_list.remove('_id')
-                        elif value:
+                        if '.' in field:
+                            raise NotImplementedError(
+                                'Using subfield "%s" in $project is a valid MongoDB operation; '
+                                "however Mongomock does not support it yet." % field)
+                        if method is None and (field != '_id' or value):
+                            method = 'include' if value else 'exclude'
+                        elif method == 'include' and not value and field != '_id':
+                            raise ValueError(
+                                "Bad projection specification, cannot exclude fields "
+                                "other than '_id' in an inclusion projection: %s" % v)
+                        elif method == 'exclude' and value:
+                            raise ValueError(
+                                "Bad projection specification, cannot include fields "
+                                "or add computed fields during an exclusion projection: %s" % v)
+                        out_collection = _extend_collection(out_collection, field, value)
+                        if field != '_id':
                             filter_list.append(field)
-                            out_collection = _extend_collection(out_collection, field, value)
-                    out_collection = [{k: v for (k, v) in x.items() if k in filter_list}
-                                      for x in out_collection]
+                    if (method == 'include') == (include_id is not False):
+                        filter_list.append('_id')
+                    out_collection = [
+                        {
+                            k: v for (k, v) in x.items()
+                            if (method == 'include') == (k in filter_list)
+                        }
+                        for x in out_collection
+                    ]
                 elif k == '$out':
                     # TODO(MetrodataTeam): should leave the origin collection unchanged
                     collection = self.database.get_collection(v)
@@ -1742,9 +1937,21 @@ class Collection(object):
     def rename(self, new_name, **kwargs):
         self.database.rename_collection(self.name, new_name, **kwargs)
 
-    def bulk_write(self, operations):
+    def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
+        if not ordered:
+            raise NotImplementedError(
+                'Unordered mode is a valid MongoDB operation; however Mongomock'
+                ' does not support it yet.')
+        if bypass_document_validation:
+            raise NotImplementedError(
+                'Skipping document validation is a valid MongoDB operation;'
+                ' however Mongomock does not support it yet.')
+        if session:
+            raise NotImplementedError(
+                'Sessions are valid in MongoDB 3.6 and newer; however Mongomock'
+                ' does not support them yet.')
         bulk = BulkOperationBuilder(self)
-        for operation in operations:
+        for operation in requests:
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)
 
@@ -1760,6 +1967,16 @@ def _resolve_sort_key(key, doc):
         return 0, value
 
     return 1, value
+
+
+def _fix_sort_key(key_getter):
+    def fixed_getter(doc):
+        key = key_getter(doc)
+        # Convert dictionaries to make sorted() work in Python 3.
+        if isinstance(key, dict):
+            return [(k, v) for (k, v) in sorted(key.items())]
+        return key
+    return fixed_getter
 
 
 class Cursor(object):
@@ -1919,6 +2136,9 @@ def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
     if isinstance(doc, dict):
+        if BSON:
+            # bson validation
+            BSON.encode({field_name: value}, check_keys=True)
         doc[field_name] = value
 
 

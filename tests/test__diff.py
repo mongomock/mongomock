@@ -1,4 +1,4 @@
-from .diff import diff
+from tests.diff import diff
 from unittest import TestCase
 
 

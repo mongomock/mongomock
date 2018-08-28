@@ -17,7 +17,7 @@ To understand what it's useful for, we can take the following code:
 
  def increase_votes(collection):
      for document in collection.find():
-         collection.update(document, {'$set' : {'votes' : document['votes'] + 1}})
+         collection.update_one(document, {'$set' : {'votes' : document['votes'] + 1}})
 
 The above code can be tested in several ways:
 
@@ -43,7 +43,7 @@ since they replicate the series of calls made in the code, violating the DRY rul
      record()
      collection_mock.find().AndReturn(objects)
      for obj in objects:
-         collection_mock.update(document, {'$set' : {'votes' : document['votes']}})
+         collection_mock.update_one(document, {'$set' : {'votes' : document['votes']}})
      replay()
      increase_votes(collection_mock)
      verify()
@@ -53,7 +53,7 @@ Let's assume the code changes one day, because the author just learned about the
 .. code-block:: python
 
  def increase_votes(collection):
-     collection.update({}, {'$inc' : {'votes' : 1}})
+     collection.update_many({}, {'$inc' : {'votes' : 1}})
 
 This breaks the test, although the end result being tested is just the same. The test also repeats
 large portions of the code we already wrote.
@@ -68,7 +68,7 @@ the test simply becomes:
      collection = mongomock.MongoClient().db.collection
      objects = [dict(votes=1), dict(votes=2), ...]
      for obj in objects:
-         obj['_id'] = collection.insert(obj)
+         obj['_id'] = collection.insert_one(obj)
      increase_votes(collection)
      for obj in objects:
          stored_obj = collection.find_one({'_id' : obj['_id']})
@@ -78,14 +78,19 @@ the test simply becomes:
 This code checks *increase_votes* with respect to its functionality, not syntax or algorithm, and
 therefore is much more robust as a test.
 
-To download, setup and perfom tests, run the following commands on Mac / Linux:
+If the code to be tested is creating the connection itself with pymongo, you can use
+mongomock with the mock library:
 
-.. code-block:: bash
+.. code-block:: python
 
- git clone git@github.com:vmalloc/mongomock.git
- pip install tox
- cd mongomock
- tox
+  mock_mongo_client = mongomock.MongoClient()
+
+  @mock.patch(pymongo.__name__ + 'MongoClient', new=lambda url: mock_mongo_client)
+  def test_increate_votes_endpoint():
+    objects = [dict(votes=1), dict(votes=2), ...]
+    mock_mongo_client.db.collection.insert_many(objects)
+    call_endpoint('/votes')
+    ... verify mock_mongo_client.db.collection
 
 
 Important Note About Project Status & Development
@@ -114,6 +119,16 @@ When submitting a PR, please make sure that:
 2. No existing test got deleted or unintentionally castrated
 3. The travis build passes on your PR.
 
+To download, setup and perfom tests, run the following commands on Mac / Linux:
+
+.. code-block:: bash
+
+ git clone git@github.com:vmalloc/mongomock.git
+ pip install tox
+ cd mongomock
+ tox
+
+
 Branching model
 ~~~~~~~~~~~~~~~
 
@@ -140,6 +155,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * David Fischer
 * Diego Garcia
 * Dmitriy Kostochko
+* Drew Winstel
 * Edward D'Souza
 * Emily Rosengren
 * Eugene Chernyshov
@@ -151,6 +167,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Jeff Browning
 * Jeff McGee
 * Joël Franusic
+* `Jonathan Hedén <https://github.com/jheden/>`_
 * Julian Hille
 * Krzysztof Płocharz
 * Lyon Zhang

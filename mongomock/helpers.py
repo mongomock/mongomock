@@ -3,6 +3,7 @@ from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import iteritems, PY2
+import sys
 import warnings
 
 
@@ -14,7 +15,11 @@ except ImportError:
 try:
     from bson import RE_TYPE
 except ImportError:
-    RE_TYPE = re._pattern_type
+    if sys.version_info >= (3, 7):
+        # for python3.7+
+        RE_TYPE = re.Pattern
+    else:
+        RE_TYPE = re._pattern_type
 
 try:
     from bson.tz_util import utc
@@ -49,6 +54,7 @@ else:
     basestring = (str, bytes)
 
 ASCENDING = 1
+DESCENDING = -1
 
 
 def print_deprecation_warning(old_param_name, new_param_name):

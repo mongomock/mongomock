@@ -4,7 +4,7 @@ from datetime import datetime, tzinfo, timedelta
 import platform
 import random
 import six
-from six import text_type
+from six import assertCountEqual, text_type
 import time
 from unittest import TestCase, skipIf
 import warnings
@@ -316,6 +316,14 @@ class CollectionAPITest(TestCase):
         for i, doc_id in enumerate(result.inserted_ids):
             self.assert_document_stored(doc_id, documents[i])
 
+    def test__insert_many_with_generator(self):
+        documents = (doc for doc in [{'a': 1}, {'b': 2}])
+        result = self.db.collection.insert_many(documents)
+        self.assertIsInstance(result.inserted_ids, list)
+
+        for i, doc_id in enumerate(result.inserted_ids):
+            self.assert_document_stored(doc_id, documents[i])
+
     def test__insert_many_type_error(self):
         with self.assertRaises(TypeError):
             self.db.collection.insert_many({'a': 1})
@@ -334,6 +342,32 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.collection.count(), 3)
         self.assertEqual(self.db.collection.count({'s': 0}), 2)
         self.assertEqual(self.db.collection.count({'s': 1}), 1)
+
+    def test__count_documents(self):
+        self.db.collection.insert_many([
+            {'a': 1, 's': 0},
+            {'a': 2, 's': 0},
+            {'a': 3, 's': 1}
+        ])
+        self.assertEqual(3, self.db.collection.count_documents({}))
+        self.assertEqual(2, self.db.collection.count_documents({'s': 0}))
+        self.assertEqual(1, self.db.collection.count_documents({'s': 1}))
+
+        self.assertEqual(2, self.db.collection.count_documents({}, skip=1))
+        self.assertEqual(1, self.db.collection.count_documents({}, skip=1, limit=1))
+
+        error_kwargs = [
+            {'unknownKwarg': None},
+            {'limit': 'one'},
+            {'limit': -1},
+            {'limit': 0},
+        ]
+        for error_kwarg in error_kwargs:
+            with self.assertRaises(mongomock.OperationFailure):
+                self.db.collection.count_documents({}, **error_kwarg)
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.count_documents({}, collation="fr")
 
     def test__find_returns_cursors(self):
         collection = self.db.collection
@@ -565,6 +599,28 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.modified_count, 1)
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, {'a': 1, 'b': [{'d': 3}]})
+
+    def test__rename_one_foo_to_bar(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        expected = {'_id': 1, 'bar': 'bar'}
+        insert_result = self.db.collection.insert_one(input_)
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'bar'}}
+        update_result = self.db.collection.update_one(query, update=update)
+
+        self.assertEqual(update_result.modified_count, 1)
+        self.assertEqual(update_result.matched_count, 1)
+        self.assert_document_stored(insert_result.inserted_id, expected)
+
+    def test__rename_unsupported(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        insert_result = self.db.collection.insert_one(input_)
+        self.assert_document_stored(insert_result.inserted_id, input_)
+
+        query = {'_id': 1}
+        update = {'$rename': {'foo': 'f.o.o.'}}
+        self.assertRaises(NotImplementedError,
+                          self.db.collection.update_one, query, update=update)
 
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
@@ -853,6 +909,32 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__ensure_uniq_idxs_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True)
+
+        self.db.collection.insert({"a": 1})
+        self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"a": {"b": 1}})
+
+        self.assertEqual(self.db.collection.find({}).count(), 2)
+
+    def test__ensure_sparse_uniq_idxs_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True, sparse=True)
+        self.db.collection.ensure_index([("c", 1)], unique=True, sparse=True)
+
+        self.db.collection.insert({})
+        self.db.collection.insert({})
+        self.db.collection.insert({"c": 1})
+        self.db.collection.insert({"a": 1})
+        self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"a": {"b": 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({"c": 1})
+
+        self.assertEqual(self.db.collection.find({}).count(), 5)
+
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.ensure_index([("value", 1)], unique=True)
 
@@ -905,6 +987,24 @@ class CollectionAPITest(TestCase):
             self.db.collection.save({'_id': 2, 'value': 1})
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.update({'_id': 2}, {'$set': {'value': 1}}, upsert=True)
+
+    def test_unique_index_with_update(self):
+        self.db.collection.ensure_index([("value", 1)], unique=True)
+
+        self.db.collection.save({'_id': 1, 'value': 1})
+        self.db.collection.save({'_id': 2, 'value': 2})
+
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'value': 1}, {'value': 2})
+
+    def test_unique_index_with_update_on_nested_field(self):
+        self.db.collection.ensure_index([("a.b", 1)], unique=True)
+
+        self.db.collection.save({'_id': 1, 'a': {'b': 1}})
+        self.db.collection.save({'_id': 2, 'a': {'b': 2}})
+
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update({'_id': 1}, {'$set': {'a.b': 2}})
 
     def test_sparse_unique_index_dup(self):
         self.db.collection.ensure_index([("value", 1)], unique=True, sparse=True)
@@ -1074,6 +1174,29 @@ class CollectionAPITest(TestCase):
 
         result = self.db.collection.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0, 'b.c.f': 0})
         self.assertEqual(result, {'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]})
+
+    def test__find_and_project(self):
+        self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other'})
+
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': 1})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': '1'})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': '0'})))
+        self.assertEqual(
+            [{'_id': 1, 'a': 42}],
+            list(self.db.collection.find({}, projection={'a': 'other'})))
+
+        self.assertEqual(
+            [{'_id': 1, 'b': 'other'}],
+            list(self.db.collection.find({}, projection={'a': 0})))
+        self.assertEqual(
+            [{'_id': 1, 'b': 'other'}],
+            list(self.db.collection.find({}, projection={'a': False})))
 
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
@@ -1368,18 +1491,125 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test__aggregate_lookup(self):
+        self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
+        self.db.b.insert_many([
+            {'_id': 2, 'should': 'include'},
+            {'_id': 3, 'should': 'skip'},
+            {'_id': 4, 'should': 'include'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': 'arr',
+                'foreignField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'arr': [2, 4],
+            'b': [
+                {'_id': 2, 'should': 'include'},
+                {'_id': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_lookup_reverse(self):
+        self.db.a.insert_many([
+            {'_id': 1},
+            {'_id': 2},
+            {'_id': 3}
+        ])
+        self.db.b.insert_one({'_id': 4, 'arr': [1, 3]})
+        actual = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': '_id',
+                'foreignField': 'arr',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([
+            {'_id': 1, 'b': [{'_id': 4, 'arr': [1, 3]}]},
+            {'_id': 2, 'b': []},
+            {'_id': 3, 'b': [{'_id': 4, 'arr': [1, 3]}]}
+        ], list(actual))
+
+    def test__aggregate_lookup_not_implemented_operators(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'let': '_id'
+                }}
+            ])
+        self.assertIn(
+            "Although 'let' is a valid lookup operator for the",
+            str(err.exception))
+
+    def test__aggregate_lookup_missing_operator(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'localField': '_id',
+                    'foreignField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Must specify 'from' field for a $lookup",
+            str(err.exception))
+
+    def test__aggregate_lookup_operator_not_string(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'from': 'b',
+                    'localField': 1,
+                    'foreignField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            'Arguments to $lookup must be strings',
+            str(err.exception))
+
+        def test__aggregate_lookup_dot_in_local_field(self):
+            with self.assertRaises(NotImplementedError) as err:
+                self.db.a.aggregate([
+                    {'$lookup': {
+                        'from': 'b',
+                        'localField': 'should.fail',
+                        'foreignField': 'arr',
+                        'as': 'b'
+                    }}
+                ])
+            self.assertIn(
+                "Although '.' is valid in the 'localField' and 'as' parameters",
+                str(err.exception))
+
+    def test__aggregate_lookup_dot_in_as(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'from': 'b',
+                    'localField': '_id',
+                    'foreignField': 'arr',
+                    'as': 'should.fail'
+                }}
+            ])
+        self.assertIn(
+            "Although '.' is valid in the 'localField' and 'as' parameters ",
+            str(err.exception))
+
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$size': '$arr'
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$size': '$arr'})
+            ])}
         ])
         self.assertEqual([{'a': 2}], list(actual))
 
@@ -1388,15 +1618,10 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 2})
         self.db.collection.insert_one({'_id': 3, 'arr': None})
         actual = self.db.collection.aggregate([
-            {},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$size': {'$ifNull': ['$arr', []]}
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$size': {'$ifNull': ['$arr', []]}})
+            ])}
         ])
         self.assertEqual([{'a': 2}, {'a': 0}, {'a': 0}], list(actual))
 
@@ -1404,28 +1629,39 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
-                    'b': {'$ifNull': ['$elem_b', '<missing_b>']}
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$ifNull': ['$elem_a', '<missing_a>']}),
+                ('b', {'$ifNull': ['$elem_b', '<missing_b>']})
+            ])}
         ])
         self.assertEqual([{'a': '<present_a>', 'b': '<missing_b>'}], list(actual))
+
+    def test__aggregate_project_if_null_expression(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'description': 'Description 1', 'title': 'Title 1'},
+            {'_id': 2, 'title': 'Title 2'},
+            {'_id': 3, 'description': None, 'title': 'Title 3'},
+        ])
+        actual = self.db.collection.aggregate([{
+            '$project': {
+                'full_description': {'$ifNull': ['$description', '$title']},
+            }
+        }])
+        self.assertEqual([
+            {'_id': 1, 'full_description': 'Description 1'},
+            {'_id': 2, 'full_description': 'Title 2'},
+            {'_id': 3, 'full_description': 'Title 3'},
+        ], list(actual))
 
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'a': {
-                        '$arrayElemAt': ['$arr', 1]
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('a', {'$arrayElemAt': ['$arr', 1]})
+            ])}
         ])
         self.assertEqual([{'a': 3}], list(actual))
 
@@ -1433,57 +1669,43 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_id': '$_id',
-                    'a': {
-                        '$arrayElemAt': ['$arr', 1]
-                    }
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_id', '$_id')
+            ])}
         ])
-        self.assertEqual([{'a': 3, 'rename_id': 1}],
-                         list(actual))
+        self.assertEqual([{'rename_id': 1}], list(actual))
 
     def test__aggregate_project_rename_dot_fields(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_dot': '$arr.a'
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_dot', '$arr.a')
+            ])}
         ])
-        self.assertEqual([{'rename_dot': 2}],
-                         list(actual))
+        self.assertEqual([{'rename_dot': 2}], list(actual))
 
     def test__aggregate_project_missing_fields(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    '_id': False,
-                    'rename_dot': '$arr.c'
-                }
-            }
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_dot', '$arr.c')
+            ])}
         ])
-        self.assertEqual([{}],
-                         list(actual))
+        self.assertEqual([{}], list(actual))
 
     def test__aggregate_project_out(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
         old_actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {
-                '$project': {
-                    'rename_dot': '$arr.a'
-                }
-            },
+            {'$project': OrderedDict([
+                ('rename_dot', '$arr.a')
+            ])},
             {'$out': 'new_collection'}
         ])
         new_collection = self.db.get_collection('new_collection')
@@ -1492,6 +1714,64 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, new_actual)
         self.assertEqual(expect, list(old_actual))
+
+    def test__aggregate_project_include_in_exclusion(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$project': OrderedDict([
+                    ('a', False),
+                    ('b', True)
+                ])}
+            ])
+        self.assertIn("Bad projection specification", str(err.exception))
+
+    def test__aggregate_project_exclude_in_inclusion(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        with self.assertRaises(ValueError) as err:
+            self.db.collection.aggregate([
+                {'$project': OrderedDict([
+                    ('a', True),
+                    ('b', False)
+                ])}
+            ])
+        self.assertIn("Bad projection specification", str(err.exception))
+
+    def test__aggregate_project_id_can_always_be_excluded(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': OrderedDict([
+                ('a', True),
+                ('b', True),
+                ('_id', False)
+            ])}
+        ])
+        self.assertEqual([{'a': 2, 'b': 3}], list(actual))
+
+    def test__aggregate_project_inclusion_with_only_id(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': True}}
+        ])
+        self.assertEqual([{'_id': 1}], list(actual))
+
+    def test__aggregate_project_exclusion_with_only_id(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': False}}
+        ])
+        self.assertEqual([{'a': 2, 'b': 3}], list(actual))
+
+    def test__aggregate_project_subfield(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': {'b': 3}, 'other': 1},
+            {'_id': 2, 'a': {'c': 3}},
+            {'_id': 3, 'b': {'c': 3}},
+        ])
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a.b': 1}},
+            ])
 
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
@@ -1613,6 +1893,18 @@ class CollectionAPITest(TestCase):
         self.assertEqual(str(cm.exception), 'batch op errors occurred')
 
     @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test_insert_many_bulk_write_error_details(self):
+        collection = self.db.collection
+        with self.assertRaises(mongomock.BulkWriteError) as cm:
+            collection.insert_many([
+                {'_id': 1},
+                {'_id': 1}
+            ])
+        self.assertEqual(65, cm.exception.code)
+        write_errors = cm.exception.details['writeErrors']
+        self.assertEqual([11000], [error.get('code') for error in write_errors])
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
     def test_insert_bson_validation(self):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
@@ -1631,6 +1923,20 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert({"$foo": "bar"})
         self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__update_invalid_encode_type(self):
+        self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
+
+        with self.assertRaises(InvalidDocument):
+            self.db.collection.update_one({}, {'$set': {'foo': {'bar'}}})
+
+    @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+    def test__replace_invalid_encode_type(self):
+        self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
+
+        with self.assertRaises(InvalidDocument):
+            self.db.collection.replace_one({}, {'foo': {'bar'}})
 
     def test_aggregate_unwind_push_first(self):
         collection = self.db.collection
@@ -1714,4 +2020,63 @@ class CollectionAPITest(TestCase):
                     {'weight': 100.0, 'b': '0302071'}],
                 '_id': 'ooo'
             }]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_group_scalar_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'a': 2, 'b': 3, 'c': 4},
+                {'a': 2, 'b': 3, 'c': 5},
+                {'a': 1, 'b': 1, 'c': 1},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$a'}},
+        ])
+        assertCountEqual(self, [{'_id': 1}, {'_id': 2}], list(actual))
+
+    def test__aggregate_group_dict_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'a': 2, 'b': 3, 'c': 4},
+                {'a': 2, 'b': 3, 'c': 5},
+                {'a': 1, 'b': 1, 'c': 1},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': {'a': '$a', 'b': '$b'}}},
+        ])
+        assertCountEqual(
+            self,
+            [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
+            list(actual)
+        )
+
+    def test_aggregate_group_sum(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'group': 'one'},
+            {'group': 'one'},
+            {'group': 'one'},
+            {'group': 'one', 'data': [1, 2]},
+            {'group': 'one', 'data': [3, 4]},
+        ])
+        actual = collection.aggregate([{'$group': {
+            '_id': '$group',
+            'count': {'$sum': 1},
+            'countData': {'$sum': {'$cond': ['$data', 1, 0]}},
+            'countNoData': {'$sum': {'$cond': {
+                'if': '$data',
+                'then': 0,
+                'else': 1,
+            }}},
+        }}])
+        expect = [{
+            '_id': 'one',
+            'count': 5,
+            'countData': 2,
+            'countNoData': 3,
+        }]
         self.assertEqual(expect, list(actual))
