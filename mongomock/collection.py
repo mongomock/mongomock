@@ -1410,7 +1410,7 @@ class Collection(object):
                 if emit_count > 1:
                     full_dict['counts']['reduce'] += 1
             full_dict['counts']['output'] = len(reduced_rows)
-        if isinstance(out, (str, bytes)):
+        if isinstance(out, (string_types, bytes)):
             out_collection = getattr(self.database, out)
             out_collection.drop()
             out_collection.insert(reduced_rows)
@@ -1765,7 +1765,7 @@ class Collection(object):
                                           "in Mongomock." % operator)
 
         def _parse_basic_expression(expression, doc_dict):
-            if isinstance(expression, str) and expression.startswith('$'):
+            if isinstance(expression, string_types) and expression.startswith('$'):
                 get_value = helpers.embedded_item_getter(expression.replace('$', ''))
                 return get_value(doc_dict)
             else:
@@ -1802,7 +1802,7 @@ class Collection(object):
                     break
             if not field_exists:
                 for doc in out_collection:
-                    if isinstance(expression, str) and expression.startswith('$'):
+                    if isinstance(expression, string_types) and expression.startswith('$'):
                         try:
                             doc[field] = get_value_by_dot(doc, expression.lstrip('$'))
                         except KeyError:
@@ -1890,7 +1890,7 @@ class Collection(object):
                         if operator not in stage['$lookup']:
                             raise OperationFailure(
                                 "Must specify '%s' field for a $lookup" % operator)
-                        if not isinstance(stage['$lookup'][operator], str):
+                        if not isinstance(stage['$lookup'][operator], string_types):
                             raise OperationFailure(
                                 'Arguments to $lookup must be strings')
                         if operator in ('as', 'localField', 'foreignField') and \
