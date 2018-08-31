@@ -2169,3 +2169,166 @@ class CollectionAPITest(TestCase):
             'countNoData': 3,
         }]
         self.assertEqual(expect, list(actual))
+
+    def test__aggregate_bucket(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_many([
+            {
+                "_id": 1,
+                "title": "The Pillars of Society",
+                "artist": "Grosz",
+                "year": 1926,
+                "price": 199.99,
+            },
+            {
+                "_id": 2,
+                "title": "Melancholy III",
+                "artist": "Munch",
+                "year": 1902,
+                "price": 200.00,
+            },
+            {
+                "_id": 3,
+                "title": "Dancer",
+                "artist": "Miro",
+                "year": 1925,
+                "price": 76.04,
+            },
+            {
+                "_id": 4,
+                "title": "The Great Wave off Kanagawa",
+                "artist": "Hokusai",
+                "price": 167.30,
+            },
+            {
+                "_id": 5,
+                "title": "The Persistence of Memory",
+                "artist": "Dali",
+                "year": 1931,
+                "price": 483.00,
+            },
+            {
+                "_id": 6,
+                "title": "Composition VII",
+                "artist": "Kandinsky",
+                "year": 1913,
+                "price": 385.00,
+            },
+            {
+                "_id": 7,
+                "title": "The Scream",
+                "artist": "Munch",
+                "year": 1893,
+                # No price
+            },
+            {
+                "_id": 8,
+                "title": "Blue Flower",
+                "artist": "O'Keefe",
+                "year": 1918,
+                "price": 118.42,
+            },
+        ])
+
+        actual = collection.aggregate([{'$bucket': {
+            'groupBy': '$price',
+            'boundaries': [0, 200, 400],
+            'default': 'Other',
+            'output': {
+                'count': {'$sum': 1},
+                'titles': {'$push': '$title'},
+            },
+        }}])
+        expect = [
+            {
+                "_id": 0,
+                "count": 4,
+                "titles": [
+                    "The Pillars of Society",
+                    "Dancer",
+                    "The Great Wave off Kanagawa",
+                    "Blue Flower"
+                ],
+            },
+            {
+                "_id": 200,
+                "count": 2,
+                "titles": [
+                    "Melancholy III",
+                    "Composition VII"
+                ],
+            },
+            {
+                "_id": "Other",
+                "count": 2,
+                "titles": [
+                    "The Persistence of Memory",
+                    "The Scream",
+                ],
+            },
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_bucket_no_default(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_many([
+            {
+                "_id": 1,
+                "title": "The Pillars of Society",
+                "artist": "Grosz",
+                "year": 1926,
+                "price": 199.99,
+            },
+            {
+                "_id": 2,
+                "title": "Melancholy III",
+                "artist": "Munch",
+                "year": 1902,
+                "price": 280.00,
+            },
+            {
+                "_id": 3,
+                "title": "Dancer",
+                "artist": "Miro",
+                "year": 1925,
+                "price": 76.04,
+            },
+        ])
+
+        actual = collection.aggregate([{'$bucket': {
+            'groupBy': '$price',
+            'boundaries': [0, 200, 400, 600],
+        }}])
+        expect = [
+            {
+                "_id": 0,
+                "count": 2,
+            },
+            {
+                "_id": 200,
+                "count": 1,
+            },
+        ]
+        self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{'$bucket': {
+                'groupBy': '$price',
+                'boundaries': [0, 150],
+            }}])
+
+    def test__aggregate_bucket_wrong_options(self):
+        options = [
+            {},
+            {'groupBy': '$price', 'boundaries': [0, 1], 'extraOption': 2},
+            {'groupBy': '$price'},
+            {'boundaries': [0, 1]},
+            {'groupBy': '$price', 'boundaries': 3},
+            {'groupBy': '$price', 'boundaries': [0]},
+            {'groupBy': '$price', 'boundaries': [1, 0]},
+        ]
+        for option in options:
+            with self.assertRaises(mongomock.OperationFailure, msg=option):
+                self.db.collection.aggregate([{'$bucket': option}])
