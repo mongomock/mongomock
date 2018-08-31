@@ -1,4 +1,5 @@
 from __future__ import division
+import bisect
 import collections
 from collections import OrderedDict
 import copy
@@ -1747,6 +1748,67 @@ class Collection(object):
                         doc[field] = _parse_expression(expression.copy(), doc)
             return out_collection
 
+        def _accumulate_group(output_fields, group_list):
+            doc_dict = {}
+            for field, value in iteritems(output_fields):
+                if field == '_id':
+                    continue
+                for operator, key in iteritems(value):
+                    if operator in (
+                            "$sum",
+                            "$avg",
+                            "$min",
+                            "$max",
+                            "$first",
+                            "$last",
+                            "$addToSet",
+                            '$push'
+                    ):
+                        key_getter = functools.partial(_parse_expression, key)
+                        values = [key_getter(doc) for doc in group_list]
+
+                        if operator == "$sum":
+                            val_it = (val or 0 for val in values)
+                            doc_dict[field] = sum(val_it)
+                        elif operator == "$avg":
+                            values = [val or 0 for val in values]
+                            doc_dict[field] = sum(values) / max(len(values), 1)
+                        elif operator == "$min":
+                            val_it = (val or MAXSIZE for val in values)
+                            doc_dict[field] = min(val_it)
+                        elif operator == "$max":
+                            val_it = (val or -MAXSIZE for val in values)
+                            doc_dict[field] = max(val_it)
+                        elif operator == "$first":
+                            doc_dict[field] = values[0]
+                        elif operator == "$last":
+                            doc_dict[field] = values[-1]
+                        elif operator == "$addToSet":
+                            value = []
+                            val_it = (val or None for val in values)
+                            # Don't use set in case elt in not hashable (like dicts).
+                            for elt in val_it:
+                                if elt not in value:
+                                    value.append(elt)
+                            doc_dict[field] = value
+                        elif operator == '$push':
+                            if field not in doc_dict:
+                                doc_dict[field] = values
+                            else:
+                                doc_dict[field].extend(values)
+                    elif operator in group_operators:
+                        raise NotImplementedError(
+                            "Although %s is a valid group operator for the "
+                            "aggregation pipeline, it is currently not implemented "
+                            "in Mongomock." % operator)
+                    else:
+                        raise NotImplementedError(
+                            "%s is not a valid group operator for the aggregation "
+                            "pipeline. See http://docs.mongodb.org/manual/meta/"
+                            "aggregation-quick-reference/ for a complete list of "
+                            "valid operators." % operator)
+            return doc_dict
+
         out_collection = [doc for doc in self.find()]
         for stage in pipeline:
             for k, v in iteritems(stage):
@@ -1804,69 +1866,74 @@ class Collection(object):
 
                     for doc_id, group in grouped:
                         group_list = ([x for x in group])
-                        doc_dict = {'_id': doc_id}
-
-                        for field, value in iteritems(v):
-                            if field == '_id':
-                                continue
-                            for operator, key in iteritems(value):
-                                if operator in (
-                                        "$sum",
-                                        "$avg",
-                                        "$min",
-                                        "$max",
-                                        "$first",
-                                        "$last",
-                                        "$addToSet",
-                                        '$push'
-                                ):
-                                    key_getter = functools.partial(_parse_expression, key)
-                                    values = [key_getter(doc) for doc in group_list]
-
-                                    if operator == "$sum":
-                                        val_it = (val or 0 for val in values)
-                                        doc_dict[field] = sum(val_it)
-                                    elif operator == "$avg":
-                                        values = [val or 0 for val in values]
-                                        doc_dict[field] = sum(values) / max(len(values), 1)
-                                    elif operator == "$min":
-                                        val_it = (val or MAXSIZE for val in values)
-                                        doc_dict[field] = min(val_it)
-                                    elif operator == "$max":
-                                        val_it = (val or -MAXSIZE for val in values)
-                                        doc_dict[field] = max(val_it)
-                                    elif operator == "$first":
-                                        doc_dict[field] = values[0]
-                                    elif operator == "$last":
-                                        doc_dict[field] = values[-1]
-                                    elif operator == "$addToSet":
-                                        value = []
-                                        val_it = (val or None for val in values)
-                                        # Don't use set in case elt in not hashable (like dicts).
-                                        for elt in val_it:
-                                            if elt not in value:
-                                                value.append(elt)
-                                        doc_dict[field] = value
-                                    elif operator == '$push':
-                                        if field not in doc_dict:
-                                            doc_dict[field] = []
-                                        doc_dict[field].extend(values)
-                                else:
-                                    if operator in group_operators:
-                                        raise NotImplementedError(
-                                            "Although %s is a valid group operator for the "
-                                            "aggregation pipeline, it is currently not implemented "
-                                            "in Mongomock." % operator)
-                                    else:
-                                        raise NotImplementedError(
-                                            "%s is not a valid group operator for the aggregation "
-                                            "pipeline. See http://docs.mongodb.org/manual/meta/"
-                                            "aggregation-quick-reference/ for a complete list of "
-                                            "valid operators." % operator)
-
+                        doc_dict = _accumulate_group(v, group_list)
+                        doc_dict['_id'] = doc_id
                         grouped_collection.append(doc_dict)
 
                     out_collection = grouped_collection
+
+                elif k == '$bucket':
+                    unknown_options = set(v) - {'groupBy', 'boundaries', 'output', 'default'}
+                    if unknown_options:
+                        raise OperationFailure(
+                            'Unrecognized option to $bucket: %s.' % unknown_options.pop())
+                    if 'groupBy' not in v or 'boundaries' not in v:
+                        raise OperationFailure(
+                            "$bucket requires 'groupBy' and 'boundaries' to be specified.")
+                    group_by = v['groupBy']
+                    boundaries = v['boundaries']
+                    if not isinstance(boundaries, list):
+                        raise OperationFailure(
+                            "The $bucket 'boundaries' field must be an array, but found type: %s"
+                            % type(boundaries))
+                    if len(boundaries) < 2:
+                        raise OperationFailure(
+                            "The $bucket 'boundaries' field must have at least 2 values, but "
+                            "found %d value(s)." % len(boundaries))
+                    if sorted(boundaries) != boundaries:
+                        raise OperationFailure(
+                            "The 'boundaries' option to $bucket must be sorted in ascending order")
+                    output_fields = v.get('output', {'count': {'$sum': 1}})
+                    default_value = v.get('default', None)
+                    try:
+                        is_default_last = default_value >= boundaries[-1]
+                    except TypeError:
+                        is_default_last = True
+
+                    def _get_default_bucket():
+                        try:
+                            return v['default']
+                        except KeyError:
+                            raise OperationFailure(
+                                '$bucket could not find a matching branch for '
+                                'an input, and no default was specified.')
+
+                    def _get_bucket_id(doc):
+                        """Get the bucket ID for a document.
+
+                        Note that it actually returns a tuple with the first
+                        param being a sort key to sort the default bucket even
+                        if it's not the same type as the boundaries.
+                        """
+                        try:
+                            value = _parse_expression(group_by, doc)
+                        except KeyError:
+                            return (is_default_last, _get_default_bucket())
+                        index = bisect.bisect_right(boundaries, value)
+                        if index and index < len(boundaries):
+                            return (False, boundaries[index - 1])
+                        return (is_default_last, _get_default_bucket())
+
+                    in_collection = ((_get_bucket_id(doc), doc) for doc in out_collection)
+                    out_collection = sorted(in_collection, key=lambda kv: kv[0])
+                    grouped = itertools.groupby(out_collection, lambda kv: kv[0])
+
+                    out_collection = []
+                    for (unused_key, doc_id), group in grouped:
+                        group_list = [kv[1] for kv in group]
+                        doc_dict = _accumulate_group(output_fields, group_list)
+                        doc_dict['_id'] = doc_id
+                        out_collection.append(doc_dict)
 
                 elif k == '$sort':
                     sort_array = []
