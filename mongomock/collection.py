@@ -1440,19 +1440,32 @@ class Collection(object):
 
     def aggregate(self, pipeline, session=None, **kwargs):
         pipeline_operators = [
-            '$project',
-            '$match',
-            '$redact',
-            '$limit',
-            '$skip',
-            '$unwind',
-            '$group',
-            '$sample'
-            '$sort',
+            '$addFields',
+            '$bucket',
+            '$bucketAuto',
+            '$collStats',
+            '$count',
+            '$currentOp',
+            '$facet',
             '$geoNear',
+            '$graphLookup',
+            '$group',
+            '$indexStats',
+            '$limit',
+            '$listLocalSessions',
+            '$listSessions',
             '$lookup',
+            '$match',
             '$out',
-            '$indexStats']
+            '$project',
+            '$redact',
+            '$replaceRoot',
+            '$sample'
+            '$skip',
+            '$sort',
+            '$sortByCount',
+            '$unwind',
+        ]
         group_operators = [
             '$addToSet',
             '$first',
