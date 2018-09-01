@@ -1843,11 +1843,65 @@ class CollectionAPITest(TestCase):
 
     def test__unwind_dict_options(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
-        with self.assertRaises(NotImplementedError) as err:
-            self.db.collection.aggregate([
-                {'$unwind': {'path': '$arr'}}
-            ])
-        self.assertIn('Mongomock', str(err.exception))
+        actual = self.db.collection.aggregate([
+            {'$unwind': {'path': '$arr'}}
+        ])
+        self.assertEqual(
+            [
+                {'_id': 1, 'arr': 1},
+                {'_id': 1, 'arr': 2},
+            ],
+            list(actual))
+
+    def test__unwind_not_array(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': 1})
+        actual = self.db.collection.aggregate([{'$unwind': '$arr'}])
+        self.assertEqual([{'_id': 1, 'arr': 1}], list(actual))
+
+    def test__unwind_include_array_index(self):
+        self.db.collection.insert_many([
+            {"_id": 1, "item": "ABC", "sizes": ["S", "M", "L"]},
+            {"_id": 2, "item": "EFG", "sizes": []},
+            {"_id": 3, "item": "IJK", "sizes": "M"},
+            {"_id": 4, "item": "LMN"},
+            {"_id": 5, "item": "XYZ", "sizes": None},
+        ])
+        actual = self.db.collection.aggregate([
+            {'$unwind': {'path': '$sizes', 'includeArrayIndex': 'arrayIndex'}}
+        ])
+        self.assertEqual(
+            [
+                {'_id': 1, 'item': 'ABC', 'sizes': 'S', 'arrayIndex': 0},
+                {'_id': 1, 'item': 'ABC', 'sizes': 'M', 'arrayIndex': 1},
+                {'_id': 1, 'item': 'ABC', 'sizes': 'L', 'arrayIndex': 2},
+                {'_id': 3, 'item': 'IJK', 'sizes': 'M', 'arrayIndex': None},
+            ],
+            list(actual))
+
+    def test__unwind_preserve_null_and_empty_arrays(self):
+        self.db.collection.insert_many([
+            {"_id": 1, "item": "ABC", "sizes": ["S", "M", "L"]},
+            {"_id": 2, "item": "EFG", "sizes": []},
+            {"_id": 3, "item": "IJK", "sizes": "M"},
+            {"_id": 4, "item": "LMN"},
+            {"_id": 5, "item": "XYZ", "sizes": None},
+            {"_id": 6, "item": "abc", "sizes": False},
+        ])
+        actual = self.db.collection.aggregate([
+            {'$unwind': {'path': '$sizes', 'preserveNullAndEmptyArrays': True}},
+        ])
+        self.assertEqual(
+            [
+                {'_id': 1, 'item': 'ABC', 'sizes': 'S'},
+                {'_id': 1, 'item': 'ABC', 'sizes': 'M'},
+                {'_id': 1, 'item': 'ABC', 'sizes': 'L'},
+                {'_id': 2, 'item': 'EFG'},
+                {'_id': 3, 'item': 'IJK', 'sizes': 'M'},
+                {'_id': 4, 'item': 'LMN'},
+                {'_id': 5, 'item': 'XYZ', 'sizes': None},
+                {'_id': 6, 'item': 'abc', 'sizes': False},
+            ],
+            list(actual))
 
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})

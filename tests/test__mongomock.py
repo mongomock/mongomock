@@ -2065,6 +2065,26 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'default': 'Other',
         }}])
 
+    def test__aggregate_unwind_options(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {"_id": 1, "item": "ABC", "sizes": ["S", "M", "L"]},
+            {"_id": 2, "item": "EFG", "sizes": []},
+            {"_id": 3, "item": "IJK", "sizes": "M"},
+            {"_id": 4, "item": "LMN"},
+            {"_id": 5, "item": "XYZ", "sizes": None},
+        ])
+
+        self.cmp.compare.aggregate([{'$unwind': {'path': '$sizes'}}])
+
+        self.cmp.compare.aggregate([
+            {'$unwind': {'path': '$sizes', 'includeArrayIndex': 'arrayIndex'}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$unwind': {'path': '$sizes', 'preserveNullAndEmptyArrays': True}},
+        ])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
