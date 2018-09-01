@@ -8,6 +8,7 @@ If i miss to include a feature in the below list, Please feel free to add to the
 * create_collection options - https://docs.mongodb.com/v3.2/reference/method/db.createCollection/#definition
 * bypass_document_validation options
 * session options
+* dict options for the `$unwind <https://docs.mongodb.com/manual/reference/operator/aggregation/unwind/>`_ operator
 * Operators in the aggregate pipeline:
 
   * `$addFields <https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/>`_

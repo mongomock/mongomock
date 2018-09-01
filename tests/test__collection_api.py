@@ -1831,6 +1831,14 @@ class CollectionAPITest(TestCase):
             "$unwind failed: exception: field path references must be prefixed with a '$' 'arr'",
             str(err.exception))
 
+    def test__unwind_dict_options(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.collection.aggregate([
+                {'$unwind': {'path': '$arr'}}
+            ])
+        self.assertIn('Mongomock', str(err.exception))
+
     def test__aggregate_project_out_replace(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
