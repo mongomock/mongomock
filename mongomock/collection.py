@@ -136,6 +136,23 @@ def set_value_by_dot(doc, key, value):
     return doc
 
 
+def delete_value_by_dot(doc, key):
+    """Delete dictionary value using dotted key"""
+    try:
+        parent_key, child_key = key.rsplit('.', 1)
+        parent = get_value_by_dot(doc, parent_key)
+    except ValueError:
+        child_key = key
+        parent = doc
+
+    if isinstance(parent, dict):
+        del parent[child_key]
+    else:
+        raise KeyError()
+
+    return doc
+
+
 class BulkWriteOperation(object):
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
@@ -2026,26 +2043,45 @@ class Collection(object):
                 elif k == '$limit':
                     out_collection = out_collection[:v]
                 elif k == '$unwind':
-                    if isinstance(v, dict):
-                        raise NotImplementedError(
-                            'Mongomock does not handle parameters as an object yet')
-                    if not isinstance(v, helpers.basestring) or v[0] != '$':
+                    if not isinstance(v, dict):
+                        v = {'path': v}
+                    path = v['path']
+                    if not isinstance(path, helpers.basestring) or path[0] != '$':
                         raise ValueError(
                             "$unwind failed: exception: field path references must be prefixed "
-                            "with a '$' '%s'" % v)
+                            "with a '$' '%s'" % path)
+                    path = path[1:]
+                    should_preserve_null_and_empty = v.get('preserveNullAndEmptyArrays')
+                    include_array_index = v.get('includeArrayIndex')
                     unwound_collection = []
                     for doc in out_collection:
-                        array_value = get_value_by_dot(doc, v[1:])
-                        if array_value in (None, []):
+                        try:
+                            array_value = get_value_by_dot(doc, path)
+                        except KeyError:
+                            if should_preserve_null_and_empty:
+                                unwound_collection.append(doc)
                             continue
-                        elif not isinstance(array_value, list):
-                            raise TypeError(
-                                '$unwind must specify an array field, field: '
-                                '"%s", value found: %s' % (v, array_value))
-                        for field_item in array_value:
-                            unwound_collection.append(copy.deepcopy(doc))
-                            unwound_collection[-1] = set_value_by_dot(
-                                unwound_collection[-1], v[1:], field_item)
+                        if array_value is None:
+                            if should_preserve_null_and_empty:
+                                unwound_collection.append(doc)
+                            continue
+                        if array_value == []:
+                            if should_preserve_null_and_empty:
+                                new_doc = copy.deepcopy(doc)
+                                delete_value_by_dot(new_doc, path)
+                                unwound_collection.append(new_doc)
+                            continue
+                        if isinstance(array_value, list):
+                            iter_array = enumerate(array_value)
+                        else:
+                            iter_array = [(None, array_value)]
+                        for index, field_item in iter_array:
+                            new_doc = copy.deepcopy(doc)
+                            new_doc = set_value_by_dot(new_doc, path, field_item)
+                            if include_array_index:
+                                new_doc = set_value_by_dot(new_doc, include_array_index, index)
+                            unwound_collection.append(new_doc)
+
                     out_collection = unwound_collection
                 elif k == '$project':
                     filter_list = []
