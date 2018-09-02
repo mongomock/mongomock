@@ -681,6 +681,10 @@ class Collection(object):
                             # document should be a list
                             # append to it
                             if isinstance(value, dict):
+                                if '$slice' in value:
+                                    raise NotImplementedError(
+                                        '$slice is a valid modifier of a $push operation but it is '
+                                        'not supported by Mongomock yet')
                                 if '$each' in value:
                                     # append the list to the field
                                     existing_document[field] += list(value['$each'])
@@ -701,6 +705,10 @@ class Collection(object):
                                 push_results = subdocument[nested_field_list[-1]]
 
                             if isinstance(value, dict):
+                                if '$slice' in value:
+                                    raise NotImplementedError(
+                                        '$slice is a valid modifier of a $push operation but it is '
+                                        'not supported by Mongomock yet')
                                 # check to see if we have the format
                                 # { '$each': [] }
                                 if '$each' in value:
@@ -732,6 +740,10 @@ class Collection(object):
                                 push_results = subdocument[nested_field_list[-1]]
 
                             if isinstance(value, dict) and '$each' in value:
+                                if '$slice' in value:
+                                    raise NotImplementedError(
+                                        '$slice is a valid modifier of a $push operation but it is '
+                                        'not supported by Mongomock yet')
                                 push_results += list(value['$each'])
                             else:
                                 push_results.append(value)
