@@ -1015,6 +1015,16 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__create_uniq_idxs_with_dupes_already_there(self):
+        self.db.collection.insert({"value": 1})
+        self.db.collection.insert({"value": 1})
+
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.create_index([("value", 1)], unique=True)
+
+        self.db.collection.insert({"value": 1})
+        self.assertEqual(self.db.collection.find({}).count(), 3)
+
     def test__set_with_positional_operator(self):
         """Real mongodb support positional operator $ for $set operation"""
         base_document = {"int_field": 1,

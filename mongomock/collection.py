@@ -1268,8 +1268,29 @@ class Collection(object):
         self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, key_or_list, cache_for=300, **kwargs):
-        if kwargs.pop('unique', False):
-            self._uniques.append((helpers.index_list(key_or_list), kwargs.pop('sparse', False)))
+        if not kwargs.pop('unique', False):
+            return
+
+        unique = helpers.index_list(key_or_list)
+        is_sparse = kwargs.pop('sparse', False)
+
+        # Check that documents already verify the uniquess of this new index.
+        indexed = set()
+        for doc in itervalues(self._documents):
+            index = []
+            for key, unused_order in unique:
+                try:
+                    index.append(get_value_by_dot(doc, key))
+                except KeyError:
+                    if is_sparse:
+                        continue
+                    index.append(None)
+            index = tuple(index)
+            if index in indexed:
+                raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+            indexed.add(index)
+
+        self._uniques.append((unique, is_sparse))
 
     def drop_index(self, index_or_name):
         pass
