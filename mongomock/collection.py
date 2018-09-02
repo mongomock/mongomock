@@ -806,6 +806,7 @@ class Collection(object):
         return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
 
     def _get_dataset(self, spec, sort, fields, as_class):
+        print "sagy - _get_dataset = %r , %r , %r" % (spec, fields, as_class)
         dataset = (self._copy_only_fields(document, fields, as_class)
                    for document in self._iter_documents(spec))
         if sort:
@@ -876,6 +877,7 @@ class Collection(object):
 
     def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
+        print "inside _copy_only_fields: %r , %r" % (fields, container)
 
         if fields is None:
             return self._copy_field(doc, container)
@@ -931,9 +933,10 @@ class Collection(object):
                                            for x in subdocument if last_key in x]
                             if subdocument:
                                 if last_copy.get(key_parts[-2]):
-                                    # key_parts[-2] was already used - needed when only-fields are used on the same
-                                    # dict. e.g. Book.objects().only('book.name', 'book.length')
-                                    last_copy[key_parts[-2]][0].update(subdocument[0])
+                                    # key_parts[-2] was already used as field's prefix in the projection parameter
+                                    # e.g. 'book_data' in: db.book.find({}, {book_data.name:1, book_data.length:1})
+                                    for last_copy_index in range(len(last_copy[key_parts[-2]])):
+                                        last_copy[key_parts[-2]][last_copy_index].update(subdocument[last_copy_index])
                                 else:
                                     last_copy[key_parts[-2]] = subdocument
 

@@ -1964,6 +1964,13 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
         # Does nothing - just make sure it exists and takes the right args
         self.cmp.do(lambda cursor: cursor.close()).find()
 
+    def test__multiple_projection_values(self):
+        self.cmp.do.remove()
+        data = {"book_id": 123, "book_translations": [{"translator": 'Sagy', "language": 'Hebrew'},
+                                                      {"translator": 'Yuri', "language": 'Russian'}]}
+        self.cmp.do.insert(data)
+        self.cmp.compare.find({"book_id": 123}, {"book_translations.translator": 1, "book_translations.language": 1})
+
 
 class InsertedDocumentTest(TestCase):
 
@@ -1973,6 +1980,10 @@ class InsertedDocumentTest(TestCase):
         self.data = {"a": 1, "b": [1, 2, 3], "c": {"d": 4}}
         self.orig_data = copy.deepcopy(self.data)
         self.object_id = self.collection.insert(self.data)
+
+    def test__object_distinct_fields(self):
+        self.collection.insert({'a': {'b': 'bbb', 'c': 'ccc'}})
+        print self.collection.find()
 
     def test__object_is_consistent(self):
         [object] = self.collection.find()
