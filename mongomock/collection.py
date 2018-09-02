@@ -806,7 +806,6 @@ class Collection(object):
         return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
 
     def _get_dataset(self, spec, sort, fields, as_class):
-        print "sagy - _get_dataset = %r , %r , %r" % (spec, fields, as_class)
         dataset = (self._copy_only_fields(document, fields, as_class)
                    for document in self._iter_documents(spec))
         if sort:
@@ -877,7 +876,6 @@ class Collection(object):
 
     def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
-        print "inside _copy_only_fields: %r , %r" % (fields, container)
 
         if fields is None:
             return self._copy_field(doc, container)
