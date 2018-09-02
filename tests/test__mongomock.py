@@ -1965,6 +1965,7 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
         self.cmp.do(lambda cursor: cursor.close()).find()
 
     def test__multiple_projection_values(self):
+        # before my fix, mongomock used to fail when projection had complex field, such as tested here:
         self.cmp.do.remove()
         data = {"book_id": 123, "book_translations": [{"translator": 'Sagy', "language": 'Hebrew'},
                                                       {"translator": 'Yuri', "language": 'Russian'}]}
@@ -1980,10 +1981,6 @@ class InsertedDocumentTest(TestCase):
         self.data = {"a": 1, "b": [1, 2, 3], "c": {"d": 4}}
         self.orig_data = copy.deepcopy(self.data)
         self.object_id = self.collection.insert(self.data)
-
-    def test__object_distinct_fields(self):
-        self.collection.insert({'a': {'b': 'bbb', 'c': 'ccc'}})
-        print self.collection.find()
 
     def test__object_is_consistent(self):
         [object] = self.collection.find()
