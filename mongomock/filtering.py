@@ -180,12 +180,22 @@ def _compare_objects(op):
     def _wrapped(a, b):
         # Do not compare uncomparable types, see Type Bracketing:
         # https://docs.mongodb.com/manual/reference/method/db.collection.find/#type-bracketing
-        return _bson_compare(op, a, b, can_compare_types=False)
+        return bson_compare(op, a, b, can_compare_types=False)
 
     return _wrapped
 
 
-def _bson_compare(op, a, b, can_compare_types=True):
+def bson_compare(op, a, b, can_compare_types=True):
+    """Compare two elements using BSON comparison.
+
+    Args:
+        op: the basic operation to compare (e.g. operator.lt, operator.ge).
+        a: the first operand
+        b: the second operand
+        can_compare_types: if True, according to BSON's definition order
+            between types is used, otherwise always return False when types are
+            different.
+    """
     a_type = _get_compare_type(a)
     b_type = _get_compare_type(b)
     if a_type != b_type:
@@ -201,8 +211,11 @@ def _bson_compare(op, a, b, can_compare_types=True):
     if isinstance(a, (tuple, list)):
         for item_a, item_b in zip(a, b):
             if item_a != item_b:
-                return _bson_compare(op, item_a, item_b)
-        return _bson_compare(op, len(a), len(b))
+                return bson_compare(op, item_a, item_b)
+        return bson_compare(op, len(a), len(b))
+
+    if isinstance(a, NoneType):
+        return op(0, 0)
 
     return op(a, b)
 
@@ -283,13 +296,18 @@ def operator_eq(doc_val, search_val):
         return True
     return operator.eq(doc_val, search_val)
 
-OPERATOR_MAP = {
+
+SORTING_OPERATOR_MAP = {
+    '$gt': operator.gt,
+    '$gte': operator.ge,
+    '$lt': operator.lt,
+    '$lte': operator.le,
+}
+
+
+OPERATOR_MAP = dict({
     '$eq': operator_eq,
     '$ne': operator.ne,
-    '$gt': _not_nothing_and(_list_expand(_compare_objects(operator.gt))),
-    '$gte': _not_nothing_and(_list_expand(_compare_objects(operator.ge))),
-    '$lt': _not_nothing_and(_list_expand(_compare_objects(operator.lt))),
-    '$lte': _not_nothing_and(_list_expand(_compare_objects(operator.le))),
     '$all': _all_op,
     '$in': _in_op,
     '$nin': lambda dv, sv: not _in_op(dv, sv),
@@ -298,7 +316,10 @@ OPERATOR_MAP = {
     '$elemMatch': _elem_match_op,
     '$size': _size_op,
     '$type': _type_op
-}
+}, **{
+    key: _not_nothing_and(_list_expand(_compare_objects(op)))
+    for key, op in iteritems(SORTING_OPERATOR_MAP)
+})
 
 
 LOGICAL_OPERATOR_MAP = {

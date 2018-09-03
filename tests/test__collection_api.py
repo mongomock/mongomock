@@ -2222,7 +2222,10 @@ class CollectionAPITest(TestCase):
         collection.insert_many([
             {'group': 'one'},
             {'group': 'one'},
-            {'group': 'one'},
+            {'group': 'one', 'data': None},
+            {'group': 'one', 'data': 0},
+            {'group': 'one', 'data': 2},
+            {'group': 'one', 'data': {'a': 1}},
             {'group': 'one', 'data': [1, 2]},
             {'group': 'one', 'data': [3, 4]},
         ])
@@ -2230,17 +2233,17 @@ class CollectionAPITest(TestCase):
             '_id': '$group',
             'count': {'$sum': 1},
             'countData': {'$sum': {'$cond': ['$data', 1, 0]}},
-            'countNoData': {'$sum': {'$cond': {
-                'if': '$data',
-                'then': 0,
-                'else': 1,
+            'countDataExists': {'$sum': {'$cond': {
+                'if': {'$gt': ['$data', None]},
+                'then': 1,
+                'else': 0,
             }}},
         }}])
         expect = [{
             '_id': 'one',
-            'count': 5,
-            'countData': 2,
-            'countNoData': 3,
+            'count': 8,
+            'countData': 4,
+            'countDataExists': 5,
         }]
         self.assertEqual(expect, list(actual))
 
