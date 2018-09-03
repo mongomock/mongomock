@@ -1989,6 +1989,30 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ])
         self.assertEqual(set_result, set_expected)
 
+    def test__aggregate32(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {'group': 'one'},
+            {'group': 'one'},
+            {'group': 'one', 'data': None},
+            {'group': 'one', 'data': 0},
+            {'group': 'one', 'data': 2},
+            {'group': 'one', 'data': {'a': 1}},
+            {'group': 'one', 'data': [1, 2]},
+            {'group': 'one', 'data': [3, 4]},
+        ])
+        pipeline = [{'$group': {
+            '_id': '$group',
+            'count': {'$sum': 1},
+            'countData': {'$sum': {'$cond': ['$data', 1, 0]}},
+            'countDataExists': {'$sum': {'$cond': {
+                'if': {'$gt': ['$data', None]},
+                'then': 1,
+                'else': 0,
+            }}},
+        }}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_bucket(self):
         self.cmp.do.remove()
         self.cmp.do.insert_many([

@@ -41,8 +41,10 @@ from six import text_type
 
 from mongomock.command_cursor import CommandCursor
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
+from mongomock.filtering import bson_compare
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
+from mongomock.filtering import SORTING_OPERATOR_MAP
 from mongomock import helpers
 from mongomock import InvalidOperation
 from mongomock import ObjectId
@@ -1582,11 +1584,7 @@ class Collection(object):
         comparison_operators = [  # noqa
             '$cmp',
             '$eq',
-            '$gt',
-            '$gte',
-            '$lt',
-            '$lte',
-            '$ne']
+            '$ne'] + list(SORTING_OPERATOR_MAP.keys())
         arithmetic_operators = [  # noqa
             '$abs',
             '$add',
@@ -1674,24 +1672,14 @@ class Collection(object):
 
         def _handle_comparison_operator(operator, values, doc_dict):
             assert len(values) == 2, 'Comparison requires two expressions'
+            a = _parse_expression(values[0], doc_dict)
+            b = _parse_expression(values[1], doc_dict)
             if operator == '$eq':
-                return _parse_expression(values[0], doc_dict) == \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$gt':
-                return _parse_expression(values[0], doc_dict) > \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$gte':
-                return _parse_expression(values[0], doc_dict) >= \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$lt':
-                return _parse_expression(values[0], doc_dict) < \
-                    _parse_expression(values[1], doc_dict)
-            elif operator == '$lte':
-                return _parse_expression(values[0], doc_dict) <= \
-                    _parse_expression(values[1], doc_dict)
+                return a == b
             elif operator == '$ne':
-                return _parse_expression(values[0], doc_dict) != \
-                    _parse_expression(values[1], doc_dict)
+                return a != b
+            elif operator in SORTING_OPERATOR_MAP:
+                return bson_compare(SORTING_OPERATOR_MAP[operator], a, b)
             else:
                 raise NotImplementedError(
                     "Although '%s' is a valid comparison operator for the "
