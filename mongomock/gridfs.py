@@ -17,7 +17,7 @@ def enable_gridfs_integration():
     from mongomock import Database as MongoMockDatabase, Collection as MongoMockCollection
 
     def isinstance_patched(object, classinfo):
-        if type(classinfo) is tuple:
+        if isinstance(classinfo, tuple):
             classesinfo = list(classinfo)
         else:
             classesinfo = [classinfo]

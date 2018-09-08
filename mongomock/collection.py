@@ -807,7 +807,7 @@ class Collection(object):
                             'Invalid modifier specified: {}'.format(k))
                 first = False
             # if empty document comes
-            if len(document) == 0:
+            if not document:
                 _id = spec.get('_id', existing_document.get('_id'))
                 existing_document.clear()
                 if _id:
@@ -1003,7 +1003,7 @@ class Collection(object):
 
             # if we have novalues passed in, make a doc_copy based on the
             # id_value
-            if len(list(fields.values())) == 0:
+            if not fields:
                 if id_value == 1:
                     doc_copy = container()
                 else:
@@ -1349,7 +1349,6 @@ class Collection(object):
     def reindex(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        pass
 
     def list_indexes(self, session=None):
         if session:

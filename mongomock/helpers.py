@@ -4,23 +4,18 @@ from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import iteritems, string_types
-import sys
 import warnings
 
 
+# Get ObjectId from bson if available or import a crafted one. This is not used
+# in this module but is made available for callers of this module.
 try:
-    from bson import ObjectId
+    from bson import ObjectId  # pylint: disable=unused-import
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
 
-try:
-    from bson import RE_TYPE
-except ImportError:
-    if sys.version_info >= (3, 7):
-        # for python3.7+
-        RE_TYPE = re.Pattern
-    else:
-        RE_TYPE = re._pattern_type
+# Cache the RegExp pattern type.
+RE_TYPE = type(re.compile(''))
 
 try:
     from bson.tz_util import utc
@@ -96,8 +91,8 @@ class hashdict(dict):
     """
     def __key(self):
         return frozenset((k,
-                          hashdict(v) if type(v) == dict else
-                          tuple(v) if type(v) == list else
+                          hashdict(v) if isinstance(v, dict) else
+                          tuple(v) if isinstance(v, list) else
                           v)
                          for k, v in iteritems(self))
 

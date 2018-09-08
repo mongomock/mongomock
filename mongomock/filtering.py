@@ -33,7 +33,7 @@ def filter_applies(search_filter, document):
 
         if (isinstance(search, dict) and
                 ('$ne' in search or search == {'$exists': False}) and
-                not len(iter_key_candidates(key, document))):
+                not iter_key_candidates(key, document)):
             continue
         if key == '$comment':
             continue
