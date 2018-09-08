@@ -1510,10 +1510,10 @@ class Collection(object):
         for k in key:
             doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
         for k in key:
-            if not isinstance(k, helpers.basestring):
+            if not isinstance(k, string_types):
                 raise TypeError(
                     "Keys must be a list of key names, "
-                    "each an instance of %s" % helpers.basestring.__name__)
+                    "each an instance of %s" % string_types[0].__name__)
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
@@ -2039,7 +2039,7 @@ class Collection(object):
                     if not isinstance(v, dict):
                         v = {'path': v}
                     path = v['path']
-                    if not isinstance(path, helpers.basestring) or path[0] != '$':
+                    if not isinstance(path, string_types) or path[0] != '$':
                         raise ValueError(
                             "$unwind failed: exception: field path references must be prefixed "
                             "with a '$' '%s'" % path)
@@ -2283,7 +2283,7 @@ class Cursor(object):
     def distinct(self, key, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if not isinstance(key, helpers.basestring):
+        if not isinstance(key, string_types):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         unique_dict_vals = []

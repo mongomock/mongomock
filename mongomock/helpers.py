@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
-from six import iteritems, PY2
+from six import iteritems, string_types
 import sys
 import warnings
 
@@ -48,12 +48,6 @@ except ImportError:
     utc = FixedOffset(0, "UTC")
 
 
-# for Python 3 compatibility
-if PY2:
-    from __builtin__ import basestring
-else:
-    basestring = (str, bytes)
-
 ASCENDING = 1
 DESCENDING = -1
 
@@ -73,7 +67,7 @@ def index_list(key_or_list, direction=None):
     if direction is not None:
         return [(key_or_list, direction)]
     else:
-        if isinstance(key_or_list, basestring):
+        if isinstance(key_or_list, string_types):
             return [(key_or_list, ASCENDING)]
         elif not isinstance(key_or_list, (list, tuple)):
             raise TypeError("if no direction is specified, "
@@ -160,9 +154,9 @@ def _fields_list_to_dict(fields):
     """
     as_dict = {}
     for field in fields:
-        if not isinstance(field, basestring):
+        if not isinstance(field, string_types):
             raise TypeError("fields must be a list of key names, "
-                            "each an instance of %s" % (basestring.__name__,))
+                            "each an instance of %s" % (string_types[0].__name__,))
         as_dict[field] = 1
     return as_dict
 

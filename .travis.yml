@@ -14,6 +14,7 @@ env:
   - TOX_ENV=py37-pymongo-pyexecjs
   - TOX_ENV=pypy-pymongo-pyexecjs
   - TOX_ENV=pep8
+  - TOX_ENV=pylint
 matrix:
     # Run all under 3.5 and pypy under pypy, temporary, to be rolled back once trusty fixes it
     include:

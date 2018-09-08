@@ -5,7 +5,7 @@ from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
 
-from mongomock import helpers
+from six import string_types
 
 
 class Database(object):
@@ -93,7 +93,7 @@ class Database(object):
     def rename_collection(self, name, new_name, dropTarget=False):
         """Changes the name of an existing collection."""
         # These are the same checks that are done in pymongo.
-        if not isinstance(new_name, helpers.basestring):
+        if not isinstance(new_name, string_types):
             raise TypeError("new_name must be an instance of basestring")
         if new_name[0] == "." or new_name[-1] == ".":
             raise InvalidName("collection names must not start or end with '.'")
