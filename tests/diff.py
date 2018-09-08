@@ -1,20 +1,22 @@
 import datetime
 from platform import python_version
+from six import integer_types, string_types, text_type
 
 
 class _NO_VALUE(object):
     pass
+
+
 # we don't use NOTHING because it might be returned from various APIs
 NO_VALUE = _NO_VALUE()
 
-_SUPPORTED_TYPES = set([
-    int, float, bool, str, datetime.datetime, type(None),
-])
-
-dict_type = dict
+_SUPPORTED_TYPES = set(
+    (float, bool, str, datetime.datetime, type(None)) +
+    string_types + integer_types + (text_type,)
+)
 
 if python_version() < "3.0":
-    _SUPPORTED_TYPES.update([long, basestring, unicode])
+    dict_type = dict
 else:
     from collections import Mapping
     dict_type = Mapping
