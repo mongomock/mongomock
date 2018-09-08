@@ -80,6 +80,13 @@ class CollectionAPITest(TestCase):
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
 
+    def test__cursor_alive(self):
+        self.db.collection.insert_one({'foo': 'bar'})
+        cursor = self.db.collection.find()
+        self.assertTrue(cursor.alive)
+        next(cursor)
+        self.assertFalse(cursor.alive)
+
     def test__drop_collection(self):
         self.db.create_collection('a')
         self.db.create_collection('b')

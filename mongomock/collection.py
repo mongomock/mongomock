@@ -2339,6 +2339,10 @@ class Cursor(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    @property
+    def alive(self):
+        return self._emitted != self.count()
+
 
 def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
