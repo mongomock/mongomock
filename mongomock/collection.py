@@ -1576,8 +1576,8 @@ class Collection(object):
             '$stdDevSamp',
             '$arrayElemAt'
         ]
-        boolean_operators = ['$and', '$or', '$not']  # noqa
-        set_operators = [  # noqa
+        boolean_operators = ['$and', '$or', '$not']
+        set_operators = [
             '$setEquals',
             '$setIntersection',
             '$setDifference',
@@ -1585,11 +1585,11 @@ class Collection(object):
             '$setIsSubset',
             '$anyElementTrue',
             '$allElementsTrue']
-        comparison_operators = [  # noqa
+        comparison_operators = [
             '$cmp',
             '$eq',
             '$ne'] + list(SORTING_OPERATOR_MAP.keys())
-        arithmetic_operators = [  # noqa
+        arithmetic_operators = [
             '$abs',
             '$add',
             '$ceil',
@@ -1605,21 +1605,21 @@ class Collection(object):
             '$sqrt',
             '$subtract',
             '$trunc']
-        string_operators = [  # noqa
+        string_operators = [
             '$concat',
             '$strcasecmp',
             '$substr',
             '$toLower',
             '$toUpper']
-        text_search_operators = ['$meta']  # noqa
-        array_operators = [  # noqa
+        text_search_operators = ['$meta']
+        array_operators = [
             '$arrayElemAt',
             '$concatArrays',
             '$filter',
             '$isArray',
             '$size',
             '$slice']
-        projection_operators = ['$map', '$let', '$literal']  # noqa
+        projection_operators = ['$map', '$let', '$literal']
         date_operators = [  # noqa
             '$dayOfYear',
             '$dayOfMonth',
@@ -1632,7 +1632,7 @@ class Collection(object):
             '$second',
             '$millisecond',
             '$dateToString']
-        conditional_operators = ['$cond', '$ifNull']  # noqa
+        conditional_operators = ['$cond', '$ifNull']
 
         def _handle_arithmetic_operator(operator, values, doc_dict):
             if operator == '$abs':
@@ -1800,6 +1800,12 @@ class Collection(object):
                     return _handle_array_operator(k, v, doc_dict)
                 elif k in conditional_operators:
                     return _handle_conditional_operator(k, v, doc_dict)
+                elif k in boolean_operators + set_operators + string_operators + \
+                        text_search_operators + projection_operators:
+                    raise NotImplementedError(
+                        "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
+                elif k.startswith('$'):
+                    raise OperationFailure("Unrecognized expression '%s'" % k)
                 else:
                     value_dict[k] = _parse_expression(v, doc_dict)
 

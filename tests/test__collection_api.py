@@ -1838,6 +1838,20 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a.b': 1}},
             ])
 
+    def test__aggregate_unrecognized(self):
+        self.db.collection.insert_one({})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$notAValidOperation': True}}}
+            ])
+
+    def test__aggregate_not_implemented(self):
+        self.db.collection.insert_one({})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$and': [True, False]}}}
+            ])
+
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})

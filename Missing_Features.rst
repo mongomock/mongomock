@@ -9,7 +9,7 @@ If i miss to include a feature in the below list, Please feel free to add to the
 * bypass_document_validation options
 * session options
 * `$slice modifier <https://docs.mongodb.com/manual/reference/operator/update/slice/>`_ during a $push operation
-* Operators in the aggregate pipeline:
+* Operations of the aggregate pipeline:
 
   * `$addFields <https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/>`_
   * `$bucketAuto <https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/>`_
@@ -22,6 +22,15 @@ If i miss to include a feature in the below list, Please feel free to add to the
   * `$indexStats <https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/>`_
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_
   * `$listSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/>`_
-  * `$multiply <https://docs.mongodb.com/manual/reference/operator/aggregation/multiply/>`_
   * `$replaceRoot <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/>`_
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
+* Operators within the aggregate pipeline:
+  * Some arithmetic operators:
+    * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
+    * `$multiply <https://docs.mongodb.com/manual/reference/operator/aggregation/multiply/>`_
+    * `$trunc <https://docs.mongodb.com/manual/reference/operator/aggregation/trunc/>`_
+  * Boolean operators ($and, $or, $not)
+  * Set operators ($setEquals, $setIntersection, $setDifference, …)
+  * String operators ($concat, $strcasecmp, $substr, …)
+  * Text search operator ($meta)
+  * Projection operators ($map, $let, $literal)
