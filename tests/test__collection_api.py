@@ -2073,6 +2073,21 @@ class CollectionAPITest(TestCase):
             [{'_id': 1, 'max': 9, 'min': 2, 'avg': 3, 'sum': 13, 'maxString': '$d'}],
             list(actual))
 
+    def test__aggregate_arithmetic(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'sum': {'$add': [15, '$a', '$b', '$c']},
+            'prod': {'$multiply': [5, '$a', '$b', '$c']},
+            'trunc': {'$trunc': '$a'},
+        }}])
+        self.assertEqual(
+            [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
     def test__aggregate_unrecognized(self):
         self.db.collection.insert_one({})
         with self.assertRaises(mongomock.OperationFailure):

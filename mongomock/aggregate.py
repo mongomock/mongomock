@@ -3,6 +3,7 @@
 import datetime
 import math
 import six
+from six import moves
 
 from mongomock import filtering
 from mongomock import helpers
@@ -141,6 +142,8 @@ class Parser(object):
     def _handle_arithmetic_operator(self, operator, values):
         if operator == '$abs':
             return abs(self.parse(values))
+        if operator == '$add':
+            return sum(self.parse(value) for value in values)
         if operator == '$ceil':
             return math.ceil(self.parse(values))
         if operator == '$divide':
@@ -160,6 +163,10 @@ class Parser(object):
         if operator == '$mod':
             assert len(values) == 2, 'mod must have only 2 items'
             return math.fmod(self.parse(values[0]), self.parse(values[1]))
+        if operator == '$multiply':
+            return moves.reduce(
+                lambda x, y: x * y,
+                (self.parse(value) for value in values))
         if operator == '$pow':
             assert len(values) == 2, 'pow must have only 2 items'
             return math.pow(self.parse(values[0]), self.parse(values[1]))
@@ -171,6 +178,8 @@ class Parser(object):
             if isinstance(res, datetime.timedelta):
                 return round(res.total_seconds() * 1000)
             return res
+        if operator == '$trunc':
+            return math.trunc(self.parse(values))
         raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
                                   'aggregation pipeline, it is currently not implemented '
                                   ' in Mongomock.' % operator)

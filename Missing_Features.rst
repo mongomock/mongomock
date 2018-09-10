@@ -25,10 +25,9 @@ If i miss to include a feature in the below list, Please feel free to add to the
   * `$replaceRoot <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/>`_
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
 * Operators within the aggregate pipeline:
-  * Some arithmetic operators:
+  * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
-    * `$multiply <https://docs.mongodb.com/manual/reference/operator/aggregation/multiply/>`_
-    * `$trunc <https://docs.mongodb.com/manual/reference/operator/aggregation/trunc/>`_
+    * `$subtract <https://docs.mongodb.com/manual/reference/operator/aggregation/subtract/>`_
   * Boolean operators ($and, $or, $not)
   * Set operators ($setEquals, $setIntersection, $setDifference, …)
   * String operators ($concat, $strcasecmp, $substr, …)
