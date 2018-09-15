@@ -43,7 +43,7 @@ class Database(object):
 
         result = []
         for name in self._get_created_collections():
-            if not name.startswith("system."):
+            if not name.startswith('system.'):
                 result.append(name)
 
         return result
@@ -79,12 +79,12 @@ class Database(object):
 
     def create_collection(self, name, **kwargs):
         if name in self.collection_names():
-            raise CollectionInvalid("collection %s already exists" % name)
+            raise CollectionInvalid('collection %s already exists' % name)
         if not name or '..' in name:
             raise InvalidName('collection names cannot be empty')
 
         if kwargs:
-            raise NotImplementedError("Special options not supported")
+            raise NotImplementedError('Special options not supported')
 
         col = self[name]
         col._force_created = True
@@ -94,10 +94,10 @@ class Database(object):
         """Changes the name of an existing collection."""
         # These are the same checks that are done in pymongo.
         if not isinstance(new_name, string_types):
-            raise TypeError("new_name must be an instance of basestring")
-        if new_name[0] == "." or new_name[-1] == ".":
+            raise TypeError('new_name must be an instance of basestring')
+        if new_name[0] == '.' or new_name[-1] == '.':
             raise InvalidName("collection names must not start or end with '.'")
-        if "$" in new_name:
+        if '$' in new_name:
             raise InvalidName("collection names must not contain '$'")
 
         # Reference for server implementation:
@@ -121,9 +121,9 @@ class Database(object):
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
         if not dbref.collection or not dbref.id:
-            raise TypeError("cannot dereference a %s" % type(dbref))
+            raise TypeError('cannot dereference a %s' % type(dbref))
         if dbref.database is not None and dbref.database != self.name:
-            raise ValueError("trying to dereference a DBRef that points to "
-                             "another database (%r not %r)" % (dbref.database,
+            raise ValueError('trying to dereference a DBRef that points to '
+                             'another database (%r not %r)' % (dbref.database,
                                                                self.__name))
-        return self[dbref.collection].find_one({"_id": dbref.id})
+        return self[dbref.collection].find_one({'_id': dbref.id})

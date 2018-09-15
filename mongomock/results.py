@@ -82,7 +82,7 @@ except ImportError:
 
     class BulkWriteResult(_WriteResult):
 
-        __slots__ = ("__bulk_api_result", "__acknowledged")
+        __slots__ = ('__bulk_api_result', '__acknowledged')
 
         def __init__(self, bulk_api_result, acknowledged):
             self.__bulk_api_result = bulk_api_result
@@ -94,26 +94,26 @@ except ImportError:
 
         @property
         def inserted_count(self):
-            return self.__bulk_api_result.get("nInserted")
+            return self.__bulk_api_result.get('nInserted')
 
         @property
         def matched_count(self):
-            return self.__bulk_api_result.get("nMatched")
+            return self.__bulk_api_result.get('nMatched')
 
         @property
         def modified_count(self):
-            return self.__bulk_api_result.get("nModified")
+            return self.__bulk_api_result.get('nModified')
 
         @property
         def deleted_count(self):
-            return self.__bulk_api_result.get("nRemoved")
+            return self.__bulk_api_result.get('nRemoved')
 
         @property
         def upserted_count(self):
-            return self.__bulk_api_result.get("nUpserted")
+            return self.__bulk_api_result.get('nUpserted')
 
         @property
         def upserted_ids(self):
             if self.__bulk_api_result:
-                return dict((upsert["index"], upsert["_id"])
-                            for upsert in self.bulk_api_result["upserted"])
+                return dict((upsert['index'], upsert['_id'])
+                            for upsert in self.bulk_api_result['upserted'])

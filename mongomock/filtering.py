@@ -101,9 +101,9 @@ def _iter_key_candidates_sublist(key, doc):
     :param doc: a list to be searched for candidates for our key
     :param key: the string key to be matched
     """
-    key_parts = key.split(".")
+    key_parts = key.split('.')
     sub_key = key_parts.pop(0)
-    key_remainder = ".".join(key_parts)
+    key_remainder = '.'.join(key_parts)
     try:
         sub_key_int = int(sub_key)
     except ValueError:
@@ -121,7 +121,7 @@ def _iter_key_candidates_sublist(key, doc):
         return ()  # dead end
     sub_doc = doc[sub_key_int]
     if key_parts:
-        return iter_key_candidates(".".join(key_parts), sub_doc)
+        return iter_key_candidates('.'.join(key_parts), sub_doc)
     return [sub_doc]
 
 

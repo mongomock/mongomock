@@ -40,7 +40,7 @@ except ImportError:
 
         def dst(self, dt):
             return timedelta(0)
-    utc = FixedOffset(0, "UTC")
+    utc = FixedOffset(0, 'UTC')
 
 
 ASCENDING = 1
@@ -50,8 +50,8 @@ DESCENDING = -1
 def print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn(
         "'%s' has been deprecated to be in line with pymongo implementation, a new parameter '%s' "
-        "should be used instead. the old parameter will be kept for backward compatibility "
-        "purposes." % (old_param_name, new_param_name), DeprecationWarning)
+        'should be used instead. the old parameter will be kept for backward compatibility '
+        'purposes.' % (old_param_name, new_param_name), DeprecationWarning)
 
 
 def index_list(key_or_list, direction=None):
@@ -64,20 +64,20 @@ def index_list(key_or_list, direction=None):
     if isinstance(key_or_list, string_types):
         return [(key_or_list, ASCENDING)]
     if not isinstance(key_or_list, (list, tuple)):
-        raise TypeError("if no direction is specified, "
-                        "key_or_list must be an instance of list")
+        raise TypeError('if no direction is specified, '
+                        'key_or_list must be an instance of list')
     return key_or_list
 
 
 class hashdict(dict):
     """hashable dict implementation, suitable for use as a key into other dicts.
 
-    >>> h1 = hashdict({"apples": 1, "bananas":2})
-    >>> h2 = hashdict({"bananas": 3, "mangoes": 5})
+    >>> h1 = hashdict({'apples': 1, 'bananas':2})
+    >>> h2 = hashdict({'bananas': 3, 'mangoes': 5})
     >>> h1+h2
     hashdict(apples=1, bananas=3, mangoes=5)
     >>> d1 = {}
-    >>> d1[h1] = "salad"
+    >>> d1[h1] = 'salad'
     >>> d1[h1]
     'salad'
     >>> d1[h2]
@@ -96,39 +96,39 @@ class hashdict(dict):
                          for k, v in iteritems(self))
 
     def __repr__(self):
-        return "{0}({1})".format(
+        return '{0}({1})'.format(
             self.__class__.__name__,
-            ", ".join("{0}={1}".format(str(i[0]), repr(i[1])) for i in self.__key()))
+            ', '.join('{0}={1}'.format(str(i[0]), repr(i[1])) for i in self.__key()))
 
     def __hash__(self):
         return hash(self.__key())
 
     def __setitem__(self, key, value):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def __delitem__(self, key):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def clear(self):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def pop(self, *args, **kwargs):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def popitem(self, *args, **kwargs):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def setdefault(self, *args, **kwargs):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def update(self, *args, **kwargs):
-        raise TypeError("{0} does not support item assignment"
+        raise TypeError('{0} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def __add__(self, right):
@@ -140,17 +140,17 @@ class hashdict(dict):
 def _fields_list_to_dict(fields):
     """Takes a list of field names and returns a matching dictionary.
 
-    ["a", "b"] becomes {"a": 1, "b": 1}
+    ['a', 'b'] becomes {'a': 1, 'b': 1}
 
     and
 
-    ["a.b.c", "d", "a.c"] becomes {"a.b.c": 1, "d": 1, "a.c": 1}
+    ['a.b.c', 'd', 'a.c'] becomes {'a.b.c': 1, 'd': 1, 'a.c': 1}
     """
     as_dict = {}
     for field in fields:
         if not isinstance(field, string_types):
-            raise TypeError("fields must be a list of key names, "
-                            "each an instance of %s" % (string_types[0].__name__,))
+            raise TypeError('fields must be a list of key names, '
+                            'each an instance of %s' % (string_types[0].__name__,))
         as_dict[field] = 1
     return as_dict
 
@@ -165,22 +165,22 @@ def parse_dbase_from_uri(uri):
     however, the URI is not fully parsed and some invalid URIs may not result
     in an exception.
 
-    "mongodb://host1/database" becomes "database"
+    'mongodb://host1/database' becomes 'database'
 
     and
 
-    "mongodb://host1" becomes None
+    'mongodb://host1' becomes None
     """
-    SCHEME = "mongodb://"
+    SCHEME = 'mongodb://'
 
     if not uri.startswith(SCHEME):
-        raise InvalidURI("Invalid URI scheme: URI "
+        raise InvalidURI('Invalid URI scheme: URI '
                          "must begin with '%s'" % (SCHEME,))
 
     scheme_free = uri[len(SCHEME):]
 
     if not scheme_free:
-        raise InvalidURI("Must provide at least one hostname or IP.")
+        raise InvalidURI('Must provide at least one hostname or IP.')
 
     dbase = None
 
@@ -189,17 +189,17 @@ def parse_dbase_from_uri(uri):
         host_part, _, path_part = scheme_free.rpartition('/')
         if not host_part:
             host_part = path_part
-            path_part = ""
+            path_part = ''
         if '/' in host_part:
             raise InvalidURI("Any '/' in a unix domain socket must be"
-                             " URL encoded: %s" % host_part)
+                             ' URL encoded: %s' % host_part)
         path_part = unquote_plus(path_part)
     else:
         host_part, _, path_part = scheme_free.partition('/')
 
     if not path_part and '?' in host_part:
         raise InvalidURI("A '/' is required between "
-                         "the host list and any options.")
+                         'the host list and any options.')
 
     if path_part:
         if path_part[0] == '?':
@@ -219,8 +219,8 @@ def embedded_item_getter(*keys):
     """Get items from embedded dictionaries.
 
     use case:
-    d = {"a": {"b": 1}}
-    embedded_item_getter("a.b")(d) == 1
+    d = {'a': {'b': 1}}
+    embedded_item_getter('a.b')(d) == 1
 
     :param keys: keys to get
                  embedded keys are separated with dot in string

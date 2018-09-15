@@ -24,7 +24,7 @@ class MongoClient(object):
 
         dbase = None
 
-        if "://" in self.host:
+        if '://' in self.host:
             dbase = parse_dbase_from_uri(self.host)
 
         self.__default_datebase_name = dbase
@@ -55,13 +55,13 @@ class MongoClient(object):
 
     def server_info(self):
         return {
-            "version": "3.0.0",
-            "sysInfo": "Mock",
-            "versionArray": [3, 0, 0, 0],
-            "bits": 64,
-            "debug": False,
-            "maxBsonObjectSize": 16777216,
-            "ok": 1
+            'version': '3.0.0',
+            'sysInfo': 'Mock',
+            'versionArray': [3, 0, 0, 0],
+            'bits': 64,
+            'debug': False,
+            'maxBsonObjectSize': 16777216,
+            'ok': 1
         }
 
     def database_names(self):

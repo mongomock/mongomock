@@ -171,11 +171,11 @@ class BulkWriteOperation(object):
 
         def exec_remove():
             op_result = collection.remove(selector, multi=multi)
-            if op_result.get("ok"):
+            if op_result.get('ok'):
                 return {'nRemoved': op_result.get('n')}
-            err = op_result.get("err")
+            err = op_result.get('err')
             if err:
-                return {"writeErrors": [err]}
+                return {'writeErrors': [err]}
             return {}
         self.builder.executors.append(exec_remove)
 
@@ -188,7 +188,7 @@ class BulkWriteOperation(object):
         self.register_remove_op(multi=False)
 
     def register_update_op(self, document, multi, **extra_args):
-        if not extra_args.get("remove"):
+        if not extra_args.get('remove'):
             validate_ok_for_update(document)
 
         collection = self.builder.collection
@@ -200,8 +200,8 @@ class BulkWriteOperation(object):
                                         **extra_args)
             ret_val = {}
             if result.get('upserted'):
-                ret_val["upserted"] = result.get('upserted')
-                ret_val["nUpserted"] = result.get('n')
+                ret_val['upserted'] = result.get('upserted')
+                ret_val['nUpserted'] = result.get('n')
             modified = result.get('nModified')
             if modified is not None:
                 ret_val['nModified'] = modified
@@ -302,19 +302,19 @@ class BulkOperationBuilder(object):
 
     def __aggregate_operation_result(self, total_result, key, value):
         agg_val = total_result.get(key)
-        assert agg_val is not None, "Unknow operation result %s=%s" \
-                                    " (unrecognized key)" % (key, value)
+        assert agg_val is not None, 'Unknow operation result %s=%s' \
+                                    ' (unrecognized key)' % (key, value)
         if isinstance(agg_val, int):
             total_result[key] += value
         elif isinstance(agg_val, list):
-            if key == "upserted":
-                new_element = {"index": len(agg_val), "_id": value}
+            if key == 'upserted':
+                new_element = {'index': len(agg_val), '_id': value}
                 agg_val.append(new_element)
             else:
                 agg_val.append(value)
         else:
-            assert False, "Fixme: missed aggreation rule for type: %s for" \
-                          " key {%s=%s}" % (type(agg_val), key, agg_val)
+            assert False, 'Fixme: missed aggreation rule for type: %s for' \
+                          ' key {%s=%s}' % (type(agg_val), key, agg_val)
 
     def _set_nModified_policy(self, insert, update):
         self._insert_returns_nModified = insert
@@ -322,9 +322,9 @@ class BulkOperationBuilder(object):
 
     def execute(self, write_concern=None):
         if not self.executors:
-            raise InvalidOperation("Bulk operation empty!")
+            raise InvalidOperation('Bulk operation empty!')
         if self.done:
-            raise InvalidOperation("Bulk operation already executed!")
+            raise InvalidOperation('Bulk operation already executed!')
         self.done = True
         result = {'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
                   'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
@@ -338,11 +338,11 @@ class BulkOperationBuilder(object):
             op_result = execute_func()
             for (key, value) in op_result.items():
                 self.__aggregate_operation_result(result, key, value)
-            if exec_name == "exec_update":
+            if exec_name == 'exec_update':
                 has_update = True
-                if "nModified" not in op_result:
+                if 'nModified' not in op_result:
                     broken_nModified_info = True
-            has_insert |= exec_name == "exec_insert"
+            has_insert |= exec_name == 'exec_insert'
 
         if broken_nModified_info:
             result.pop('nModified')
@@ -380,7 +380,7 @@ class Collection(object):
 
     def __init__(self, database, name, create=False, write_concern=None):
         self.name = name
-        self.full_name = "{0}.{1}".format(database.name, name)
+        self.full_name = '{0}.{1}'.format(database.name, name)
         self.database = database
         self._documents = OrderedDict()
         self._force_created = create
@@ -412,8 +412,8 @@ class Collection(object):
 
     def insert(self, data, manipulate=True, check_keys=True,
                continue_on_error=False, **kwargs):
-        warnings.warn("insert is deprecated. Use insert_one or insert_many "
-                      "instead.", DeprecationWarning, stacklevel=2)
+        warnings.warn('insert is deprecated. Use insert_one or insert_many '
+                      'instead.', DeprecationWarning, stacklevel=2)
         validate_write_concern_params(**kwargs)
         return self._insert(data)
 
@@ -454,7 +454,7 @@ class Collection(object):
             data[key] = helpers.patch_datetime_awareness_in_document(data[key])
 
         if not all(isinstance(k, string_types) for k in data):
-            raise ValueError("Document keys must be strings")
+            raise ValueError('Document keys must be strings')
 
         if BSON:
             # bson validation
@@ -466,7 +466,7 @@ class Collection(object):
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._documents:
-            raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+            raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
         with lock:
             self._documents[object_id] = self._internalize_dict(data)
         try:
@@ -488,7 +488,7 @@ class Collection(object):
                     find_kwargs[key] = None
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 1 and not (is_sparse and find_kwargs[key] is None):
-                raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+                raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in iteritems(d)}
@@ -527,8 +527,8 @@ class Collection(object):
 
     def update(self, spec, document, upsert=False, manipulate=False,
                multi=False, check_keys=False, **kwargs):
-        warnings.warn("update is deprecated. Use replace_one, update_one or "
-                      "update_many instead.", DeprecationWarning, stacklevel=2)
+        warnings.warn('update is deprecated. Use replace_one, update_one or '
+                      'update_many instead.', DeprecationWarning, stacklevel=2)
         return self._update(spec, document, upsert, manipulate, multi,
                             check_keys, **kwargs)
 
@@ -799,7 +799,7 @@ class Collection(object):
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
-                                "The _id field cannot be changed from {0} to {1}"
+                                'The _id field cannot be changed from {0} to {1}'
                                 .format(existing_document['_id'], _id))
                         break
                     else:
@@ -830,13 +830,13 @@ class Collection(object):
                 break
 
         return {
-            text_type("connectionId"): self.database.client._id,
-            text_type("err"): None,
-            text_type("n"): num_updated,
-            text_type("nModified"): num_updated if updated_existing else 0,
-            text_type("ok"): 1,
-            text_type("upserted"): upserted_id,
-            text_type("updatedExisting"): updated_existing,
+            text_type('connectionId'): self.database.client._id,
+            text_type('err'): None,
+            text_type('n'): num_updated,
+            text_type('nModified'): num_updated if updated_existing else 0,
+            text_type('ok'): 1,
+            text_type('upserted'): upserted_id,
+            text_type('updatedExisting'): updated_existing,
         }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
@@ -888,7 +888,7 @@ class Collection(object):
                 sub_doc = {key: sub_doc}
             key = key_parts[0]
             if key in expanded:
-                raise WriteError("cannot infer query fields to set, "
+                raise WriteError('cannot infer query fields to set, '
                                  "both paths '%s' and '%s' are matched"
                                  % (k, paths[key]))
             paths[key] = k
@@ -897,7 +897,7 @@ class Collection(object):
 
     def _discard_operators(self, doc):
         # TODO(this looks a little too naive...)
-        return {k: v for k, v in iteritems(doc) if not k.startswith("$")}
+        return {k: v for k, v in iteritems(doc) if not k.startswith('$')}
 
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,
@@ -984,11 +984,11 @@ class Collection(object):
             return self._copy_field(doc, container)
 
         if not fields:
-            fields = {"_id": 1}
+            fields = {'_id': 1}
         if not isinstance(fields, dict):
             fields = helpers._fields_list_to_dict(fields)
 
-        # we can pass in something like {"_id":0, "field":1}, so pull the id
+        # we can pass in something like {'_id':0, 'field':1}, so pull the id
         # value out and hang on to it until later
         id_value = fields.pop('_id', 1)
 
@@ -1056,9 +1056,9 @@ class Collection(object):
                         new_spec = {}
                         for el in subspec:
                             if el.startswith(part):
-                                if len(el.split(".")) > 1:
-                                    new_spec[".".join(
-                                        el.split(".")[1:])] = subspec[el]
+                                if len(el.split('.')) > 1:
+                                    new_spec['.'.join(
+                                        el.split('.')[1:])] = subspec[el]
                                 else:
                                     new_spec = subspec[el]
                         subspec = new_spec
@@ -1091,7 +1091,7 @@ class Collection(object):
         return subdocument
 
     def _update_document_single_field(self, doc, field_name, field_value, updater):
-        field_name_parts = field_name.split(".")
+        field_name_parts = field_name.split('.')
         for part in field_name_parts[:-1]:
             if isinstance(doc, list):
                 try:
@@ -1158,8 +1158,8 @@ class Collection(object):
 
     def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
                         full_response=False, manipulate=False, fields=None, **kwargs):
-        warnings.warn("find_and_modify is deprecated, use find_one_and_delete"
-                      ", find_one_and_replace, or find_one_and_update instead",
+        warnings.warn('find_and_modify is deprecated, use find_one_and_delete'
+                      ', find_one_and_replace, or find_one_and_update instead',
                       DeprecationWarning, stacklevel=2)
         if 'projection' in kwargs:
             raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
@@ -1171,13 +1171,13 @@ class Collection(object):
                          return_document=ReturnDocument.BEFORE, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        remove = kwargs.get("remove", False)
-        if kwargs.get("new", False) and remove:
+        remove = kwargs.get('remove', False)
+        if kwargs.get('new', False) and remove:
             # message from mongodb
             raise OperationFailure("remove and returnNew can't co-exist")
 
         if not (remove or update):
-            raise ValueError("Must either update or remove")
+            raise ValueError('Must either update or remove')
 
         if remove and update:
             raise ValueError("Can't do both update and remove")
@@ -1199,15 +1199,15 @@ class Collection(object):
         return old
 
     def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
-        warnings.warn("save is deprecated. Use insert_one or replace_one "
-                      "instead", DeprecationWarning, stacklevel=2)
-        validate_is_mutable_mapping("to_save", to_save)
+        warnings.warn('save is deprecated. Use insert_one or replace_one '
+                      'instead', DeprecationWarning, stacklevel=2)
+        validate_is_mutable_mapping('to_save', to_save)
         validate_write_concern_params(**kwargs)
 
-        if "_id" not in to_save:
+        if '_id' not in to_save:
             return self.insert(to_save)
-        self._update({"_id": to_save["_id"]}, to_save, True, manipulate, check_keys=True, **kwargs)
-        return to_save.get("_id", None)
+        self._update({'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs)
+        return to_save.get('_id', None)
 
     def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
@@ -1237,24 +1237,24 @@ class Collection(object):
                 break
 
         return {
-            "connectionId": self.database.client._id,
-            "n": deleted_count,
-            "ok": 1.0,
-            "err": None,
+            'connectionId': self.database.client._id,
+            'n': deleted_count,
+            'ok': 1.0,
+            'err': None,
         }
 
     def remove(self, spec_or_id=None, multi=True, **kwargs):
-        warnings.warn("remove is deprecated. Use delete_one or delete_many "
-                      "instead.", DeprecationWarning, stacklevel=2)
+        warnings.warn('remove is deprecated. Use delete_one or delete_many '
+                      'instead.', DeprecationWarning, stacklevel=2)
         validate_write_concern_params(**kwargs)
         return self._delete(spec_or_id, multi=multi)
 
     def count(self, filter=None, **kwargs):
         warnings.warn(
-            "count is deprecated. Use estimated_document_count or "
-            "count_documents instead. Please note that $where must be replaced "
-            "by $expr, $near must be replaced by $geoWithin with $center, and "
-            "$nearSphere must be replaced by $geoWithin with $centerSphere",
+            'count is deprecated. Use estimated_document_count or '
+            'count_documents instead. Please note that $where must be replaced '
+            'by $expr, $near must be replaced by $geoWithin with $center, and '
+            '$nearSphere must be replaced by $geoWithin with $centerSphere',
             DeprecationWarning, stacklevel=2)
         if kwargs.pop('session', None):
             raise NotImplementedError('Mongomock does not handle sessions yet')
@@ -1265,17 +1265,17 @@ class Collection(object):
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
             raise NotImplementedError(
-                "The collation argument of count_documents is valid but has not been "
-                "implemented in mongomock yet")
+                'The collation argument of count_documents is valid but has not been '
+                'implemented in mongomock yet')
         if kwargs.pop('session', None):
             raise NotImplementedError('Mongomock does not handle sessions yet')
         skip = kwargs.pop('skip', 0)
         if 'limit' in kwargs:
             limit = kwargs.pop('limit')
             if not isinstance(limit, (int, float)):
-                raise OperationFailure("the limit must be specified as a number")
+                raise OperationFailure('the limit must be specified as a number')
             if limit <= 0:
-                raise OperationFailure("the limit must be positive")
+                raise OperationFailure('the limit must be positive')
             limit = math.floor(limit)
         else:
             limit = None
@@ -1314,7 +1314,7 @@ class Collection(object):
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 
-        index_string = "_".join("_".join([str(i) for i in ix]) for ix in index_list)
+        index_string = '_'.join('_'.join([str(i) for i in ix]) for ix in index_list)
         self._index_information[index_string] = {
             'key': index_list,
             'ns': self.full_name,
@@ -1336,7 +1336,7 @@ class Collection(object):
                         index.append(None)
                 index = tuple(index)
                 if index in indexed:
-                    raise DuplicateKeyError("E11000 Duplicate Key Error", 11000)
+                    raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                 indexed.add(index)
 
             self._uniques[index_string] = (index_list, is_sparse)
@@ -1374,7 +1374,7 @@ class Collection(object):
                    query=None, limit=0, session=None):
         if execjs is None:
             raise NotImplementedError(
-                "PyExecJS is required in order to run Map-Reduce. "
+                'PyExecJS is required in order to run Map-Reduce. '
                 "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
             )
         if session:
@@ -1393,7 +1393,7 @@ class Collection(object):
             'timeMillis': 0,
             'ok': 1.0,
             'result': None}
-        map_ctx = execjs.compile("""
+        map_ctx = execjs.compile('''
             function doMap(fnc, docList) {
                 var mappedDict = {};
                 function emit(key, val) {
@@ -1416,8 +1416,8 @@ class Collection(object):
                 }
                 return mappedDict;
             }
-        """)
-        reduce_ctx = execjs.compile("""
+        ''')
+        reduce_ctx = execjs.compile('''
             function doReduce(fnc, docList) {
                 var reducedList = new Array();
                 reducer = eval('('+fnc+')');
@@ -1428,7 +1428,7 @@ class Collection(object):
                 }
                 return reducedList;
             }
-        """)
+        ''')
         doc_list = [json.dumps(doc, default=json_util.default)
                     for doc in self.find(query)]
         mapped_rows = map_ctx.call('doMap', map_func, doc_list)
@@ -1479,10 +1479,10 @@ class Collection(object):
     def group(self, key, condition, initial, reduce, finalize=None):
         if execjs is None:
             raise NotImplementedError(
-                "PyExecJS is required in order to use group. "
+                'PyExecJS is required in order to use group. '
                 "Use 'pip install pyexecjs pymongo' to support group mock."
             )
-        reduce_ctx = execjs.compile("""
+        reduce_ctx = execjs.compile('''
             function doReduce(fnc, docList) {
                 reducer = eval('('+fnc+')');
                 for(var i=0, l=docList.length; i<l; i++) {
@@ -1495,7 +1495,7 @@ class Collection(object):
                 }
             return docList[docList.length - 1];
             }
-        """)
+        ''')
 
         ret_array = []
         doc_list_copy = []
@@ -1521,8 +1521,8 @@ class Collection(object):
         for k in key:
             if not isinstance(k, string_types):
                 raise TypeError(
-                    "Keys must be a list of key names, "
-                    "each an instance of %s" % string_types[0].__name__)
+                    'Keys must be a list of key names, '
+                    'each an instance of %s' % string_types[0].__name__)
             for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
@@ -1679,8 +1679,8 @@ class Collection(object):
                 return _parse_expression(values[0], doc_dict) - _parse_expression(values[1],
                                                                                   doc_dict)
             raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
-                                      "aggregation pipeline, it is currently not implemented "
-                                      " in Mongomock." % operator)
+                                      'aggregation pipeline, it is currently not implemented '
+                                      ' in Mongomock.' % operator)
 
         def _handle_comparison_operator(operator, values, doc_dict):
             assert len(values) == 2, 'Comparison requires two expressions'
@@ -1694,8 +1694,8 @@ class Collection(object):
                 return bson_compare(SORTING_OPERATOR_MAP[operator], a, b)
             raise NotImplementedError(
                 "Although '%s' is a valid comparison operator for the "
-                "aggregation pipeline, it is currently not implemented "
-                " in Mongomock." % operator)
+                'aggregation pipeline, it is currently not implemented '
+                ' in Mongomock.' % operator)
 
         def _handle_date_operator(operator, values, doc_dict):
             out_value = _parse_expression(values, doc_dict)
@@ -1721,25 +1721,25 @@ class Collection(object):
                 return int(out_value.microsecond / 1000)
             raise NotImplementedError(
                 "Although '%s' is a valid date operator for the "
-                "aggregation pipeline, it is currently not implemented "
-                " in Mongomock." % operator)
+                'aggregation pipeline, it is currently not implemented '
+                ' in Mongomock.' % operator)
 
         def _handle_array_operator(operator, value, doc_dict):
             if operator == '$size':
                 if isinstance(value, list):
                     if len(value) != 1:
-                        raise OperationFailure("Expression $size takes exactly 1 arguments. "
-                                               "%d were passed in." % len(value))
+                        raise OperationFailure('Expression $size takes exactly 1 arguments. '
+                                               '%d were passed in.' % len(value))
                     value = value[0]
                 array_value = _parse_expression(value, doc_dict)
                 if not isinstance(array_value, list):
-                    raise OperationFailure("The argument to $size must be an array, "
-                                           "but was of type: %s" % type(array_value))
+                    raise OperationFailure('The argument to $size must be an array, '
+                                           'but was of type: %s' % type(array_value))
                 return len(array_value)
             raise NotImplementedError(
                 "Although '%s' is a valid array operator for the "
-                "aggregation pipeline, it is currently not implemented "
-                "in Mongomock." % operator)
+                'aggregation pipeline, it is currently not implemented '
+                'in Mongomock.' % operator)
 
         def _handle_conditional_operator(operator, values, doc_dict):
             if operator == '$ifNull':
@@ -1766,15 +1766,15 @@ class Collection(object):
                 return _parse_expression(expression, doc_dict)
             raise NotImplementedError(
                 "Although '%s' is a valid conditional operator for the "
-                "aggregation pipeline, it is currently not implemented "
-                " in Mongomock." % operator)
+                'aggregation pipeline, it is currently not implemented '
+                ' in Mongomock.' % operator)
 
         def _handle_project_operator(operator, values, doc_dict):
             if operator == '$min':
                 if len(values) > 2:
-                    raise NotImplementedError("Although %d is a valid amount of elements in "
-                                              "aggregation pipeline, it is currently not "
-                                              " implemented in Mongomock" % len(values))
+                    raise NotImplementedError('Although %d is a valid amount of elements in '
+                                              'aggregation pipeline, it is currently not '
+                                              ' implemented in Mongomock' % len(values))
                 return min(_parse_expression(values[0], doc_dict),
                            _parse_expression(values[1], doc_dict))
             if operator == '$arrayElemAt':
@@ -1783,15 +1783,15 @@ class Collection(object):
                 v = array[index]
                 return v
             raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                      "aggregation pipeline, it is currently not implemented "
-                                      "in Mongomock." % operator)
+                                      'aggregation pipeline, it is currently not implemented '
+                                      'in Mongomock.' % operator)
 
         def _handle_projection_operator(operator, value, doc_dict):
             if operator == '$literal':
                 return value
             raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                      "aggregation pipeline, it is currently not implemented "
-                                      "in Mongomock." % operator)
+                                      'aggregation pipeline, it is currently not implemented '
+                                      'in Mongomock.' % operator)
 
         def _parse_basic_expression(expression, doc_dict):
             if isinstance(expression, string_types) and expression.startswith('$'):
@@ -1854,35 +1854,35 @@ class Collection(object):
                     continue
                 for operator, key in iteritems(value):
                     if operator in (
-                            "$sum",
-                            "$avg",
-                            "$min",
-                            "$max",
-                            "$first",
-                            "$last",
-                            "$addToSet",
+                            '$sum',
+                            '$avg',
+                            '$min',
+                            '$max',
+                            '$first',
+                            '$last',
+                            '$addToSet',
                             '$push'
                     ):
                         key_getter = functools.partial(_parse_expression, key)
                         values = [key_getter(doc) for doc in group_list]
 
-                        if operator == "$sum":
+                        if operator == '$sum':
                             val_it = (val or 0 for val in values)
                             doc_dict[field] = sum(val_it)
-                        elif operator == "$avg":
+                        elif operator == '$avg':
                             values = [val or 0 for val in values]
                             doc_dict[field] = sum(values) / max(len(values), 1)
-                        elif operator == "$min":
+                        elif operator == '$min':
                             val_it = (val or MAXSIZE for val in values)
                             doc_dict[field] = min(val_it)
-                        elif operator == "$max":
+                        elif operator == '$max':
                             val_it = (val or -MAXSIZE for val in values)
                             doc_dict[field] = max(val_it)
-                        elif operator == "$first":
+                        elif operator == '$first':
                             doc_dict[field] = values[0]
-                        elif operator == "$last":
+                        elif operator == '$last':
                             doc_dict[field] = values[-1]
-                        elif operator == "$addToSet":
+                        elif operator == '$addToSet':
                             value = []
                             val_it = (val or None for val in values)
                             # Don't use set in case elt in not hashable (like dicts).
@@ -1897,15 +1897,15 @@ class Collection(object):
                                 doc_dict[field].extend(values)
                     elif operator in group_operators:
                         raise NotImplementedError(
-                            "Although %s is a valid group operator for the "
-                            "aggregation pipeline, it is currently not implemented "
-                            "in Mongomock." % operator)
+                            'Although %s is a valid group operator for the '
+                            'aggregation pipeline, it is currently not implemented '
+                            'in Mongomock.' % operator)
                     else:
                         raise NotImplementedError(
-                            "%s is not a valid group operator for the aggregation "
-                            "pipeline. See http://docs.mongodb.org/manual/meta/"
-                            "aggregation-quick-reference/ for a complete list of "
-                            "valid operators." % operator)
+                            '%s is not a valid group operator for the aggregation '
+                            'pipeline. See http://docs.mongodb.org/manual/meta/'
+                            'aggregation-quick-reference/ for a complete list of '
+                            'valid operators.' % operator)
             return doc_dict
 
         out_collection = [doc for doc in self.find()]
@@ -1919,8 +1919,8 @@ class Collection(object):
                         if operator in stage['$lookup']:
                             raise NotImplementedError(
                                 "Although '%s' is a valid lookup operator for the "
-                                "aggregation pipeline, it is currently not "
-                                "implemented in Mongomock." % operator)
+                                'aggregation pipeline, it is currently not '
+                                'implemented in Mongomock.' % operator)
                     for operator in ('from', 'localField', 'foreignField', 'as'):
                         if operator not in stage['$lookup']:
                             raise OperationFailure(
@@ -1936,8 +1936,8 @@ class Collection(object):
                                 '.' in stage['$lookup'][operator]:
                             raise NotImplementedError(
                                 "Although '.' is valid in the 'localField' and 'as' "
-                                "parameters for the lookup stage of the aggregation "
-                                "pipeline, it is currently not implemented in Mongomock.")
+                                'parameters for the lookup stage of the aggregation '
+                                'pipeline, it is currently not implemented in Mongomock.')
 
                     foreign_name = stage['$lookup']['from']
                     local_field = stage['$lookup']['localField']
@@ -1988,7 +1988,7 @@ class Collection(object):
                     if len(boundaries) < 2:
                         raise OperationFailure(
                             "The $bucket 'boundaries' field must have at least 2 values, but "
-                            "found %d value(s)." % len(boundaries))
+                            'found %d value(s).' % len(boundaries))
                     if sorted(boundaries) != boundaries:
                         raise OperationFailure(
                             "The 'boundaries' option to $bucket must be sorted in ascending order")
@@ -2064,7 +2064,7 @@ class Collection(object):
                     path = v['path']
                     if not isinstance(path, string_types) or path[0] != '$':
                         raise ValueError(
-                            "$unwind failed: exception: field path references must be prefixed "
+                            '$unwind failed: exception: field path references must be prefixed '
                             "with a '$' '%s'" % path)
                     path = path[1:]
                     should_preserve_null_and_empty = v.get('preserveNullAndEmptyArrays')
@@ -2107,17 +2107,17 @@ class Collection(object):
                         if '.' in field:
                             raise NotImplementedError(
                                 'Using subfield "%s" in $project is a valid MongoDB operation; '
-                                "however Mongomock does not support it yet." % field)
+                                'however Mongomock does not support it yet.' % field)
                         if method is None and (field != '_id' or value):
                             method = 'include' if value else 'exclude'
                         elif method == 'include' and not value and field != '_id':
                             raise ValueError(
-                                "Bad projection specification, cannot exclude fields "
+                                'Bad projection specification, cannot exclude fields '
                                 "other than '_id' in an inclusion projection: %s" % v)
                         elif method == 'exclude' and value:
                             raise ValueError(
-                                "Bad projection specification, cannot include fields "
-                                "or add computed fields during an exclusion projection: %s" % v)
+                                'Bad projection specification, cannot include fields '
+                                'or add computed fields during an exclusion projection: %s' % v)
                         out_collection = _extend_collection(out_collection, field, value)
                         if field != '_id':
                             filter_list.append(field)
@@ -2140,12 +2140,12 @@ class Collection(object):
                     if k in pipeline_operators:
                         raise NotImplementedError(
                             "Although '%s' is a valid operator for the aggregation pipeline, it is "
-                            "currently not implemented in Mongomock." % k)
+                            'currently not implemented in Mongomock.' % k)
                     else:
                         raise NotImplementedError(
-                            "%s is not a valid operator for the aggregation pipeline. "
-                            "See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ "
-                            "for a complete list of valid operators." % k)
+                            '%s is not a valid operator for the aggregation pipeline. '
+                            'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
+                            'for a complete list of valid operators.' % k)
         return CommandCursor(out_collection)
 
     def with_options(self, **kwargs):
@@ -2157,8 +2157,8 @@ class Collection(object):
         for key in keys:
             if kwargs.get(key) is not None:
                 raise NotImplementedError(
-                    "%s is a valid parameter for with_options but it is currently not implemented "
-                    "in Mongomock" % key)
+                    '%s is a valid parameter for with_options but it is currently not implemented '
+                    'in Mongomock' % key)
         return self
 
     def rename(self, new_name, session=None, **kwargs):
@@ -2327,20 +2327,20 @@ class Cursor(object):
     def __getitem__(self, index):
         if isinstance(index, slice):
             if index.step is not None:
-                raise IndexError("Cursor instances do not support slice steps")
+                raise IndexError('Cursor instances do not support slice steps')
 
             skip = 0
             if index.start is not None:
                 if index.start < 0:
-                    raise IndexError("Cursor instances do not support"
-                                     "negative indices")
+                    raise IndexError('Cursor instances do not support'
+                                     'negative indices')
                 skip = index.start
 
             if index.stop is not None:
                 limit = index.stop - skip
                 if limit < 0:
-                    raise IndexError("stop index must be greater than start"
-                                     "index for slice %r" % index)
+                    raise IndexError('stop index must be greater than start'
+                                     'index for slice %r' % index)
                 if limit == 0:
                     self.__empty = True
             else:
