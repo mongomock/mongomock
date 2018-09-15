@@ -930,8 +930,7 @@ class Collection(object):
             for key, value in obj.items():
                 new[key] = self._copy_field(value, container)
             return new
-        else:
-            return copy.copy(obj)
+        return copy.copy(obj)
 
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
@@ -983,52 +982,52 @@ class Collection(object):
 
         if fields is None:
             return self._copy_field(doc, container)
+
+        if not fields:
+            fields = {"_id": 1}
+        if not isinstance(fields, dict):
+            fields = helpers._fields_list_to_dict(fields)
+
+        # we can pass in something like {"_id":0, "field":1}, so pull the id
+        # value out and hang on to it until later
+        id_value = fields.pop('_id', 1)
+
+        # filter out fields with projection operators, we will take care of them later
+        projection_operators = self._extract_projection_operators(fields)
+
+        # other than the _id field, all fields must be either includes or
+        # excludes, this can evaluate to 0
+        if len(set(list(fields.values()))) > 1:
+            raise ValueError(
+                'You cannot currently mix including and excluding fields.')
+
+        # if we have novalues passed in, make a doc_copy based on the
+        # id_value
+        if not fields:
+            if id_value == 1:
+                doc_copy = container()
+            else:
+                doc_copy = self._copy_field(doc, container)
         else:
-            if not fields:
-                fields = {"_id": 1}
-            if not isinstance(fields, dict):
-                fields = helpers._fields_list_to_dict(fields)
+            doc_copy = _project_by_spec(
+                doc, _combine_projection_spec(fields),
+                is_include=list(fields.values())[0],
+                container=container)
 
-            # we can pass in something like {"_id":0, "field":1}, so pull the id
-            # value out and hang on to it until later
-            id_value = fields.pop('_id', 1)
+        # set the _id value if we requested it, otherwise remove it
+        if id_value == 0:
+            doc_copy.pop('_id', None)
+        else:
+            if '_id' in doc:
+                doc_copy['_id'] = doc['_id']
 
-            # filter out fields with projection operators, we will take care of them later
-            projection_operators = self._extract_projection_operators(fields)
+        fields['_id'] = id_value  # put _id back in fields
 
-            # other than the _id field, all fields must be either includes or
-            # excludes, this can evaluate to 0
-            if len(set(list(fields.values()))) > 1:
-                raise ValueError(
-                    'You cannot currently mix including and excluding fields.')
-
-            # if we have novalues passed in, make a doc_copy based on the
-            # id_value
-            if not fields:
-                if id_value == 1:
-                    doc_copy = container()
-                else:
-                    doc_copy = self._copy_field(doc, container)
-            else:
-                doc_copy = _project_by_spec(
-                    doc, _combine_projection_spec(fields),
-                    is_include=list(fields.values())[0],
-                    container=container)
-
-            # set the _id value if we requested it, otherwise remove it
-            if id_value == 0:
-                doc_copy.pop('_id', None)
-            else:
-                if '_id' in doc:
-                    doc_copy['_id'] = doc['_id']
-
-            fields['_id'] = id_value  # put _id back in fields
-
-            # time to apply the projection operators and put back their fields
-            self._apply_projection_operators(projection_operators, doc, doc_copy)
-            for field, op in iteritems(projection_operators):
-                fields[field] = op
-            return doc_copy
+        # time to apply the projection operators and put back their fields
+        self._apply_projection_operators(projection_operators, doc, doc_copy)
+        for field, op in iteritems(projection_operators):
+            fields[field] = op
+        return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
@@ -1207,10 +1206,8 @@ class Collection(object):
 
         if "_id" not in to_save:
             return self.insert(to_save)
-        else:
-            self._update({"_id": to_save["_id"]}, to_save, True,
-                         manipulate, check_keys=True, **kwargs)
-            return to_save.get("_id", None)
+        self._update({"_id": to_save["_id"]}, to_save, True, manipulate, check_keys=True, **kwargs)
+        return to_save.get("_id", None)
 
     def delete_one(self, filter, session=None):
         validate_is_mapping('filter', filter)
@@ -1263,8 +1260,7 @@ class Collection(object):
             raise NotImplementedError('Mongomock does not handle sessions yet')
         if filter is None:
             return len(self._documents)
-        else:
-            return len(list(self._iter_documents(filter)))
+        return len(list(self._iter_documents(filter)))
 
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
@@ -1650,42 +1646,41 @@ class Collection(object):
         def _handle_arithmetic_operator(operator, values, doc_dict):
             if operator == '$abs':
                 return abs(_parse_expression(values, doc_dict))
-            elif operator == '$ceil':
+            if operator == '$ceil':
                 return math.ceil(_parse_expression(values, doc_dict))
-            elif operator == '$divide':
+            if operator == '$divide':
                 assert len(values) == 2, 'divide must have only 2 items'
                 return _parse_expression(values[0], doc_dict) / _parse_expression(values[1],
                                                                                   doc_dict)
-            elif operator == '$exp':
+            if operator == '$exp':
                 return math.exp(_parse_expression(values, doc_dict))
-            elif operator == '$floor':
+            if operator == '$floor':
                 return math.floor(_parse_expression(values, doc_dict))
-            elif operator == '$ln':
+            if operator == '$ln':
                 return math.log(_parse_expression(values, doc_dict))
-            elif operator == '$log':
+            if operator == '$log':
                 assert len(values) == 2, 'log must have only 2 items'
                 return math.log(_parse_expression(values[0], doc_dict),
                                 _parse_expression(values[1], doc_dict))
-            elif operator == '$log10':
+            if operator == '$log10':
                 return math.log10(_parse_expression(values, doc_dict))
-            elif operator == '$mod':
+            if operator == '$mod':
                 assert len(values) == 2, 'mod must have only 2 items'
                 return math.fmod(_parse_expression(values[0], doc_dict),
                                  _parse_expression(values[1], doc_dict))
-            elif operator == '$pow':
+            if operator == '$pow':
                 assert len(values) == 2, 'pow must have only 2 items'
                 return math.pow(_parse_expression(values[0], doc_dict),
                                 _parse_expression(values[1], doc_dict))
-            elif operator == '$sqrt':
+            if operator == '$sqrt':
                 return math.sqrt(_parse_expression(values, doc_dict))
-            elif operator == '$subtract':
+            if operator == '$subtract':
                 assert len(values) == 2, 'subtract must have only 2 items'
                 return _parse_expression(values[0], doc_dict) - _parse_expression(values[1],
                                                                                   doc_dict)
-            else:
-                raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
-                                          "aggregation pipeline, it is currently not implemented "
-                                          " in Mongomock." % operator)
+            raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
+                                      "aggregation pipeline, it is currently not implemented "
+                                      " in Mongomock." % operator)
 
         def _handle_comparison_operator(operator, values, doc_dict):
             assert len(values) == 2, 'Comparison requires two expressions'
@@ -1693,43 +1688,41 @@ class Collection(object):
             b = _parse_expression(values[1], doc_dict)
             if operator == '$eq':
                 return a == b
-            elif operator == '$ne':
+            if operator == '$ne':
                 return a != b
-            elif operator in SORTING_OPERATOR_MAP:
+            if operator in SORTING_OPERATOR_MAP:
                 return bson_compare(SORTING_OPERATOR_MAP[operator], a, b)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid comparison operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    " in Mongomock." % operator)
+            raise NotImplementedError(
+                "Although '%s' is a valid comparison operator for the "
+                "aggregation pipeline, it is currently not implemented "
+                " in Mongomock." % operator)
 
         def _handle_date_operator(operator, values, doc_dict):
             out_value = _parse_expression(values, doc_dict)
             if operator == '$dayOfYear':
                 return out_value.timetuple().tm_yday
-            elif operator == '$dayOfMonth':
+            if operator == '$dayOfMonth':
                 return out_value.day
-            elif operator == '$dayOfWeek':
+            if operator == '$dayOfWeek':
                 return out_value.isoweekday()
-            elif operator == '$year':
+            if operator == '$year':
                 return out_value.year
-            elif operator == '$month':
+            if operator == '$month':
                 return out_value.month
-            elif operator == '$week':
+            if operator == '$week':
                 return out_value.isocalendar()[1]
-            elif operator == '$hour':
+            if operator == '$hour':
                 return out_value.hour
-            elif operator == '$minute':
+            if operator == '$minute':
                 return out_value.minute
-            elif operator == '$second':
+            if operator == '$second':
                 return out_value.second
-            elif operator == '$millisecond':
+            if operator == '$millisecond':
                 return int(out_value.microsecond / 1000)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid date operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    " in Mongomock." % operator)
+            raise NotImplementedError(
+                "Although '%s' is a valid date operator for the "
+                "aggregation pipeline, it is currently not implemented "
+                " in Mongomock." % operator)
 
         def _handle_array_operator(operator, value, doc_dict):
             if operator == '$size':
@@ -1743,11 +1736,10 @@ class Collection(object):
                     raise OperationFailure("The argument to $size must be an array, "
                                            "but was of type: %s" % type(array_value))
                 return len(array_value)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid array operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    "in Mongomock." % operator)
+            raise NotImplementedError(
+                "Although '%s' is a valid array operator for the "
+                "aggregation pipeline, it is currently not implemented "
+                "in Mongomock." % operator)
 
         def _handle_conditional_operator(operator, values, doc_dict):
             if operator == '$ifNull':
@@ -1759,7 +1751,7 @@ class Collection(object):
                 except KeyError:
                     pass
                 return _parse_expression(fallback, doc_dict)
-            elif operator == '$cond':
+            if operator == '$cond':
                 if isinstance(values, list):
                     condition, true_case, false_case = values
                 elif isinstance(values, dict):
@@ -1772,11 +1764,10 @@ class Collection(object):
                     condition_value = False
                 expression = true_case if condition_value else false_case
                 return _parse_expression(expression, doc_dict)
-            else:
-                raise NotImplementedError(
-                    "Although '%s' is a valid conditional operator for the "
-                    "aggregation pipeline, it is currently not implemented "
-                    " in Mongomock." % operator)
+            raise NotImplementedError(
+                "Although '%s' is a valid conditional operator for the "
+                "aggregation pipeline, it is currently not implemented "
+                " in Mongomock." % operator)
 
         def _handle_project_operator(operator, values, doc_dict):
             if operator == '$min':
@@ -1786,30 +1777,27 @@ class Collection(object):
                                               " implemented in Mongomock" % len(values))
                 return min(_parse_expression(values[0], doc_dict),
                            _parse_expression(values[1], doc_dict))
-            elif operator == '$arrayElemAt':
+            if operator == '$arrayElemAt':
                 key, index = values
                 array = _parse_basic_expression(key, doc_dict)
                 v = array[index]
                 return v
-            else:
-                raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                          "aggregation pipeline, it is currently not implemented "
-                                          "in Mongomock." % operator)
+            raise NotImplementedError("Although '%s' is a valid project operator for the "
+                                      "aggregation pipeline, it is currently not implemented "
+                                      "in Mongomock." % operator)
 
         def _handle_projection_operator(operator, value, doc_dict):
             if operator == '$literal':
                 return value
-            else:
-                raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                          "aggregation pipeline, it is currently not implemented "
-                                          "in Mongomock." % operator)
+            raise NotImplementedError("Although '%s' is a valid project operator for the "
+                                      "aggregation pipeline, it is currently not implemented "
+                                      "in Mongomock." % operator)
 
         def _parse_basic_expression(expression, doc_dict):
             if isinstance(expression, string_types) and expression.startswith('$'):
                 get_value = helpers.embedded_item_getter(expression.replace('$', ''))
                 return get_value(doc_dict)
-            else:
-                return expression
+            return expression
 
         def _parse_expression(expression, doc_dict):
             if not isinstance(expression, dict):
@@ -1819,26 +1807,25 @@ class Collection(object):
             for k, v in iteritems(expression):
                 if k in arithmetic_operators:
                     return _handle_arithmetic_operator(k, v, doc_dict)
-                elif k in project_operators:
+                if k in project_operators:
                     return _handle_project_operator(k, v, doc_dict)
-                elif k in projection_operators:
+                if k in projection_operators:
                     return _handle_projection_operator(k, v, doc_dict)
-                elif k in comparison_operators:
+                if k in comparison_operators:
                     return _handle_comparison_operator(k, v, doc_dict)
-                elif k in date_operators:
+                if k in date_operators:
                     return _handle_date_operator(k, v, doc_dict)
-                elif k in array_operators:
+                if k in array_operators:
                     return _handle_array_operator(k, v, doc_dict)
-                elif k in conditional_operators:
+                if k in conditional_operators:
                     return _handle_conditional_operator(k, v, doc_dict)
-                elif k in boolean_operators + set_operators + string_operators + \
+                if k in boolean_operators + set_operators + string_operators + \
                         text_search_operators + projection_operators:
                     raise NotImplementedError(
                         "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
-                elif k.startswith('$'):
+                if k.startswith('$'):
                     raise OperationFailure("Unrecognized expression '%s'" % k)
-                else:
-                    value_dict[k] = _parse_expression(v, doc_dict)
+                value_dict[k] = _parse_expression(v, doc_dict)
 
             return value_dict
 

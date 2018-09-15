@@ -61,12 +61,11 @@ def index_list(key_or_list, direction=None):
     """
     if direction is not None:
         return [(key_or_list, direction)]
-    else:
-        if isinstance(key_or_list, string_types):
-            return [(key_or_list, ASCENDING)]
-        elif not isinstance(key_or_list, (list, tuple)):
-            raise TypeError("if no direction is specified, "
-                            "key_or_list must be an instance of list")
+    if isinstance(key_or_list, string_types):
+        return [(key_or_list, ASCENDING)]
+    if not isinstance(key_or_list, (list, tuple)):
+        raise TypeError("if no direction is specified, "
+                        "key_or_list must be an instance of list")
     return key_or_list
 
 
@@ -261,16 +260,14 @@ def patch_datetime_awareness_in_document(value):
     # datetime use microsecond, so we must lower the precision to mimic mongo.
     if isinstance(value, (dict, OrderedDict)):
         return type(value)((k, patch_datetime_awareness_in_document(v)) for k, v in value.items())
-    elif isinstance(value, (tuple, list)):
+    if isinstance(value, (tuple, list)):
         return [patch_datetime_awareness_in_document(item) for item in value]
-    elif isinstance(value, datetime):
+    if isinstance(value, datetime):
         mongo_us = (value.microsecond // 1000) * 1000
         if value.tzinfo:
             return (value - value.utcoffset()).replace(tzinfo=None, microsecond=mongo_us)
-        else:
-            return value.replace(microsecond=mongo_us)
-    else:
-        return value
+        return value.replace(microsecond=mongo_us)
+    return value
 
 
 def make_datetime_timezone_aware_in_document(value):
@@ -279,9 +276,8 @@ def make_datetime_timezone_aware_in_document(value):
     # information, all returned datetime have utc as timezone.
     if isinstance(value, dict):
         return {k: make_datetime_timezone_aware_in_document(v) for k, v in value.items()}
-    elif isinstance(value, (tuple, list)):
+    if isinstance(value, (tuple, list)):
         return [make_datetime_timezone_aware_in_document(item) for item in value]
-    elif isinstance(value, datetime):
+    if isinstance(value, datetime):
         return value.replace(tzinfo=utc)
-    else:
-        return value
+    return value

@@ -24,7 +24,7 @@ def filter_applies(search_filter, document):
     """
     if search_filter is None:
         return True
-    elif isinstance(search_filter, ObjectId):
+    if isinstance(search_filter, ObjectId):
         search_filter = {'_id': search_filter}
 
     for key, search in iteritems(search_filter):
@@ -115,14 +115,14 @@ def _iter_key_candidates_sublist(key, doc):
                 for sub_doc in doc
                 if isinstance(sub_doc, dict) and sub_key in sub_doc
                 for x in iter_key_candidates(key_remainder, sub_doc[sub_key])]
-    else:
-        # subkey is an index
-        if sub_key_int >= len(doc):
-            return ()  # dead end
-        sub_doc = doc[sub_key_int]
-        if key_parts:
-            return iter_key_candidates(".".join(key_parts), sub_doc)
-        return [sub_doc]
+
+    # subkey is an index
+    if sub_key_int >= len(doc):
+        return ()  # dead end
+    sub_doc = doc[sub_key_int]
+    if key_parts:
+        return iter_key_candidates(".".join(key_parts), sub_doc)
+    return [sub_doc]
 
 
 def _force_list(v):
@@ -267,8 +267,7 @@ def _regex(doc_val, regex):
 def _size_op(doc_val, search_val):
     if isinstance(doc_val, (list, tuple, dict)):
         return search_val == len(doc_val)
-    else:
-        return search_val == 1 if doc_val else 0
+    return search_val == 1 if doc_val else 0
 
 
 def _list_expand(f):
@@ -278,8 +277,7 @@ def _list_expand(f):
                 if f(val, search_val):
                     return True
             return False
-        else:
-            return f(doc_val, search_val)
+        return f(doc_val, search_val)
     return func
 
 
