@@ -3193,6 +3193,71 @@ class CollectionAPITest(TestCase):
             'select_array': [5, 15],
         }, actual[0])
 
+    def test__aggregate_filter(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_many([
+            {
+                '_id': 0,
+                'items': [
+                    {'item_id': 43, 'quantity': 2, 'price': 10},
+                    {'item_id': 2, 'quantity': 1, 'price': 240},
+                ],
+            },
+            {
+                '_id': 1,
+                'items': [
+                    {'item_id': 23, 'quantity': 3, 'price': 110},
+                    {'item_id': 103, 'quantity': 4, 'price': 5},
+                    {'item_id': 38, 'quantity': 1, 'price': 300},
+                ],
+            },
+            {
+                '_id': 2,
+                'items': [
+                    {'item_id': 4, 'quantity': 1, 'price': 23},
+                ],
+            },
+        ])
+
+        actual = collection.aggregate([{'$project': {'filtered_items': {'$filter': {
+            'input': '$items',
+            'as': 'item',
+            'cond': {'$gte': ['$$item.price', 100]},
+        }}}}])
+        expect = [
+            {
+                '_id': 0,
+                'filtered_items': [
+                    {'item_id': 2, 'quantity': 1, 'price': 240},
+                ],
+            },
+            {
+                '_id': 1,
+                'filtered_items': [
+                    {'item_id': 23, 'quantity': 3, 'price': 110},
+                    {'item_id': 38, 'quantity': 1, 'price': 300},
+                ],
+            },
+            {'_id': 2, 'filtered_items': []},
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_filter_wrong_options(self):
+        options = [
+            3,
+            ['$items', {'$gte': ['$$item.price', 100]}],
+            {},
+            {'input': '$items'},
+            {'cond': {'$gte': ['$$item.price', 100]}},
+            {'input': '$items', 'cond': {'$$this.filter'}, 'extraOption': 2},
+        ]
+        self.db.collection.insert_one({})
+        for option in options:
+            with self.assertRaises(mongomock.OperationFailure, msg=option):
+                self.db.collection.aggregate(
+                    [{'$project': {'filtered_items': {'$filter': option}}}])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)

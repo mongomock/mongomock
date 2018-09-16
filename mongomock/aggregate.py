@@ -120,8 +120,9 @@ _GROUPING_OPERATOR_MAP = {
 class _Parser(object):
     """Helper to parse expressions within the aggregate pipeline."""
 
-    def __init__(self, doc_dict):
+    def __init__(self, doc_dict, user_vars=None):
         self._doc_dict = doc_dict
+        self._user_vars = user_vars or {}
 
     def parse(self, expression):
         """Parse a MongoDB expression."""
@@ -159,10 +160,10 @@ class _Parser(object):
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
-                return helpers.get_value_by_dot({
+                return helpers.get_value_by_dot(dict({
                     'ROOT': self._doc_dict,
                     'CURRENT': self._doc_dict,
-                }, expression[2:])
+                }, **self._user_vars), expression[2:])
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
 
@@ -284,6 +285,25 @@ class _Parser(object):
                 raise OperationFailure('The argument to $size must be an array, '
                                        'but was of type: %s' % type(array_value))
             return len(array_value)
+
+        if operator == '$filter':
+            if not isinstance(value, dict):
+                raise OperationFailure('$filter only supports an object as its argument')
+            extra_params = set(value) - {'input', 'cond', 'as'}
+            if extra_params:
+                raise OperationFailure('Unrecognized parameter to $filter: %s' % extra_params.pop())
+            missing_params = {'input', 'cond'} - set(value)
+            if missing_params:
+                raise OperationFailure("Missing '%s' parameter to $filter" % missing_params.pop())
+
+            input_array = self.parse(value['input'])
+            fieldname = value.get('as', 'this')
+            cond = value['cond']
+            return [
+                item for item in input_array
+                if _Parser(self._doc_dict, dict(self._user_vars, **{fieldname: item})).parse(cond)
+            ]
+
         raise NotImplementedError(
             "Although '%s' is a valid array operator for the "
             'aggregation pipeline, it is currently not implemented '
