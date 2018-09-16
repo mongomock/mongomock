@@ -24,11 +24,14 @@ except ImportError:
     execjs = None
 
 try:
+    from pymongo import ReadPreference
     from pymongo import ReturnDocument
+    _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     class ReturnDocument(object):
         BEFORE = False
         AFTER = True
+    _READ_PREFERENCE_PRIMARY = None
 
 from sentinels import NOTHING
 from six import iteritems
@@ -1362,7 +1365,7 @@ class Collection(object):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
         for name, information in self._index_information.items():
-            yield [('name', name)] + list(sorted(information.items(), key=lambda kv: kv[0]))
+            yield dict(information, name=name)
 
     def index_information(self, session=None):
         if session:
@@ -1472,7 +1475,9 @@ class Collection(object):
         return self.map_reduce(
             map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session)
 
-    def distinct(self, key, filter=None):
+    def distinct(self, key, filter=None, session=None):
+        if session:
+            raise NotImplementedError('Mongomock does not handle sessions yet')
         return self.find(filter).distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
@@ -1897,13 +1902,19 @@ class Collection(object):
         return CommandCursor(out_collection)
 
     def with_options(self, **kwargs):
-        keys = {'codec_options', 'read_preference', 'write_concern', 'read_concern'}
-        forbidden_kwargs = set(kwargs.keys()) - keys
+        default_kwargs = {
+            'codec_options': None,
+            'read_preference': _READ_PREFERENCE_PRIMARY,
+            'write_concern': None,
+            'read_concern': None,
+        }
+        forbidden_kwargs = set(kwargs.keys()) - set(default_kwargs)
         if forbidden_kwargs:
             raise TypeError(
                 "with_options() got an unexpected keyword argument '%s'" % forbidden_kwargs.pop())
-        for key in keys:
-            if kwargs.get(key) is not None:
+        for key, default_value in iteritems(default_kwargs):
+            value = kwargs.get(key)
+            if value is not None and value != default_value:
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
@@ -1959,7 +1970,7 @@ def _fix_sort_key(key_getter):
 class Cursor(object):
 
     def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
-                 collation=None):
+                 collation=None, no_cursor_timeout=False, batch_size=0, session=None):
         super(Cursor, self).__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)
@@ -1974,6 +1985,7 @@ class Cursor(object):
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self._collation = collation
+        self.session = session
         self.rewind()
 
     def _compute_results(self, with_limit_and_skip=False):

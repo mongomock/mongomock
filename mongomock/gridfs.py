@@ -15,6 +15,7 @@ def enable_gridfs_integration():
     from pymongo.collection import Collection as PyMongoCollection
     from pymongo.database import Database as PyMongoDatabase
     from mongomock import Database as MongoMockDatabase, Collection as MongoMockCollection
+    from mongomock.collection import Cursor as MongoMockCursor
 
     def isinstance_patched(object, classinfo):
         if isinstance(classinfo, tuple):
@@ -29,7 +30,44 @@ def enable_gridfs_integration():
                 mocked_needed.append(MongoMockDatabase)
         return builtins.isinstance(object, tuple(classesinfo + mocked_needed))
 
+    modules = {}
     for modname in ('gridfs', 'gridfs.grid_file', 'gridfs.errors'):
         mod = import_module(modname)
         mod.__builtins__ = mod.__builtins__.copy()
         mod.__builtins__['isinstance'] = isinstance_patched
+        modules[modname] = mod
+
+    PyMongoGridOut = modules['gridfs.grid_file'].GridOut
+    PyMongoGridOutCursor = modules['gridfs.grid_file'].GridOutCursor
+
+    # This is a copy of GridOutCursor but with a different base. Note that we
+    # need both classes as one might want to access both mongomock and real
+    # MongoDb.
+    class MongoMockGridOutCursor(MongoMockCursor):
+
+        def __init__(self, collection, *args, **kwargs):
+            self.__root_collection = collection
+            super(MongoMockGridOutCursor, self).__init__(collection.files, *args, **kwargs)
+
+        def next(self):
+            next_file = super(MongoMockGridOutCursor, self).next()
+            return PyMongoGridOut(
+                self.__root_collection, file_document=next_file, session=self.session)
+
+        __next__ = next
+
+        def add_option(self, *args, **kwargs):
+            raise NotImplementedError()
+
+        def remove_option(self, *args, **kwargs):
+            raise NotImplementedError()
+
+        def _clone_base(self, session):
+            return MongoMockGridOutCursor(self.__root_collection, session=session)
+
+    def _create_grid_out_cursor(collection, *args, **kwargs):
+        if isinstance(collection, MongoMockCollection):
+            return MongoMockGridOutCursor(collection, *args, **kwargs)
+        return PyMongoGridOutCursor(collection, *args, **kwargs)
+
+    modules['gridfs'].GridOutCursor = _create_grid_out_cursor

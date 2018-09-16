@@ -1,10 +1,15 @@
+import time
+import unittest
+from unittest import TestCase, skipIf
 
 import mongomock
 import mongomock.gridfs
 from nose.tools import assert_raises
-from unittest import TestCase, skipIf
+from six import text_type
+
 try:
     import gridfs
+    from gridfs import errors
     _HAVE_GRIDFS = True
     mongomock.gridfs.enable_gridfs_integration()
 except ImportError:
@@ -12,7 +17,6 @@ except ImportError:
 
 
 try:
-    from bson.binary import text_type
     from bson.objectid import ObjectId
 
     import pymongo
@@ -20,8 +24,6 @@ try:
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
-
-import time
 
 
 @skipIf(not _HAVE_PYMONGO, "pymongo not installed")
@@ -34,8 +36,8 @@ class GridFsTest(TestCase):
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = "mongomock___testing_db"
 
-        self.mongo_conn[self.db_name]["fs"]["files"].remove()
-        self.mongo_conn[self.db_name]["fs"]["chunks"].remove()
+        self.mongo_conn[self.db_name]["fs"]["files"].drop()
+        self.mongo_conn[self.db_name]["fs"]["chunks"].drop()
 
         self.real_gridfs = gridfs.GridFS(self.mongo_conn[self.db_name])
         self.fake_gridfs = gridfs.GridFS(self.fake_conn[self.db_name])
@@ -121,14 +123,14 @@ class GridFsTest(TestCase):
         c = self.fake_gridfs.find({"filename": "a"}).sort("uploadDate", -1)
         should_be_fid3 = c.next()
         should_be_fid0 = c.next()
-        self.assertEqual(0, c.count())
+        self.assertEqual(2, c.count())
 
         self.assertEqual(fids[3], should_be_fid3._id)
         self.assertEqual(fids[0], should_be_fid0._id)
 
     def test__put_exists(self):
         self.fake_gridfs.put(GenFile(1), _id="12345")
-        with assert_raises(mongomock.gridfs.errors.FileExists):
+        with assert_raises(errors.FileExists):
             self.fake_gridfs.put(GenFile(2, 3), _id="12345")
 
     def assertSameFile(self, real, fake):
@@ -158,7 +160,7 @@ class GridFsTest(TestCase):
 
 
 class GenFile(object):
-    def __init__(self, length, value=0, do_encode=False):
+    def __init__(self, length, value=0, do_encode=True):
         self.gen = self._gen_data(length, value)
         self.do_encode = do_encode
 
@@ -166,6 +168,11 @@ class GenFile(object):
         while (length != 0):
             length -= 1
             yield value
+
+    def _maybe_encode(self, s):
+        if self.do_encode and isinstance(s, text_type):
+            return s.encode('UTF-8')
+        return s
 
     def read(self, num_bytes=-1):
         s = ""
@@ -176,10 +183,12 @@ class GenFile(object):
         while True:
             n = next(self.gen, None)
             if n is None:
-                return s
+                return self._maybe_encode(s)
             s += chr(n)
             bytes_left -= 1
             if bytes_left == 0:
-                if self.do_encode and isinstance(s, text_type):
-                    return s.encode("UTF-8")
-                return s
+                return self._maybe_encode(s)
+
+
+if __name__ == '__main__':
+    unittest.main()

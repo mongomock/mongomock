@@ -1042,7 +1042,7 @@ class CollectionAPITest(TestCase):
             index_information,
         )
         self.assertEqual(
-            [[('name', '_id_'), ('key', [('_id', 1)]), ('ns', 'somedb.collection'), ('v', 1)]],
+            [{'name': '_id_', 'key': [('_id', 1)], 'ns': 'somedb.collection', 'v': 1}],
             list(self.db.collection.list_indexes()),
         )
 
