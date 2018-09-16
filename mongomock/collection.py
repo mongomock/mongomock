@@ -39,12 +39,11 @@ from six import string_types
 from six import text_type
 
 
+from mongomock import aggregate
 from mongomock.command_cursor import CommandCursor
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
-from mongomock.filtering import bson_compare
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
-from mongomock.filtering import SORTING_OPERATOR_MAP
 from mongomock import helpers
 from mongomock import InvalidOperation
 from mongomock import ObjectId
@@ -1577,257 +1576,6 @@ class Collection(object):
             '$sum',
             '$stdDevPop',
             '$stdDevSamp']
-        project_operators = [
-            '$max',
-            '$min',
-            '$avg',
-            '$sum',
-            '$stdDevPop',
-            '$stdDevSamp',
-            '$arrayElemAt'
-        ]
-        boolean_operators = ['$and', '$or', '$not']
-        set_operators = [
-            '$setEquals',
-            '$setIntersection',
-            '$setDifference',
-            '$setUnion',
-            '$setIsSubset',
-            '$anyElementTrue',
-            '$allElementsTrue']
-        comparison_operators = [
-            '$cmp',
-            '$eq',
-            '$ne'] + list(SORTING_OPERATOR_MAP.keys())
-        arithmetic_operators = [
-            '$abs',
-            '$add',
-            '$ceil',
-            '$divide',
-            '$exp',
-            '$floor',
-            '$ln',
-            '$log',
-            '$log10',
-            '$mod',
-            '$multiply',
-            '$pow',
-            '$sqrt',
-            '$subtract',
-            '$trunc']
-        string_operators = [
-            '$concat',
-            '$strcasecmp',
-            '$substr',
-            '$toLower',
-            '$toUpper']
-        text_search_operators = ['$meta']
-        array_operators = [
-            '$concatArrays',
-            '$filter',
-            '$isArray',
-            '$size',
-            '$slice']
-        projection_operators = ['$map', '$let', '$literal']
-        date_operators = [  # noqa
-            '$dayOfYear',
-            '$dayOfMonth',
-            '$dayOfWeek',
-            '$year',
-            '$month',
-            '$week',
-            '$hour',
-            '$minute',
-            '$second',
-            '$millisecond',
-            '$dateToString']
-        conditional_operators = ['$cond', '$ifNull']
-
-        def _handle_arithmetic_operator(operator, values, doc_dict):
-            if operator == '$abs':
-                return abs(_parse_expression(values, doc_dict))
-            if operator == '$ceil':
-                return math.ceil(_parse_expression(values, doc_dict))
-            if operator == '$divide':
-                assert len(values) == 2, 'divide must have only 2 items'
-                return _parse_expression(values[0], doc_dict) / _parse_expression(values[1],
-                                                                                  doc_dict)
-            if operator == '$exp':
-                return math.exp(_parse_expression(values, doc_dict))
-            if operator == '$floor':
-                return math.floor(_parse_expression(values, doc_dict))
-            if operator == '$ln':
-                return math.log(_parse_expression(values, doc_dict))
-            if operator == '$log':
-                assert len(values) == 2, 'log must have only 2 items'
-                return math.log(_parse_expression(values[0], doc_dict),
-                                _parse_expression(values[1], doc_dict))
-            if operator == '$log10':
-                return math.log10(_parse_expression(values, doc_dict))
-            if operator == '$mod':
-                assert len(values) == 2, 'mod must have only 2 items'
-                return math.fmod(_parse_expression(values[0], doc_dict),
-                                 _parse_expression(values[1], doc_dict))
-            if operator == '$pow':
-                assert len(values) == 2, 'pow must have only 2 items'
-                return math.pow(_parse_expression(values[0], doc_dict),
-                                _parse_expression(values[1], doc_dict))
-            if operator == '$sqrt':
-                return math.sqrt(_parse_expression(values, doc_dict))
-            if operator == '$subtract':
-                assert len(values) == 2, 'subtract must have only 2 items'
-                return _parse_expression(values[0], doc_dict) - _parse_expression(values[1],
-                                                                                  doc_dict)
-            raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
-                                      'aggregation pipeline, it is currently not implemented '
-                                      ' in Mongomock.' % operator)
-
-        def _handle_comparison_operator(operator, values, doc_dict):
-            assert len(values) == 2, 'Comparison requires two expressions'
-            a = _parse_expression(values[0], doc_dict)
-            b = _parse_expression(values[1], doc_dict)
-            if operator == '$eq':
-                return a == b
-            if operator == '$ne':
-                return a != b
-            if operator in SORTING_OPERATOR_MAP:
-                return bson_compare(SORTING_OPERATOR_MAP[operator], a, b)
-            raise NotImplementedError(
-                "Although '%s' is a valid comparison operator for the "
-                'aggregation pipeline, it is currently not implemented '
-                ' in Mongomock.' % operator)
-
-        def _handle_date_operator(operator, values, doc_dict):
-            out_value = _parse_expression(values, doc_dict)
-            if operator == '$dayOfYear':
-                return out_value.timetuple().tm_yday
-            if operator == '$dayOfMonth':
-                return out_value.day
-            if operator == '$dayOfWeek':
-                return out_value.isoweekday()
-            if operator == '$year':
-                return out_value.year
-            if operator == '$month':
-                return out_value.month
-            if operator == '$week':
-                return out_value.isocalendar()[1]
-            if operator == '$hour':
-                return out_value.hour
-            if operator == '$minute':
-                return out_value.minute
-            if operator == '$second':
-                return out_value.second
-            if operator == '$millisecond':
-                return int(out_value.microsecond / 1000)
-            raise NotImplementedError(
-                "Although '%s' is a valid date operator for the "
-                'aggregation pipeline, it is currently not implemented '
-                ' in Mongomock.' % operator)
-
-        def _handle_array_operator(operator, value, doc_dict):
-            if operator == '$size':
-                if isinstance(value, list):
-                    if len(value) != 1:
-                        raise OperationFailure('Expression $size takes exactly 1 arguments. '
-                                               '%d were passed in.' % len(value))
-                    value = value[0]
-                array_value = _parse_expression(value, doc_dict)
-                if not isinstance(array_value, list):
-                    raise OperationFailure('The argument to $size must be an array, '
-                                           'but was of type: %s' % type(array_value))
-                return len(array_value)
-            raise NotImplementedError(
-                "Although '%s' is a valid array operator for the "
-                'aggregation pipeline, it is currently not implemented '
-                'in Mongomock.' % operator)
-
-        def _handle_conditional_operator(operator, values, doc_dict):
-            if operator == '$ifNull':
-                field, fallback = values
-                try:
-                    out_value = _parse_expression(field, doc_dict)
-                    if out_value is not None:
-                        return out_value
-                except KeyError:
-                    pass
-                return _parse_expression(fallback, doc_dict)
-            if operator == '$cond':
-                if isinstance(values, list):
-                    condition, true_case, false_case = values
-                elif isinstance(values, dict):
-                    condition = values['if']
-                    true_case = values['then']
-                    false_case = values['else']
-                try:
-                    condition_value = _parse_expression(condition, doc_dict)
-                except KeyError:
-                    condition_value = False
-                expression = true_case if condition_value else false_case
-                return _parse_expression(expression, doc_dict)
-            raise NotImplementedError(
-                "Although '%s' is a valid conditional operator for the "
-                'aggregation pipeline, it is currently not implemented '
-                ' in Mongomock.' % operator)
-
-        def _handle_project_operator(operator, values, doc_dict):
-            if operator == '$min':
-                if len(values) > 2:
-                    raise NotImplementedError('Although %d is a valid amount of elements in '
-                                              'aggregation pipeline, it is currently not '
-                                              ' implemented in Mongomock' % len(values))
-                return min(_parse_expression(values[0], doc_dict),
-                           _parse_expression(values[1], doc_dict))
-            if operator == '$arrayElemAt':
-                key, index = values
-                array = _parse_basic_expression(key, doc_dict)
-                v = array[index]
-                return v
-            raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                      'aggregation pipeline, it is currently not implemented '
-                                      'in Mongomock.' % operator)
-
-        def _handle_projection_operator(operator, value, doc_dict):
-            if operator == '$literal':
-                return value
-            raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                      'aggregation pipeline, it is currently not implemented '
-                                      'in Mongomock.' % operator)
-
-        def _parse_basic_expression(expression, doc_dict):
-            if isinstance(expression, string_types) and expression.startswith('$'):
-                get_value = helpers.embedded_item_getter(expression.replace('$', ''))
-                return get_value(doc_dict)
-            return expression
-
-        def _parse_expression(expression, doc_dict):
-            if not isinstance(expression, dict):
-                return _parse_basic_expression(expression, doc_dict)
-
-            value_dict = {}
-            for k, v in iteritems(expression):
-                if k in arithmetic_operators:
-                    return _handle_arithmetic_operator(k, v, doc_dict)
-                if k in project_operators:
-                    return _handle_project_operator(k, v, doc_dict)
-                if k in projection_operators:
-                    return _handle_projection_operator(k, v, doc_dict)
-                if k in comparison_operators:
-                    return _handle_comparison_operator(k, v, doc_dict)
-                if k in date_operators:
-                    return _handle_date_operator(k, v, doc_dict)
-                if k in array_operators:
-                    return _handle_array_operator(k, v, doc_dict)
-                if k in conditional_operators:
-                    return _handle_conditional_operator(k, v, doc_dict)
-                if k in boolean_operators + set_operators + string_operators + \
-                        text_search_operators + projection_operators:
-                    raise NotImplementedError(
-                        "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
-                if k.startswith('$'):
-                    raise OperationFailure("Unrecognized expression '%s'" % k)
-                value_dict[k] = _parse_expression(v, doc_dict)
-
-            return value_dict
 
         def _extend_collection(out_collection, field, expression):
             field_exists = False
@@ -1844,7 +1592,7 @@ class Collection(object):
                             pass
                     else:
                         # verify expression has operator as first
-                        doc[field] = _parse_expression(expression.copy(), doc)
+                        doc[field] = aggregate.parse_expression(expression.copy(), doc)
             return out_collection
 
         def _accumulate_group(output_fields, group_list):
@@ -1863,7 +1611,7 @@ class Collection(object):
                             '$addToSet',
                             '$push'
                     ):
-                        key_getter = functools.partial(_parse_expression, key)
+                        key_getter = functools.partial(aggregate.parse_expression, key)
                         values = [key_getter(doc) for doc in group_list]
 
                         if operator == '$sum':
@@ -1954,7 +1702,7 @@ class Collection(object):
                     grouped_collection = []
                     _id = stage['$group']['_id']
                     if _id:
-                        key_getter = functools.partial(_parse_expression, _id)
+                        key_getter = functools.partial(aggregate.parse_expression, _id)
                         sort_key_getter = _fix_sort_key(key_getter)
                         # Sort the collection only for the itertools.groupby.
                         # $group does not order its output document.
@@ -2015,7 +1763,7 @@ class Collection(object):
                         if it's not the same type as the boundaries.
                         """
                         try:
-                            value = _parse_expression(group_by, doc)
+                            value = aggregate.parse_expression(group_by, doc)
                         except KeyError:
                             return (is_default_last, _get_default_bucket())
                         index = bisect.bisect_right(boundaries, value)
@@ -2406,6 +2154,7 @@ def _sum_updater(doc, field_name, current, result):
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = datetime.utcnow()
+
 
 _updaters = {
     '$set': _set_updater,
