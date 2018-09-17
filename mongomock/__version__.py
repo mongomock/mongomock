@@ -1,1 +1,3 @@
-__version__ = '3.11.1'
+import pkg_resources
+
+__version__ = pkg_resources.get_distribution('mongomock').version
