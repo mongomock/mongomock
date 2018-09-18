@@ -200,7 +200,7 @@ class _CollectionComparisonTest(TestCase):
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = "mongomock___testing_db"
         self.collection_name = "mongomock___testing_collection"
-        self.mongo_conn[self.db_name][self.collection_name].remove()
+        self.mongo_conn[self.db_name][self.collection_name].drop()
         self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
         self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
         self.cmp = MultiCollection({
@@ -1409,18 +1409,31 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({})
 
     def test__ensure_index(self):
-        # Does nothing - just make sure it exists and takes the right args
-        self.cmp.do.ensure_index("name")
-        self.cmp.do.ensure_index("hat", cache_for=100)
-        self.cmp.do.ensure_index([("name", 1), ("hat", -1)])
+        self.cmp.compare.ensure_index("name")
+        self.cmp.compare.ensure_index("hat", cache_for=100)
+        self.cmp.compare.ensure_index([("name", 1), ("hat", -1)])
+        self.cmp.do.insert_one({})
+        self.cmp.compare.index_information()
 
     def test__drop_index(self):
-        # Does nothing - just make sure it exists and takes the right args
-        self.cmp.do.drop_index("name")
+        self.cmp.do.insert_one({})
+        self.cmp.compare.ensure_index([("name", 1), ("hat", -1)])
+        self.cmp.compare.drop_index([("name", 1), ("hat", -1)])
+        self.cmp.compare.index_information()
+
+    def test__drop_index_by_name(self):
+        self.cmp.do.insert_one({})
+        results = self.cmp.compare.ensure_index("name")
+        self.cmp.compare.drop_index(results['real'])
+        self.cmp.compare.index_information()
 
     def test__index_information(self):
-        # Does nothing - just make sure it exists
-        self.cmp.do.index_information()
+        self.cmp.do.insert_one({})
+        self.cmp.compare.index_information()
+
+    def test__list_indexes(self):
+        self.cmp.do.insert_one({})
+        self.cmp.compare_ignore_order.sort_by(lambda i: i['name']).list_indexes()
 
     def test__empty_logical_operators(self):
         for operator in mongomock.filtering.LOGICAL_OPERATOR_MAP:

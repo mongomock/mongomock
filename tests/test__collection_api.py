@@ -1038,18 +1038,18 @@ class CollectionAPITest(TestCase):
 
         index_information = self.db.collection.index_information()
         self.assertEqual(
-            {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
             index_information,
         )
         self.assertEqual(
-            [{'name': '_id_', 'key': [('_id', 1)], 'ns': 'somedb.collection', 'v': 1}],
+            [{'name': '_id_', 'key': {'_id': 1}, 'ns': 'somedb.collection', 'v': 2}],
             list(self.db.collection.list_indexes()),
         )
 
         del index_information['_id_']
 
         self.assertEqual(
-            {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
             self.db.collection.index_information(),
             msg='index_information is immutable',
         )
@@ -1063,13 +1063,17 @@ class CollectionAPITest(TestCase):
             {
                 'key': [('value', 1)],
                 'ns': self.db.collection.full_name,
-                'v': 1,
+                'v': 2,
             },
             self.db.collection.index_information()[index])
         self.assertEqual({'_id_', index}, set(self.db.collection.index_information().keys()))
 
         self.db.collection.drop_index(index)
         self.assertEqual({'_id_'}, set(self.db.collection.index_information().keys()))
+
+    def test__drop_index_not_found(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.drop_index('unknownIndex')
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__create_unique_idx_information_with_ascending_ordering(self):
@@ -1082,7 +1086,7 @@ class CollectionAPITest(TestCase):
                 'key': [('value', pymongo.ASCENDING)],
                 'ns': self.db.collection.full_name,
                 'unique': True,
-                'v': 1,
+                'v': 2,
             },
             self.db.collection.index_information()[index])
 
@@ -1098,7 +1102,7 @@ class CollectionAPITest(TestCase):
                 'key': [("value", pymongo.DESCENDING)],
                 'ns': self.db.collection.full_name,
                 'unique': True,
-                'v': 1,
+                'v': 2,
             })
 
     def test__set_with_positional_operator(self):

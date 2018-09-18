@@ -388,7 +388,7 @@ class Collection(object):
         self._force_created = create
         self._write_concern = write_concern or WriteConcern()
         self._uniques = {}
-        self._index_information = {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.full_name}}
+        self._index_information = {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.full_name}}
 
     def _is_created(self):
         return self._documents or self._uniques or self._force_created
@@ -1307,7 +1307,7 @@ class Collection(object):
         self.database.drop_collection(self.name)
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
-        self.create_index(key_or_list, cache_for, **kwargs)
+        return self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
@@ -1316,11 +1316,11 @@ class Collection(object):
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 
-        index_string = '_'.join('_'.join([str(i) for i in ix]) for ix in index_list)
+        index_string = helpers.gen_index_name(index_list)
         self._index_information[index_string] = {
             'key': index_list,
             'ns': self.full_name,
-            'v': 1,
+            'v': 2,
         }
 
         # Check that documents already verify the uniquess of this new index.
@@ -1348,14 +1348,21 @@ class Collection(object):
     def drop_index(self, index_or_name, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        self._index_information.pop(index_or_name, None)
-        self._uniques.pop(index_or_name, None)
+        if isinstance(index_or_name, list):
+            name = helpers.gen_index_name(index_or_name)
+        else:
+            name = index_or_name
+        try:
+            del self._index_information[name]
+        except KeyError:
+            raise OperationFailure('index not found with name [%s]' % name)
+        self._uniques.pop(name, None)
 
     def drop_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
         self._uniques = {}
-        self._index_information = {'_id_': {'v': 1, 'key': [('_id', 1)], 'ns': self.full_name}}
+        self._index_information = {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.full_name}}
 
     def reindex(self, session=None):
         if session:
@@ -1365,7 +1372,7 @@ class Collection(object):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
         for name, information in self._index_information.items():
-            yield dict(information, name=name)
+            yield dict(information, key=dict(information['key']), name=name)
 
     def index_information(self, session=None):
         if session:

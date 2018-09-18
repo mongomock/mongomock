@@ -69,6 +69,12 @@ def index_list(key_or_list, direction=None):
     return key_or_list
 
 
+def gen_index_name(index_list):
+    """Generate an index name based on the list of keys with directions."""
+
+    return '_'.join('_'.join([str(i) for i in ix]) for ix in index_list)
+
+
 class hashdict(dict):
     """hashable dict implementation, suitable for use as a key into other dicts.
 

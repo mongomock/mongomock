@@ -26,6 +26,10 @@ def diff(a, b, path=None):
     path = _make_path(path)
     if type(a) in (list, tuple):
         return _diff_sequences(a, b, path)
+    if type(a).__name__ == "SON":
+        a = dict(a)
+    if type(b).__name__ == "SON":
+        b = dict(b)
     if isinstance(a, dict_type):
         return _diff_dicts(a, b, path)
     if type(a).__name__ == "ObjectId":
