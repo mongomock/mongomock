@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 import copy
 from datetime import datetime, tzinfo, timedelta
 import platform
@@ -666,6 +666,12 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 0)
         self.assertIsNotNone(update_result.upserted_id)
         self.assert_document_stored(update_result.upserted_id, {'a': 1, 'c': 0})
+
+    def test__update_non_json_values(self):
+        self.db.collection.insert_one({'a': Counter({'b': 1})})
+        self.assertEqual({'b': 1}, self.db.collection.find_one()['a'])
+        self.db.collection.update_one({}, {'$set': {'a': Counter({'b': 2})}})
+        self.assertEqual({'b': 2}, self.db.collection.find_one()['a'])
 
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
