@@ -568,6 +568,7 @@ class Collection(object):
                     _id = ObjectId()
                 to_insert = dict(spec, _id=_id)
                 to_insert = self._expand_dots(to_insert)
+                to_insert, _ = self._discard_operators(to_insert)
                 existing_document = to_insert
                 was_insert = True
             else:
@@ -903,8 +904,18 @@ class Collection(object):
         return expanded
 
     def _discard_operators(self, doc):
-        # TODO(this looks a little too naive...)
-        return {k: v for k, v in iteritems(doc) if not k.startswith('$')}
+        if not doc or not isinstance(doc, dict):
+            return doc, False
+        new_doc = OrderedDict()
+        for k, v in iteritems(doc):
+            if k == '$eq':
+                return v, False
+            if k.startswith('$'):
+                continue
+            new_v, discarded = self._discard_operators(v)
+            if not discarded:
+                new_doc[k] = new_v
+        return new_doc, not bool(new_doc)
 
     def find(self, filter=None, projection=None, skip=0, limit=0,
              no_cursor_timeout=False, cursor_type=None, sort=None,

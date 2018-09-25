@@ -911,6 +911,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)
         self.cmp.compare.find()
 
+    def test__update_upsert_with_operators(self):
+        self.cmp.do.update_one(
+            {'$or': [{'name': 'billy'}, {'name': 'Billy'}]},
+            {'$set': {'name': 'Billy', 'age': 5}}, upsert=True)
+        self.cmp.compare.find()
+        self.cmp.do.update_one({'a.b': {'$eq': 1}, 'd': {}}, {'$set': {'c': 2}}, upsert=True)
+        self.cmp.compare.find()
+
     def test__update_with_empty_document_comes(self):
         """Tests calling update with just '{}' for replacing whole document"""
         self.cmp.do.insert({'name': 'bob', 'hat': 'wide'})
