@@ -73,18 +73,17 @@ This code checks *increase_votes* with respect to its functionality, not syntax 
 therefore is much more robust as a test.
 
 If the code to be tested is creating the connection itself with pymongo, you can use
-mongomock with the mock library:
+mongomock.patch:
 
 .. code-block:: python
 
-  mock_mongo_client = mongomock.MongoClient()
-
-  @mock.patch(pymongo.__name__ + 'MongoClient', new=lambda url: mock_mongo_client)
+  @mongomock.patch(servers=(('server.example.com', 27017),))
   def test_increate_votes_endpoint():
     objects = [dict(votes=1), dict(votes=2), ...]
-    mock_mongo_client.db.collection.insert_many(objects)
+    client = pymongo.MongoClient('server.example.com')
+    client.db.collection.insert_many(objects)
     call_endpoint('/votes')
-    ... verify mock_mongo_client.db.collection
+    ... verify client.db.collection
 
 
 Important Note About Project Status & Development

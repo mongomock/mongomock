@@ -4,7 +4,9 @@ cache: pip
 python:
   - 3.5
 env:
-  - TOX_ENV=py27-pymongo-pyexecjs
+  - TOX_ENV=py27
+  - TOX_ENV=py27-mock-pymongo-pyexecjs
+  - TOX_ENV=pypy-mock-pymongo-pyexecjs
   - TOX_ENV=py34-pymongo-pyexecjs
   - TOX_ENV=py35-pymongo-pyexecjs
   - TOX_ENV=py36-pymongo-pyexecjs
@@ -12,13 +14,12 @@ env:
   - TOX_ENV=py37-pymongo
   - TOX_ENV=py37-pyexecjs
   - TOX_ENV=py37-pymongo-pyexecjs
-  - TOX_ENV=pypy-pymongo-pyexecjs
   - TOX_ENV=pep8
   - TOX_ENV=pylint
 matrix:
     # Run all under 3.5 and pypy under pypy, temporary, to be rolled back once trusty fixes it
     include:
-        - env: TOX_ENV=pypy-pymongo-pyexecjs
+        - env: TOX_ENV=pypy-mock-pymongo-pyexecjs
           python: pypy-5.4.1
         - env: TOX_ENV=py36-pymongo-pyexecjs
           python: 3.6
@@ -36,7 +37,7 @@ matrix:
           dist: xenial
     exclude:
         - python: 3.5
-          env: TOX_ENV=pypy-pymongo-pyexecjs
+          env: TOX_ENV=pypy-mock-pymongo-pyexecjs
         - python: 3.5
           env: TOX_ENV=py36-pymongo-pyexecjs
         - python: 3.5

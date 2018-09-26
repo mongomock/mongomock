@@ -75,11 +75,13 @@ __all__ = [
     'MongoClient',
     'ObjectId',
     'OperationFailure',
-    'WriteConcern'
+    'WriteConcern',
+    'patch',
 ]
 
 
 from .collection import Collection
 from .database import Database
 from .mongo_client import MongoClient
+from .patch import patch
 from .write_concern import WriteConcern
