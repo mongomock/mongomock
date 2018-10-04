@@ -39,7 +39,7 @@ class Database(object):
 
     def collection_names(self, include_system_collections=True, session=None):
         warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
-        
+
         return self.list_collection_names(session=session)
 
     def list_collection_names(self, session=None):
