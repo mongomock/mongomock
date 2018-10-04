@@ -1,7 +1,10 @@
 from __future__ import division
 import bisect
-import collections
 from collections import OrderedDict
+try:
+    from collections.abc import Iterable, Mapping, MutableMapping
+except ImportError:
+    from collections import Iterable, Mapping, MutableMapping
 import copy
 from datetime import datetime
 import functools
@@ -68,14 +71,14 @@ _random = random.Random()
 
 
 def validate_is_mapping(option, value):
-    if not isinstance(value, collections.Mapping):
+    if not isinstance(value, Mapping):
         raise TypeError('%s must be an instance of dict, bson.son.SON, or '
                         'other type that inherits from '
                         'collections.Mapping' % (option,))
 
 
 def validate_is_mutable_mapping(option, value):
-    if not isinstance(value, collections.MutableMapping):
+    if not isinstance(value, MutableMapping):
         raise TypeError('%s must be an instance of dict, bson.son.SON, or '
                         'other type that inherits from '
                         'collections.MutableMapping' % (option,))
@@ -428,7 +431,7 @@ class Collection(object):
         return InsertOneResult(self._insert(document, session), acknowledged=True)
 
     def insert_many(self, documents, ordered=True, session=None):
-        if not isinstance(documents, collections.Iterable) or not documents:
+        if not isinstance(documents, Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         for document in documents:
             validate_is_mutable_mapping('document', document)
@@ -1138,7 +1141,7 @@ class Collection(object):
         # the id for the query.
         if filter is None:
             filter = {}
-        if not isinstance(filter, collections.Mapping):
+        if not isinstance(filter, Mapping):
             filter = {'_id': filter}
 
         try:
@@ -1238,7 +1241,7 @@ class Collection(object):
         filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
-        if not isinstance(filter, collections.Mapping):
+        if not isinstance(filter, Mapping):
             filter = {'_id': filter}
         to_delete = list(self.find(filter))
         deleted_count = 0
