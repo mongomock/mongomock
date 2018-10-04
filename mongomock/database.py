@@ -39,6 +39,8 @@ class Database(object):
 
     def collection_names(self, include_system_collections=True, session=None):
         warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
+        if include_system_collections:
+            return list(self._get_created_collections())
 
         return self.list_collection_names(session=session)
 
