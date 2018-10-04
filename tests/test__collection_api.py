@@ -39,7 +39,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.a.b.full_name, "somedb.a.b")
         self.assertEqual(self.db.a.b.name, "a.b")
 
-        self.assertEqual(set(self.db.collection_names()), set(["a.b"]))
+        self.assertEqual(set(self.db.list_collection_names()), set(["a.b"]))
 
     def test__get_sibling_collection(self):
         self.assertEqual(self.db.a.database.b.full_name, "somedb.b")
@@ -53,15 +53,21 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.coll.name, "coll")
         self.assertEqual(self.db.coll.full_name, "somedb.coll")
 
-    def test__get_collection_names(self):
+    def test__collection_names(self):
         self.db.create_collection('a')
         self.db.create_collection('b')
         self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
-        self.assertEqual(set(self.db.collection_names(True)), set(['a', 'b']))
-        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
 
         self.db.c.drop()
-        self.assertEqual(set(self.db.collection_names(False)), set(['a', 'b']))
+        self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
+
+    def test__list_collection_names(self):
+        self.db.create_collection('a')
+        self.db.create_collection('b')
+        self.assertEqual(set(self.db.list_collection_names()), set(['a', 'b']))
+
+        self.db.c.drop()
+        self.assertEqual(set(self.db.list_collection_names()), set(['a', 'b']))
 
     def test__create_collection(self):
         coll = self.db.create_collection("c")
@@ -77,9 +83,9 @@ class CollectionAPITest(TestCase):
 
     def test__lazy_create_collection(self):
         col = self.db.a
-        self.assertEqual(set(self.db.collection_names()), set())
+        self.assertEqual(set(self.db.list_collection_names()), set())
         col.insert({'foo': 'bar'})
-        self.assertEqual(set(self.db.collection_names()), set(['a']))
+        self.assertEqual(set(self.db.list_collection_names()), set(['a']))
 
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
@@ -98,7 +104,7 @@ class CollectionAPITest(TestCase):
         self.db.drop_collection('b')
         self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
-        self.assertEqual(set(self.db.collection_names()), set(['a']))
+        self.assertEqual(set(self.db.list_collection_names()), set(['a']))
 
         col = self.db.a
         r = col.insert({"aa": "bb"})
@@ -1486,7 +1492,7 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual("other_name", coll.name)
         self.assertEqual(
-            set(["other_name"]), set(self.db.collection_names(False)))
+            set(["other_name"]), set(self.db.list_collection_names()))
         self.assertEqual(coll, self.db.other_name)
         data_in_db = coll.find()
         self.assertEqual(
@@ -1507,7 +1513,7 @@ class CollectionAPITest(TestCase):
         coll = self.db.create_collection("a")
         self.db.create_collection("c")
         coll.rename("c", dropTarget=True)
-        self.assertEqual(set(["c"]), set(self.db.collection_names(False)))
+        self.assertEqual(set(["c"]), set(self.db.list_collection_names()))
 
     def test__cursor_rewind(self):
         coll = self.db.create_collection('a')

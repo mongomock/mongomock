@@ -70,7 +70,7 @@ class MongoClient(object):
     def drop_database(self, name_or_db):
 
         def drop_collections_for_db(_db):
-            for col_name in _db.collection_names():
+            for col_name in _db.list_collection_names():
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):

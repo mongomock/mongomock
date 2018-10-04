@@ -1,3 +1,5 @@
+import warnings
+
 from collections import OrderedDict
 
 from . import CollectionInvalid
@@ -36,10 +38,13 @@ class Database(object):
         return [name for name, col in self._collections.items() if col._is_created()]
 
     def collection_names(self, include_system_collections=True, session=None):
+        warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
+        
+        return list_collection_names(session=session)
+
+    def list_collection_names(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if include_system_collections:
-            return list(self._get_created_collections())
 
         result = []
         for name in self._get_created_collections():
@@ -80,7 +85,7 @@ class Database(object):
             pass
 
     def create_collection(self, name, **kwargs):
-        if name in self.collection_names():
+        if name in self.list_collection_names():
             raise CollectionInvalid('collection %s already exists' % name)
         if not name or '..' in name:
             raise InvalidName('collection names cannot be empty')
