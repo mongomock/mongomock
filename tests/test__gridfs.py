@@ -4,7 +4,6 @@ from unittest import TestCase, skipIf
 
 import mongomock
 import mongomock.gridfs
-from nose.tools import assert_raises
 from six import text_type
 
 try:
@@ -130,7 +129,7 @@ class GridFsTest(TestCase):
 
     def test__put_exists(self):
         self.fake_gridfs.put(GenFile(1), _id="12345")
-        with assert_raises(errors.FileExists):
+        with self.assertRaises(errors.FileExists):
             self.fake_gridfs.put(GenFile(2, 3), _id="12345")
 
     def assertSameFile(self, real, fake):

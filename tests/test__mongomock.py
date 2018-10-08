@@ -29,7 +29,6 @@ try:
     _HAVE_MAP_REDUCE = True
 except ImportError:
     _HAVE_MAP_REDUCE = False
-from nose.tools import assert_raises
 from tests.multicollection import MultiCollection
 
 
@@ -50,10 +49,10 @@ class InterfaceTest(TestCase):
                          "mongomock.MongoClient('localhost', 27017)")
 
     def test__bad_uri_raises(self):
-        with assert_raises(InvalidURI):
+        with self.assertRaises(InvalidURI):
             mongomock.MongoClient("http://host1")
 
-        with assert_raises(InvalidURI):
+        with self.assertRaises(InvalidURI):
             mongomock.MongoClient("://host1")
 
     def test__none_uri_host(self):
@@ -170,19 +169,19 @@ class DatabaseGettingTest(TestCase):
             return mongomock.MongoClient(uri)
 
         c = client("mongodb://host1")
-        with assert_raises(ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
         c = client("host1")
-        with assert_raises(ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
         c = client("")
-        with assert_raises(ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
         c = client("mongodb://host1/")
-        with assert_raises(ConfigurationError):
+        with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
 
@@ -586,24 +585,24 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__find_not_exceptions(self):
         self.cmp.do.insert(dict(noise="longhorn"))
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': True}}).count()
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.fake_collection.find({'name': {'$not': True}}).count()
 
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': {'$regex': ''}}}).count()
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.fake_collection.find({'name': {'$not': {'$regex': ''}}}).count()
 
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': []}}).count()
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.fake_collection.find({'name': {'$not': []}}).count()
 
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': ''}}).count()
-        with assert_raises(OperationFailure):
+        with self.assertRaises(OperationFailure):
             self.fake_collection.find({'name': {'$not': ''}}).count()
 
     def test__find_compare(self):
