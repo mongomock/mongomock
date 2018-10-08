@@ -532,6 +532,22 @@ class CollectionAPITest(TestCase):
         doc.pop('_id')
         self.assertDictEqual(doc, update)
 
+    def test__find_in_empty_collection(self):
+        self.db.collection.drop()
+
+        # Valid filter.
+        self.db.collection.find_one({'a.b': 3})
+
+        # Invalid filter.
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'$or': []})
+
+        # Do not raise when creating the cursor.
+        cursor = self.db.collection.find({'$or': []})
+        # Only raise when using it.
+        with self.assertRaises(mongomock.OperationFailure):
+            next(cursor)
+
     def test__iterate_on_find_and_update(self):
         documents = [
             {'x': 1, 's': 0},

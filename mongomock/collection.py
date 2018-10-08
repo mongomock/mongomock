@@ -1135,6 +1135,10 @@ class Collection(object):
         updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter=None):
+        # Validate the filter even if no documents can be returned.
+        if not self._documents:
+            filter_applies(filter, {})
+
         return (document for document in list(itervalues(self._documents))
                 if filter_applies(filter, document))
 
