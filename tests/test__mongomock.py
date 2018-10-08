@@ -346,7 +346,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
         id2 = ObjectId()
-        self.cmp.do.insert({'_id': id1, 'name': 'new', 'someOtherProp': 2})
+        self.cmp.do.insert({'_id': id1, 'name': 'new', 'someOtherProp': 2, 'nestedProp': {'a': 1}})
         self.cmp.do.insert({'_id': id2, 'name': 'another new'})
 
         self.cmp.compare_ignore_order.find({}, {'_id': 0})  # test exclusion of _id

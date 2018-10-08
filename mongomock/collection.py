@@ -265,12 +265,14 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
     doc_copy = container()
 
     if not is_include:
-        # copy only scalar values
         for key, val in iteritems(doc):
-            if not isinstance(val, (list, tuple, dict)):
-                doc_copy[key] = val
+            doc_copy[key] = val
 
     for key, spec in iteritems(combined_projection_spec):
+        if key == '$':
+            if is_include:
+                raise NotImplementedError('Positional projection is not implemented in mongomock')
+            raise OperationFailure('Cannot exclude array elements with the positional operator')
         if key not in doc:
             continue
 

@@ -1340,7 +1340,7 @@ class CollectionAPITest(TestCase):
                 {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
 
     def test__find_and_project(self):
-        self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other'})
+        self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other', 'c': {'d': 'nested'}})
 
         self.assertEqual(
             [{'_id': 1, 'a': 42}],
@@ -1356,11 +1356,20 @@ class CollectionAPITest(TestCase):
             list(self.db.collection.find({}, projection={'a': 'other'})))
 
         self.assertEqual(
-            [{'_id': 1, 'b': 'other'}],
+            [{'_id': 1, 'b': 'other', 'c': {'d': 'nested'}}],
             list(self.db.collection.find({}, projection={'a': 0})))
         self.assertEqual(
-            [{'_id': 1, 'b': 'other'}],
+            [{'_id': 1, 'b': 'other', 'c': {'d': 'nested'}}],
             list(self.db.collection.find({}, projection={'a': False})))
+
+    def test__find_and_project_positional(self):
+        self.db.collection.insert({'_id': 1, 'a': [{'b': 1}, {'b': 2}]})
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 0})
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 1})
 
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
