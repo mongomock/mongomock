@@ -25,7 +25,7 @@ except ImportError:
 try:
     from bson.code import Code
     from bson.son import SON
-    import execjs  # noqa
+    import execjs as _  # noqa
     _HAVE_MAP_REDUCE = True
 except ImportError:
     _HAVE_MAP_REDUCE = False
@@ -50,10 +50,10 @@ class InterfaceTest(TestCase):
 
     def test__bad_uri_raises(self):
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient("http://host1")
+            mongomock.MongoClient('http://host1')
 
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient("://host1")
+            mongomock.MongoClient('://host1')
 
     def test__none_uri_host(self):
         self.assertIsNotNone(mongomock.MongoClient('host1'))
@@ -86,33 +86,33 @@ class DatabaseGettingTest(TestCase):
     def test__drop_database(self):
         db = self.client.a
         collection = db.a
-        doc_id = collection.insert({"aa": "bb"})
-        result = collection.find({"_id": doc_id})
+        doc_id = collection.insert({'aa': 'bb'})
+        result = collection.find({'_id': doc_id})
         self.assertEqual(result.count(), 1)
 
-        self.client.drop_database("a")
-        result = collection.find({"_id": doc_id})
+        self.client.drop_database('a')
+        result = collection.find({'_id': doc_id})
         self.assertEqual(result.count(), 0)
 
         db = self.client.a
         collection = db.a
 
-        doc_id = collection.insert({"aa": "bb"})
-        result = collection.find({"_id": doc_id})
+        doc_id = collection.insert({'aa': 'bb'})
+        result = collection.find({'_id': doc_id})
         self.assertEqual(result.count(), 1)
 
         self.client.drop_database(db)
-        result = collection.find({"_id": doc_id})
+        result = collection.find({'_id': doc_id})
         self.assertEqual(result.count(), 0)
 
     def test__drop_database_indexes(self):
         db = self.client.somedb
         collection = db.a
         collection.create_index('simple')
-        collection.create_index([("value", 1)], unique=True)
-        collection.ensure_index([("sparsed", 1)], unique=True, sparse=True)
+        collection.create_index([('value', 1)], unique=True)
+        collection.ensure_index([('sparsed', 1)], unique=True, sparse=True)
 
-        self.client.drop_database("somedb")
+        self.client.drop_database('somedb')
 
         # Make sure indexes' rules no longer apply
         collection.insert({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
@@ -127,10 +127,10 @@ class DatabaseGettingTest(TestCase):
     def test__dereference(self):
         db = self.client.a
         collection = db.a
-        to_insert = {"_id": "a", "aa": "bb"}
+        to_insert = {'_id': 'a', 'aa': 'bb'}
         collection.insert(to_insert)
 
-        a = db.dereference(DBRef("a", "a", db.name))
+        a = db.dereference(DBRef('a', 'a', db.name))
         self.assertEqual(to_insert, a)
 
     def test__getting_default_database_valid(self):
@@ -138,23 +138,23 @@ class DatabaseGettingTest(TestCase):
             client = mongomock.MongoClient(uri)
             return client, client.get_default_database()
 
-        c, db = gddb("mongodb://host1/foo")
+        c, db = gddb('mongodb://host1/foo')
         self.assertIsNotNone(db)
         self.assertIsInstance(db, Database)
         self.assertIs(db.client, c)
         self.assertIs(db, c['foo'])
 
-        c, db = gddb("mongodb://host1/bar")
+        c, db = gddb('mongodb://host1/bar')
         self.assertIs(db, c['bar'])
 
-        c, db = gddb(r"mongodb://a%00lice:f%00oo@127.0.0.1/t%00est")
-        self.assertIs(db, c["t\x00est"])
+        c, db = gddb(r'mongodb://a%00lice:f%00oo@127.0.0.1/t%00est')
+        self.assertIs(db, c['t\x00est'])
 
-        c, db = gddb("mongodb://bob:bar@[::1]:27018/admin")
+        c, db = gddb('mongodb://bob:bar@[::1]:27018/admin')
         self.assertIs(db, c['admin'])
 
-        c, db = gddb("mongodb://%24am:f%3Azzb%40zz@127.0.0.1/"
-                     "admin%3F?authMechanism=MONGODB-CR")
+        c, db = gddb('mongodb://%24am:f%3Azzb%40zz@127.0.0.1/'
+                     'admin%3F?authMechanism=MONGODB-CR')
         self.assertIs(db, c['admin?'])
         c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
         self.assertIs(db, c['foo'])
@@ -168,24 +168,24 @@ class DatabaseGettingTest(TestCase):
         def client(uri):
             return mongomock.MongoClient(uri)
 
-        c = client("mongodb://host1")
+        c = client('mongodb://host1')
         with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
-        c = client("host1")
+        c = client('host1')
         with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
-        c = client("")
+        c = client('')
         with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
-        c = client("mongodb://host1/")
+        c = client('mongodb://host1/')
         with self.assertRaises(ConfigurationError):
             c.get_default_database()
 
 
-@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 class _CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation
 
@@ -196,14 +196,14 @@ class _CollectionComparisonTest(TestCase):
         super(_CollectionComparisonTest, self).setUp()
         self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
-        self.db_name = "mongomock___testing_db"
-        self.collection_name = "mongomock___testing_collection"
+        self.db_name = 'mongomock___testing_db'
+        self.collection_name = 'mongomock___testing_collection'
         self.mongo_conn[self.db_name][self.collection_name].drop()
         self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
         self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
         self.cmp = MultiCollection({
-            "fake": self.fake_collection,
-            "real": self.mongo_collection,
+            'fake': self.fake_collection,
+            'real': self.mongo_collection,
         })
 
     def _connect_to_local_mongodb(self, num_retries=60):
@@ -216,7 +216,7 @@ class _CollectionComparisonTest(TestCase):
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
-                if "connection refused" not in e.message.lower():
+                if 'connection refused' not in e.message.lower():
                     raise
 
     def tearDown(self):
@@ -232,18 +232,18 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__inserting(self):
         self.cmp.do.remove()
-        data = {"a": 1, "b": 2, "c": "data"}
+        data = {'a': 1, 'b': 2, 'c': 'data'}
         self.cmp.do.insert(data)
         self.cmp.compare.find()  # single document, no need to ignore order
 
     def test__bulk_insert(self):
-        objs = [{"a": 2, "b": {"c": 3}}, {"c": 5}, {"d": 7}]
+        objs = [{'a': 2, 'b': {'c': 3}}, {'c': 5}, {'d': 7}]
         results_dict = self.cmp.do.insert(objs)
         for results in results_dict.values():
             self.assertEqual(len(results), len(objs))
             self.assertEqual(
                 len(set(results)), len(results),
-                "Returned object ids not unique!")
+                'Returned object ids not unique!')
         self.cmp.compare_ignore_order.find()
 
     def test__insert_one(self):
@@ -256,8 +256,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__save(self):
         # add an item with a non ObjectId _id first.
-        self.cmp.do.insert({"_id": "b"})
-        self.cmp.do.save({"_id": ObjectId(), "someProp": 1})
+        self.cmp.do.insert({'_id': 'b'})
+        self.cmp.do.save({'_id': ObjectId(), 'someProp': 1})
         self.cmp.compare_ignore_order.find()
 
     def test__insert_object_id_as_dict(self):
@@ -289,82 +289,82 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__count(self):
         self.cmp.compare.count()
-        self.cmp.do.insert({"a": 1})
+        self.cmp.do.insert({'a': 1})
         self.cmp.compare.count()
-        self.cmp.do.insert({"a": 0})
+        self.cmp.do.insert({'a': 0})
         self.cmp.compare.count()
-        self.cmp.compare.count({"a": 1})
+        self.cmp.compare.count({'a': 1})
 
     def test__count_documents(self):
         self.cmp.compare.count_documents({})
-        self.cmp.do.insert_one({"a": 1})
+        self.cmp.do.insert_one({'a': 1})
         self.cmp.compare.count_documents({})
-        self.cmp.do.insert_one({"a": 0})
+        self.cmp.do.insert_one({'a': 0})
         self.cmp.compare.count_documents({})
-        self.cmp.compare.count_documents({"a": 1})
+        self.cmp.compare.count_documents({'a': 1})
 
     def test__estimated_document_count(self):
         self.cmp.compare.estimated_document_count()
-        self.cmp.do.insert({"a": 1})
+        self.cmp.do.insert({'a': 1})
         self.cmp.compare.estimated_document_count()
-        self.cmp.do.insert({"a": 0})
+        self.cmp.do.insert({'a': 0})
         self.cmp.compare.estimated_document_count()
         self.cmp.compare.estimated_document_count(skip=2)
-        self.cmp.compare.estimated_document_count(filter={"a": 1})
+        self.cmp.compare.estimated_document_count(filter={'a': 1})
 
     def test__find_one(self):
-        self.cmp.do.insert({"_id": "id1", "name": "new"})
-        self.cmp.compare.find_one({"_id": "id1"})
-        self.cmp.do.insert({"_id": "id2", "name": "another new"})
-        self.cmp.compare.find_one({"_id": "id2"}, {"_id": 1})
-        self.cmp.compare.find_one("id2", {"_id": 1})
+        self.cmp.do.insert({'_id': 'id1', 'name': 'new'})
+        self.cmp.compare.find_one({'_id': 'id1'})
+        self.cmp.do.insert({'_id': 'id2', 'name': 'another new'})
+        self.cmp.compare.find_one({'_id': 'id2'}, {'_id': 1})
+        self.cmp.compare.find_one('id2', {'_id': 1})
 
     def test__find_one_no_args(self):
-        self.cmp.do.insert({"_id": "new_obj", "field": "value"})
+        self.cmp.do.insert({'_id': 'new_obj', 'field': 'value'})
         self.cmp.compare.find_one()
 
     def test__find_by_attributes(self):
         id1 = ObjectId()
-        self.cmp.do.insert({"_id": id1, "name": "new"})
-        self.cmp.do.insert({"name": "another new"})
-        self.cmp.compare_ignore_order.sort_by(lambda doc: str(doc.get("name", str(doc)))).find()
-        self.cmp.compare.find({"_id": id1})
+        self.cmp.do.insert({'_id': id1, 'name': 'new'})
+        self.cmp.do.insert({'name': 'another new'})
+        self.cmp.compare_ignore_order.sort_by(lambda doc: str(doc.get('name', str(doc)))).find()
+        self.cmp.compare.find({'_id': id1})
 
     def test__find_by_document(self):
-        self.cmp.do.insert({"name": "new", "doc": {"key": "val"}})
-        self.cmp.do.insert({"name": "another new"})
+        self.cmp.do.insert({'name': 'new', 'doc': {'key': 'val'}})
+        self.cmp.do.insert({'name': 'another new'})
         self.cmp.compare_ignore_order.find()
-        self.cmp.compare.find({"doc": {"key": "val"}})
-        self.cmp.compare.find({"doc": {"key": {'$eq': 'val'}}})
+        self.cmp.compare.find({'doc': {'key': 'val'}})
+        self.cmp.compare.find({'doc': {'key': {'$eq': 'val'}}})
 
     def test__find_by_empty_document(self):
-        self.cmp.do.insert({"doc": {"data": "val"}})
-        self.cmp.do.insert({"doc": {}})
-        self.cmp.do.insert({"doc": None})
-        self.cmp.compare.find({"doc": {}})
+        self.cmp.do.insert({'doc': {'data': 'val'}})
+        self.cmp.do.insert({'doc': {}})
+        self.cmp.do.insert({'doc': None})
+        self.cmp.compare.find({'doc': {}})
 
     def test__find_by_attributes_return_fields(self):
         id1 = ObjectId()
         id2 = ObjectId()
-        self.cmp.do.insert({"_id": id1, "name": "new", "someOtherProp": 2})
-        self.cmp.do.insert({"_id": id2, "name": "another new"})
+        self.cmp.do.insert({'_id': id1, 'name': 'new', 'someOtherProp': 2})
+        self.cmp.do.insert({'_id': id2, 'name': 'another new'})
 
-        self.cmp.compare_ignore_order.find({}, {"_id": 0})  # test exclusion of _id
-        self.cmp.compare_ignore_order.find({}, {"_id": 1, "someOtherProp": 1})  # test inclusion
-        self.cmp.compare_ignore_order.find({}, {"_id": 0, "someOtherProp": 0})  # test exclusion
-        self.cmp.compare_ignore_order.find({}, {"_id": 0, "someOtherProp": 1})  # test mixed _id:0
-        self.cmp.compare_ignore_order.find({}, {"someOtherProp": 0})  # test no _id, otherProp:0
-        self.cmp.compare_ignore_order.find({}, {"someOtherProp": 1})  # test no _id, otherProp:1
+        self.cmp.compare_ignore_order.find({}, {'_id': 0})  # test exclusion of _id
+        self.cmp.compare_ignore_order.find({}, {'_id': 1, 'someOtherProp': 1})  # test inclusion
+        self.cmp.compare_ignore_order.find({}, {'_id': 0, 'someOtherProp': 0})  # test exclusion
+        self.cmp.compare_ignore_order.find({}, {'_id': 0, 'someOtherProp': 1})  # test mixed _id:0
+        self.cmp.compare_ignore_order.find({}, {'someOtherProp': 0})  # test no _id, otherProp:0
+        self.cmp.compare_ignore_order.find({}, {'someOtherProp': 1})  # test no _id, otherProp:1
 
-        self.cmp.compare.find({"_id": id1}, {"_id": 0})  # test exclusion of _id
-        self.cmp.compare.find({"_id": id1}, {"_id": 1, "someOtherProp": 1})  # test inclusion
-        self.cmp.compare.find({"_id": id1}, {"_id": 0, "someOtherProp": 0})  # test exclusion
+        self.cmp.compare.find({'_id': id1}, {'_id': 0})  # test exclusion of _id
+        self.cmp.compare.find({'_id': id1}, {'_id': 1, 'someOtherProp': 1})  # test inclusion
+        self.cmp.compare.find({'_id': id1}, {'_id': 0, 'someOtherProp': 0})  # test exclusion
         # test mixed _id:0
-        self.cmp.compare.find({"_id": id1}, {"_id": 0, "someOtherProp": 1})
+        self.cmp.compare.find({'_id': id1}, {'_id': 0, 'someOtherProp': 1})
         # test no _id, otherProp:0
-        self.cmp.compare.find({"_id": id1}, {"someOtherProp": 0})
+        self.cmp.compare.find({'_id': id1}, {'someOtherProp': 0})
         # test no _id, otherProp:1
-        self.cmp.compare.find({"_id": id1}, {"someOtherProp": 1})
+        self.cmp.compare.find({'_id': id1}, {'someOtherProp': 1})
 
     def test__find_by_attributes_return_fields_elemMatch(self):
         id = ObjectId()
@@ -429,7 +429,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert(green_bowler)
         self.cmp.do.insert(red_bowler)
         self.cmp.compare_ignore_order.find()
-        self.cmp.compare_ignore_order.find({"name": "sam"})
+        self.cmp.compare_ignore_order.find({'name': 'sam'})
         self.cmp.compare_ignore_order.find({'hat.color': 'green'})
         self.cmp.compare_ignore_order.find({'hat.type': 'bowler'})
         self.cmp.compare.find({
@@ -477,9 +477,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert(sam)
         self.cmp.compare_ignore_order.find()
         regex = re.compile('bob|sam')
-        self.cmp.compare_ignore_order.find({"name": regex})
+        self.cmp.compare_ignore_order.find({'name': regex})
         regex = re.compile('bob|notsam')
-        self.cmp.compare_ignore_order.find({"name": regex})
+        self.cmp.compare_ignore_order.find({'name': regex})
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -488,7 +488,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert(bob)
         self.cmp.do.insert(sam)
         self.cmp.compare_ignore_order.find()
-        self.cmp.compare_ignore_order.find({"name": {'$regex': 'bob|sam'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|sam'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|notsam'}})
 
     def test__find_in_array_by_regex_object(self):
@@ -498,11 +498,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert(bob)
         self.cmp.do.insert(sam)
         regex = re.compile('^a')
-        self.cmp.compare_ignore_order.find({"text": regex})
+        self.cmp.compare_ignore_order.find({'text': regex})
         regex = re.compile('e$')
-        self.cmp.compare_ignore_order.find({"text": regex})
+        self.cmp.compare_ignore_order.find({'text': regex})
         regex = re.compile('bde|cde')
-        self.cmp.compare_ignore_order.find({"text": regex})
+        self.cmp.compare_ignore_order.find({'text': regex})
 
     def test__find_in_array_by_regex_string(self):
         """Test searching inside array with regular expression string"""
@@ -510,9 +510,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         sam = {'name': 'sam', 'text': ['bde']}
         self.cmp.do.insert(bob)
         self.cmp.do.insert(sam)
-        self.cmp.compare_ignore_order.find({"text": {'$regex': '^a'}})
-        self.cmp.compare_ignore_order.find({"text": {'$regex': 'e$'}})
-        self.cmp.compare_ignore_order.find({"text": {'$regex': 'bcd|cde'}})
+        self.cmp.compare_ignore_order.find({'text': {'$regex': '^a'}})
+        self.cmp.compare_ignore_order.find({'text': {'$regex': 'e$'}})
+        self.cmp.compare_ignore_order.find({'text': {'$regex': 'bcd|cde'}})
 
     def test__find_by_regex_string_on_absent_field_dont_break(self):
         """Test searching on absent field with regular expression string dont break"""
@@ -520,33 +520,33 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         sam = {'name': 'sam'}
         self.cmp.do.insert(bob)
         self.cmp.do.insert(sam)
-        self.cmp.compare_ignore_order.find({"text": {'$regex': 'bob|sam'}})
+        self.cmp.compare_ignore_order.find({'text': {'$regex': 'bob|sam'}})
 
     def test__find_by_elemMatch(self):
-        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
-        self.cmp.do.insert({"field": [{"a": 1, "b": 4}, {"c": 3, "d": 8}]})
-        self.cmp.do.insert({"field": "nonlist"})
-        self.cmp.do.insert({"field": 2})
+        self.cmp.do.insert({'field': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}]})
+        self.cmp.do.insert({'field': [{'a': 1, 'b': 4}, {'c': 3, 'd': 8}]})
+        self.cmp.do.insert({'field': 'nonlist'})
+        self.cmp.do.insert({'field': 2})
 
-        self.cmp.compare.find({"field": {"$elemMatch": {"b": 1}}})
-        self.cmp.compare_ignore_order.find({"field": {"$elemMatch": {"a": 1}}})
-        self.cmp.compare.find({"field": {"$elemMatch": {"b": {"$gt": 3}}}})
+        self.cmp.compare.find({'field': {'$elemMatch': {'b': 1}}})
+        self.cmp.compare_ignore_order.find({'field': {'$elemMatch': {'a': 1}}})
+        self.cmp.compare.find({'field': {'$elemMatch': {'b': {'$gt': 3}}}})
 
     def test__find_in_array(self):
-        self.cmp.do.insert({"field": [{"a": 1, "b": 2}, {"c": 3, "d": 4}]})
+        self.cmp.do.insert({'field': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}]})
 
-        self.cmp.compare.find({"field.0.a": 1})
-        self.cmp.compare.find({"field.0.b": 2})
-        self.cmp.compare.find({"field.1.c": 3})
-        self.cmp.compare.find({"field.1.d": 4})
-        self.cmp.compare.find({"field.0": {"$exists": True}})
-        self.cmp.compare.find({"field.0": {"$exists": False}})
-        self.cmp.compare.find({"field.0.a": {"$exists": True}})
-        self.cmp.compare.find({"field.0.a": {"$exists": False}})
-        self.cmp.compare.find({"field.1.a": {"$exists": True}})
-        self.cmp.compare.find({"field.1.a": {"$exists": False}})
+        self.cmp.compare.find({'field.0.a': 1})
+        self.cmp.compare.find({'field.0.b': 2})
+        self.cmp.compare.find({'field.1.c': 3})
+        self.cmp.compare.find({'field.1.d': 4})
+        self.cmp.compare.find({'field.0': {'$exists': True}})
+        self.cmp.compare.find({'field.0': {'$exists': False}})
+        self.cmp.compare.find({'field.0.a': {'$exists': True}})
+        self.cmp.compare.find({'field.0.a': {'$exists': False}})
+        self.cmp.compare.find({'field.1.a': {'$exists': True}})
+        self.cmp.compare.find({'field.1.a': {'$exists': False}})
         self.cmp.compare.find(
-            {"field.0.a": {"$exists": True}, "field.1.a": {"$exists": False}})
+            {'field.0.a': {'$exists': True}, 'field.1.a': {'$exists': False}})
 
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
@@ -584,7 +584,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': {'$not': re.compile('dan')}})
 
     def test__find_not_exceptions(self):
-        self.cmp.do.insert(dict(noise="longhorn"))
+        self.cmp.do.insert(dict(noise='longhorn'))
         with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': True}}).count()
         with self.assertRaises(OperationFailure):
@@ -606,7 +606,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             self.fake_collection.find({'name': {'$not': ''}}).count()
 
     def test__find_compare(self):
-        self.cmp.do.insert(dict(noise="longhorn", sqrd="non numeric"))
+        self.cmp.do.insert(dict(noise='longhorn', sqrd='non numeric'))
         for x in range(10):
             self.cmp.do.insert(dict(num=x, sqrd=x * x))
         self.cmp.compare_ignore_order.find({'sqrd': {'$lte': 4}})
@@ -693,8 +693,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'x': {'$nin': [non_existing_pat]}})
 
     def test__find_and_modify_remove(self):
-        self.cmp.do.insert([{"a": x, "junk": True} for x in range(10)])
-        self.cmp.compare.find_and_modify({"a": 2}, remove=True, fields={'_id': False, 'a': True})
+        self.cmp.do.insert([{'a': x, 'junk': True} for x in range(10)])
+        self.cmp.compare.find_and_modify({'a': 2}, remove=True, fields={'_id': False, 'a': True})
         self.cmp.compare_ignore_order.find()
 
     def test__find_one_and_delete(self):
@@ -716,56 +716,56 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__find_sort_list(self):
         self.cmp.do.remove()
-        for data in ({"a": 1, "b": 3, "c": "data1"},
-                     {"a": 2, "b": 2, "c": "data3"},
-                     {"a": 3, "b": 1, "c": "data2"}):
+        for data in ({'a': 1, 'b': 3, 'c': 'data1'},
+                     {'a': 2, 'b': 2, 'c': 'data3'},
+                     {'a': 3, 'b': 1, 'c': 'data2'}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(sort=[("a", 1), ("b", -1)])
-        self.cmp.compare.find(sort=[("b", 1), ("a", -1)])
-        self.cmp.compare.find(sort=[("b", 1), ("a", -1), ("c", 1)])
+        self.cmp.compare.find(sort=[('a', 1), ('b', -1)])
+        self.cmp.compare.find(sort=[('b', 1), ('a', -1)])
+        self.cmp.compare.find(sort=[('b', 1), ('a', -1), ('c', 1)])
 
     def test__find_sort_list_empty_order(self):
         self.cmp.do.remove()
-        for data in ({"a": 1},
-                     {"a": 2, "b": -2},
-                     {"a": 3, "b": 4}):
+        for data in ({'a': 1},
+                     {'a': 2, 'b': -2},
+                     {'a': 3, 'b': 4}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(sort=[("b", 1)])
-        self.cmp.compare.find(sort=[("b", -1)])
+        self.cmp.compare.find(sort=[('b', 1)])
+        self.cmp.compare.find(sort=[('b', -1)])
 
     def test__find_sort_list_nested_doc(self):
         self.cmp.do.remove()
-        for data in ({"root": {"a": 1, "b": 3, "c": "data1"}},
-                     {"root": {"a": 2, "b": 2, "c": "data3"}},
-                     {"root": {"a": 3, "b": 1, "c": "data2"}}):
+        for data in ({'root': {'a': 1, 'b': 3, 'c': 'data1'}},
+                     {'root': {'a': 2, 'b': 2, 'c': 'data3'}},
+                     {'root': {'a': 3, 'b': 1, 'c': 'data2'}}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(sort=[("root.a", 1), ("root.b", -1)])
-        self.cmp.compare.find(sort=[("root.b", 1), ("root.a", -1)])
+        self.cmp.compare.find(sort=[('root.a', 1), ('root.b', -1)])
+        self.cmp.compare.find(sort=[('root.b', 1), ('root.a', -1)])
         self.cmp.compare.find(
             sort=[
-                ("root.b", 1), ("root.a", -1), ("root.c", 1)])
+                ('root.b', 1), ('root.a', -1), ('root.c', 1)])
 
     def test__find_sort_list_nested_list(self):
         self.cmp.do.remove()
-        for data in ({"root": [{"a": 1, "b": 3, "c": "data1"}]},
-                     {"root": [{"a": 2, "b": 2, "c": "data3"}]},
-                     {"root": [{"a": 3, "b": 1, "c": "data2"}]}):
+        for data in ({'root': [{'a': 1, 'b': 3, 'c': 'data1'}]},
+                     {'root': [{'a': 2, 'b': 2, 'c': 'data3'}]},
+                     {'root': [{'a': 3, 'b': 1, 'c': 'data2'}]}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(sort=[("root.0.a", 1), ("root.0.b", -1)])
-        self.cmp.compare.find(sort=[("root.0.b", 1), ("root.0.a", -1)])
+        self.cmp.compare.find(sort=[('root.0.a', 1), ('root.0.b', -1)])
+        self.cmp.compare.find(sort=[('root.0.b', 1), ('root.0.a', -1)])
         self.cmp.compare.find(
             sort=[
-                ("root.0.b", 1), ("root.0.a", -1), ("root.0.c", 1)])
+                ('root.0.b', 1), ('root.0.a', -1), ('root.0.c', 1)])
 
     def test__find_limit(self):
         self.cmp.do.remove()
-        for data in ({"a": 1, "b": 3, "c": "data1"},
-                     {"a": 2, "b": 2, "c": "data3"},
-                     {"a": 3, "b": 1, "c": "data2"}):
+        for data in ({'a': 1, 'b': 3, 'c': 'data1'},
+                     {'a': 2, 'b': 2, 'c': 'data3'},
+                     {'a': 3, 'b': 1, 'c': 'data2'}):
             self.cmp.do.insert(data)
-        self.cmp.compare.find(limit=2, sort=[("a", 1), ("b", -1)])
+        self.cmp.compare.find(limit=2, sort=[('a', 1), ('b', -1)])
         # pymongo limit defaults to 0, returning everything
-        self.cmp.compare.find(limit=0, sort=[("a", 1), ("b", -1)])
+        self.cmp.compare.find(limit=0, sort=[('a', 1), ('b', -1)])
 
     def test__find_projection_subdocument_lists(self):
         self.cmp.do.remove()
@@ -792,9 +792,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     #
     #     self.cmp.do.remove()
     #     self.cmp.do.insert(
-    #         {"a": 1, "b": {"ba": 3, "bb": 4, "bc": [{"bca": 5}]}})
+    #         {'a': 1, 'b': {'ba': 3, 'bb': 4, 'bc': [{'bca': 5}]}})
     #     self.cmp.compare.find({}, as_class=MyDict)
-    #     self.cmp.compare.find({"a": 1}, as_class=MyDict)
+    #     self.cmp.compare.find({'a': 1}, as_class=MyDict)
 
     def test__return_only_selected_fields(self):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
@@ -863,7 +863,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__remove(self):
         """Test the remove method."""
-        self.cmp.do.insert({"value": 1})
+        self.cmp.do.insert({'value': 1})
         self.cmp.compare_ignore_order.find()
         self.cmp.do.remove()
         self.cmp.compare.find()
@@ -894,10 +894,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find()
 
     def test__update(self):
-        doc = {"a": 1}
+        doc = {'a': 1}
         self.cmp.do.insert(doc)
-        new_document = {"new_attr": 2}
-        self.cmp.do.update({"a": 1}, new_document)
+        new_document = {'new_attr': 2}
+        self.cmp.do.update({'a': 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
     def test__update_upsert_with_id(self):
@@ -990,7 +990,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
         self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
         self.cmp.compare.find({'name': 'bob'})
-        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': ""}})
+        self.cmp.do.update({'name': 'bob'}, {'$unset': {'a': ''}})
         self.cmp.compare.find({'name': 'bob'})
 
         self.cmp.do.update({'name': 'bob'}, {'a': 'aaa'}, upsert=True)
@@ -1030,9 +1030,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__set_upsert(self):
         self.cmp.do.remove()
-        self.cmp.do.update({"name": "bob"}, {"$set": {"age": 1}}, True)
+        self.cmp.do.update({'name': 'bob'}, {'$set': {'age': 1}}, True)
         self.cmp.compare.find()
-        self.cmp.do.update({"name": "alice"}, {"$set": {"age": 1}}, True)
+        self.cmp.do.update({'name': 'alice'}, {'$set': {'age': 1}}, True)
         self.cmp.compare_ignore_order.find()
 
     def test__set_subdocument_array(self):
@@ -1447,26 +1447,26 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'bob'})
 
     def test__drop(self):
-        self.cmp.do.insert({"name": "another new"})
+        self.cmp.do.insert({'name': 'another new'})
         self.cmp.do.drop()
         self.cmp.compare.find({})
 
     def test__ensure_index(self):
-        self.cmp.compare.ensure_index("name")
-        self.cmp.compare.ensure_index("hat", cache_for=100)
-        self.cmp.compare.ensure_index([("name", 1), ("hat", -1)])
+        self.cmp.compare.ensure_index('name')
+        self.cmp.compare.ensure_index('hat', cache_for=100)
+        self.cmp.compare.ensure_index([('name', 1), ('hat', -1)])
         self.cmp.do.insert_one({})
         self.cmp.compare.index_information()
 
     def test__drop_index(self):
         self.cmp.do.insert_one({})
-        self.cmp.compare.ensure_index([("name", 1), ("hat", -1)])
-        self.cmp.compare.drop_index([("name", 1), ("hat", -1)])
+        self.cmp.compare.ensure_index([('name', 1), ('hat', -1)])
+        self.cmp.compare.drop_index([('name', 1), ('hat', -1)])
         self.cmp.compare.index_information()
 
     def test__drop_index_by_name(self):
         self.cmp.do.insert_one({})
-        results = self.cmp.compare.ensure_index("name")
+        results = self.cmp.compare.ensure_index('name')
         self.cmp.compare.drop_index(results['real'])
         self.cmp.compare.index_information()
 
@@ -1496,32 +1496,32 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find()
 
 
-@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
-@skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class CollectionMapReduceTest(TestCase):
 
     def setUp(self):
         self.db = mongomock.MongoClient().map_reduce_test
-        self.data = [{"x": 1, "tags": ["dog", "cat"]},
-                     {"x": 2, "tags": ["cat"]},
-                     {"x": 3, "tags": ["mouse", "cat", "dog"]},
-                     {"x": 4, "tags": []}]
+        self.data = [{'x': 1, 'tags': ['dog', 'cat']},
+                     {'x': 2, 'tags': ['cat']},
+                     {'x': 3, 'tags': ['mouse', 'cat', 'dog']},
+                     {'x': 4, 'tags': []}]
         for item in self.data:
             self.db.things.insert(item)
-        self.map_func = Code("""
+        self.map_func = Code('''
                 function() {
                     this.tags.forEach(function(z) {
                         emit(z, 1);
                     });
-                }""")
-        self.reduce_func = Code("""
+                }''')
+        self.reduce_func = Code('''
                 function(key, values) {
                     var total = 0;
                     for(var i = 0; i<values.length; i++) {
                         total += values[i];
                     }
                     return total;
-                }""")
+                }''')
         self.expected_results = [{'_id': 'mouse', 'value': 1},
                                  {'_id': 'dog', 'value': 2},
                                  {'_id': 'cat', 'value': 3}]
@@ -1533,10 +1533,10 @@ class CollectionMapReduceTest(TestCase):
         # Checks that the result collection is cleaned between calls
         self._check_map_reduce(self.db.things, self.expected_results)
 
-        more_data = [{"x": 1, "tags": []},
-                     {"x": 2, "tags": []},
-                     {"x": 3, "tags": []},
-                     {"x": 4, "tags": []}]
+        more_data = [{'x': 1, 'tags': []},
+                     {'x': 2, 'tags': []},
+                     {'x': 3, 'tags': []},
+                     {'x': 4, 'tags': []}]
         for item in more_data:
             self.db.more_things.insert(item)
         expected_results = []
@@ -1636,8 +1636,8 @@ class CollectionMapReduceTest(TestCase):
     def test__map_reduce_with_object_id(self):
         obj1 = ObjectId()
         obj2 = ObjectId()
-        data = [{"x": 1, "tags": [obj1, obj2]},
-                {"x": 2, "tags": [obj1]}]
+        data = [{'x': 1, 'tags': [obj1, obj2]},
+                {'x': 2, 'tags': [obj1]}]
         for item in data:
             self.db.things_with_obj.insert(item)
         expected_results = [{'_id': obj1, 'value': 2},
@@ -1654,119 +1654,119 @@ class CollectionMapReduceTest(TestCase):
         # Arrange
         fake_etap = mongomock.MongoClient().db
         fake_statuses_collection = fake_etap.create_collection('statuses')
-        fake_config_id = "this_is_config_id"
-        test_name = "this_is_test_name"
+        fake_config_id = 'this_is_config_id'
+        test_name = 'this_is_test_name'
         fake_statuses_objects = [
             {
-                "testID": test_name,
-                "kind": "Test",
-                "duration": 8392,
-                "configID": fake_config_id
+                'testID': test_name,
+                'kind': 'Test',
+                'duration': 8392,
+                'configID': fake_config_id
             },
             {
-                "testID": test_name,
-                "kind": "Test",
-                "duration": 8393,
-                "configID": fake_config_id
+                'testID': test_name,
+                'kind': 'Test',
+                'duration': 8393,
+                'configID': fake_config_id
             },
             {
-                "testID": test_name,
-                "kind": "Test",
-                "duration": 8394,
-                "configID": fake_config_id
+                'testID': test_name,
+                'kind': 'Test',
+                'duration': 8394,
+                'configID': fake_config_id
             }
         ]
         fake_statuses_collection.insert_many(fake_statuses_objects)
 
-        map_function = Code("function(){emit(this._id, this.duration);}")
-        reduce_function = Code("function() {}")
+        map_function = Code('function(){emit(this._id, this.duration);}')
+        reduce_function = Code('function() {}')
         search_query = {'configID': fake_config_id, 'kind': 'Test', 'testID': test_name}
 
         # Act
         result = fake_etap.statuses.map_reduce(
-            map_function, reduce_function, "my_collection", query=search_query)
+            map_function, reduce_function, 'my_collection', query=search_query)
 
         # Assert
         self.assertEqual(result.count(), 3)
 
 
-@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
-@skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class _GroupTest(_CollectionComparisonTest):
 
     def setUp(self):
         _CollectionComparisonTest.setUp(self)
         self._id1 = ObjectId()
         self.data = [
-            {"a": 1, "count": 4},
-            {"a": 1, "count": 2},
-            {"a": 1, "count": 4},
-            {"a": 2, "count": 3},
-            {"a": 2, "count": 1},
-            {"a": 1, "count": 5},
-            {"a": 4, "count": 4},
-            {"b": 4, "foo": 4},
-            {"b": 2, "foo": 3, "name": "theone"},
-            {"b": 1, "foo": 2},
-            {"b": 1, "foo": self._id1},
+            {'a': 1, 'count': 4},
+            {'a': 1, 'count': 2},
+            {'a': 1, 'count': 4},
+            {'a': 2, 'count': 3},
+            {'a': 2, 'count': 1},
+            {'a': 1, 'count': 5},
+            {'a': 4, 'count': 4},
+            {'b': 4, 'foo': 4},
+            {'b': 2, 'foo': 3, 'name': 'theone'},
+            {'b': 1, 'foo': 2},
+            {'b': 1, 'foo': self._id1},
         ]
         for item in self.data:
             self.cmp.do.insert(item)
 
     def test__group1(self):
-        key = ["a"]
-        initial = {"count": 0}
-        condition = {"a": {"$lt": 3}}
-        reduce_func = Code("""
+        key = ['a']
+        initial = {'count': 0}
+        condition = {'a': {'$lt': 3}}
+        reduce_func = Code('''
                 function(cur, result) { result.count += cur.count }
-                """)
+                ''')
         self.cmp.compare.group(key, condition, initial, reduce_func)
 
     def test__group2(self):
-        reduce_func = Code("""
+        reduce_func = Code('''
                 function(cur, result) { result.count += 1 }
-                """)
+                ''')
         self.cmp.compare.group(
-            key=["b"],
-            condition={"foo": {"$in": [3, 4]}, "name": "theone"},
-            initial={"count": 0},
+            key=['b'],
+            condition={'foo': {'$in': [3, 4]}, 'name': 'theone'},
+            initial={'count': 0},
             reduce=reduce_func)
 
     def test__group3(self):
-        reducer = Code("""
+        reducer = Code('''
             function(obj, result) {result.count+=1 }
-            """)
+            ''')
         conditions = {'foo': {'$in': [self._id1]}}
         self.cmp.compare.group(
             key=['foo'],
             condition=conditions,
-            initial={"count": 0},
+            initial={'count': 0},
             reduce=reducer)
 
 
-@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
-@skipIf(not _HAVE_MAP_REDUCE, "execjs not installed")
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def setUp(self):
         super(MongoClientAggregateTest, self).setUp()
         self.data = [
-            {"_id": ObjectId(), "a": 1, "b": 1, "count": 4, "swallows": ['European swallow'],
-             "date": datetime.datetime(2015, 10, 1, 10, 0)},
-            {"_id": ObjectId(), "a": 1, "b": 1, "count": 2, "swallows": ['African swallow'],
-             "date": datetime.datetime(2015, 12, 1, 12, 0)},
-            {"_id": ObjectId(), "a": 1, "b": 2, "count": 4, "swallows": ['European swallow'],
-             "date": datetime.datetime(2014, 10, 2, 12, 0)},
-            {"_id": ObjectId(), "a": 2, "b": 2, "count": 3, "swallows": ['African swallow',
+            {'_id': ObjectId(), 'a': 1, 'b': 1, 'count': 4, 'swallows': ['European swallow'],
+             'date': datetime.datetime(2015, 10, 1, 10, 0)},
+            {'_id': ObjectId(), 'a': 1, 'b': 1, 'count': 2, 'swallows': ['African swallow'],
+             'date': datetime.datetime(2015, 12, 1, 12, 0)},
+            {'_id': ObjectId(), 'a': 1, 'b': 2, 'count': 4, 'swallows': ['European swallow'],
+             'date': datetime.datetime(2014, 10, 2, 12, 0)},
+            {'_id': ObjectId(), 'a': 2, 'b': 2, 'count': 3, 'swallows': ['African swallow',
                                                                          'European swallow'],
-             "date": datetime.datetime(2015, 1, 2, 10, 0)},
-            {"_id": ObjectId(), "a": 2, "b": 3, "count": 1, "swallows": [],
-             "date": datetime.datetime(2013, 1, 3, 12, 0)},
-            {"_id": ObjectId(), "a": 1, "b": 4, "count": 5, "swallows": ['African swallow',
+             'date': datetime.datetime(2015, 1, 2, 10, 0)},
+            {'_id': ObjectId(), 'a': 2, 'b': 3, 'count': 1, 'swallows': [],
+             'date': datetime.datetime(2013, 1, 3, 12, 0)},
+            {'_id': ObjectId(), 'a': 1, 'b': 4, 'count': 5, 'swallows': ['African swallow',
                                                                          'European swallow'],
-             "date": datetime.datetime(2015, 8, 4, 12, 0)},
-            {"_id": ObjectId(), "a": 4, "b": 4, "count": 4, "swallows": ['unladen swallow'],
-             "date": datetime.datetime(2014, 7, 4, 13, 0)}]
+             'date': datetime.datetime(2015, 8, 4, 12, 0)},
+            {'_id': ObjectId(), 'a': 4, 'b': 4, 'count': 4, 'swallows': ['unladen swallow'],
+             'date': datetime.datetime(2014, 7, 4, 13, 0)}]
 
         for item in self.data:
             self.cmp.do.insert(item)
@@ -1843,18 +1843,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.remove()
 
         data = [
-            {"_id": ObjectId(),
-             "key_1": {"sub_key_1": "value_1"}, "nb": 1},
-            {"_id": ObjectId(),
-             "key_1": {"sub_key_1": "value_2"}, "nb": 1},
-            {"_id": ObjectId(),
-             "key_1": {"sub_key_1": "value_1"}, "nb": 2}
+            {'_id': ObjectId(),
+             'key_1': {'sub_key_1': 'value_1'}, 'nb': 1},
+            {'_id': ObjectId(),
+             'key_1': {'sub_key_1': 'value_2'}, 'nb': 1},
+            {'_id': ObjectId(),
+             'key_1': {'sub_key_1': 'value_1'}, 'nb': 2}
         ]
         for item in data:
             self.cmp.do.insert(item)
 
         pipeline = [
-            {'$group': {"_id": "$key_1.sub_key_1", "nb": {"$sum": "$nb"}}},
+            {'$group': {'_id': '$key_1.sub_key_1', 'nb': {'$sum': '$nb'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
@@ -1944,34 +1944,34 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def test__aggregate22(self):
         pipeline = [
-            {"$group": {"_id": {"$gte": ["$a", 2]}, "total": {"$sum": "$count"}}},
+            {'$group': {'_id': {'$gte': ['$a', 2]}, 'total': {'$sum': '$count'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate23(self):
         # make sure we aggregate compound keys correctly
         pipeline = [
-            {"$group": {"_id": {"id_a": "$a", "id_b": "$b"}, "total": {"$sum": "$count"}}},
+            {'$group': {'_id': {'id_a': '$a', 'id_b': '$b'}, 'total': {'$sum': '$count'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate24(self):
         # make sure we aggregate zero rows correctly
         pipeline = [
-            {"$match": {"_id": "123456"}},
-            {"$group": {"_id": {"$eq": ["$a", 1]}, 'total': {"$sum": "$count"}}},
+            {'$match': {'_id': '123456'}},
+            {'$group': {'_id': {'$eq': ['$a', 1]}, 'total': {'$sum': '$count'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate25(self):
         pipeline = [
-            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}}},
+            {'$group': {'_id': {'$eq': [{'$year': '$date'}, 2015]}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate26(self):
         pipeline = [
-            {"$group": {"_id": {"$eq": [{'$year': '$date'}, 2015]}, "total": {"$sum": "$count"}}},
+            {'$group': {'_id': {'$eq': [{'$year': '$date'}, 2015]}, 'total': {'$sum': '$count'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
@@ -1988,22 +1988,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate(pipeline)
 
     def test__aggregate28(self):
-        pipeline = [{"$group": {
-            "_id": "$b",
-            "total2015": {"$sum": {"$cond": [{"$eq": [{'$year': '$date'}, 2015]}, 1, 0]}},
+        pipeline = [{'$group': {
+            '_id': '$b',
+            'total2015': {'$sum': {'$cond': [{'$eq': [{'$year': '$date'}, 2015]}, 1, 0]}},
         }}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate29(self):
         # group addToSet
         pipeline = [
-            {"$group": {"_id": "$a", "nb": {"$addToSet": "$count"}}},
-            {"$sort": {"_id": 1}}
+            {'$group': {'_id': '$a', 'nb': {'$addToSet': '$count'}}},
+            {'$sort': {'_id': 1}}
         ]
         # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
         aggregations = self.cmp.do.aggregate(pipeline)
-        expected = list(aggregations["real"])
-        result = list(aggregations["fake"])
+        expected = list(aggregations['real'])
+        result = list(aggregations['fake'])
         self.assertEqual(len(result), len(expected))
         for expected_elt, result_elt in zip(expected, result):
             assertCountEqual(self, expected_elt.keys(), result_elt.keys())
@@ -2017,26 +2017,26 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         # group addToSet dict element
         self.cmp.do.remove()
         data = [
-            {"a": {"c": "1", "d": 1}, "b": {"c": "2", "d": 2}},
-            {"a": {"c": "1", "d": 3}, "b": {"c": "4", "d": 4}},
-            {"a": {"c": "5", "d": 1}, "b": {"c": "6", "d": 6}},
-            {"a": {"c": "5", "d": 2}, "b": {"c": "6", "d": 6}}
+            {'a': {'c': '1', 'd': 1}, 'b': {'c': '2', 'd': 2}},
+            {'a': {'c': '1', 'd': 3}, 'b': {'c': '4', 'd': 4}},
+            {'a': {'c': '5', 'd': 1}, 'b': {'c': '6', 'd': 6}},
+            {'a': {'c': '5', 'd': 2}, 'b': {'c': '6', 'd': 6}}
         ]
         self.cmp.do.insert_many(data)
         pipeline = [
-            {'$group': {"_id": "a.c", "nb": {"$addToSet": "b"}}},
+            {'$group': {'_id': 'a.c', 'nb': {'$addToSet': 'b'}}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate31(self):
         # group addToSet creating dict
         pipeline = [
-            {'$group': {"_id": "$count", "set": {"$addToSet": {"a": "$a", "b": "$b"}}}},
+            {'$group': {'_id': '$count', 'set': {'$addToSet': {'a': '$a', 'b': '$b'}}}},
         ]
         # self.cmp.compare cannot be used as addToSet returns elements in an unpredictable order
         aggregations = self.cmp.do.aggregate(pipeline)
-        expected = list(aggregations["real"])
-        result = list(aggregations["fake"])
+        expected = list(aggregations['real'])
+        result = list(aggregations['fake'])
         self.assertEqual(len(result), len(expected))
         set_expected = set([
             tuple(sorted(e.items())) for elt in expected for e in elt['set']
@@ -2087,59 +2087,59 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.remove()
         self.cmp.do.insert_many([
             {
-                "_id": 1,
-                "title": "The Pillars of Society",
-                "artist": "Grosz",
-                "year": 1926,
-                "price": 199.99,
+                '_id': 1,
+                'title': 'The Pillars of Society',
+                'artist': 'Grosz',
+                'year': 1926,
+                'price': 199.99,
             },
             {
-                "_id": 2,
-                "title": "Melancholy III",
-                "artist": "Munch",
-                "year": 1902,
-                "price": 200.00,
+                '_id': 2,
+                'title': 'Melancholy III',
+                'artist': 'Munch',
+                'year': 1902,
+                'price': 200.00,
             },
             {
-                "_id": 3,
-                "title": "Dancer",
-                "artist": "Miro",
-                "year": 1925,
-                "price": 76.04,
+                '_id': 3,
+                'title': 'Dancer',
+                'artist': 'Miro',
+                'year': 1925,
+                'price': 76.04,
             },
             {
-                "_id": 4,
-                "title": "The Great Wave off Kanagawa",
-                "artist": "Hokusai",
-                "price": 167.30,
+                '_id': 4,
+                'title': 'The Great Wave off Kanagawa',
+                'artist': 'Hokusai',
+                'price': 167.30,
             },
             {
-                "_id": 5,
-                "title": "The Persistence of Memory",
-                "artist": "Dali",
-                "year": 1931,
-                "price": 483.00,
+                '_id': 5,
+                'title': 'The Persistence of Memory',
+                'artist': 'Dali',
+                'year': 1931,
+                'price': 483.00,
             },
             {
-                "_id": 6,
-                "title": "Composition VII",
-                "artist": "Kandinsky",
-                "year": 1913,
-                "price": 385.00,
+                '_id': 6,
+                'title': 'Composition VII',
+                'artist': 'Kandinsky',
+                'year': 1913,
+                'price': 385.00,
             },
             {
-                "_id": 7,
-                "title": "The Scream",
-                "artist": "Munch",
-                "year": 1893,
+                '_id': 7,
+                'title': 'The Scream',
+                'artist': 'Munch',
+                'year': 1893,
                 # No price
             },
             {
-                "_id": 8,
-                "title": "Blue Flower",
-                "artist": "O'Keefe",
-                "year": 1918,
-                "price": 118.42,
+                '_id': 8,
+                'title': 'Blue Flower',
+                'artist': "O'Keefe",
+                'year': 1918,
+                'price': 118.42,
             },
         ])
 
@@ -2162,11 +2162,11 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def test__aggregate_unwind_options(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
-            {"_id": 1, "item": "ABC", "sizes": ["S", "M", "L"]},
-            {"_id": 2, "item": "EFG", "sizes": []},
-            {"_id": 3, "item": "IJK", "sizes": "M"},
-            {"_id": 4, "item": "LMN"},
-            {"_id": 5, "item": "XYZ", "sizes": None},
+            {'_id': 1, 'item': 'ABC', 'sizes': ['S', 'M', 'L']},
+            {'_id': 2, 'item': 'EFG', 'sizes': []},
+            {'_id': 3, 'item': 'IJK', 'sizes': 'M'},
+            {'_id': 4, 'item': 'LMN'},
+            {'_id': 5, 'item': 'XYZ', 'sizes': None},
         ])
 
         self.cmp.compare.aggregate([{'$unwind': {'path': '$sizes'}}])
@@ -2196,80 +2196,80 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
 
     def setUp(self):
         super(MongoClientSortSkipLimitTest, self).setUp()
-        self.cmp.do.insert([{"_id": i, "index": i} for i in range(30)])
+        self.cmp.do.insert([{'_id': i, 'index': i} for i in range(30)])
 
     def test__skip(self):
-        self.cmp.compare(_SORT("index", 1), _SKIP(10)).find()
+        self.cmp.compare(_SORT('index', 1), _SKIP(10)).find()
 
     def test__skipped_find(self):
-        self.cmp.compare(_SORT("index", 1)).find(skip=10)
+        self.cmp.compare(_SORT('index', 1)).find(skip=10)
 
     def test__limit(self):
-        self.cmp.compare(_SORT("index", 1), _LIMIT(10)).find()
+        self.cmp.compare(_SORT('index', 1), _LIMIT(10)).find()
 
     def test__skip_and_limit(self):
-        self.cmp.compare(_SORT("index", 1), _SKIP(10), _LIMIT(10)).find()
+        self.cmp.compare(_SORT('index', 1), _SKIP(10), _LIMIT(10)).find()
 
     def test__sort_name(self):
         self.cmp.do.remove()
-        for data in ({"a": 1, "b": 3, "c": "data1"},
-                     {"a": 2, "b": 2, "c": "data3"},
-                     {"a": 3, "b": 1, "c": "data2"}):
+        for data in ({'a': 1, 'b': 3, 'c': 'data1'},
+                     {'a': 2, 'b': 2, 'c': 'data3'},
+                     {'a': 3, 'b': 1, 'c': 'data2'}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT("a")).find()
-        self.cmp.compare(_SORT("b")).find()
+        self.cmp.compare(_SORT('a')).find()
+        self.cmp.compare(_SORT('b')).find()
 
     def test__sort_name_nested_doc(self):
         self.cmp.do.remove()
-        for data in ({"root": {"a": 1, "b": 3, "c": "data1"}},
-                     {"root": {"a": 2, "b": 2, "c": "data3"}},
-                     {"root": {"a": 3, "b": 1, "c": "data2"}}):
+        for data in ({'root': {'a': 1, 'b': 3, 'c': 'data1'}},
+                     {'root': {'a': 2, 'b': 2, 'c': 'data3'}},
+                     {'root': {'a': 3, 'b': 1, 'c': 'data2'}}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT("root.a")).find()
-        self.cmp.compare(_SORT("root.b")).find()
+        self.cmp.compare(_SORT('root.a')).find()
+        self.cmp.compare(_SORT('root.b')).find()
 
     def test__sort_name_nested_list(self):
         self.cmp.do.remove()
-        for data in ({"root": [{"a": 1, "b": 3, "c": "data1"}]},
-                     {"root": [{"a": 2, "b": 2, "c": "data3"}]},
-                     {"root": [{"a": 3, "b": 1, "c": "data2"}]}):
+        for data in ({'root': [{'a': 1, 'b': 3, 'c': 'data1'}]},
+                     {'root': [{'a': 2, 'b': 2, 'c': 'data3'}]},
+                     {'root': [{'a': 3, 'b': 1, 'c': 'data2'}]}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT("root.0.a")).find()
-        self.cmp.compare(_SORT("root.0.b")).find()
+        self.cmp.compare(_SORT('root.0.a')).find()
+        self.cmp.compare(_SORT('root.0.b')).find()
 
     def test__sort_list(self):
         self.cmp.do.remove()
-        for data in ({"a": 1, "b": 3, "c": "data1"},
-                     {"a": 2, "b": 2, "c": "data3"},
-                     {"a": 3, "b": 1, "c": "data2"}):
+        for data in ({'a': 1, 'b': 3, 'c': 'data1'},
+                     {'a': 2, 'b': 2, 'c': 'data3'},
+                     {'a': 3, 'b': 1, 'c': 'data2'}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT([("a", 1), ("b", -1)])).find()
-        self.cmp.compare(_SORT([("b", 1), ("a", -1)])).find()
-        self.cmp.compare(_SORT([("b", 1), ("a", -1), ("c", 1)])).find()
+        self.cmp.compare(_SORT([('a', 1), ('b', -1)])).find()
+        self.cmp.compare(_SORT([('b', 1), ('a', -1)])).find()
+        self.cmp.compare(_SORT([('b', 1), ('a', -1), ('c', 1)])).find()
 
     def test__sort_list_nested_doc(self):
         self.cmp.do.remove()
-        for data in ({"root": {"a": 1, "b": 3, "c": "data1"}},
-                     {"root": {"a": 2, "b": 2, "c": "data3"}},
-                     {"root": {"a": 3, "b": 1, "c": "data2"}}):
+        for data in ({'root': {'a': 1, 'b': 3, 'c': 'data1'}},
+                     {'root': {'a': 2, 'b': 2, 'c': 'data3'}},
+                     {'root': {'a': 3, 'b': 1, 'c': 'data2'}}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT([("root.a", 1), ("root.b", -1)])).find()
-        self.cmp.compare(_SORT([("root.b", 1), ("root.a", -1)])).find()
+        self.cmp.compare(_SORT([('root.a', 1), ('root.b', -1)])).find()
+        self.cmp.compare(_SORT([('root.b', 1), ('root.a', -1)])).find()
         self.cmp.compare(
-            _SORT([("root.b", 1), ("root.a", -1), ("root.c", 1)])).find()
+            _SORT([('root.b', 1), ('root.a', -1), ('root.c', 1)])).find()
 
     def test__sort_list_nested_list(self):
         self.cmp.do.remove()
-        for data in ({"root": [{"a": 1, "b": 3, "c": "data1"}]},
-                     {"root": [{"a": 2, "b": 2, "c": "data3"}]},
-                     {"root": [{"a": 3, "b": 1, "c": "data2"}]}):
+        for data in ({'root': [{'a': 1, 'b': 3, 'c': 'data1'}]},
+                     {'root': [{'a': 2, 'b': 2, 'c': 'data3'}]},
+                     {'root': [{'a': 3, 'b': 1, 'c': 'data2'}]}):
             self.cmp.do.insert(data)
-        self.cmp.compare(_SORT([("root.0.a", 1), ("root.0.b", -1)])).find()
-        self.cmp.compare(_SORT([("root.0.b", 1), ("root.0.a", -1)])).find()
+        self.cmp.compare(_SORT([('root.0.a', 1), ('root.0.b', -1)])).find()
+        self.cmp.compare(_SORT([('root.0.b', 1), ('root.0.a', -1)])).find()
         self.cmp.compare(
             _SORT(
-                [("root.0.b", 1), ("root.0.a", -1),
-                 ("root.0.c", 1)])).find()
+                [('root.0.b', 1), ('root.0.a', -1),
+                 ('root.0.c', 1)])).find()
 
     def test__close(self):
         # Does nothing - just make sure it exists and takes the right args
@@ -2281,16 +2281,16 @@ class InsertedDocumentTest(TestCase):
     def setUp(self):
         super(InsertedDocumentTest, self).setUp()
         self.collection = mongomock.MongoClient().db.collection
-        self.data = {"a": 1, "b": [1, 2, 3], "c": {"d": 4}}
+        self.data = {'a': 1, 'b': [1, 2, 3], 'c': {'d': 4}}
         self.orig_data = copy.deepcopy(self.data)
         self.object_id = self.collection.insert(self.data)
 
     def test__object_is_consistent(self):
         [object] = self.collection.find()
-        self.assertEqual(object["_id"], self.object_id)
+        self.assertEqual(object['_id'], self.object_id)
 
     def test__find_by_id(self):
-        [object] = self.collection.find({"_id": self.object_id})
+        [object] = self.collection.find({'_id': self.object_id})
         self.assertEqual(object, self.data)
 
     def test__remove_by_id(self):
@@ -2305,8 +2305,8 @@ class InsertedDocumentTest(TestCase):
     def test__data_is_copied(self):
         [object] = self.collection.find()
         self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
-        self.data.pop("a")
-        self.data["b"].append(5)
+        self.data.pop('a')
+        self.data['b'].append(5)
         self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
         [object] = self.collection.find()
         self.assertEqual(dict(self.orig_data, _id=self.object_id), object)
@@ -2316,7 +2316,7 @@ class InsertedDocumentTest(TestCase):
         [object2] = self.collection.find()
         self.assertEqual(object1, object2)
         self.assertIsNot(object1, object2)
-        object1["b"].append("bla")
+        object1['b'].append('bla')
         self.assertNotEqual(object1, object2)
 
 

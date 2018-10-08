@@ -50,7 +50,7 @@ def create_uri_spec_tests():
     """
     def create_uri_spec_test(scenario_def):
         def run_scenario(self):
-            self.assertTrue(scenario_def['tests'], "tests cannot be empty")
+            self.assertTrue(scenario_def['tests'], 'tests cannot be empty')
             for test in scenario_def['tests']:
                 dsc = test['description']
 
@@ -73,7 +73,7 @@ def create_uri_spec_tests():
                     if expected_dbase and '.' in expected_dbase:
                         expected_dbase, _ = expected_dbase.split('.', 1)
                     self.assertEqual(expected_dbase, dbase,
-                                     "Expected %s but got %s"
+                                     'Expected %s but got %s'
                                      % (expected_dbase, dbase))
         return run_scenario
 
@@ -97,4 +97,4 @@ create_uri_spec_tests()
 
 class TestHelpers(TestCase):
     def test01_embedded_item_getter(self):
-        assert embedded_item_getter("a.b", "c", "a")({"a": {"b": 1}, "c": 5}) == (1, 5, {"b": 1})
+        assert embedded_item_getter('a.b', 'c', 'a')({'a': {'b': 1}, 'c': 5}) == (1, 5, {'b': 1})

@@ -10,42 +10,40 @@ class _NO_VALUE(object):
 # we don't use NOTHING because it might be returned from various APIs
 NO_VALUE = _NO_VALUE()
 
-_SUPPORTED_TYPES = set(
-    (float, bool, str, datetime.datetime, type(None)) +
+_SUPPORTED_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
     string_types + integer_types + (text_type,)
-)
 
-if python_version() < "3.0":
+if python_version() < '3.0':
     dict_type = dict
 else:
-    from collections import Mapping
-    dict_type = Mapping
+    from collections import abc
+    dict_type = abc.Mapping
 
 
 def diff(a, b, path=None):
     path = _make_path(path)
-    if type(a) in (list, tuple):
+    if isinstance(a, (list, tuple)):
         return _diff_sequences(a, b, path)
-    if type(a).__name__ == "SON":
+    if type(a).__name__ == 'SON':
         a = dict(a)
-    if type(b).__name__ == "SON":
+    if type(b).__name__ == 'SON':
         b = dict(b)
     if isinstance(a, dict_type):
         return _diff_dicts(a, b, path)
-    if type(a).__name__ == "ObjectId":
+    if type(a).__name__ == 'ObjectId':
         a = str(a)
-    if type(b).__name__ == "ObjectId":
+    if type(b).__name__ == 'ObjectId':
         b = str(b)
-    if type(a).__name__ == "Int64":
+    if type(a).__name__ == 'Int64':
         a = int(a)
-    if type(b).__name__ == "Int64":
+    if type(b).__name__ == 'Int64':
         b = int(b)
-    if type(a) not in _SUPPORTED_TYPES:
+    if not isinstance(a, _SUPPORTED_TYPES):
         raise NotImplementedError(
-            "Unsupported diff type: {0}".format(type(a)))  # pragma: no cover
-    if type(b) not in _SUPPORTED_TYPES:
+            'Unsupported diff type: {0}'.format(type(a)))  # pragma: no cover
+    if not isinstance(b, _SUPPORTED_TYPES):
         raise NotImplementedError(
-            "Unsupported diff type: {0}".format(type(b)))  # pragma: no cover
+            'Unsupported diff type: {0}'.format(type(b)))  # pragma: no cover
     if a != b:
         return [(path[:], a, b)]
     return []
@@ -71,9 +69,9 @@ def _diff_sequences(a, b, path):
     if len(a) != len(b):
         return [(path[:], a, b)]
     returned = []
-    for i in range(len(a)):
+    for i, a_i in enumerate(a):
         path.append(i)
-        returned.extend(diff(a[i], b[i], path))
+        returned.extend(diff(a_i, b[i], path))
         path.pop()
     return returned
 

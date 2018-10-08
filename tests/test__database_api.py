@@ -10,7 +10,7 @@ class DatabaseAPITest(TestCase):
         database = client['somedb']
 
         with self.assertRaises(AttributeError) as err_context:
-            database._users
+            database._users  # pylint: disable=pointless-statement
 
         self.assertIn("Database has no attribute '_users'", str(err_context.exception))
 

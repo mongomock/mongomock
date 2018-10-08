@@ -25,18 +25,18 @@ except ImportError:
     _HAVE_PYMONGO = False
 
 
-@skipIf(not _HAVE_PYMONGO, "pymongo not installed")
-@skipIf(not _HAVE_GRIDFS, "gridfs not installed")
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not _HAVE_GRIDFS, 'gridfs not installed')
 class GridFsTest(TestCase):
 
     def setUp(self):
         super(GridFsTest, self).setUp()
         self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
-        self.db_name = "mongomock___testing_db"
+        self.db_name = 'mongomock___testing_db'
 
-        self.mongo_conn[self.db_name]["fs"]["files"].drop()
-        self.mongo_conn[self.db_name]["fs"]["chunks"].drop()
+        self.mongo_conn[self.db_name]['fs']['files'].drop()
+        self.mongo_conn[self.db_name]['fs']['chunks'].drop()
 
         self.real_gridfs = gridfs.GridFS(self.mongo_conn[self.db_name])
         self.fake_gridfs = gridfs.GridFS(self.fake_conn[self.db_name])
@@ -92,12 +92,12 @@ class GridFsTest(TestCase):
         self.fake_gridfs.delete(ObjectId())
 
     def test__list_files(self):
-        fids = [self.fake_gridfs.put(GenFile(50, 9), filename="one"),
-                self.fake_gridfs.put(GenFile(62, 5), filename="two"),
-                self.fake_gridfs.put(GenFile(654, 1), filename="three"),
-                self.fake_gridfs.put(GenFile(5), filename="four")]
-        names = ["one", "two", "three", "four"]
-        names_no_two = [x for x in names if x != "two"]
+        fids = [self.fake_gridfs.put(GenFile(50, 9), filename='one'),
+                self.fake_gridfs.put(GenFile(62, 5), filename='two'),
+                self.fake_gridfs.put(GenFile(654, 1), filename='three'),
+                self.fake_gridfs.put(GenFile(5), filename='four')]
+        names = ['one', 'two', 'three', 'four']
+        names_no_two = [x for x in names if x != 'two']
         for x in self.fake_gridfs.list():
             self.assertTrue(x in names)
 
@@ -107,19 +107,19 @@ class GridFsTest(TestCase):
             self.assertTrue(x in names_no_two)
 
         three_file = self.get_fake_file(fids[2])
-        self.assertEqual("three", three_file["filename"])
-        self.assertEqual(654, three_file["length"])
+        self.assertEqual('three', three_file['filename'])
+        self.assertEqual(654, three_file['length'])
         self.fake_gridfs.delete(fids[0])
         self.fake_gridfs.delete(fids[2])
         self.fake_gridfs.delete(fids[3])
         self.assertEqual(0, len(self.fake_gridfs.list()))
 
     def test__find_files(self):
-        fids = [self.fake_gridfs.put(GenFile(50, 9), filename="a"),
-                self.fake_gridfs.put(GenFile(62, 5), filename="b"),
-                self.fake_gridfs.put(GenFile(654, 1), filename="b"),
-                self.fake_gridfs.put(GenFile(5), filename="a")]
-        c = self.fake_gridfs.find({"filename": "a"}).sort("uploadDate", -1)
+        fids = [self.fake_gridfs.put(GenFile(50, 9), filename='a'),
+                self.fake_gridfs.put(GenFile(62, 5), filename='b'),
+                self.fake_gridfs.put(GenFile(654, 1), filename='b'),
+                self.fake_gridfs.put(GenFile(5), filename='a')]
+        c = self.fake_gridfs.find({'filename': 'a'}).sort('uploadDate', -1)
         should_be_fid3 = c.next()
         should_be_fid0 = c.next()
         self.assertEqual(2, c.count())
@@ -128,21 +128,21 @@ class GridFsTest(TestCase):
         self.assertEqual(fids[0], should_be_fid0._id)
 
     def test__put_exists(self):
-        self.fake_gridfs.put(GenFile(1), _id="12345")
+        self.fake_gridfs.put(GenFile(1), _id='12345')
         with self.assertRaises(errors.FileExists):
-            self.fake_gridfs.put(GenFile(2, 3), _id="12345")
+            self.fake_gridfs.put(GenFile(2, 3), _id='12345')
 
     def assertSameFile(self, real, fake):
-        self.assertEqual(real["md5"], fake["md5"])
-        self.assertEqual(real["length"], fake["length"])
-        self.assertEqual(real["chunkSize"], fake["chunkSize"])
-        self.assertTrue(abs(real["uploadDate"] - fake["uploadDate"]).seconds <= 1)
+        self.assertEqual(real['md5'], fake['md5'])
+        self.assertEqual(real['length'], fake['length'])
+        self.assertEqual(real['chunkSize'], fake['chunkSize'])
+        self.assertTrue(abs(real['uploadDate'] - fake['uploadDate']).seconds <= 1)
 
     def get_mongo_file(self, i):
-        return self.mongo_conn[self.db_name]["fs"]["files"].find_one({"_id": i})
+        return self.mongo_conn[self.db_name]['fs']['files'].find_one({'_id': i})
 
     def get_fake_file(self, i):
-        return self.fake_conn[self.db_name]["fs"]["files"].find_one({"_id": i})
+        return self.fake_conn[self.db_name]['fs']['files'].find_one({'_id': i})
 
     def _connect_to_local_mongodb(self, num_retries=60):
         """Performs retries on connection refused errors (for travis-ci builds)"""
@@ -154,7 +154,7 @@ class GridFsTest(TestCase):
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
-                if "connection refused" not in e.message.lower():
+                if 'connection refused' not in e.message.lower():
                     raise
 
 
@@ -164,7 +164,7 @@ class GenFile(object):
         self.do_encode = do_encode
 
     def _gen_data(self, length, value):
-        while (length != 0):
+        while length:
             length -= 1
             yield value
 
@@ -174,7 +174,7 @@ class GenFile(object):
         return s
 
     def read(self, num_bytes=-1):
-        s = ""
+        s = ''
         if num_bytes <= 0:
             bytes_left = -1
         else:

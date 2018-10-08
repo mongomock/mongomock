@@ -98,11 +98,11 @@ def _assert_no_diff(results, ignore_order, sort_by):
 
 
 def _result_is_cursor(results):
-    return any(type(result).__name__ == "Cursor" for result in results.values())
+    return any(type(result).__name__ == 'Cursor' for result in results.values())
 
 
 def _result_is_command_cursor(results):
-    return any(type(result).__name__ == "CommandCursor"
+    return any(type(result).__name__ == 'CommandCursor'
                for result in results.values())
 
 
@@ -115,17 +115,17 @@ def _expand_cursor(cursor, sort, by=by_id):
     if sort:
         returned.sort(key=by)
     for result in returned:
-        result.pop("_id", None)
+        result.pop('_id', None)
     return returned
 
 
 def _format_diff_message(a_name, b_name, diff):
-    msg = "Unexpected Diff:"
+    msg = 'Unexpected Diff:'
     for (path, a_value, b_value) in diff:
         a_path = [a_name] + path
         b_path = [b_name] + path
-        msg += "\n\t{} != {} ({} != {})".format(
-            ".".join(map(str, a_path)), ".".join(
+        msg += '\n\t{} != {} ({} != {})'.format(
+            '.'.join(map(str, a_path)), '.'.join(
                 map(str, b_path)), a_value, b_value)
     return msg
 
