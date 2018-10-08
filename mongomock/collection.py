@@ -1923,7 +1923,7 @@ class Collection(object):
         default_kwargs = {
             'codec_options': None,
             'read_preference': _READ_PREFERENCE_PRIMARY,
-            'write_concern': None,
+            'write_concern': WriteConcern(),
             'read_concern': None,
         }
         forbidden_kwargs = set(kwargs.keys()) - set(default_kwargs)
@@ -1932,7 +1932,7 @@ class Collection(object):
                 "with_options() got an unexpected keyword argument '%s'" % forbidden_kwargs.pop())
         for key, default_value in iteritems(default_kwargs):
             value = kwargs.get(key)
-            if value is not None and value != default_value:
+            if value is not None and default_value != value:
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
