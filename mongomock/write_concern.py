@@ -11,10 +11,16 @@ class WriteConcern(object):
             self._document['fsync'] = fsync
 
     def __eq__(self, other):
-        return other and other.document == self.document
+        try:
+            return other.document == self.document
+        except AttributeError:
+            return NotImplemented
 
     def __ne__(self, other):
-        return not other or other.document != self.document
+        try:
+            return other.document != self.document
+        except AttributeError:
+            return NotImplemented
 
     @property
     def acknowledged(self):
