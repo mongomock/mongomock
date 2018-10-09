@@ -207,13 +207,10 @@ def parse_dbase_from_uri(uri):
         raise InvalidURI("A '/' is required between "
                          'the host list and any options.')
 
-    if path_part:
-        if path_part[0] == '?':
-            opts = path_part[1:]
-        else:
-            dbase, _, opts = path_part.partition('?')
-            if '.' in dbase:
-                dbase, _ = dbase.split('.', 1)
+    if path_part and path_part[0] != '?':
+        dbase, _, _ = path_part.partition('?')
+        if '.' in dbase:
+            dbase, _ = dbase.split('.', 1)
 
     if dbase is not None:
         dbase = unquote_plus(dbase)

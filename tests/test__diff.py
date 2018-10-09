@@ -27,6 +27,6 @@ class DiffTest(TestCase):
         self.assertEqual(y, 6)
 
     def _assert_entire_diff(self, a, b):
-        [(path, x, y)] = diff(a, b)
+        [(_, x, y)] = diff(a, b)
         self.assertEqual(x, a)
         self.assertEqual(y, b)

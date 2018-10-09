@@ -1779,19 +1779,19 @@ class CollectionAPITest(TestCase):
             'Arguments to $lookup must be strings',
             str(err.exception))
 
-        def test__aggregate_lookup_dot_in_local_field(self):
-            with self.assertRaises(NotImplementedError) as err:
-                self.db.a.aggregate([
-                    {'$lookup': {
-                        'from': 'b',
-                        'localField': 'should.fail',
-                        'foreignField': 'arr',
-                        'as': 'b'
-                    }}
-                ])
-            self.assertIn(
-                "Although '.' is valid in the 'localField' and 'as' parameters",
-                str(err.exception))
+    def test__aggregate_lookup_dot_in_local_field(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$lookup': {
+                    'from': 'b',
+                    'localField': 'should.fail',
+                    'foreignField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertIn(
+            "Although '.' is valid in the 'localField' and 'as' parameters",
+            str(err.exception))
 
     def test__aggregate_lookup_dot_in_as(self):
         with self.assertRaises(NotImplementedError) as err:

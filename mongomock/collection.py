@@ -492,13 +492,15 @@ class Collection(object):
         # Note we consider new_data is already inserted in db
         for unique, is_sparse in self._uniques.values():
             find_kwargs = {}
-            for key, direction in unique:
+            for key, _ in unique:
                 try:
                     find_kwargs[key] = get_value_by_dot(new_data, key)
                 except KeyError:
                     find_kwargs[key] = None
+            if is_sparse and set(find_kwargs.values()) == {None}:
+                continue
             answer_count = len(list(self._iter_documents(find_kwargs)))
-            if answer_count > 1 and not (is_sparse and find_kwargs[key] is None):
+            if answer_count > 1:
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
     def _internalize_dict(self, d):
@@ -1551,11 +1553,11 @@ class Collection(object):
         doc_list = [doc for doc in self.find(condition)]
         for doc in doc_list:
             doc_copy = copy.deepcopy(doc)
-            for k in doc:
-                if isinstance(doc[k], ObjectId):
-                    doc_copy[k] = str(doc[k])
-                if k not in key and k not in reduce:
-                    del doc_copy[k]
+            for doc_key in doc:
+                if isinstance(doc[doc_key], ObjectId):
+                    doc_copy[doc_key] = str(doc[doc_key])
+                if doc_key not in key and doc_key not in reduce:
+                    del doc_copy[doc_key]
             for initial_key in initial:
                 if initial_key in doc.keys():
                     pass
@@ -1563,14 +1565,14 @@ class Collection(object):
                     doc_copy[initial_key] = initial[initial_key]
             doc_list_copy.append(doc_copy)
         doc_list = doc_list_copy
-        for k in key:
-            doc_list = sorted(doc_list, key=lambda x: _resolve_key(k, x))
-        for k in key:
-            if not isinstance(k, string_types):
+        for k1 in key:
+            doc_list = sorted(doc_list, key=lambda x: _resolve_key(k1, x))
+        for k2 in key:
+            if not isinstance(k2, string_types):
                 raise TypeError(
                     'Keys must be a list of key names, '
                     'each an instance of %s' % string_types[0].__name__)
-            for k2, group in itertools.groupby(doc_list, lambda item: item[k]):
+            for _, group in itertools.groupby(doc_list, lambda item: item[k2]):
                 group_list = ([x for x in group])
                 reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
                 ret_array.append(reduced_val)
