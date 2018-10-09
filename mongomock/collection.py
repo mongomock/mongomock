@@ -408,8 +408,12 @@ class Collection(object):
     def __getitem__(self, name):
         return self.database[self.name + '.' + name]
 
-    def __getattr__(self, name):
-        return self.__getitem__(name)
+    def __getattr__(self, attr):
+        if attr.startswith('_'):
+            raise AttributeError(
+                "%s has no attribute '%s'. To access the %s.%s collection, use database['%s.%s']." %
+                (self.__class__.__name__, attr, self.name, attr, self.name, attr))
+        return self.__getitem__(attr)
 
     @property
     def write_concern(self):

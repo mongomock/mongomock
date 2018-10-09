@@ -41,6 +41,16 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(set(self.db.list_collection_names()), set(['a.b']))
 
+    def test__get_subcollections_by_attribute_underscore(self):
+        with self.assertRaises(AttributeError) as err_context:
+            self.db.a._b  # pylint: disable=pointless-statement
+
+        self.assertIn("Collection has no attribute '_b'", str(err_context.exception))
+
+        # No problem accessing it through __get_item__.
+        self.db.a['_b'].insert_one({'a': 1})
+        self.assertEqual(1, self.db.a['_b'].find_one().get('a'))
+
     def test__get_sibling_collection(self):
         self.assertEqual(self.db.a.database.b.full_name, 'somedb.b')
         self.assertEqual(self.db.a.database.b.name, 'b')
