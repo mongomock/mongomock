@@ -2060,15 +2060,22 @@ class Cursor(object):
         if direction is None:
             direction = 1
 
-        def _make_sort_factory_layer(upper_factory, sortKey, sortDirection):
+        def _make_sort_factory_layer(upper_factory, sort_key, sort_direction):
+            if sort_key == '$natural':
+                if sort_direction >= 0:
+                    return upper_factory
+                return lambda: reversed(list(upper_factory()))
+
             def layer():
-                return sorted(upper_factory(), key=lambda x: _resolve_sort_key(sortKey, x),
-                              reverse=sortDirection < 0)
+                return sorted(upper_factory(), key=lambda x: _resolve_sort_key(sort_key, x),
+                              reverse=sort_direction < 0)
             return layer
 
+        if isinstance(key_or_list, dict):
+            key_or_list = list(key_or_list.items())
         if isinstance(key_or_list, (tuple, list)):
-            for sortKey, sortDirection in reversed(key_or_list):
-                self._factory = _make_sort_factory_layer(self._factory, sortKey, sortDirection)
+            for sort_key, sort_direction in reversed(key_or_list):
+                self._factory = _make_sort_factory_layer(self._factory, sort_key, sort_direction)
         else:
             self._factory = _make_sort_factory_layer(self._factory, key_or_list, direction)
         return self

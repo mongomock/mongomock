@@ -1571,6 +1571,35 @@ class CollectionAPITest(TestCase):
         self.assertEqual(next(curs)['a'], 1)
         self.assertEqual(next(curs)['a'], 2)
 
+    def test__cursor_sort(self):
+        coll = self.db.create_collection('a')
+        coll.insert_many([{'a': 1}, {'a': 3}, {'a': 2}])
+
+        self.assertEqual([1, 2, 3], [doc['a'] for doc in coll.find().sort({'a': 1})])
+        self.assertEqual([3, 2, 1], [doc['a'] for doc in coll.find().sort({'a': -1})])
+
+        self.assertEqual([1, 3, 2], [doc['a'] for doc in coll.find().sort({'$natural': 1})])
+        self.assertEqual([2, 3, 1], [doc['a'] for doc in coll.find().sort({'$natural': -1})])
+        self.assertEqual([2, 3, 1], [doc['a'] for doc in coll.find().sort('$natural', -1)])
+
+    def test__cursor_sort_composed(self):
+        coll = self.db.create_collection('a')
+        coll.insert_many([
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 1, 'b': 0},
+            {'_id': 3, 'a': 2, 'b': 1},
+        ])
+
+        self.assertEqual(
+            [2, 1, 3],
+            [doc['_id'] for doc in coll.find().sort(OrderedDict((('a', 1), ('b', 1))))])
+        self.assertEqual(
+            [1, 2, 3],
+            [doc['_id'] for doc in coll.find().sort(OrderedDict((('a', 1), ('b', -1))))])
+        self.assertEqual(
+            [2, 3, 1],
+            [doc['_id'] for doc in coll.find().sort(OrderedDict((('b', 1), ('a', 1))))])
+
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_insert_one(self):
         operations = [pymongo.InsertOne({'a': 1, 'b': 2})]
