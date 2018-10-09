@@ -1,5 +1,6 @@
 """Module to handle the operations within the aggregate pipeline."""
 
+import datetime
 import math
 import six
 
@@ -166,7 +167,10 @@ class Parser(object):
             return math.sqrt(self.parse(values))
         if operator == '$subtract':
             assert len(values) == 2, 'subtract must have only 2 items'
-            return self.parse(values[0]) - self.parse(values[1])
+            res = self.parse(values[0]) - self.parse(values[1])
+            if isinstance(res, datetime.timedelta):
+                return round(res.total_seconds() * 1000)
+            return res
         raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
                                   'aggregation pipeline, it is currently not implemented '
                                   ' in Mongomock.' % operator)

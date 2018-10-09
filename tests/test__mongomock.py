@@ -2179,6 +2179,12 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$unwind': {'path': '$sizes', 'preserveNullAndEmptyArrays': True}},
         ])
 
+    def test__aggregate_subtract_dates(self):
+        self.cmp.compare.aggregate([{'$project': {
+            '_id': 0,
+            'since': {'$subtract': ['$date', datetime.datetime(2014, 7, 4, 13, 0)]},
+        }}])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

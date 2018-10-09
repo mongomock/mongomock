@@ -2670,6 +2670,15 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure, msg=option):
                 self.db.collection.aggregate([{'$bucket': option}])
 
+    def test__aggregate_subtract_dates(self):
+        self.db.collection.insert_one({
+            'date': datetime(2014, 7, 4, 13, 0, 4, 20000),
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'since': {'$subtract': ['$date', datetime(2014, 7, 4, 13, 0, 0, 20)]},
+        }}])
+        self.assertEqual([4020], [d['since'] for d in actual])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)
