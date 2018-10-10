@@ -918,6 +918,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.update_one({'a.b': {'$eq': 1}, 'd': {}}, {'$set': {'c': 2}}, upsert=True)
         self.cmp.compare.find()
 
+    def test__update_upsert_with_matched_subdocuments(self):
+        self.cmp.do.update_one(
+            {'b.c.': 1, 'b.d': 3},
+            {'$set': {'a': 1}}, upsert=True)
+        self.cmp.compare.find()
+
     def test__update_with_empty_document_comes(self):
         """Tests calling update with just '{}' for replacing whole document"""
         self.cmp.do.insert({'name': 'bob', 'hat': 'wide'})

@@ -634,6 +634,19 @@ class CollectionAPITest(TestCase):
         self.assertIsNotNone(update_result.upserted_id)
         self.assert_document_stored(update_result.upserted_id, {'a': {'b': 1}, 'c': 2})
 
+    def test__update_one_upsert_match_subdocuments(self):
+        update_result = self.db.collection.update_one(
+            filter={'b.c.': 1, 'b.d': 3},
+            update={'$set': {'a': 1}},
+            upsert=True
+        )
+
+        self.assertEqual(update_result.modified_count, 0)
+        self.assertEqual(update_result.matched_count, 0)
+        self.assertIsNotNone(update_result.upserted_id)
+        self.assert_document_stored(
+            update_result.upserted_id, {'a': 1, 'b': {'c': {'': 1}, 'd': 3}})
+
     def test__update_one_upsert_operators(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_one(

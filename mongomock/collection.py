@@ -902,18 +902,28 @@ class Collection(object):
         expanded = {}
         paths = {}
         for k, v in iteritems(doc):
+
+            def _raise_incompatible(subkey):
+                raise WriteError(
+                    "cannot infer query fields to set, both paths '%s' and '%s' are matched"
+                    % (k, paths[subkey]))
+
+            if k in paths:
+                _raise_incompatible(k)
+
             key_parts = k.split('.')
-            sub_doc = v
-            for i in reversed(range(1, len(key_parts))):
-                key = key_parts[i]
-                sub_doc = {key: sub_doc}
-            key = key_parts[0]
-            if key in expanded:
-                raise WriteError('cannot infer query fields to set, '
-                                 "both paths '%s' and '%s' are matched"
-                                 % (k, paths[key]))
-            paths[key] = k
-            expanded[key] = sub_doc
+            sub_expanded = expanded
+
+            paths[k] = k
+            for i, key_part in enumerate(key_parts[:-1]):
+                if key_part not in sub_expanded:
+                    sub_expanded[key_part] = {}
+                sub_expanded = sub_expanded[key_part]
+                key = '.'.join(key_parts[:i + 1])
+                if not isinstance(sub_expanded, dict):
+                    _raise_incompatible(key)
+                paths[key] = k
+            sub_expanded[key_parts[-1]] = v
         return expanded
 
     def _discard_operators(self, doc):
