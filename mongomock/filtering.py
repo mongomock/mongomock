@@ -31,14 +31,19 @@ def filter_applies(search_filter, document):
 
         is_match = False
 
-        if (isinstance(search, dict) and
-                ('$ne' in search or search == {'$exists': False}) and
-                not iter_key_candidates(key, document)):
+        is_checking_negative_match = \
+            isinstance(search, dict) and {'$ne', '$nin'} & set(search.keys())
+        is_checking_positive_match = \
+            not isinstance(search, dict) or (set(search.keys()) - {'$ne', '$nin'})
+        has_candidates = False
+
+        if search == {'$exists': False} and not iter_key_candidates(key, document):
             continue
         if key == '$comment':
             continue
 
         for doc_val in iter_key_candidates(key, document):
+            has_candidates |= doc_val is not NOTHING
             if isinstance(search, dict):
                 is_match = (all(
                     operator_string in OPERATOR_MAP and
@@ -60,10 +65,15 @@ def filter_applies(search_filter, document):
             else:
                 is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
 
-            if is_match:
+            # When checking negative match, all the elements should match.
+            if is_checking_negative_match and not is_match:
+                return False
+
+            # If not checking negative matches, the first match is enouh for this criteria.
+            if is_match and not is_checking_negative_match:
                 break
 
-        if not is_match:
+        if not is_match and (has_candidates or is_checking_positive_match):
             return False
 
     return True

@@ -2337,6 +2337,44 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find(filters)
         self.assertEqual([doc['_id'] for doc in results], [7, 8])
 
+    def test__filter_ne_on_array(self):
+        """$ne and $nin on array only matches if no element of the array matches."""
+        collection = self.db.collection
+        collection.insert_many([
+            {'_id': 1, 'shape': [{'color': 'red'}]},
+            {'_id': 2, 'shape': [{'color': 'yellow'}]},
+            {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
+            {'_id': 4, 'shape': [{'size': 3}]},
+            {'_id': 5},
+        ])
+
+        # $ne
+        results = self.db.collection.find({'shape.color': {'$ne': 'red'}})
+        self.assertEqual([2, 4, 5], [doc['_id'] for doc in results])
+
+        # $nin
+        results = self.db.collection.find({'shape.color': {'$nin': ['blue', 'red']}})
+        self.assertEqual([2, 4, 5], [doc['_id'] for doc in results])
+
+    def test__filter_ne_multiple_keys(self):
+        """Using $ne and another operator."""
+        collection = self.db.collection
+        collection.insert_many([
+            {'_id': 1, 'cases': [{'total': 1}]},
+            {'_id': 2, 'cases': [{'total': 2}]},
+            {'_id': 3, 'cases': [{'total': 3}]},
+            {'_id': 4, 'cases': []},
+            {'_id': 5},
+        ])
+
+        # $ne
+        results = self.db.collection.find({'cases.total': {'$gt': 1, '$ne': 3}})
+        self.assertEqual([2], [doc['_id'] for doc in results])
+
+        # $nin
+        results = self.db.collection.find({'cases.total': {'$gt': 1, '$nin': [1, 3]}})
+        self.assertEqual([2], [doc['_id'] for doc in results])
+
     def test__filter_objects_comparison(self):
         collection = self.db.collection
         query = {'counts': {'$gt': {'circles': 1}}}

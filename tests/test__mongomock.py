@@ -692,6 +692,30 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'x': {'$nin': [str_pat]}})
         self.cmp.compare_ignore_order.find({'x': {'$nin': [non_existing_pat]}})
 
+    def test__find_negative_matches(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'shape': [{'color': 'red'}]},
+            {'_id': 2, 'shape': [{'color': 'yellow'}]},
+            {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
+            {'_id': 4, 'shape': [{'size': 3}]},
+            {'_id': 5},
+        ])
+
+        self.cmp.compare_ignore_order.find({'shape.color': {'$ne': 'red'}})
+        self.cmp.compare_ignore_order.find({'shape.color': {'$nin': ['blue', 'red']}})
+
+    def test__find_ne_multiple_keys(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'cases': [{'total': 1}]},
+            {'_id': 2, 'cases': [{'total': 2}]},
+            {'_id': 3, 'cases': [{'total': 3}]},
+            {'_id': 4, 'cases': []},
+            {'_id': 5},
+        ])
+
+        self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$ne': 3}})
+        self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$nin': [1, 3]}})
+
     def test__find_and_modify_remove(self):
         self.cmp.do.insert([{'a': x, 'junk': True} for x in range(10)])
         self.cmp.compare.find_and_modify({'a': 2}, remove=True, fields={'_id': False, 'a': True})
