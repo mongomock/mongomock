@@ -14,7 +14,6 @@ import math
 import random
 import threading
 import time
-import types
 import warnings
 
 try:
@@ -439,6 +438,7 @@ class Collection(object):
     def insert_many(self, documents, ordered=True, session=None):
         if not isinstance(documents, Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
+        documents = list(documents)
         for document in documents:
             validate_is_mutable_mapping('document', document)
         return InsertManyResult(self._insert(documents, session), acknowledged=True)
@@ -446,7 +446,7 @@ class Collection(object):
     def _insert(self, data, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if isinstance(data, list) or isinstance(data, types.GeneratorType):
+        if not isinstance(data, Mapping):
             results = []
             for index, item in enumerate(data):
                 try:
