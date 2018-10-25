@@ -72,6 +72,8 @@ class PatchTest(unittest.TestCase):
     def test__create_timeout(self, mock_sleep):
         pymongo.MongoClient()
 
+        mock_sleep.reset_mock()
+
         with self.assertRaises(pymongo.errors.ServerSelectionTimeoutError):
             client = pymongo.MongoClient('myserver.example.com', port=12345)
             client.db.coll.insert_one({'name': 'Pascal'})
