@@ -1476,6 +1476,34 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'name': 'bob'}, {'$push': {'hat': {'$each': ['wide', 'blue']}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__push_each_slice(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one({'scores': [40, 50, 60]})
+
+        self.cmp.do.update_one({}, {'$push': {'scores': {
+            '$each': [80, 78, 86],
+            '$slice': -5,
+        }}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({}, {'$push': {'scores': {
+            '$each': [100, 20],
+            '$slice': 3,
+        }}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({}, {'$push': {'scores': {
+            '$each': [],
+            '$slice': 2,
+        }}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one({}, {'$push': {'scores': {
+            '$each': [25, 15],
+            '$slice': 0,
+        }}})
+        self.cmp.compare.find()
+
     def test__drop(self):
         self.cmp.do.insert({'name': 'another new'})
         self.cmp.do.drop()

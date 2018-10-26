@@ -750,6 +750,38 @@ class CollectionAPITest(TestCase):
         self.db.collection.update_one({}, {'$set': {'a': Counter({'b': 2})}})
         self.assertEqual({'b': 2}, self.db.collection.find_one()['a'])
 
+    def test__update_push_slice_from_the_end(self):
+        self.db.collection.insert_one({'scores': [40, 50, 60]})
+        self.db.collection.update_one({}, {'$push': {'scores': {
+            '$each': [80, 78, 86],
+            '$slice': -5,
+        }}})
+        self.assertEqual([50, 60, 80, 78, 86], self.db.collection.find_one()['scores'])
+
+    def test__update_push_slice_from_the_front(self):
+        self.db.collection.insert_one({'scores': [89, 90]})
+        self.db.collection.update_one({}, {'$push': {'scores': {
+            '$each': [100, 20],
+            '$slice': 3,
+        }}})
+        self.assertEqual([89, 90, 100], self.db.collection.find_one()['scores'])
+
+    def test__update_push_slice_to_zero(self):
+        self.db.collection.insert_one({'scores': [40, 50, 60]})
+        self.db.collection.update_one({}, {'$push': {'scores': {
+            '$each': [80, 78, 86],
+            '$slice': 0,
+        }}})
+        self.assertEqual([], self.db.collection.find_one()['scores'])
+
+    def test__update_push_slice_only(self):
+        self.db.collection.insert_one({'scores': [89, 70, 100, 20]})
+        self.db.collection.update_one({}, {'$push': {'scores': {
+            '$each': [],
+            '$slice': -3,
+        }}})
+        self.assertEqual([70, 100, 20], self.db.collection.find_one()['scores'])
+
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])

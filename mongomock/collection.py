@@ -731,15 +731,20 @@ class Collection(object):
                                 existing_document[field] = []
                             # document should be a list
                             # append to it
-                            if isinstance(value, dict):
+                            if isinstance(value, dict) and '$each' in value:
+                                # Append the list to the field.
+                                existing_document[field] += list(value['$each'])
                                 if '$slice' in value:
-                                    raise NotImplementedError(
-                                        '$slice is a valid modifier of a $push operation but it is '
-                                        'not supported by Mongomock yet')
-                                if '$each' in value:
-                                    # append the list to the field
-                                    existing_document[field] += list(value['$each'])
-                                    continue
+                                    slice_value = value['$slice']
+                                    if slice_value < 0:
+                                        existing_document[field] = \
+                                            existing_document[field][slice_value:]
+                                    elif slice_value == 0:
+                                        existing_document[field] = []
+                                    else:
+                                        existing_document[field] = \
+                                            existing_document[field][:slice_value]
+                                continue
                             existing_document[field].append(value)
                             continue
                         # nested fields includes a positional element
