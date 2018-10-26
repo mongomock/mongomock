@@ -1504,6 +1504,32 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         }}})
         self.cmp.compare.find()
 
+    def test__update_push_slice_nested_field(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one({'games': [{'scores': [40, 50, 60]}, {'a': 1}]})
+
+        self.cmp.do.update_one({}, {'$push': {'games.0.scores': {
+            '$each': [80, 78, 86],
+            '$slice': -5,
+        }}})
+        self.cmp.compare.find()
+
+        self.cmp.do.update_one(
+            {'games': {'$elemMatch': {'scores': {'$exists': True}}}},
+            {'$push': {'games.$.scores': {'$each': [0, 1], '$slice': -5}}},
+        )
+        self.cmp.compare.find()
+
+    def test__update_push_array_of_arrays(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one({'scores': [[40, 50], [60, 20]]})
+
+        self.cmp.do.update_one(
+            {'scores': {'$elemMatch': {'0': 60}}},
+            {'$push': {'scores.$': 30}},
+        )
+        self.cmp.compare.find()
+
     def test__drop(self):
         self.cmp.do.insert({'name': 'another new'})
         self.cmp.do.drop()

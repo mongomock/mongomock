@@ -667,7 +667,7 @@ class Collection(object):
                         # need to find that element
                         if '$' in nested_field_list:
                             if not subdocument:
-                                subdocument = self._get_subdocument(
+                                subdocument, _ = self._get_subdocument(
                                     existing_document, spec, nested_field_list)
 
                             # value should be a dictionary since we're pulling
@@ -725,86 +725,28 @@ class Collection(object):
                                     obj for obj in arr if obj not in value]
                 elif k == '$push':
                     for field, value in iteritems(v):
+                        # Find the place where to push.
                         nested_field_list = field.rsplit('.')
-                        if len(nested_field_list) == 1:
-                            if field not in existing_document:
-                                existing_document[field] = []
-                            # document should be a list
-                            # append to it
-                            if isinstance(value, dict) and '$each' in value:
-                                # Append the list to the field.
-                                existing_document[field] += list(value['$each'])
-                                if '$slice' in value:
-                                    slice_value = value['$slice']
-                                    if slice_value < 0:
-                                        existing_document[field] = \
-                                            existing_document[field][slice_value:]
-                                    elif slice_value == 0:
-                                        existing_document[field] = []
-                                    else:
-                                        existing_document[field] = \
-                                            existing_document[field][:slice_value]
-                                continue
-                            existing_document[field].append(value)
-                            continue
-                        # nested fields includes a positional element
-                        # need to find that element
-                        elif '$' in nested_field_list:
-                            if not subdocument:
-                                subdocument = self._get_subdocument(
-                                    existing_document, spec, nested_field_list)
+                        subdocument, field = self._get_subdocument(
+                            existing_document, spec, nested_field_list)
 
-                            # we're pushing a list
-                            push_results = []
-                            if nested_field_list[-1] in subdocument:
-                                # if the list exists, then use that list
-                                push_results = subdocument[nested_field_list[-1]]
-
-                            if isinstance(value, dict):
-                                if '$slice' in value:
-                                    raise NotImplementedError(
-                                        '$slice is a valid modifier of a $push operation but it is '
-                                        'not supported by Mongomock yet')
-                                # check to see if we have the format
-                                # { '$each': [] }
-                                if '$each' in value:
-                                    push_results += list(value['$each'])
+                        # Push the new element or elements.
+                        if isinstance(subdocument, dict) and field not in subdocument:
+                            subdocument[field] = []
+                        push_results = subdocument[field]
+                        if isinstance(value, dict) and '$each' in value:
+                            push_results += list(value['$each'])
+                            if '$slice' in value:
+                                slice_value = value['$slice']
+                                if slice_value < 0:
+                                    push_results = push_results[slice_value:]
+                                elif slice_value == 0:
+                                    push_results = []
                                 else:
-                                    push_results.append(value)
-                            else:
-                                push_results.append(value)
-
-                            # cannot write to doc directly as it doesn't save to
-                            # existing_document
-                            subdocument[nested_field_list[-1]] = push_results
-                        # push to array in a nested attribute
+                                    push_results = push_results[:slice_value]
                         else:
-                            # create nested attributes if they do not exist
-                            subdocument = existing_document
-                            for field in nested_field_list[:-1]:
-                                if isinstance(subdocument, dict):
-                                    if field not in subdocument:
-                                        subdocument[field] = {}
-                                    subdocument = subdocument[field]
-                                else:
-                                    subdocument = subdocument[int(field)]
-
-                            # we're pushing a list
-                            push_results = []
-                            if nested_field_list[-1] in subdocument:
-                                # if the list exists, then use that list
-                                push_results = subdocument[nested_field_list[-1]]
-
-                            if isinstance(value, dict) and '$each' in value:
-                                if '$slice' in value:
-                                    raise NotImplementedError(
-                                        '$slice is a valid modifier of a $push operation but it is '
-                                        'not supported by Mongomock yet')
-                                push_results += list(value['$each'])
-                            else:
-                                push_results.append(value)
-
-                            subdocument[nested_field_list[-1]] = push_results
+                            push_results.append(value)
+                        subdocument[field] = push_results
                 else:
                     if first:
                         # replace entire document
@@ -873,35 +815,50 @@ class Collection(object):
         '$' is the positional operator, so we use the $elemMatch in the spec to find the right
         subdocument in the array.
         """
-        # current document in view
+        # Current document in view.
         doc = existing_document
-        # previous document in view
-        subdocument = existing_document
-        # current spec in view
+        # Previous document in view.
+        parent_doc = existing_document
+        # Current spec in view.
         subspec = spec
-        # walk down the dictionary
-        for subfield in nested_field_list:
+        # Whether spec is following the document.
+        is_following_spec = True
+        # Walk down the dictionary.
+        for index, subfield in enumerate(nested_field_list):
             if subfield == '$':
-                # positional element should have the equivalent elemMatch in the
-                # query
+                if not is_following_spec:
+                    raise WriteError(
+                        'The positional operator did not find the match needed from the query')
+                # Positional element should have the equivalent elemMatch in the query.
                 subspec = subspec['$elemMatch']
-                for item in doc:
-                    # iterate through
+                is_following_spec = False
+                # Iterate through.
+                for spec_index, item in enumerate(doc):
                     if filter_applies(subspec, item):
-                        # found the matching item save the parent
-                        subdocument = doc
-                        # save the item
-                        doc = item
+                        subfield = spec_index
                         break
-                continue
+                else:
+                    raise WriteError(
+                        'The positional operator did not find the match needed from the query')
 
-            subdocument = doc
-            doc = doc[subfield]
-            if subfield not in subspec:
-                break
-            subspec = subspec[subfield]
+            parent_doc = doc
+            if isinstance(parent_doc, list):
+                subfield = int(subfield)
+                if is_following_spec and (subfield < 0 or subfield >= len(subspec)):
+                    is_following_spec = False
 
-        return subdocument
+            if index == len(nested_field_list) - 1:
+                return parent_doc, subfield
+
+            if not isinstance(parent_doc, list):
+                if subfield not in parent_doc:
+                    parent_doc[subfield] = {}
+                if is_following_spec and subfield not in subspec:
+                    is_following_spec = False
+
+            doc = parent_doc[subfield]
+            if is_following_spec:
+                subspec = subspec[subfield]
 
     def _expand_dots(self, doc):
         expanded = {}

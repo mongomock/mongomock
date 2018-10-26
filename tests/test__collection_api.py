@@ -782,6 +782,39 @@ class CollectionAPITest(TestCase):
         }}})
         self.assertEqual([70, 100, 20], self.db.collection.find_one()['scores'])
 
+    def test__update_push_slice_nested_field(self):
+        self.db.collection.insert_one({'games': [{'scores': [89, 70, 100, 20]}]})
+        self.db.collection.update_one({}, {'$push': {'games.0.scores': {
+            '$each': [15],
+            '$slice': -3,
+        }}})
+        self.assertEqual([100, 20, 15], self.db.collection.find_one()['games'][0]['scores'])
+
+    def test__update_push_slice_positional_nested_field(self):
+        self.db.collection.insert_one({'games': [{'scores': [0, 1]}, {'scores': [2, 3]}]})
+        self.db.collection.update_one(
+            {'games': {'$elemMatch': {'scores.0': 2}}},
+            {'$push': {'games.$.scores': {
+                '$each': [15],
+                '$slice': -2,
+            }}})
+        self.assertEqual([0, 1], self.db.collection.find_one()['games'][0]['scores'])
+        self.assertEqual([3, 15], self.db.collection.find_one()['games'][1]['scores'])
+
+    def test__update_push_positional_nested_field(self):
+        self.db.collection.insert_one({'games': [{}]})
+        self.db.collection.update_one(
+            {'games': {'$elemMatch': {'player.scores': {'$exists': False}}}},
+            {'$push': {'games.$.player.scores': 15}})
+        self.assertEqual([{'player': {'scores': [15]}}], self.db.collection.find_one()['games'])
+
+    def test__update_push_array_of_arrays(self):
+        self.db.collection.insert_one({'games': [[0], [1]]})
+        self.db.collection.update_one(
+            {'games': {'$elemMatch': {'0': 1}}},
+            {'$push': {'games.$': 15}})
+        self.assertEqual([[0], [1, 15]], self.db.collection.find_one()['games'])
+
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])
