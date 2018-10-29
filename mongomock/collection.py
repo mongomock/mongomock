@@ -2186,12 +2186,6 @@ def _min_updater(doc, field_name, value):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
-def _sum_updater(doc, field_name, current, result):
-    if isinstance(doc, dict):
-        result = current + doc.get[field_name, 0]
-        return result
-
-
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         doc[field_name] = datetime.utcnow()
