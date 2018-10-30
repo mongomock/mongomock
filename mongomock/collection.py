@@ -147,7 +147,10 @@ def set_value_by_dot(doc, key, value):
 
 
 def delete_value_by_dot(doc, key):
-    """Delete dictionary value using dotted key"""
+    """Delete dictionary value using dotted key.
+
+    This function assumes that the value exists.
+    """
     try:
         parent_key, child_key = key.rsplit('.', 1)
         parent = get_value_by_dot(doc, parent_key)
@@ -155,10 +158,7 @@ def delete_value_by_dot(doc, key):
         child_key = key
         parent = doc
 
-    if isinstance(parent, dict):
-        del parent[child_key]
-    else:
-        raise KeyError()
+    del parent[child_key]
 
     return doc
 
@@ -518,13 +518,6 @@ class Collection(object):
                 return False
             sub_doc = sub_doc[part]
         return True
-
-    def _remove_key(self, doc, key):
-        key_parts = key.split('.')
-        sub_doc = doc
-        for part in key_parts[:-1]:
-            sub_doc = sub_doc[part]
-        del sub_doc[key_parts[-1]]
 
     def update_one(self, filter, update, upsert=False, session=None):
         validate_ok_for_update(update)
@@ -1840,6 +1833,7 @@ class Collection(object):
                         if array_value == []:
                             if should_preserve_null_and_empty:
                                 new_doc = copy.deepcopy(doc)
+                                # We just ran a get_value_by_dot so we know the value exists.
                                 delete_value_by_dot(new_doc, path)
                                 unwound_collection.append(new_doc)
                             continue

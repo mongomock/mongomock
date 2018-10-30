@@ -363,6 +363,14 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_many('a')
         self.assert_document_count(0)
 
+        with self.assertRaises(TypeError):
+            self.db.collection.insert_many(5)
+        self.assert_document_count(0)
+
+        with self.assertRaises(TypeError):
+            self.db.collection.insert_many([])
+        self.assert_document_count(0)
+
     def test__insert_many_type_error_do_not_insert(self):
         with self.assertRaises(TypeError):
             self.db.collection.insert_many([{'a': 1}, 'a'])
@@ -697,6 +705,17 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, expected)
 
+    def test__rename_missing_field(self):
+        input_ = {'_id': 1, 'foo': 'bar'}
+        insert_result = self.db.collection.insert_one(input_)
+        query = {'_id': 1}
+        update = {'$rename': {'bar': 'foo'}}
+        update_result = self.db.collection.update_one(query, update=update)
+
+        self.assertEqual(update_result.modified_count, 0)
+        self.assertEqual(update_result.matched_count, 1)
+        self.assert_document_stored(insert_result.inserted_id, input_)
+
     def test__rename_unsupported(self):
         input_ = {'_id': 1, 'foo': 'bar'}
         insert_result = self.db.collection.insert_one(input_)
@@ -846,6 +865,15 @@ class CollectionAPITest(TestCase):
         self.assertEqual(result.modified_count, 0)
         self.assertIsNotNone(result.upserted_id)
         self.assert_document_stored(result.upserted_id, {'x': 1, 'y': 2})
+
+    def test__replace_one_invalid(self):
+        with self.assertRaises(ValueError):
+            self.db.collection.replace_one(
+                filter={'a': 2}, replacement={'$set': {'x': 1, 'y': 2}})
+
+    def test__update_one_invalid(self):
+        with self.assertRaises(ValueError):
+            self.db.collection.update_one({'a': 2}, {})
 
     def test__delete_one(self):
         self.assert_document_count(0)
@@ -2272,6 +2300,37 @@ class CollectionAPITest(TestCase):
                 {'_id': 4, 'item': 'LMN'},
                 {'_id': 5, 'item': 'XYZ', 'sizes': None},
                 {'_id': 6, 'item': 'abc', 'sizes': False},
+            ],
+            list(actual))
+
+    def test__unwind_preserve_null_and_empty_arrays_on_nested(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'item': 'ABC', 'nest': {'sizes': ['S', 'M', 'L']}},
+            {'_id': 2, 'item': 'EFG', 'nest': {'sizes': []}},
+            {'_id': 3, 'item': 'IJK', 'nest': {'sizes': 'M'}},
+            {'_id': 4, 'item': 'LMN', 'nest': {}},
+            {'_id': 5, 'item': 'XYZ', 'nest': {'sizes': None}},
+            {'_id': 6, 'item': 'abc', 'nest': {'sizes': False}},
+            {'_id': 7, 'item': 'abc', 'nest': ['A', 'B', 'C']},
+            {'_id': 8, 'item': 'abc', 'nest': [{'sizes': 'A'}, {'sizes': ['B', 'C']}]},
+            {'_id': 9, 'item': 'def'},
+        ])
+        actual = self.db.collection.aggregate([
+            {'$unwind': {'path': '$nest.sizes', 'preserveNullAndEmptyArrays': True}},
+        ])
+        self.assertEqual(
+            [
+                {'_id': 1, 'item': 'ABC', 'nest': {'sizes': 'S'}},
+                {'_id': 1, 'item': 'ABC', 'nest': {'sizes': 'M'}},
+                {'_id': 1, 'item': 'ABC', 'nest': {'sizes': 'L'}},
+                {'_id': 2, 'item': 'EFG', 'nest': {}},
+                {'_id': 3, 'item': 'IJK', 'nest': {'sizes': 'M'}},
+                {'_id': 4, 'item': 'LMN', 'nest': {}},
+                {'_id': 5, 'item': 'XYZ', 'nest': {'sizes': None}},
+                {'_id': 6, 'item': 'abc', 'nest': {'sizes': False}},
+                {'_id': 7, 'item': 'abc', 'nest': ['A', 'B', 'C']},
+                {'_id': 8, 'item': 'abc', 'nest': [{'sizes': 'A'}, {'sizes': ['B', 'C']}]},
+                {'_id': 9, 'item': 'def'},
             ],
             list(actual))
 
