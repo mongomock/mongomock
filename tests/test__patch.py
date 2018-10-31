@@ -14,8 +14,12 @@ try:
 except ImportError:
     import mock
 
+import platform
+_USING_PYPY = platform.python_implementation() == 'PyPy'
+
 
 @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@unittest.skipIf(_USING_PYPY, 'PyPy does not handle mocking time sleep properly')
 class PatchTest(unittest.TestCase):
     """Test the use of the patch function.
 
