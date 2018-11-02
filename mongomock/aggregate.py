@@ -135,7 +135,10 @@ class Parser(object):
 
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
-            get_value = helpers.embedded_item_getter(expression.replace('$', ''))
+            if expression.startswith('$$'):
+                raise NotImplementedError(
+                    'Mongomock does not implement variables in aggregations yet')
+            get_value = helpers.embedded_item_getter(expression[1:])
             return get_value(self._doc_dict)
         return expression
 

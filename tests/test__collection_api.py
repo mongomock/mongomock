@@ -2924,6 +2924,18 @@ class CollectionAPITest(TestCase):
         }}])
         self.assertEqual([4020], [d['since'] for d in actual])
 
+    def test__aggregate_system_variables(self):
+        self.db.collection.insert_many([
+            {'_id': 1},
+            {'_id': 2, 'parent_id': 1},
+            {'_id': 3, 'parent_id': 1},
+        ])
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$match': {'parent_id': {'$in': [1]}}},
+                {'$group': {'_id': 1, 'docs': {'$push': '$$ROOT'}}},
+            ])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)
