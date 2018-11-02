@@ -2930,11 +2930,16 @@ class CollectionAPITest(TestCase):
             {'_id': 2, 'parent_id': 1},
             {'_id': 3, 'parent_id': 1},
         ])
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$match': {'parent_id': {'$in': [1]}}},
-                {'$group': {'_id': 1, 'docs': {'$push': '$$ROOT'}}},
-            ])
+        actual = self.db.collection.aggregate([
+            {'$match': {'parent_id': {'$in': [1]}}},
+            {'$group': {'_id': 1, 'docs': {'$push': '$$ROOT'}}},
+        ])
+        self.assertEqual(
+            [{'_id': 1, 'docs': [
+                {'_id': 2, 'parent_id': 1},
+                {'_id': 3, 'parent_id': 1},
+            ]}],
+            list(actual))
 
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
