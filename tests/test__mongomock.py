@@ -2278,6 +2278,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'since': {'$subtract': ['$date', datetime.datetime(2014, 7, 4, 13, 0)]},
         }}])
 
+    def test__aggregate_system_variables(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {'_id': 1},
+            {'_id': 2, 'parent_id': 1},
+            {'_id': 3, 'parent_id': 1},
+        ])
+        self.cmp.compare.aggregate([
+            {'$match': {'parent_id': {'$in': [1]}}},
+            {'$group': {'_id': 1, 'docs': {'$push': '$$ROOT'}}},
+        ])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
