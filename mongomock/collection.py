@@ -632,11 +632,11 @@ class Collection(object):
                         else:
                             # create nested attributes if they do not exist
                             subdocument = existing_document
-                            for field in nested_field_list[:-1]:
-                                if field not in subdocument:
-                                    subdocument[field] = {}
+                            for field_part in nested_field_list[:-1]:
+                                if field_part not in subdocument:
+                                    subdocument[field_part] = {}
 
-                                subdocument = subdocument[field]
+                                subdocument = subdocument[field_part]
 
                             # we're pushing a list
                             push_results = []
@@ -680,10 +680,10 @@ class Collection(object):
                             subdocument[nested_field_list[-1]] = pull_results
                         else:
                             arr = existing_document
-                            for field in nested_field_list:
-                                if field not in arr:
+                            for field_part in nested_field_list:
+                                if field_part not in arr:
                                     break
-                                arr = arr[field]
+                                arr = arr[field_part]
                             if not isinstance(arr, list):
                                 continue
 
@@ -1116,7 +1116,7 @@ class Collection(object):
         return (document for document in list(itervalues(self._documents))
                 if filter_applies(filter, document))
 
-    def find_one(self, filter=None, *args, **kwargs):
+    def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
         # Allow calling find_one with a non-dict argument that gets used as
         # the id for the query.
         if filter is None:
@@ -1308,7 +1308,7 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        index_list = helpers.index_list(key_or_list)
+        index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 

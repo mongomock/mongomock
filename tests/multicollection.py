@@ -119,9 +119,9 @@ def _expand_cursor(cursor, sort, by=by_id):
     return returned
 
 
-def _format_diff_message(a_name, b_name, diff):
+def _format_diff_message(a_name, b_name, diff_list):
     msg = 'Unexpected Diff:'
-    for (path, a_value, b_value) in diff:
+    for (path, a_value, b_value) in diff_list:
         a_path = [a_name] + path
         b_path = [b_name] + path
         msg += '\n\t{} != {} ({} != {})'.format(
