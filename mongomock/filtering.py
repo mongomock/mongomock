@@ -22,10 +22,8 @@ def filter_applies(search_filter, document):
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    if search_filter is None:
-        return True
-    if isinstance(search_filter, ObjectId):
-        search_filter = {'_id': search_filter}
+    if not isinstance(search_filter, dict):
+        raise OperationFailure('the match filter must be an expression in an object')
 
     for key, search in iteritems(search_filter):
 
@@ -106,7 +104,7 @@ def iter_key_candidates(key, doc):
 
 
 def _iter_key_candidates_sublist(key, doc):
-    """Iterates of cadindates
+    """Iterates of candidates
 
     :param doc: a list to be searched for candidates for our key
     :param key: the string key to be matched
@@ -167,13 +165,13 @@ def _not_op(d, k, s):
     if isinstance(s, dict):
         for key in s.keys():
             if key == '$regex':
-                raise OperationFailure('BadValue $not cannot have a regex')
+                raise OperationFailure('$not cannot have a regex')
             if key not in OPERATOR_MAP and key not in LOGICAL_OPERATOR_MAP:
-                raise OperationFailure('BadValue $not needs a regex or a document')
+                raise OperationFailure('unknown operator: %s' % key)
     elif isinstance(s, type(re.compile(''))):
         pass
     else:
-        raise OperationFailure('BadValue $not needs a regex or a document')
+        raise OperationFailure('$not needs a regex or a document')
     return not filter_applies({k: s}, d)
 
 
@@ -253,7 +251,7 @@ def _get_compare_type(val):
         return 35
     if isinstance(val, datetime):
         return 45
-    if isinstance(val, re.Pattern):
+    if isinstance(val, RE_TYPE):
         return 50
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
@@ -263,6 +261,8 @@ def _get_compare_type(val):
 def _elem_match_op(doc_val, query):
     if not isinstance(doc_val, list):
         return False
+    if not isinstance(query, dict):
+        raise OperationFailure('$elemMatch needs an Object')
     return any(filter_applies(query, item) for item in doc_val)
 
 
@@ -295,7 +295,7 @@ def _type_op(doc_val, search_val):
     if search_val not in TYPE_MAP:
         raise OperationFailure('%r is not a valid $type' % search_val)
     elif TYPE_MAP[search_val] is None:
-        raise OperationFailure('%s is a valid $type but not implemented' % search_val)
+        raise NotImplementedError('%s is a valid $type but not implemented' % search_val)
     return isinstance(doc_val, TYPE_MAP[search_val])
 
 

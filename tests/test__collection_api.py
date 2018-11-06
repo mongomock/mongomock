@@ -3,6 +3,7 @@ import copy
 from datetime import datetime, tzinfo, timedelta
 import platform
 import random
+import re
 import six
 from six import assertCountEqual, text_type
 import time
@@ -390,7 +391,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_many([
             {'a': 1, 's': 0},
             {'a': 2, 's': 0},
-            {'a': 3, 's': 1}
+            {'_id': 'unique', 'a': 3, 's': 1}
         ])
         self.assertEqual(3, self.db.collection.count_documents({}))
         self.assertEqual(2, self.db.collection.count_documents({'s': 0}))
@@ -411,6 +412,9 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.count_documents({}, collation='fr')
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.count_documents('unique')
 
     def test__find_returns_cursors(self):
         collection = self.db.collection
@@ -2214,11 +2218,18 @@ class CollectionAPITest(TestCase):
     def test__find_type_object(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
-        actual = self.db.collection.find(
-            {'arr': {'$type': 'object'}})
+        actual = self.db.collection.find({'arr': {'$type': 'object'}})
         expect = [{'_id': 2, 'arr': {'a': 4, 'b': 5}}]
 
         self.assertEqual(expect, list(actual))
+
+    def test__find_unknown_type(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'arr': {'$type': 'unknown-type'}})
+
+    def test__find_unimplemented_type(self):
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.find_one({'arr': {'$type': 'javascript'}})
 
     def test__find_eq_none(self):
         self.db.collection.insert_one({'_id': 1, 'arr': None})
@@ -2230,6 +2241,27 @@ class CollectionAPITest(TestCase):
         expect = [{'_id': 1}, {'_id': 2}]
 
         self.assertEqual(expect, list(actual))
+
+    def test__find_too_much_nested(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': {'a': {'b': 1}}})
+        self.db.collection.insert_one({'_id': 2, 'arr': None})
+        actual = self.db.collection.find({'arr.a.b': 1}, projection=['_id'])
+        self.assertEqual([{'_id': 1}], list(actual))
+
+    def test__find_too_far(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [0, 1]})
+        self.db.collection.insert_one({'_id': 2, 'arr': [0]})
+
+        actual = self.db.collection.find({'arr.1': 1}, projection=['_id'])
+        self.assertEqual([{'_id': 1}], list(actual))
+
+        actual = self.db.collection.find({'arr.1': {'$exists': False}}, projection=['_id'])
+        self.assertEqual([{'_id': 2}], list(actual))
+
+    def test__find_elemmatch_none(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [0, 1]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'arr': {'$elemMatch': None}})
 
     def test__unwind_no_prefix(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
@@ -2529,9 +2561,21 @@ class CollectionAPITest(TestCase):
             {'_id': 9, 'counts': {'circles': 'three'}},
             # Document dropped: None is less than numbers.
             {'_id': 10, 'counts': {'circles': None}},
+            # Document kept: ObjectIds are more than numbers.
+            {'_id': 11, 'counts': {'circles': mongomock.ObjectId()}},
+            # Document kept: datetimes are more than numbers.
+            {'_id': 12, 'counts': {'circles': datetime.now()}},
         ])
         results = collection.find(query)
-        self.assertEqual({1, 2, 5, 9}, {doc['_id'] for doc in results})
+        self.assertEqual({1, 2, 5, 9, 11, 12}, {doc['_id'] for doc in results})
+
+        query = {'counts': {'$gt': {'circles': re.compile('3')}}}
+        self.assertFalse(list(collection.find(query)))
+
+    def test__filter_objects_comparison_unknown_type(self):
+        self.db.collection.insert_one({'counts': 3})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.find_one({'counts': {'$gt': str}})
 
     def test__filter_objects_nested_comparison(self):
         collection = self.db.collection
@@ -2550,6 +2594,13 @@ class CollectionAPITest(TestCase):
         ])
         results = collection.find(query)
         self.assertEqual({1, 2, 5}, {doc['_id'] for doc in results})
+
+    def test_filter_not_bad_value(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a': {'$not': 3}})
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a': {'$not': {'b': 3}}})
 
     def test_insert_many_bulk_write_error(self):
         collection = self.db.collection
