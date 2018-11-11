@@ -982,7 +982,7 @@ class Collection(object):
         if not fields:
             fields = {'_id': 1}
         if not isinstance(fields, dict):
-            fields = helpers._fields_list_to_dict(fields)
+            fields = helpers.fields_list_to_dict(fields)
 
         # we can pass in something like {'_id':0, 'field':1}, so pull the id
         # value out and hang on to it until later

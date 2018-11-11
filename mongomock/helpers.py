@@ -20,13 +20,10 @@ RE_TYPE = type(re.compile(''))
 try:
     from bson.tz_util import utc
 except ImportError:
-    class FixedOffset(tzinfo):
+    class _FixedOffset(tzinfo):
 
         def __init__(self, offset, name):
-            if isinstance(offset, timedelta):
-                self.__offset = offset
-            else:
-                self.__offset = timedelta(minutes=offset)
+            self.__offset = timedelta(minutes=offset)
             self.__name = name
 
         def __getinitargs__(self):
@@ -40,7 +37,7 @@ except ImportError:
 
         def dst(self, dt):
             return timedelta(0)
-    utc = FixedOffset(0, 'UTC')
+    utc = _FixedOffset(0, 'UTC')
 
 
 ASCENDING = 1
@@ -54,13 +51,11 @@ def print_deprecation_warning(old_param_name, new_param_name):
         'purposes.' % (old_param_name, new_param_name), DeprecationWarning)
 
 
-def create_index_list(key_or_list, direction=None):
+def create_index_list(key_or_list):
     """Helper to generate a list of (key, direction) pairs.
 
        It takes such a list, or a single key, or a single key and direction.
     """
-    if direction is not None:
-        return [(key_or_list, direction)]
     if isinstance(key_or_list, string_types):
         return [(key_or_list, ASCENDING)]
     if not isinstance(key_or_list, (list, tuple)):
@@ -104,7 +99,7 @@ class hashdict(dict):
     def __repr__(self):
         return '{0}({1})'.format(
             self.__class__.__name__,
-            ', '.join('{0}={1}'.format(str(i[0]), repr(i[1])) for i in self.__key()))
+            ', '.join('{0}={1}'.format(str(i[0]), repr(i[1])) for i in sorted(self.__key())))
 
     def __hash__(self):
         return hash(self.__key())
@@ -143,7 +138,7 @@ class hashdict(dict):
         return result
 
 
-def _fields_list_to_dict(fields):
+def fields_list_to_dict(fields):
     """Takes a list of field names and returns a matching dictionary.
 
     ['a', 'b'] becomes {'a': 1, 'b': 1}
@@ -248,11 +243,6 @@ def embedded_item_getter(*keys):
             return tuple(recurse_embedded(obj, item) for item in keys)
 
     return g
-
-
-def inplace_patch_datetime_awareness_in_document(doc):
-    for key in doc.keys():
-        doc[key] = patch_datetime_awareness_in_document(doc)
 
 
 def patch_datetime_awareness_in_document(value):

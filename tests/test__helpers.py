@@ -25,6 +25,27 @@ class HashdictTest(TestCase):
         h[_id] = 'foo'
         self.assertEqual(h[_id], 'foo')
 
+        with self.assertRaises(TypeError):
+            _id['a'] = 2
+        with self.assertRaises(TypeError):
+            del _id['a']
+        with self.assertRaises(TypeError):
+            _id.clear()
+        with self.assertRaises(TypeError):
+            _id.pop('a')
+        with self.assertRaises(TypeError):
+            _id.popitem('a')
+        with self.assertRaises(TypeError):
+            _id.setdefault('c', 3)
+        with self.assertRaises(TypeError):
+            _id.update({'b': 2, 'c': 4})
+
+        self.assertEqual(
+            hashdict({'a': 1, 'b': 3, 'c': 4}),
+            hashdict({'a': 1, 'b': 2}) + hashdict({'b': 3, 'c': 4}))
+
+        self.assertEqual('hashdict(a=1, b=2)', repr(hashdict({'a': 1, 'b': 2})))
+
 
 class TestDeprecationWarning(TestCase):
     def test__deprecation_warning(self):

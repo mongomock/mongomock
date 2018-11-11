@@ -1081,6 +1081,10 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__create_index_wrong_type(self):
+        with self.assertRaises(TypeError):
+            self.db.collection.create_index({'value': 1})
+
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
         with self.assertRaises(TypeError):
@@ -1452,6 +1456,11 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             list(data_in_db), [{'_id': 1, 'a': {'b': {'c': 2}}}])
 
+    def test__find_and_project_wrong_types(self):
+        self.db.collection.insert({'_id': 1, 'a': {'b': {'c': 2}}})
+        with self.assertRaises(TypeError):
+            self.db.collection.find_one({}, projection=[{'a': {'b': {'c': 1}}}])
+
     def test__find_projection_with_subdoc_lists(self):
         doc = {'a': 1, 'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]}
         self.db.collection.insert_one(doc)
@@ -1627,6 +1636,12 @@ class CollectionAPITest(TestCase):
             objs = list(db.collection.find())
             assert objs == [{'_id': objid, 'date_aware': returned, 'date_naive': returned}]
 
+            if tz_awarness:
+                self.assertEqual('UTC', returned.tzinfo.tzname(returned))
+                self.assertEqual(timedelta(0), returned.tzinfo.utcoffset(returned))
+                self.assertEqual(timedelta(0), returned.tzinfo.dst(returned))
+                self.assertEqual((timedelta(0), 'UTC'), returned.tzinfo.__getinitargs__())
+
             # Given both date are equivalent, we can mix them
             db.collection.update_one(
                 {'date_aware': naive, 'date_naive': aware},
@@ -1646,6 +1661,13 @@ class CollectionAPITest(TestCase):
             db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
             objs = list(db.collection.find())
             assert not objs
+
+    def test__list_of_dates(self):
+        client = mongomock.MongoClient(tz_aware=True)
+        client.db.collection.insert_one({'dates': [datetime.now(), datetime.now()]})
+        dates = client.db.collection.find_one()['dates']
+        self.assertTrue(dates[0].tzinfo)
+        self.assertEqual(dates[0].tzinfo, dates[1].tzinfo)
 
     # should be removed once Timestamp supported or implemented
     def test__current_date_timestamp_is_not_supported_yet(self):

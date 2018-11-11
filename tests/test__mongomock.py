@@ -55,6 +55,15 @@ class InterfaceTest(TestCase):
         with self.assertRaises(InvalidURI):
             mongomock.MongoClient('://host1')
 
+        with self.assertRaises(InvalidURI):
+            mongomock.MongoClient('mongodb://')
+
+        with self.assertRaises(InvalidURI):
+            mongomock.MongoClient('mongodb://localhost/path/mongodb.sock')
+
+        with self.assertRaises(InvalidURI):
+            mongomock.MongoClient('mongodb://localhost?option')
+
     def test__none_uri_host(self):
         self.assertIsNotNone(mongomock.MongoClient('host1'))
         self.assertIsNotNone(mongomock.MongoClient('//host2'))
