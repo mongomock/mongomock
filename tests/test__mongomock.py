@@ -2029,6 +2029,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'exp': {'$exp': 2},
             'floor': {'$floor': 4.65},
             'ln': {'$ln': 100},
+            'log': {'$log': [8, 2]},
             'log10': {'$log10': 1000},
             'mod': {'$mod': [46, 9]},
             'multiply': {'$multiply': [5, '$a', '$b']},
@@ -2092,7 +2093,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def test__aggregate28(self):
         pipeline = [{'$group': {
             '_id': '$b',
-            'total2015': {'$sum': {'$cond': [{'$eq': [{'$year': '$date'}, 2015]}, 1, 0]}},
+            'total2015': {'$sum': {'$cond': [{'$ne': [{'$year': '$date'}, 2015]}, 0, 1]}},
         }}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
@@ -2297,6 +2298,21 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([
             {'$match': {'parent_id': {'$in': [1]}}},
             {'$group': {'_id': 1, 'docs': {'$push': '$$ROOT'}}},
+        ])
+
+    def test__aggregate_date_operators(self):
+        self.cmp.compare_ignore_order.aggregate([
+            {'$project': {
+                'doy': {'$dayOfYear': '$date'},
+                'dom': {'$dayOfMonth': '$date'},
+                'dow': {'$dayOfWeek': '$date'},
+                'M': {'$month': '$date'},
+                'w': {'$week': '$date'},
+                'h': {'$hour': '$date'},
+                'm': {'$minute': '$date'},
+                's': {'$second': '$date'},
+                'ms': {'$millisecond': '$date'},
+            }},
         ])
 
 

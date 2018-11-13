@@ -183,9 +183,10 @@ class Parser(object):
             return res
         if operator == '$trunc':
             return math.trunc(self.parse(values))
-        raise NotImplementedError("Although '%s' is a valid aritmetic operator for the "
-                                  'aggregation pipeline, it is currently not implemented '
-                                  ' in Mongomock.' % operator)
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid aritmetic operator for the aggregation "
+            'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
     def _handle_project_operator(self, operator, values):
         if operator in GROUPING_OPERATOR_MAP:
@@ -228,13 +229,13 @@ class Parser(object):
         if operator == '$dayOfMonth':
             return out_value.day
         if operator == '$dayOfWeek':
-            return out_value.isoweekday()
+            return (out_value.isoweekday() % 7) + 1
         if operator == '$year':
             return out_value.year
         if operator == '$month':
             return out_value.month
         if operator == '$week':
-            return out_value.isocalendar()[1]
+            return int(out_value.strftime('%U'))
         if operator == '$hour':
             return out_value.hour
         if operator == '$minute':
@@ -288,7 +289,8 @@ class Parser(object):
                 condition_value = False
             expression = true_case if condition_value else false_case
             return self.parse(expression)
-        raise NotImplementedError(
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid conditional operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)

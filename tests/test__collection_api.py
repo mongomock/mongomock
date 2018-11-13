@@ -2228,6 +2228,34 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$and': [True, False]}}}
             ])
 
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$stdDevPop': 'scores'}}},
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([{'$project': {
+                'a': {'$let': {
+                    'vars': {'a': 1},
+                    'in': {'$multiply': ['$$a', 3]},
+                }},
+            }}])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$cmp': [1, 2]}}},
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {'date': datetime.now()}}}},
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$concatArrays': [[0, 1], [2, 3]]}}},
+            ])
+
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
