@@ -1535,6 +1535,7 @@ class CollectionAPITest(TestCase):
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
+        self.db.collection.with_options(write_concern=WriteConcern(w=1))
 
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)

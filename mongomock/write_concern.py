@@ -1,3 +1,9 @@
+def _with_default_values(document):
+    if 'w' in document:
+        return document
+    return dict(document, w=1)
+
+
 class WriteConcern(object):
     def __init__(self, w=None, wtimeout=None, j=None, fsync=None):
         self._document = {}
@@ -12,13 +18,13 @@ class WriteConcern(object):
 
     def __eq__(self, other):
         try:
-            return other.document == self.document
+            return _with_default_values(other.document) == _with_default_values(self.document)
         except AttributeError:
             return NotImplemented
 
     def __ne__(self, other):
         try:
-            return other.document != self.document
+            return _with_default_values(other.document) != _with_default_values(self.document)
         except AttributeError:
             return NotImplemented
 
