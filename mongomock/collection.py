@@ -1,5 +1,4 @@
 from __future__ import division
-import bisect
 from collections import OrderedDict
 try:
     from collections.abc import Iterable, Mapping, MutableMapping
@@ -11,7 +10,6 @@ import functools
 import itertools
 import json
 import math
-import random
 import threading
 import time
 import warnings
@@ -49,10 +47,10 @@ from six import text_type
 
 
 from mongomock import aggregate
-from mongomock.command_cursor import CommandCursor
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
-from mongomock.filtering import iter_key_candidates
+from mongomock.filtering import resolve_key
+from mongomock.filtering import resolve_sort_key
 from mongomock import helpers
 from mongomock import InvalidOperation
 from mongomock import ObjectId
@@ -66,7 +64,6 @@ from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 
 lock = threading.RLock()
-_random = random.Random()
 
 
 def validate_is_mapping(option, value):
@@ -103,64 +100,6 @@ def validate_ok_for_update(update):
 def validate_write_concern_params(**params):
     if params:
         WriteConcern(**params)
-
-
-def get_value_by_dot(doc, key):
-    """Get dictionary value using dotted key"""
-    result = doc
-    for key_item in key.split('.'):
-        if isinstance(result, dict):
-            result = result[key_item]
-
-        elif isinstance(result, (list, tuple)):
-            try:
-                result = result[int(key_item)]
-            except (ValueError, IndexError):
-                raise KeyError()
-
-        else:
-            raise KeyError()
-
-    return result
-
-
-def set_value_by_dot(doc, key, value):
-    """Set dictionary value using dotted key"""
-    try:
-        parent_key, child_key = key.rsplit('.', 1)
-        parent = get_value_by_dot(doc, parent_key)
-    except ValueError:
-        child_key = key
-        parent = doc
-
-    if isinstance(parent, dict):
-        parent[child_key] = value
-    elif isinstance(parent, (list, tuple)):
-        try:
-            parent[int(child_key)] = value
-        except (ValueError, IndexError):
-            raise KeyError()
-    else:
-        raise KeyError()
-
-    return doc
-
-
-def delete_value_by_dot(doc, key):
-    """Delete dictionary value using dotted key.
-
-    This function assumes that the value exists.
-    """
-    try:
-        parent_key, child_key = key.rsplit('.', 1)
-        parent = get_value_by_dot(doc, parent_key)
-    except ValueError:
-        child_key = key
-        parent = doc
-
-    del parent[child_key]
-
-    return doc
 
 
 class BulkWriteOperation(object):
@@ -498,7 +437,7 @@ class Collection(object):
             find_kwargs = {}
             for key, _ in unique:
                 try:
-                    find_kwargs[key] = get_value_by_dot(new_data, key)
+                    find_kwargs[key] = helpers.get_value_by_dot(new_data, key)
                 except KeyError:
                     find_kwargs[key] = None
             if is_sparse and set(find_kwargs.values()) == {None}:
@@ -911,7 +850,7 @@ class Collection(object):
         if sort:
             for sortKey, sortDirection in reversed(sort):
                 dataset = iter(sorted(
-                    dataset, key=lambda x: _resolve_sort_key(sortKey, x),
+                    dataset, key=lambda x: resolve_sort_key(sortKey, x),
                     reverse=sortDirection < 0))
         return dataset
 
@@ -1327,7 +1266,7 @@ class Collection(object):
                 index = []
                 for key, unused_order in index_list:
                     try:
-                        index.append(get_value_by_dot(doc, key))
+                        index.append(helpers.get_value_by_dot(doc, key))
                     except KeyError:
                         if is_sparse:
                             continue
@@ -1538,7 +1477,7 @@ class Collection(object):
             doc_list_copy.append(doc_copy)
         doc_list = doc_list_copy
         for k1 in key:
-            doc_list = sorted(doc_list, key=lambda x: _resolve_key(k1, x))
+            doc_list = sorted(doc_list, key=lambda x: resolve_key(k1, x))
         for k2 in key:
             if not isinstance(k2, string_types):
                 raise TypeError(
@@ -1557,346 +1496,9 @@ class Collection(object):
         ret_array = ret_array_copy
         return ret_array
 
-    def aggregate(self, pipeline, session=None, **kwargs):
-        if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
-        pipeline_operators = [
-            '$addFields',
-            '$bucket',
-            '$bucketAuto',
-            '$collStats',
-            '$count',
-            '$currentOp',
-            '$facet',
-            '$geoNear',
-            '$graphLookup',
-            '$group',
-            '$indexStats',
-            '$limit',
-            '$listLocalSessions',
-            '$listSessions',
-            '$lookup',
-            '$match',
-            '$out',
-            '$project',
-            '$redact',
-            '$replaceRoot',
-            '$sample'
-            '$skip',
-            '$sort',
-            '$sortByCount',
-            '$unwind',
-        ]
-        group_operators = [
-            '$addToSet',
-            '$first',
-            '$last',
-            '$max',
-            '$min',
-            '$avg',
-            '$push',
-            '$sum',
-            '$stdDevPop',
-            '$stdDevSamp']
-
-        def _extend_collection(out_collection, field, expression):
-            field_exists = False
-            for doc in out_collection:
-                if field in doc:
-                    field_exists = True
-                    break
-            if not field_exists:
-                for doc in out_collection:
-                    if isinstance(expression, string_types) and expression.startswith('$'):
-                        try:
-                            doc[field] = get_value_by_dot(doc, expression.lstrip('$'))
-                        except KeyError:
-                            pass
-                    else:
-                        # verify expression has operator as first
-                        doc[field] = aggregate.parse_expression(expression.copy(), doc)
-            return out_collection
-
-        def _accumulate_group(output_fields, group_list):
-            doc_dict = {}
-            for field, value in iteritems(output_fields):
-                if field == '_id':
-                    continue
-                for operator, key in iteritems(value):
-                    key_getter = functools.partial(aggregate.parse_expression, key)
-                    values = [key_getter(doc) for doc in group_list]
-                    if operator in aggregate.GROUPING_OPERATOR_MAP:
-                        doc_dict[field] = aggregate.GROUPING_OPERATOR_MAP[operator](values)
-                    elif operator == '$first':
-                        doc_dict[field] = values[0]
-                    elif operator == '$last':
-                        doc_dict[field] = values[-1]
-                    elif operator == '$addToSet':
-                        value = []
-                        val_it = (val or None for val in values)
-                        # Don't use set in case elt in not hashable (like dicts).
-                        for elt in val_it:
-                            if elt not in value:
-                                value.append(elt)
-                        doc_dict[field] = value
-                    elif operator == '$push':
-                        if field not in doc_dict:
-                            doc_dict[field] = values
-                        else:
-                            doc_dict[field].extend(values)
-                    elif operator in group_operators:
-                        raise NotImplementedError(
-                            'Although %s is a valid group operator for the '
-                            'aggregation pipeline, it is currently not implemented '
-                            'in Mongomock.' % operator)
-                    else:
-                        raise NotImplementedError(
-                            '%s is not a valid group operator for the aggregation '
-                            'pipeline. See http://docs.mongodb.org/manual/meta/'
-                            'aggregation-quick-reference/ for a complete list of '
-                            'valid operators.' % operator)
-            return doc_dict
-
-        out_collection = [doc for doc in self.find()]
-        for stage in pipeline:
-            for k, v in iteritems(stage):
-                if k == '$match':
-                    out_collection = [doc for doc in out_collection
-                                      if filter_applies(v, doc)]
-                elif k == '$lookup':
-                    for operator in ('let', 'pipeline'):
-                        if operator in stage['$lookup']:
-                            raise NotImplementedError(
-                                "Although '%s' is a valid lookup operator for the "
-                                'aggregation pipeline, it is currently not '
-                                'implemented in Mongomock.' % operator)
-                    for operator in ('from', 'localField', 'foreignField', 'as'):
-                        if operator not in stage['$lookup']:
-                            raise OperationFailure(
-                                "Must specify '%s' field for a $lookup" % operator)
-                        if not isinstance(stage['$lookup'][operator], string_types):
-                            raise OperationFailure(
-                                'Arguments to $lookup must be strings')
-                        if operator in ('as', 'localField', 'foreignField') and \
-                                stage['$lookup'][operator].startswith('$'):
-                            raise OperationFailure(
-                                "FieldPath field names may not start with '$'")
-                        if operator in ('localField', 'as') and \
-                                '.' in stage['$lookup'][operator]:
-                            raise NotImplementedError(
-                                "Although '.' is valid in the 'localField' and 'as' "
-                                'parameters for the lookup stage of the aggregation '
-                                'pipeline, it is currently not implemented in Mongomock.')
-
-                    foreign_name = stage['$lookup']['from']
-                    local_field = stage['$lookup']['localField']
-                    foreign_field = stage['$lookup']['foreignField']
-                    local_name = stage['$lookup']['as']
-                    foreign_collection = self.database.get_collection(foreign_name)
-                    for doc in out_collection:
-                        query = doc.get(local_field)
-                        if isinstance(query, list):
-                            query = {'$in': query}
-                        matches = foreign_collection.find({foreign_field: query})
-                        doc[local_name] = [foreign_doc for foreign_doc in matches]
-                elif k == '$group':
-                    grouped_collection = []
-                    _id = stage['$group']['_id']
-                    if _id:
-                        key_getter = functools.partial(aggregate.parse_expression, _id)
-                        sort_key_getter = _fix_sort_key(key_getter)
-                        # Sort the collection only for the itertools.groupby.
-                        # $group does not order its output document.
-                        out_collection = sorted(out_collection, key=sort_key_getter)
-                        grouped = itertools.groupby(out_collection, key_getter)
-                    else:
-                        grouped = [(None, out_collection)]
-
-                    for doc_id, group in grouped:
-                        group_list = ([x for x in group])
-                        doc_dict = _accumulate_group(v, group_list)
-                        doc_dict['_id'] = doc_id
-                        grouped_collection.append(doc_dict)
-
-                    out_collection = grouped_collection
-
-                elif k == '$bucket':
-                    unknown_options = set(v) - {'groupBy', 'boundaries', 'output', 'default'}
-                    if unknown_options:
-                        raise OperationFailure(
-                            'Unrecognized option to $bucket: %s.' % unknown_options.pop())
-                    if 'groupBy' not in v or 'boundaries' not in v:
-                        raise OperationFailure(
-                            "$bucket requires 'groupBy' and 'boundaries' to be specified.")
-                    group_by = v['groupBy']
-                    boundaries = v['boundaries']
-                    if not isinstance(boundaries, list):
-                        raise OperationFailure(
-                            "The $bucket 'boundaries' field must be an array, but found type: %s"
-                            % type(boundaries))
-                    if len(boundaries) < 2:
-                        raise OperationFailure(
-                            "The $bucket 'boundaries' field must have at least 2 values, but "
-                            'found %d value(s).' % len(boundaries))
-                    if sorted(boundaries) != boundaries:
-                        raise OperationFailure(
-                            "The 'boundaries' option to $bucket must be sorted in ascending order")
-                    output_fields = v.get('output', {'count': {'$sum': 1}})
-                    default_value = v.get('default', None)
-                    try:
-                        is_default_last = default_value >= boundaries[-1]
-                    except TypeError:
-                        is_default_last = True
-
-                    def _get_default_bucket():
-                        try:
-                            return v['default']
-                        except KeyError:
-                            raise OperationFailure(
-                                '$bucket could not find a matching branch for '
-                                'an input, and no default was specified.')
-
-                    def _get_bucket_id(doc):
-                        """Get the bucket ID for a document.
-
-                        Note that it actually returns a tuple with the first
-                        param being a sort key to sort the default bucket even
-                        if it's not the same type as the boundaries.
-                        """
-                        try:
-                            value = aggregate.parse_expression(group_by, doc)
-                        except KeyError:
-                            return (is_default_last, _get_default_bucket())
-                        index = bisect.bisect_right(boundaries, value)
-                        if index and index < len(boundaries):
-                            return (False, boundaries[index - 1])
-                        return (is_default_last, _get_default_bucket())
-
-                    in_collection = ((_get_bucket_id(doc), doc) for doc in out_collection)
-                    out_collection = sorted(in_collection, key=lambda kv: kv[0])
-                    grouped = itertools.groupby(out_collection, lambda kv: kv[0])
-
-                    out_collection = []
-                    for (unused_key, doc_id), group in grouped:
-                        group_list = [kv[1] for kv in group]
-                        doc_dict = _accumulate_group(output_fields, group_list)
-                        doc_dict['_id'] = doc_id
-                        out_collection.append(doc_dict)
-
-                elif k == '$sample':
-                    if not isinstance(v, dict):
-                        raise OperationFailure('the $sample stage specification must be an object')
-                    size = v.pop('size', None)
-                    if size is None:
-                        raise OperationFailure('$sample stage must specify a size')
-                    if v:
-                        raise OperationFailure('unrecognized option to $sample: %s' % set(v).pop())
-                    out_collection = [_random.choice(out_collection) for i in range(size)]
-
-                elif k == '$sort':
-                    sort_array = []
-                    for x, y in v.items():
-                        sort_array.append({x: y})
-                    for sort_pair in reversed(sort_array):
-                        for sortKey, sortDirection in sort_pair.items():
-                            out_collection = sorted(
-                                out_collection,
-                                key=lambda x: _resolve_sort_key(sortKey, x),
-                                reverse=sortDirection < 0)
-                elif k == '$skip':
-                    out_collection = out_collection[v:]
-                elif k == '$limit':
-                    out_collection = out_collection[:v]
-                elif k == '$unwind':
-                    if not isinstance(v, dict):
-                        v = {'path': v}
-                    path = v['path']
-                    if not isinstance(path, string_types) or path[0] != '$':
-                        raise ValueError(
-                            '$unwind failed: exception: field path references must be prefixed '
-                            "with a '$' '%s'" % path)
-                    path = path[1:]
-                    should_preserve_null_and_empty = v.get('preserveNullAndEmptyArrays')
-                    include_array_index = v.get('includeArrayIndex')
-                    unwound_collection = []
-                    for doc in out_collection:
-                        try:
-                            array_value = get_value_by_dot(doc, path)
-                        except KeyError:
-                            if should_preserve_null_and_empty:
-                                unwound_collection.append(doc)
-                            continue
-                        if array_value is None:
-                            if should_preserve_null_and_empty:
-                                unwound_collection.append(doc)
-                            continue
-                        if array_value == []:
-                            if should_preserve_null_and_empty:
-                                new_doc = copy.deepcopy(doc)
-                                # We just ran a get_value_by_dot so we know the value exists.
-                                delete_value_by_dot(new_doc, path)
-                                unwound_collection.append(new_doc)
-                            continue
-                        if isinstance(array_value, list):
-                            iter_array = enumerate(array_value)
-                        else:
-                            iter_array = [(None, array_value)]
-                        for index, field_item in iter_array:
-                            new_doc = copy.deepcopy(doc)
-                            new_doc = set_value_by_dot(new_doc, path, field_item)
-                            if include_array_index:
-                                new_doc = set_value_by_dot(new_doc, include_array_index, index)
-                            unwound_collection.append(new_doc)
-
-                    out_collection = unwound_collection
-                elif k == '$project':
-                    filter_list = []
-                    method = None
-                    include_id = v.get('_id')
-                    for field, value in iteritems(v):
-                        if '.' in field:
-                            raise NotImplementedError(
-                                'Using subfield "%s" in $project is a valid MongoDB operation; '
-                                'however Mongomock does not support it yet.' % field)
-                        if method is None and (field != '_id' or value):
-                            method = 'include' if value else 'exclude'
-                        elif method == 'include' and not value and field != '_id':
-                            raise ValueError(
-                                'Bad projection specification, cannot exclude fields '
-                                "other than '_id' in an inclusion projection: %s" % v)
-                        elif method == 'exclude' and value:
-                            raise ValueError(
-                                'Bad projection specification, cannot include fields '
-                                'or add computed fields during an exclusion projection: %s' % v)
-                        out_collection = _extend_collection(out_collection, field, value)
-                        if field != '_id':
-                            filter_list.append(field)
-                    if (method == 'include') == (include_id is not False):
-                        filter_list.append('_id')
-                    out_collection = [
-                        {
-                            k: v for (k, v) in x.items()
-                            if (method == 'include') == (k in filter_list)
-                        }
-                        for x in out_collection
-                    ]
-                elif k == '$out':
-                    # TODO(MetrodataTeam): should leave the origin collection unchanged
-                    collection = self.database.get_collection(v)
-                    if collection.count() > 0:
-                        collection.drop()
-                    collection.insert_many(out_collection)
-                else:
-                    if k in pipeline_operators:
-                        raise NotImplementedError(
-                            "Although '%s' is a valid operator for the aggregation pipeline, it is "
-                            'currently not implemented in Mongomock.' % k)
-                    else:
-                        raise NotImplementedError(
-                            '%s is not a valid operator for the aggregation pipeline. '
-                            'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
-                            'for a complete list of valid operators.' % k)
-        return CommandCursor(out_collection)
+    def aggregate(self, pipeline, session=None, **unused_kwargs):
+        in_collection = [doc for doc in self.find()]
+        return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
     def with_options(self, **kwargs):
         default_kwargs = {
@@ -1939,29 +1541,6 @@ class Collection(object):
         for operation in requests:
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)
-
-
-def _resolve_key(key, doc):
-    return next(iter(iter_key_candidates(key, doc)), NOTHING)
-
-
-def _resolve_sort_key(key, doc):
-    value = _resolve_key(key, doc)
-    # see http://docs.mongodb.org/manual/reference/method/cursor.sort/#ascending-descending-sort
-    if value is NOTHING:
-        return 0, value
-
-    return 1, value
-
-
-def _fix_sort_key(key_getter):
-    def fixed_getter(doc):
-        key = key_getter(doc)
-        # Convert dictionaries to make sorted() work in Python 3.
-        if isinstance(key, dict):
-            return [(k, v) for (k, v) in sorted(key.items())]
-        return key
-    return fixed_getter
 
 
 class Cursor(object):
@@ -2036,7 +1615,7 @@ class Cursor(object):
                 return lambda: reversed(list(upper_factory()))
 
             def layer():
-                return sorted(upper_factory(), key=lambda x: _resolve_sort_key(sort_key, x),
+                return sorted(upper_factory(), key=lambda x: resolve_sort_key(sort_key, x),
                               reverse=sort_direction < 0)
             return layer
 
@@ -2075,7 +1654,7 @@ class Cursor(object):
         unique = set()
         unique_dict_vals = []
         for x in self._compute_results():
-            value = _resolve_key(key, x)
+            value = resolve_key(key, x)
             if value == NOTHING:
                 continue
             if isinstance(value, dict):

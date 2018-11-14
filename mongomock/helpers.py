@@ -275,3 +275,61 @@ def make_datetime_timezone_aware_in_document(value):
     if isinstance(value, datetime):
         return value.replace(tzinfo=utc)
     return value
+
+
+def get_value_by_dot(doc, key):
+    """Get dictionary value using dotted key"""
+    result = doc
+    for key_item in key.split('.'):
+        if isinstance(result, dict):
+            result = result[key_item]
+
+        elif isinstance(result, (list, tuple)):
+            try:
+                result = result[int(key_item)]
+            except (ValueError, IndexError):
+                raise KeyError()
+
+        else:
+            raise KeyError()
+
+    return result
+
+
+def set_value_by_dot(doc, key, value):
+    """Set dictionary value using dotted key"""
+    try:
+        parent_key, child_key = key.rsplit('.', 1)
+        parent = get_value_by_dot(doc, parent_key)
+    except ValueError:
+        child_key = key
+        parent = doc
+
+    if isinstance(parent, dict):
+        parent[child_key] = value
+    elif isinstance(parent, (list, tuple)):
+        try:
+            parent[int(child_key)] = value
+        except (ValueError, IndexError):
+            raise KeyError()
+    else:
+        raise KeyError()
+
+    return doc
+
+
+def delete_value_by_dot(doc, key):
+    """Delete dictionary value using dotted key.
+
+    This function assumes that the value exists.
+    """
+    try:
+        parent_key, child_key = key.rsplit('.', 1)
+        parent = get_value_by_dot(doc, parent_key)
+    except ValueError:
+        child_key = key
+        parent = doc
+
+    del parent[child_key]
+
+    return doc

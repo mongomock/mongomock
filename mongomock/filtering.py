@@ -35,12 +35,12 @@ def filter_applies(search_filter, document):
             not isinstance(search, dict) or (set(search.keys()) - {'$ne', '$nin'})
         has_candidates = False
 
-        if search == {'$exists': False} and not iter_key_candidates(key, document):
+        if search == {'$exists': False} and not _iter_key_candidates(key, document):
             continue
         if key == '$comment':
             continue
 
-        for doc_val in iter_key_candidates(key, document):
+        for doc_val in _iter_key_candidates(key, document):
             has_candidates |= doc_val is not NOTHING
             if isinstance(search, dict):
                 is_match = (all(
@@ -77,7 +77,7 @@ def filter_applies(search_filter, document):
     return True
 
 
-def iter_key_candidates(key, doc):
+def _iter_key_candidates(key, doc):
     """Get possible subdocuments or lists that are referred to by the key in question
 
     Returns the appropriate nested value if the key includes dot notation.
@@ -100,7 +100,7 @@ def iter_key_candidates(key, doc):
 
     sub_key = '.'.join(key_parts[1:])
     sub_doc = doc.get(key_parts[0], {})
-    return iter_key_candidates(sub_key, sub_doc)
+    return _iter_key_candidates(sub_key, sub_doc)
 
 
 def _iter_key_candidates_sublist(key, doc):
@@ -122,14 +122,14 @@ def _iter_key_candidates_sublist(key, doc):
         return [x
                 for sub_doc in doc
                 if isinstance(sub_doc, dict) and sub_key in sub_doc
-                for x in iter_key_candidates(key_remainder, sub_doc[sub_key])]
+                for x in _iter_key_candidates(key_remainder, sub_doc[sub_key])]
 
     # subkey is an index
     if sub_key_int >= len(doc):
         return ()  # dead end
     sub_doc = doc[sub_key_int]
     if key_parts:
-        return iter_key_candidates('.'.join(key_parts), sub_doc)
+        return _iter_key_candidates('.'.join(key_parts), sub_doc)
     return [sub_doc]
 
 
@@ -359,3 +359,16 @@ TYPE_MAP = {
     'minKey': None,
     'maxKey': None,
 }
+
+
+def resolve_key(key, doc):
+    return next(iter(_iter_key_candidates(key, doc)), NOTHING)
+
+
+def resolve_sort_key(key, doc):
+    value = resolve_key(key, doc)
+    # see http://docs.mongodb.org/manual/reference/method/cursor.sort/#ascending-descending-sort
+    if value is NOTHING:
+        return 0, value
+
+    return 1, value
