@@ -92,6 +92,7 @@ comparison_operators = [
 ] + list(filtering.SORTING_OPERATOR_MAP.keys())
 boolean_operators = ['$and', '$or', '$not']
 set_operators = [
+    '$in',
     '$setEquals',
     '$setIntersection',
     '$setDifference',
