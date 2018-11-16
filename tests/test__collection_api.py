@@ -2259,7 +2259,7 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$in': [2, [1, 2, 3]]}}},
+                {'$project': {'a': {'$setUnion': [[2], [1, 2, 3]]}}},
             ])
 
     def test__find_type_array(self):

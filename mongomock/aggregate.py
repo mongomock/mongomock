@@ -143,7 +143,9 @@ class _Parser(object):
                 return self._handle_array_operator(k, v)
             if k in conditional_operators:
                 return self._handle_conditional_operator(k, v)
-            if k in boolean_operators + set_operators + string_operators + \
+            if k in set_operators:
+                return self._handle_set_operator(k, v)
+            if k in boolean_operators + string_operators + \
                     text_search_operators + projection_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
@@ -313,6 +315,14 @@ class _Parser(object):
             "Although '%s' is a valid conditional operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
+
+    def _handle_set_operator(self, operator, values):
+        if operator == '$in':
+            expression, array = values
+            return self.parse(expression) in self.parse(array)
+        raise NotImplementedError(
+            "Although '%s' is a valid set operator for the aggregation "
+            'pipeline, it is currently not implemented in Mongomock.' % operator)
 
 
 def _parse_expression(expression, doc_dict):

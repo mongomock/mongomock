@@ -2315,6 +2315,14 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_in(self):
+        self.cmp.compare_ignore_order.aggregate([
+            {'$project': {
+                'count': '$count',
+                'in': {'$in': ['$count', [1, 4, 5]]},
+            }},
+        ])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
