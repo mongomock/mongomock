@@ -136,3 +136,7 @@ class Database(object):
                              'another database (%r not %r)' % (dbref.database,
                                                                self.__name))
         return self[dbref.collection].find_one({'_id': dbref.id})
+
+    def command(self, command, **unused_kwargs):
+        raise NotImplementedError(
+            'command is a valid Database method but is not implemented in Mongomock yet')
