@@ -18,7 +18,11 @@ class DatabaseAPITest(TestCase):
         database['_users'].insert_one({'a': 1})
         self.assertEqual(1, database['_users'].find_one().get('a'))
 
+    def test__command_ping(self):
+        database = mongomock.MongoClient().somedb
+        self.assertEqual({'ok': 1}, database.command({'ping': 1}))
+
     def test__command(self):
         database = mongomock.MongoClient().somedb
         with self.assertRaises(NotImplementedError):
-            database.command({'ping': 1})
+            database.command({'count': 'user'})
