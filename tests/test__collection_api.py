@@ -131,9 +131,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 1)
 
-        self.assertTrue(isinstance(col._documents, OrderedDict))
+        self.assertTrue(isinstance(col._store._documents, OrderedDict))
         self.db.drop_collection(col)
-        self.assertTrue(isinstance(col._documents, OrderedDict))
+        self.assertTrue(isinstance(col._store._documents, OrderedDict))
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 0)
 
@@ -294,14 +294,14 @@ class CollectionAPITest(TestCase):
                 self.db.col1.save({key: 'value'})
 
     def assert_document_count(self, count=1):
-        self.assertEqual(len(self.db.collection._documents), count)
+        self.assertEqual(len(self.db.collection._store), count)
 
     def assert_document_stored(self, doc_id, expected=None):
-        self.assertIn(doc_id, self.db.collection._documents)
+        self.assertIn(doc_id, self.db.collection._store)
         if expected is not None:
             expected = expected.copy()
             expected['_id'] = doc_id
-            doc = self.db.collection._documents[doc_id]
+            doc = self.db.collection._store[doc_id]
             self.assertDictEqual(doc, expected)
 
     def assert_documents(self, documents, ignore_ids=True):

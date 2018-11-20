@@ -33,6 +33,7 @@ class PatchTest(unittest.TestCase):
         client1.db.coll.insert_one({'name': 'Pascal'})
 
         client2 = pymongo.MongoClient()
+        self.assertEqual(['db'], client2.database_names())
         self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
         client2.db.coll.drop()
 
@@ -83,6 +84,23 @@ class PatchTest(unittest.TestCase):
             client.db.coll.insert_one({'name': 'Pascal'})
 
         mock_sleep.assert_called_once_with(30000)
+
+    @mongomock.patch('example.com')
+    def test__different_default_db(self):
+        client_1 = pymongo.MongoClient('mongodb://example.com/db1')
+        client_2 = pymongo.MongoClient('mongodb://example.com/db2')
+
+        # Access the same data from different clients, despite the different DB.
+        client_1.test_db.collection.insert_one({'name': 'Pascal'})
+        self.assertEqual(['Pascal'], [d['name'] for d in client_2.test_db.collection.find()])
+
+        # Access the data from "default DB" of client 1 but by its name from client 2.
+        client_1.get_default_database().collection.insert_one({'name': 'Lascap'})
+        self.assertEqual(['Lascap'], [d['name'] for d in client_2.db1.collection.find()])
+
+        # Access the data from "default DB" of client 2 but by its name from client 1.
+        client_2.get_default_database().collection.insert_one({'name': 'Caribou'})
+        self.assertEqual(['Caribou'], [d['name'] for d in client_1.db2.collection.find()])
 
 
 if __name__ == '__main__':

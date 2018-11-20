@@ -70,7 +70,9 @@ def patch(servers='localhost', on_new='error'):
         host, port = _parse_host_and_port(client_host, client_port)
 
         try:
-            return persisted_clients[(host, port)]
+            persisted_client = persisted_clients[(host, port)]
+            client._store = persisted_client._store
+            return client
         except KeyError:
             pass
 

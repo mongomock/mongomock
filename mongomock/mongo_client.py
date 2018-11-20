@@ -1,5 +1,6 @@
 from .database import Database
 from .helpers import parse_dbase_from_uri
+from .store import ServerStore
 import itertools
 from mongomock import ConfigurationError
 
@@ -11,14 +12,15 @@ class MongoClient(object):
     _CONNECTION_ID = itertools.count()
 
     def __init__(self, host=None, port=None, document_class=dict,
-                 tz_aware=False, connect=True, **kwargs):
+                 tz_aware=False, connect=True, _store=None, **kwargs):
         if host:
             self.host = host[0] if isinstance(host, (list, tuple)) else host
         else:
             self.host = self.HOST
         self.port = port or self.PORT
         self._tz_aware = tz_aware
-        self._databases = {}
+        self._database_accesses = {}
+        self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class
 
@@ -65,7 +67,7 @@ class MongoClient(object):
         }
 
     def database_names(self):
-        return list(self._databases.keys())
+        return self._store.list_created_database_names()
 
     def drop_database(self, name_or_db):
 
@@ -74,12 +76,12 @@ class MongoClient(object):
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):
-            db = next(db for db in self._databases.values() if db is name_or_db)
+            db = next(db for db in self._database_accesses.values() if db is name_or_db)
             if db:
                 drop_collections_for_db(db)
 
-        elif name_or_db in self._databases:
-            db = self._databases[name_or_db]
+        elif name_or_db in self._store:
+            db = self.get_database(name_or_db)
             drop_collections_for_db(db)
 
     def get_database(self, name=None, codec_options=None, read_preference=None,
@@ -87,9 +89,10 @@ class MongoClient(object):
         if name is None:
             return self.get_default_database()
 
-        db = self._databases.get(name)
+        db = self._database_accesses.get(name)
         if db is None:
-            db = self._databases[name] = Database(self, name)
+            db_store = self._store[name]
+            db = self._database_accesses[name] = Database(self, name, _store=db_store)
         return db
 
     def get_default_database(self):

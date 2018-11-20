@@ -11,7 +11,6 @@ import functools
 import itertools
 import json
 import math
-import threading
 import time
 import warnings
 
@@ -63,8 +62,6 @@ from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
-
-lock = threading.RLock()
 
 _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'attrs'])
 
@@ -345,17 +342,14 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, database, name, create=False, write_concern=None):
+    def __init__(self, database, name, _store, create=False, write_concern=None):
         self.name = name
         self.full_name = '{0}.{1}'.format(database.name, name)
         self.database = database
-        self._documents = OrderedDict()
-        self._force_created = create
-        self._indexes = {}
+        self._store = _store
+        if create:
+            self._store.create()
         self._write_concern = write_concern or WriteConcern()
-
-    def _is_created(self):
-        return self._documents or self._indexes or self._force_created
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -436,21 +430,20 @@ class Collection(object):
         object_id = data['_id']
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
-        if object_id in self._documents:
+        if object_id in self._store:
             raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
-        with lock:
-            self._documents[object_id] = self._internalize_dict(data)
+        self._store[object_id] = self._internalize_dict(data)
         try:
             self._ensure_uniques(data)
         except DuplicateKeyError:
             # Rollback
-            del self._documents[object_id]
+            del self._store[object_id]
             raise
         return data['_id']
 
     def _ensure_uniques(self, new_data):
         # Note we consider new_data is already inserted in db
-        for index in self._indexes.values():
+        for index in self._store.indexes.values():
             if not index.get('unique'):
                 continue
             unique = index.get('key')
@@ -744,7 +737,7 @@ class Collection(object):
                     num_updated += 1
                 except DuplicateKeyError:
                     # Rollback
-                    self._documents[original_document_snapshot['_id']] = original_document_snapshot
+                    self._store[original_document_snapshot['_id']] = original_document_snapshot
                     raise
 
             if not multi:
@@ -1070,10 +1063,10 @@ class Collection(object):
 
     def _iter_documents(self, filter=None):
         # Validate the filter even if no documents can be returned.
-        if not self._documents:
+        if self._store.is_empty:
             filter_applies(filter, {})
 
-        return (document for document in list(itervalues(self._documents))
+        return (document for document in list(self._store.documents)
                 if filter_applies(filter, document))
 
     def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
@@ -1189,7 +1182,7 @@ class Collection(object):
             doc_id = doc['_id']
             if isinstance(doc_id, dict):
                 doc_id = helpers.hashdict(doc_id)
-            del self._documents[doc_id]
+            del self._store[doc_id]
             deleted_count += 1
             if not multi:
                 break
@@ -1217,7 +1210,7 @@ class Collection(object):
         if kwargs.pop('session', None):
             raise NotImplementedError('Mongomock does not handle sessions yet')
         if filter is None:
-            return len(self._documents)
+            return len(self._store)
         return len(list(self._iter_documents(filter)))
 
     def count_documents(self, filter, **kwargs):
@@ -1281,7 +1274,7 @@ class Collection(object):
         if is_unique:
             index_dict['unique'] = True
             indexed = set()
-            for doc in itervalues(self._documents):
+            for doc in self._store.documents:
                 index = []
                 for key, unused_order in index_list:
                     try:
@@ -1295,7 +1288,7 @@ class Collection(object):
                     raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                 indexed.add(index)
 
-        self._indexes[index_string] = index_dict
+        self._store.indexes[index_string] = index_dict
 
         return index_string
 
@@ -1321,24 +1314,24 @@ class Collection(object):
         else:
             name = index_or_name
         try:
-            del self._indexes[name]
+            del self._store.indexes[name]
         except KeyError:
             raise OperationFailure('index not found with name [%s]' % name)
 
     def drop_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        self._indexes = {}
+        self._store.indexes = {}
 
     def reindex(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
     def _list_all_indexes(self):
-        if not self._is_created():
+        if not self._store.is_created:
             return
         yield '_id_', {'key': [('_id', 1)]}
-        for name, information in self._indexes.items():
+        for name, information in self._store.indexes.items():
             yield name, information
 
     def list_indexes(self, session=None):
