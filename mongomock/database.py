@@ -138,5 +138,11 @@ class Database(object):
         return self[dbref.collection].find_one({'_id': dbref.id})
 
     def command(self, command, **unused_kwargs):
+        if isinstance(command, string_types):
+            command = {command: 1}
+        if 'ping' in command:
+            return {'ok': 1.}
+        # TODO(pascal): Differentiate NotImplementedError for valid commands
+        # and OperationFailure if the command is not valid.
         raise NotImplementedError(
             'command is a valid Database method but is not implemented in Mongomock yet')
