@@ -2811,6 +2811,20 @@ class CollectionAPITest(TestCase):
         ])
         assertCountEqual(self, [{'_id': 1}, {'_id': 2}], list(actual))
 
+    def test__aggregate_group_missing_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'a': 1},
+                {},
+                {'a': None},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$a'}},
+        ])
+        assertCountEqual(self, [{'_id': 1}, {'_id': None}], list(actual))
+
     def test__aggregate_group_dict_key(self):
         collection = self.db.collection
         collection.insert_many(

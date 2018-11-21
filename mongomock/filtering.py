@@ -372,3 +372,13 @@ def resolve_sort_key(key, doc):
         return 0, value
 
     return 1, value
+
+
+class BsonComparable(object):
+    """Wraps a value in an BSON like object that can be compared one to another."""
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __lt__(self, other):
+        return bson_compare(operator.lt, self.obj, other.obj)

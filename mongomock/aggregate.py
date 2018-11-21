@@ -445,12 +445,20 @@ def _handle_group_stage(in_collection, unused_database, options):
     grouped_collection = []
     _id = options['_id']
     if _id:
-        key_getter = functools.partial(_parse_expression, _id)
-        sort_key_getter = _fix_sort_key(key_getter)
+
+        def _key_getter(doc):
+            try:
+                return _parse_expression(_id, doc)
+            except KeyError:
+                return None
+
+        def _sort_key_getter(doc):
+            return filtering.BsonComparable(_key_getter(doc))
+
         # Sort the collection only for the itertools.groupby.
         # $group does not order its output document.
-        sorted_collection = sorted(in_collection, key=sort_key_getter)
-        grouped = itertools.groupby(sorted_collection, key_getter)
+        sorted_collection = sorted(in_collection, key=_sort_key_getter)
+        grouped = itertools.groupby(sorted_collection, _key_getter)
     else:
         grouped = [(None, in_collection)]
 
