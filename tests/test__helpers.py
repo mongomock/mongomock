@@ -1,7 +1,6 @@
 import json
 import os
 
-from mongomock.helpers import embedded_item_getter
 from mongomock.helpers import hashdict
 from mongomock.helpers import get_value_by_dot, set_value_by_dot
 from mongomock.helpers import parse_dbase_from_uri
@@ -115,11 +114,6 @@ def create_uri_spec_tests():
 
 
 create_uri_spec_tests()
-
-
-class TestHelpers(TestCase):
-    def test01_embedded_item_getter(self):
-        assert embedded_item_getter('a.b', 'c', 'a')({'a': {'b': 1}, 'c': 5}) == (1, 5, {'b': 1})
 
 
 class ValueByDotTest(TestCase):

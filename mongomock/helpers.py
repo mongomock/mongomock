@@ -213,38 +213,6 @@ def parse_dbase_from_uri(uri):
     return dbase
 
 
-def embedded_item_getter(*keys):
-    """Get items from embedded dictionaries.
-
-    use case:
-    d = {'a': {'b': 1}}
-    embedded_item_getter('a.b')(d) == 1
-
-    :param keys: keys to get
-                 embedded keys are separated with dot in string
-    :return: itemgetter function
-    """
-
-    def recurse_embedded(obj, key):
-        ret = obj
-        for k in key.split('.'):
-            ret = ret[k]
-        return ret
-
-    if len(keys) == 1:
-        item = keys[0]
-
-        def g(obj):
-            return recurse_embedded(obj, item)
-
-    else:
-
-        def g(obj):
-            return tuple(recurse_embedded(obj, item) for item in keys)
-
-    return g
-
-
 def patch_datetime_awareness_in_document(value):
     # MongoDB is supposed to stock everything as timezone naive utc date
     # Hence we have to convert incoming datetimes to avoid errors while
@@ -277,21 +245,30 @@ def make_datetime_timezone_aware_in_document(value):
     return value
 
 
-def get_value_by_dot(doc, key):
+def get_value_by_dot(doc, key, can_generate_array=False):
     """Get dictionary value using dotted key"""
     result = doc
-    for key_item in key.split('.'):
+    key_items = key.split('.')
+    for key_index, key_item in enumerate(key_items):
         if isinstance(result, dict):
             result = result[key_item]
 
         elif isinstance(result, (list, tuple)):
             try:
-                result = result[int(key_item)]
+                int_key = int(key_item)
+            except ValueError:
+                if not can_generate_array:
+                    raise KeyError(key_index)
+                remaining_key = '.'.join(key_items[key_index:])
+                return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
+
+            try:
+                result = result[int_key]
             except (ValueError, IndexError):
-                raise KeyError()
+                raise KeyError(key_index)
 
         else:
-            raise KeyError()
+            raise KeyError(key_index)
 
     return result
 

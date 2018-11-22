@@ -158,10 +158,11 @@ class _Parser(object):
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
-                get_value = helpers.embedded_item_getter(expression[2:])
-                return get_value({'ROOT': self._doc_dict, 'CURRENT': self._doc_dict})
-            get_value = helpers.embedded_item_getter(expression[1:])
-            return get_value(self._doc_dict)
+                return helpers.get_value_by_dot({
+                    'ROOT': self._doc_dict,
+                    'CURRENT': self._doc_dict,
+                }, expression[2:])
+            return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
 
     def _handle_arithmetic_operator(self, operator, values):
@@ -328,18 +329,6 @@ class _Parser(object):
 def _parse_expression(expression, doc_dict):
     """Parse an expression."""
     return _Parser(doc_dict).parse(expression)
-
-
-def _extend_collection(in_collection, out_collection, field, expression):
-    for in_doc, out_doc in zip(in_collection, out_collection):
-        if isinstance(expression, six.string_types) and expression.startswith('$'):
-            try:
-                out_doc[field] = helpers.get_value_by_dot(in_doc, expression.lstrip('$'))
-            except KeyError:
-                pass
-        else:
-            # Verify expression has operator as first.
-            out_doc[field] = _parse_expression(expression.copy(), in_doc)
 
 
 def _accumulate_group(output_fields, group_list):
@@ -625,7 +614,12 @@ def _handle_project_stage(in_collection, unused_database, options):
             continue
         if not new_fields_collection:
             new_fields_collection = [{} for unused_doc in in_collection]
-        _extend_collection(in_collection, new_fields_collection, field, value)
+
+        for in_doc, out_doc in zip(in_collection, new_fields_collection):
+            try:
+                out_doc[field] = _parse_expression(value, in_doc)
+            except KeyError:
+                pass
     if (method == 'include') == (include_id is not False):
         filter_list.append('_id')
 

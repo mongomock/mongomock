@@ -2329,6 +2329,28 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_bug_473(self):
+        """Regression test for bug https://github.com/mongomock/mongomock/issues/473."""
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'name': 'first',
+            'base_value': 100,
+            'values_list': [
+                {'updated_value': 5},
+                {'updated_value': 15},
+            ],
+        })
+        self.cmp.compare.aggregate([
+            {'$project': {
+                'name': 1,
+                '_id': 0,
+                'sum': {'$sum': [
+                    '$base_value',
+                    {'$arrayElemAt': ['$values_list.updated_value', -1]},
+                ]},
+            }},
+        ])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

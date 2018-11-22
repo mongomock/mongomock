@@ -3085,6 +3085,32 @@ class CollectionAPITest(TestCase):
             ]}],
             list(actual))
 
+    def test__aggregate_select_nested(self):
+        self.db.collection.insert_one({
+            'base_value': 100,
+            'values_list': [
+                {'updated_value': 5},
+                {'updated_value': 15},
+            ],
+            'nested_value': {
+                'updated_value': 7,
+            },
+        })
+        actual = list(self.db.collection.aggregate([
+            {'$project': {
+                'select_1': '$values_list.1.updated_value',
+                'select_nested': '$nested_value.updated_value',
+                'select_array': '$values_list.updated_value',
+            }},
+        ]))
+        self.assertEqual(1, len(actual), msg=actual)
+        actual[0].pop('_id')
+        self.assertEqual({
+            'select_1': 15,
+            'select_nested': 7,
+            'select_array': [5, 15],
+        }, actual[0])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)
