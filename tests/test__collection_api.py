@@ -1541,9 +1541,12 @@ class CollectionAPITest(TestCase):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
 
     def test__with_options_not_implemented(self):
-        self.assertRaises(
-            NotImplementedError,
-            self.db.collection.with_options, write_concern=WriteConcern(j=True))
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.with_options(write_concern=WriteConcern(j=True))
+
+    def test__with_options_wrong_type(self):
+        with self.assertRaises(TypeError):
+            self.db.collection.with_options(write_concern=1)
 
     def test__update_current_date(self):
         for type_specification in [True, {'$type': 'date'}]:

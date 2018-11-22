@@ -1,4 +1,5 @@
 from __future__ import division
+import collections
 from collections import OrderedDict
 try:
     from collections.abc import Iterable, Mapping, MutableMapping
@@ -64,6 +65,23 @@ from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
 
 lock = threading.RLock()
+
+_KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'attrs'])
+
+_WITH_OPTIONS_KWARGS = {
+    'codec_options': _KwargOption(
+        'bson.codec_options.CodecOptions', None,
+        ('document_class', 'tz_aware', 'uuid_representation')),
+    'read_preference': _KwargOption(
+        'pymongo.read_preference.ReadPreference', _READ_PREFERENCE_PRIMARY,
+        ('document', 'mode', 'mongos_mode', 'max_staleness')),
+    'write_concern': _KwargOption(
+        'pymongo.write_concern.WriteConcern', WriteConcern(),
+        ('acknowledged', 'document', 'is_server_default')),
+    'read_concern': _KwargOption(
+        'pymongo.read_concern.ReadConcern', None,
+        ('document', 'level', 'ok_for_legacy'))
+}
 
 
 def validate_is_mapping(option, value):
@@ -1501,19 +1519,20 @@ class Collection(object):
         return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
     def with_options(self, **kwargs):
-        default_kwargs = {
-            'codec_options': None,
-            'read_preference': _READ_PREFERENCE_PRIMARY,
-            'write_concern': WriteConcern(),
-            'read_concern': None,
-        }
-        forbidden_kwargs = set(kwargs.keys()) - set(default_kwargs)
+        forbidden_kwargs = set(kwargs.keys()) - set(_WITH_OPTIONS_KWARGS)
         if forbidden_kwargs:
             raise TypeError(
                 "with_options() got an unexpected keyword argument '%s'" % forbidden_kwargs.pop())
-        for key, default_value in iteritems(default_kwargs):
-            value = kwargs.get(key)
-            if value is not None and default_value != value:
+
+        for key, value in iteritems(kwargs):
+            if value is None:
+                continue
+            options = _WITH_OPTIONS_KWARGS[key]
+            for attr in options.attrs:
+                if not hasattr(value, attr):
+                    raise TypeError(
+                        '{} must be an instance of {}'.format(key, options.typename))
+            if options.default != value:
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
