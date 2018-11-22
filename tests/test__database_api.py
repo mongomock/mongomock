@@ -18,6 +18,10 @@ class DatabaseAPITest(TestCase):
         self.database['_users'].insert_one({'a': 1})
         self.assertEqual(1, self.database['_users'].find_one().get('a'))
 
+    def test__list_collection_names(self):
+        self.database.test1.create_index('foo')
+        self.assertEqual(['test1'], self.database.list_collection_names())
+
     def test__command_ping(self):
         self.assertEqual({'ok': 1}, self.database.command({'ping': 1}))
 

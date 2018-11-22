@@ -1265,6 +1265,11 @@ class CollectionAPITest(TestCase):
             msg='index_information is immutable',
         )
 
+    def test__empty_table_idx_information(self):
+        self.db.collection.drop()
+        index_information = self.db.collection.index_information()
+        self.assertEqual({}, index_information)
+
     def test__create_idx_information(self):
         index = self.db.collection.create_index([('value', 1)])
 

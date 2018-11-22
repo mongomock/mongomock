@@ -351,12 +351,11 @@ class Collection(object):
         self.database = database
         self._documents = OrderedDict()
         self._force_created = create
+        self._indexes = {}
         self._write_concern = write_concern or WriteConcern()
-        self._uniques = {}
-        self._index_information = {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.full_name}}
 
     def _is_created(self):
-        return self._documents or self._uniques or self._force_created
+        return self._documents or self._indexes or self._force_created
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -451,7 +450,11 @@ class Collection(object):
 
     def _ensure_uniques(self, new_data):
         # Note we consider new_data is already inserted in db
-        for unique, is_sparse in self._uniques.values():
+        for index in self._indexes.values():
+            if not index.get('unique'):
+                continue
+            unique = index.get('key')
+            is_sparse = index.get('sparse')
             find_kwargs = {}
             for key, _ in unique:
                 try:
@@ -1270,15 +1273,13 @@ class Collection(object):
         is_sparse = kwargs.pop('sparse', False)
 
         index_string = helpers.gen_index_name(index_list)
-        self._index_information[index_string] = {
-            'key': index_list,
-            'ns': self.full_name,
-            'v': 2,
-        }
+        index_dict = {'key': index_list}
+        if is_sparse:
+            index_dict['sparse'] = True
 
         # Check that documents already verify the uniquess of this new index.
         if is_unique:
-            self._index_information[index_string]['unique'] = True
+            index_dict['unique'] = True
             indexed = set()
             for doc in itervalues(self._documents):
                 index = []
@@ -1294,7 +1295,7 @@ class Collection(object):
                     raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                 indexed.add(index)
 
-            self._uniques[index_string] = (index_list, is_sparse)
+        self._indexes[index_string] = index_dict
 
         return index_string
 
@@ -1320,31 +1321,44 @@ class Collection(object):
         else:
             name = index_or_name
         try:
-            del self._index_information[name]
+            del self._indexes[name]
         except KeyError:
             raise OperationFailure('index not found with name [%s]' % name)
-        self._uniques.pop(name, None)
 
     def drop_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        self._uniques = {}
-        self._index_information = {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.full_name}}
+        self._indexes = {}
 
     def reindex(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
+    def _list_all_indexes(self):
+        if not self._is_created():
+            return
+        yield '_id_', {'key': [('_id', 1)]}
+        for name, information in self._indexes.items():
+            yield name, information
+
     def list_indexes(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        for name, information in self._index_information.items():
-            yield dict(information, key=dict(information['key']), name=name)
+        for name, information in self._list_all_indexes():
+            yield dict(
+                information,
+                key=dict(information['key']),
+                name=name,
+                v=2,
+                ns=self.full_name)
 
     def index_information(self, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        return copy.deepcopy(self._index_information)
+        return {
+            name: dict(index, v=2, ns=self.full_name)
+            for name, index in self._list_all_indexes()
+        }
 
     def map_reduce(self, map_func, reduce_func, out, full_response=False,
                    query=None, limit=0, session=None):
