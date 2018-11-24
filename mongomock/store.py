@@ -35,7 +35,7 @@ class DatabaseStore(object):
         try:
             return self._collections[col_name]
         except KeyError:
-            col = self._collections[col_name] = CollectionStore()
+            col = self._collections[col_name] = CollectionStore(col_name)
             return col
 
     def __contains__(self, col_name):
@@ -50,7 +50,8 @@ class DatabaseStore(object):
         return col
 
     def rename(self, name, new_name):
-        col = self._collections.pop(name, CollectionStore())
+        col = self._collections.pop(name, CollectionStore(new_name))
+        col.name = new_name
         self._collections[new_name] = col
 
     @property
@@ -61,10 +62,11 @@ class DatabaseStore(object):
 class CollectionStore(object):
     """Object holding the data for a collection."""
 
-    def __init__(self):
+    def __init__(self, name):
         self._documents = collections.OrderedDict()
         self.indexes = {}
         self._is_force_created = False
+        self.name = name
 
     def create(self):
         self._is_force_created = True
