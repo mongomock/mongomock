@@ -342,13 +342,9 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, database, name, _store, create=False, write_concern=None):
-        self.name = name
-        self.full_name = '{0}.{1}'.format(database.name, name)
+    def __init__(self, database, _store, write_concern=None):
         self.database = database
         self._store = _store
-        if create:
-            self._store.create()
         self._write_concern = write_concern or WriteConcern()
 
     def __repr__(self):
@@ -363,6 +359,14 @@ class Collection(object):
                 "%s has no attribute '%s'. To access the %s.%s collection, use database['%s.%s']." %
                 (self.__class__.__name__, attr, self.name, attr, self.name, attr))
         return self.__getitem__(attr)
+
+    @property
+    def full_name(self):
+        return '{0}.{1}'.format(self.database.name, self._store.name)
+
+    @property
+    def name(self):
+        return self._store.name
 
     @property
     def write_concern(self):
@@ -1539,11 +1543,13 @@ class Collection(object):
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if options.default != value:
+            if key != 'write_concern' and options.default != value:
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
-        return self
+
+        write_concern = kwargs.get('write_concern', self.write_concern)
+        return Collection(self.database, write_concern=write_concern, _store=self._store)
 
     def rename(self, new_name, session=None, **kwargs):
         if session:

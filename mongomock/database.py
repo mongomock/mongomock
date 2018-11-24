@@ -61,7 +61,7 @@ class Database(object):
             return self._collection_accesses[name]
         except KeyError:
             collection = self._collection_accesses[name] = \
-                Collection(self, name, write_concern=write_concern, _store=self._store[name])
+                Collection(self, write_concern=write_concern, _store=self._store[name])
             return collection
 
     def drop_collection(self, name_or_collection, session=None):
@@ -108,7 +108,6 @@ class Database(object):
                     10027)
         self._store.rename(name, new_name)
         collection = self._collection_accesses.pop(name)
-        collection.name = new_name
         self._collection_accesses[new_name] = collection
 
     def dereference(self, dbref, session=None):

@@ -1,4 +1,4 @@
-from collections import Counter, OrderedDict
+import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
 import platform
@@ -131,9 +131,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 1)
 
-        self.assertTrue(isinstance(col._store._documents, OrderedDict))
+        self.assertTrue(isinstance(col._store._documents, collections.OrderedDict))
         self.db.drop_collection(col)
-        self.assertTrue(isinstance(col._store._documents, OrderedDict))
+        self.assertTrue(isinstance(col._store._documents, collections.OrderedDict))
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 0)
 
@@ -768,9 +768,9 @@ class CollectionAPITest(TestCase):
         self.assert_document_stored(update_result.upserted_id, {'a': 1, 'c': 0})
 
     def test__update_non_json_values(self):
-        self.db.collection.insert_one({'a': Counter({'b': 1})})
+        self.db.collection.insert_one({'a': collections.Counter({'b': 1})})
         self.assertEqual({'b': 1}, self.db.collection.find_one()['a'])
-        self.db.collection.update_one({}, {'$set': {'a': Counter({'b': 2})}})
+        self.db.collection.update_one({}, {'$set': {'a': collections.Counter({'b': 2})}})
         self.assertEqual({'b': 2}, self.db.collection.find_one()['a'])
 
     def test__update_push_slice_from_the_end(self):
@@ -1488,22 +1488,22 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one(doc)
 
         result = self.db.collection.find_one(
-            {'a': 1}, OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
+            {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
         self.assertEqual(result, doc)
 
         result = self.db.collection.find_one(
-            {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
+            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
         self.assertEqual(result, {'a': 1, 'b': [{'c': 2}, {'c': 5}]})
 
         result = self.db.collection.find_one(
-            {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
+            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
         self.assertEqual(result, {'b': [{'d': 3, 'e': 4}, {'d': 6, 'e': 7}]})
 
         # This one is tricky: the refinement 'b' overrides the previous 'b.c'
         # but it is not the equivalent of having only 'b'.
         with self.assertRaises(NotImplementedError):
             result = self.db.collection.find_one(
-                {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
+                {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
 
     def test__find_and_project(self):
         self.db.collection.insert({'_id': 1, 'a': 42, 'b': 'other', 'c': {'d': 'nested'}})
@@ -1542,12 +1542,34 @@ class CollectionAPITest(TestCase):
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
         self.db.collection.with_options(write_concern=WriteConcern(w=1))
 
+    def test__with_options_different_write_concern(self):
+        self.db.collection.insert_one({'name': 'col1'})
+        col2 = self.db.collection.with_options(write_concern=WriteConcern(w=2))
+        col2.insert_one({'name': 'col2'})
+
+        # Check that the two objects have the same data.
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in self.db.collection.find()})
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in col2.find()})
+
+        # Check that each object has its own write concern.
+        self.assertEqual({}, self.db.collection.write_concern.document)
+        self.assertNotEqual(self.db.collection.write_concern, col2.write_concern)
+        self.assertEqual({'w': 2}, col2.write_concern.document)
+
+        # Check that renaming one, renames the other.
+        col1 = self.db.collection
+        col1.rename('new_name')
+        self.assertEqual('new_name', col1.name)
+        self.assertEqual('new_name', col2.name)
+
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
 
     def test__with_options_not_implemented(self):
+        _CodecOptions = collections.namedtuple(
+            'CodecOptions', ['document_class', 'tz_aware', 'uuid_representation'])
         with self.assertRaises(NotImplementedError):
-            self.db.collection.with_options(write_concern=WriteConcern(j=True))
+            self.db.collection.with_options(codec_options=_CodecOptions(None, True, 3))
 
     def test__with_options_wrong_type(self):
         with self.assertRaises(TypeError):
@@ -1749,13 +1771,14 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(
             [2, 1, 3],
-            [doc['_id'] for doc in coll.find().sort(OrderedDict((('a', 1), ('b', 1))))])
+            [doc['_id'] for doc in coll.find().sort(collections.OrderedDict((('a', 1), ('b', 1))))])
         self.assertEqual(
             [1, 2, 3],
-            [doc['_id'] for doc in coll.find().sort(OrderedDict((('a', 1), ('b', -1))))])
+            [doc['_id']
+             for doc in coll.find().sort(collections.OrderedDict((('a', 1), ('b', -1))))])
         self.assertEqual(
             [2, 3, 1],
-            [doc['_id'] for doc in coll.find().sort(OrderedDict((('b', 1), ('a', 1))))])
+            [doc['_id'] for doc in coll.find().sort(collections.OrderedDict((('b', 1), ('a', 1))))])
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_insert_one(self):
@@ -2027,7 +2050,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('a', {'$size': '$arr'})
             ])}
@@ -2039,7 +2062,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 2})
         self.db.collection.insert_one({'_id': 3, 'arr': None})
         actual = self.db.collection.aggregate([
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('a', {'$size': {'$ifNull': ['$arr', []]}})
             ])}
@@ -2050,7 +2073,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('a', {'$ifNull': ['$elem_a', '<missing_a>']}),
                 ('b', {'$ifNull': ['$elem_b', '<missing_b>']})
@@ -2079,7 +2102,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('a', {'$arrayElemAt': ['$arr', 1]})
             ])}
@@ -2090,7 +2113,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('rename_id', '$_id')
             ])}
@@ -2101,7 +2124,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('rename_dot', '$arr.a')
             ])}
@@ -2112,7 +2135,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('_id', False),
                 ('rename_dot', '$arr.c')
             ])}
@@ -2124,7 +2147,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
         old_actual = self.db.collection.aggregate([
             {'$match': {'_id': 1}},
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('rename_dot', '$arr.a')
             ])},
             {'$out': 'new_collection'}
@@ -2140,7 +2163,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         with self.assertRaises(mongomock.OperationFailure) as err:
             self.db.collection.aggregate([
-                {'$project': OrderedDict([
+                {'$project': collections.OrderedDict([
                     ('a', False),
                     ('b', True)
                 ])}
@@ -2151,7 +2174,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         with self.assertRaises(mongomock.OperationFailure) as err:
             self.db.collection.aggregate([
-                {'$project': OrderedDict([
+                {'$project': collections.OrderedDict([
                     ('a', True),
                     ('b', False)
                 ])}
@@ -2169,7 +2192,7 @@ class CollectionAPITest(TestCase):
     def test__aggregate_project_id_can_always_be_excluded(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
         actual = self.db.collection.aggregate([
-            {'$project': OrderedDict([
+            {'$project': collections.OrderedDict([
                 ('a', True),
                 ('b', True),
                 ('_id', False)
@@ -2623,12 +2646,12 @@ class CollectionAPITest(TestCase):
             # Document dropped: the dicts are equal.
             {'_id': 4, 'counts': {'circles': 1}},
             # Document kept: the first item is equal, and there is an additional item.
-            {'_id': 5, 'counts': OrderedDict([
+            {'_id': 5, 'counts': collections.OrderedDict([
                 ('circles', 1),
                 ('arrows', 15),
             ])},
             # Document dropped: same as above, but order matters.
-            {'_id': 6, 'counts': OrderedDict([
+            {'_id': 6, 'counts': collections.OrderedDict([
                 ('arrows', 15),
                 ('circles', 1),
             ])},
