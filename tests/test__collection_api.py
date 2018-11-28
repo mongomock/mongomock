@@ -2219,11 +2219,57 @@ class CollectionAPITest(TestCase):
             {'_id': 1, 'a': {'b': 3}, 'other': 1},
             {'_id': 2, 'a': {'c': 3}},
             {'_id': 3, 'b': {'c': 3}},
+            {'_id': 4, 'a': 5},
         ])
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
+        self.assertEqual(
+            [
+                {'_id': 1, 'a': {'b': 3}},
+                {'_id': 2, 'a': {}},
+                {'_id': 3},
+                {'_id': 4},
+            ],
+            list(self.db.collection.aggregate([
                 {'$project': {'a.b': 1}},
-            ])
+            ])),
+        )
+
+    def test__aggregate_project_subfield_exclude(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': {'b': 3}, 'other': 1},
+            {'_id': 2, 'a': {'c': 3}},
+            {'_id': 3, 'b': {'c': 3}},
+            {'_id': 4, 'a': 5},
+        ])
+        self.assertEqual(
+            [
+                {'_id': 1, 'a': {}, 'other': 1},
+                {'_id': 2, 'a': {'c': 3}},
+                {'_id': 3, 'b': {'c': 3}},
+                {'_id': 4, 'a': 5},
+            ],
+            list(self.db.collection.aggregate([
+                {'$project': {'a.b': 0}},
+            ])),
+        )
+
+    def test__aggregate_project_subfield_conflict(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': {'b': 3}, 'other': 1},
+            {'_id': 2, 'a': {'c': 3}},
+            {'_id': 3, 'b': {'c': 3}},
+        ])
+        with self.assertRaises(mongomock.OperationFailure):
+            list(self.db.collection.aggregate([
+                {'$project': collections.OrderedDict([('a.b', 1), ('a', 1)])},
+            ]))
+        with self.assertRaises(mongomock.OperationFailure):
+            list(self.db.collection.aggregate([
+                {'$project': collections.OrderedDict([('a', 1), ('a.b', 1)])},
+            ]))
+        with self.assertRaises(mongomock.OperationFailure):
+            list(self.db.collection.aggregate([
+                {'$project': collections.OrderedDict([('d.e.f', 1), ('d.e.f.g', 1)])},
+            ]))
 
     def test__aggregate_project_group_operations(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d'})

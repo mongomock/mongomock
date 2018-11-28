@@ -2001,6 +2001,31 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate_project_with_subfields(self):
+        self.cmp.do.insert_many([
+            {'a': {'b': 3}, 'other': 1},
+            {'a': {'c': 3}},
+            {'b': {'c': 3}},
+            {'a': 5},
+        ])
+        pipeline = [
+            {'$project': {'a.b': 1}}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_project_with_subfields_exclude(self):
+        self.cmp.do.insert_many([
+            {'a': {'b': 3}, 'other': 1},
+            {'a': {'b': 3, 'd': 5}},
+            {'a': {'c': 3, 'd': 5}},
+            {'b': {'c': 3}},
+            {'a': 5},
+        ])
+        pipeline = [
+            {'$project': {'a.b': 0}}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate17(self):
         pipeline = [
             {'$project': {'_id': 0, 'created': {'$subtract': [{'$min': ['$a', '$b']}, '$count']}}}

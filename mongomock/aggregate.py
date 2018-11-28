@@ -1,6 +1,7 @@
 """Module to handle the operations within the aggregate pipeline."""
 
 import bisect
+import collections
 import copy
 import datetime
 import functools
@@ -585,6 +586,63 @@ def _handle_unwind_stage(in_collection, unused_database, options):
     return unwound_collection
 
 
+# TODO(pascal): Combine with the equivalent function in collection but check
+# what are the allowed overriding.
+def _combine_projection_spec(filter_list, original_filter, prefix=''):
+    """Re-format a projection fields spec into a nested dictionary.
+
+    e.g: ['a', 'b.c', 'b.d'] => {'a': 1, 'b': {'c': 1, 'd': 1}}
+    """
+    if not isinstance(filter_list, list):
+        return filter_list
+
+    filter_dict = collections.OrderedDict()
+
+    for key in filter_list:
+        field, separator, subkey = key.partition('.')
+        if not separator:
+            if isinstance(filter_dict.get(field), list):
+                other_key = field + '.' + filter_dict[field][0]
+                raise OperationFailure(
+                    'Invalid $project :: caused by :: specification contains two conflicting paths.'
+                    ' Cannot specify both %s and %s: %s' % (
+                        repr(prefix + field), repr(prefix + other_key), original_filter))
+            filter_dict[field] = 1
+            continue
+        if not isinstance(filter_dict.get(field, []), list):
+            raise OperationFailure(
+                'Invalid $project :: caused by :: specification contains two conflicting paths.'
+                ' Cannot specify both %s and %s: %s' % (
+                    repr(prefix + field), repr(prefix + key), original_filter))
+        filter_dict[field] = filter_dict.get(field, []) + [subkey]
+
+    return collections.OrderedDict(
+        (k, _combine_projection_spec(v, original_filter, prefix='%s%s.' % (prefix, k)))
+        for k, v in six.iteritems(filter_dict)
+    )
+
+
+def _project_by_spec(doc, proj_spec, is_include):
+    output = {}
+    for key, value in six.iteritems(doc):
+        if key not in proj_spec:
+            if not is_include:
+                output[key] = value
+            continue
+
+        if not isinstance(proj_spec[key], dict):
+            if is_include:
+                output[key] = value
+            continue
+
+        if isinstance(value, dict):
+            output[key] = _project_by_spec(value, proj_spec[key], is_include)
+        elif not is_include:
+            output[key] = value
+
+    return output
+
+
 def _handle_project_stage(in_collection, unused_database, options):
     filter_list = []
     method = None
@@ -593,10 +651,6 @@ def _handle_project_stage(in_collection, unused_database, options):
     # handled in one final step.
     new_fields_collection = None
     for field, value in six.iteritems(options):
-        if '.' in field:
-            raise NotImplementedError(
-                'Using subfield "%s" in $project is a valid MongoDB operation; '
-                'however Mongomock does not support it yet.' % field)
         if method is None and (field != '_id' or value):
             method = 'include' if value else 'exclude'
         elif method == 'include' and not value and field != '_id':
@@ -626,14 +680,11 @@ def _handle_project_stage(in_collection, unused_database, options):
     if not filter_list:
         return new_fields_collection
 
-    # Final steps: include or exclude fields and merge with
-    # newly created fields.
+    # Final steps: include or exclude fields and merge with newly created fields.
+    projection_spec = _combine_projection_spec(filter_list, original_filter=options)
     out_collection = [
-        {
-            k: v for (k, v) in x.items()
-            if (method == 'include') == (k in filter_list)
-        }
-        for x in in_collection
+        _project_by_spec(doc, projection_spec, is_include=(method == 'include'))
+        for doc in in_collection
     ]
     if new_fields_collection:
         return [
