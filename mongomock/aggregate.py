@@ -526,7 +526,9 @@ def _handle_sample_stage(in_collection, unused_database, options):
         raise OperationFailure('$sample stage must specify a size')
     if options:
         raise OperationFailure('unrecognized option to $sample: %s' % set(options).pop())
-    return [_random.choice(in_collection) for i in range(size)]
+    shuffled = list(in_collection)
+    _random.shuffle(shuffled)
+    return shuffled[:size]
 
 
 def _handle_sort_stage(in_collection, unused_database, options):

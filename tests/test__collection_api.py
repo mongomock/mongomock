@@ -2031,9 +2031,22 @@ class CollectionAPITest(TestCase):
             {'_id': i}
             for i in range(5)
         ])
+
         actual = list(self.db.a.aggregate([{'$sample': {'size': 2}}]))
         self.assertEqual(2, len(actual))
-        self.assertLessEqual({doc.get('_id') for doc in actual}, {0, 1, 2, 3, 4})
+        results = {doc.get('_id') for doc in actual}
+        self.assertLessEqual(results, {0, 1, 2, 3, 4})
+        self.assertLessEqual(2, len(results))
+
+        actual = list(self.db.a.aggregate([{'$sample': {'size': 10}}]))
+        self.assertEqual(5, len(actual))
+        self.assertEqual({doc.get('_id') for doc in actual}, {0, 1, 2, 3, 4})
+
+    def test__aggregate_empty(self):
+        self.db.a.drop()
+
+        actual = list(self.db.a.aggregate([{'$sample': {'size': 1}}]))
+        self.assertEqual([], list(actual))
 
     def test__aggregate_sample_errors(self):
         self.db.a.insert_many([
