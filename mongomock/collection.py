@@ -297,9 +297,19 @@ class BulkOperationBuilder(object):
         has_update = False
         has_insert = False
         broken_nModified_info = False
-        for execute_func in self.executors:
+        for index, execute_func in enumerate(self.executors):
             exec_name = execute_func.__name__
-            op_result = execute_func()
+            try:
+                op_result = execute_func()
+            except DuplicateKeyError:
+                result['writeErrors'].append({
+                    'index': index,
+                    'code': 11000,
+                    'errmsg': 'E11000 duplicate key error',
+                })
+                if self.ordered:
+                    break
+                continue
             for (key, value) in op_result.items():
                 self.__aggregate_operation_result(result, key, value)
             if exec_name == 'exec_update':
@@ -318,6 +328,10 @@ class BulkOperationBuilder(object):
             pass
         else:
             result.pop('nModified')
+
+        if result.get('writeErrors'):
+            raise BulkWriteError(result)
+
         return result
 
     def add_insert(self, doc):
@@ -1557,10 +1571,6 @@ class Collection(object):
         self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
-        if not ordered:
-            raise NotImplementedError(
-                'Unordered mode is a valid MongoDB operation; however Mongomock'
-                ' does not support it yet.')
         if bypass_document_validation:
             raise NotImplementedError(
                 'Skipping document validation is a valid MongoDB operation;'
@@ -1569,7 +1579,7 @@ class Collection(object):
             raise NotImplementedError(
                 'Sessions are valid in MongoDB 3.6 and newer; however Mongomock'
                 ' does not support them yet.')
-        bulk = BulkOperationBuilder(self)
+        bulk = BulkOperationBuilder(self, ordered=ordered)
         for operation in requests:
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)

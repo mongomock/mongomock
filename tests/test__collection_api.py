@@ -3280,3 +3280,32 @@ class CollectionAPITest(TestCase):
             'w': 2,
             'wtimeout': 100,
         }, collection.write_concern.document, msg='Write concern is immutable')
+
+    def test__bulk_write_unordered(self):
+        bulk = self.db.collection.initialize_unordered_bulk_op()
+        bulk.insert({'_id': 1})
+        bulk.insert({'_id': 2})
+        bulk.insert({'_id': 1})
+        bulk.insert({'_id': 3})
+        bulk.insert({'_id': 1})
+
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            bulk.execute()
+
+        assertCountEqual(self, [1, 2, 3], [d['_id'] for d in self.db.collection.find()])
+        self.assertEqual(3, err_context.exception.details['nInserted'])
+        self.assertEqual([2, 4], [e['index'] for e in err_context.exception.details['writeErrors']])
+
+    def test__bulk_write_ordered(self):
+        bulk = self.db.collection.initialize_ordered_bulk_op()
+        bulk.insert({'_id': 1})
+        bulk.insert({'_id': 2})
+        bulk.insert({'_id': 1})
+        bulk.insert({'_id': 3})
+        bulk.insert({'_id': 1})
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            bulk.execute()
+
+        assertCountEqual(self, [1, 2], [d['_id'] for d in self.db.collection.find()])
+        self.assertEqual(2, err_context.exception.details['nInserted'])
+        self.assertEqual([2], [e['index'] for e in err_context.exception.details['writeErrors']])

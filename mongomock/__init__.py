@@ -15,6 +15,12 @@ try:
 except ImportError:
     class BulkWriteError(PyMongoError):
 
+        def __init__(self, details):
+            super(BulkWriteError, self).__init__()
+            self._details = details
+
+        details = property(lambda self: self._details)
+
         def __str__(self):
             return 'batch op errors occurred'
 
