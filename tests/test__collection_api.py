@@ -15,6 +15,7 @@ from mongomock.write_concern import WriteConcern
 
 try:
     from bson.errors import InvalidDocument
+    from bson import tz_util
     import pymongo
     from pymongo.collation import Collation
     from pymongo import ReturnDocument
@@ -1700,11 +1701,32 @@ class CollectionAPITest(TestCase):
         self.assertTrue(dates[0].tzinfo)
         self.assertEqual(dates[0].tzinfo, dates[1].tzinfo)
 
-    # should be removed once Timestamp supported or implemented
-    def test__current_date_timestamp_is_not_supported_yet(self):
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__current_date_timestamp_requires_pymongo(self):
         with self.assertRaises(NotImplementedError):
             self.db.collection.update_one(
-                {}, {'$currentDate': {'updated_at': {'$type': 'timestamp'}}}, upsert=True)
+                {}, {'$currentDate': {
+                    'updated_at': {'$type': 'timestamp'},
+                    'updated_again': {'$type': 'timestamp'},
+                }}, upsert=True)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__current_date_timestamp(self):
+        before = datetime.now(tz_util.utc) - timedelta(seconds=1)
+        self.db.collection.update_one(
+            {}, {'$currentDate': {
+                'updated_at': {'$type': 'timestamp'},
+                'updated_again': {'$type': 'timestamp'},
+            }}, upsert=True)
+        after = datetime.now(tz_util.utc)
+
+        doc = self.db.collection.find_one()
+        self.assertTrue(doc.get('updated_at'))
+        self.assertTrue(doc.get('updated_again'))
+        self.assertNotEqual(doc['updated_at'], doc['updated_again'])
+
+        self.assertLessEqual(before, doc['updated_at'].as_datetime())
+        self.assertLessEqual(doc['updated_at'].as_datetime(), after)
 
     def test__rename_collection(self):
         self.db.collection.insert({'_id': 1, 'test_list': [{'data': 'val'}]})

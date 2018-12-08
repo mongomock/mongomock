@@ -15,9 +15,9 @@ import time
 import warnings
 
 try:
-    from bson import json_util, SON, BSON
+    from bson import json_util, SON, BSON, Timestamp
 except ImportError:
-    json_utils = SON = BSON = None
+    json_utils = SON = BSON = Timestamp = None
 try:
     import execjs
 except ImportError:
@@ -41,7 +41,6 @@ except ImportError:
 from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
-from six import itervalues
 from six import string_types
 from six import text_type
 
@@ -575,10 +574,6 @@ class Collection(object):
                         existing_document, v, spec, _set_updater, subdocument)
 
                 elif k == '$currentDate':
-                    for value in itervalues(v):
-                        if value == {'$type': 'timestamp'}:
-                            raise NotImplementedError('timestamp is not supported so far')
-
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, _current_date_updater, subdocument)
 
@@ -1801,9 +1796,27 @@ def _min_updater(doc, field_name, value):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
+_LAST_TIMESTAMP_INC = []
+
+
+def _get_current_timestamp():
+    if not Timestamp:
+        raise NotImplementedError('timestamp is not supported. Import pymongo to use it.')
+    now = int(time.time())
+    if _LAST_TIMESTAMP_INC and _LAST_TIMESTAMP_INC[0] == now:
+        _LAST_TIMESTAMP_INC[1] += 1
+    else:
+        del _LAST_TIMESTAMP_INC[:]
+        _LAST_TIMESTAMP_INC.extend([now, 1])
+    return Timestamp(now, _LAST_TIMESTAMP_INC[1])
+
+
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
-        doc[field_name] = datetime.utcnow()
+        if value == {'$type': 'timestamp'}:
+            doc[field_name] = _get_current_timestamp()
+        else:
+            doc[field_name] = datetime.utcnow()
 
 
 _updaters = {
