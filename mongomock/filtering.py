@@ -7,7 +7,7 @@ import numbers
 import operator
 import re
 from sentinels import NOTHING
-from six import iteritems, string_types
+from six import iteritems, iterkeys, string_types
 try:
     from types import NoneType
 except ImportError:
@@ -44,9 +44,7 @@ def filter_applies(search_filter, document):
             has_candidates |= doc_val is not NOTHING
             if isinstance(search, dict):
                 if '$options' in search and '$regex' in search:
-                    raise NotImplementedError(
-                        'Although $options operator is valid in MongoDB, it is not implemented '
-                        'in Mongomock yet')
+                    search = _combine_regex_options(search)
                 is_match = (all(
                     operator_string in OPERATOR_MAP and
                     OPERATOR_MAP[operator_string](doc_val, search_val) or
@@ -301,6 +299,39 @@ def _type_op(doc_val, search_val):
     elif TYPE_MAP[search_val] is None:
         raise NotImplementedError('%s is a valid $type but not implemented' % search_val)
     return isinstance(doc_val, TYPE_MAP[search_val])
+
+
+def _combine_regex_options(search):
+    if not isinstance(search['$options'], string_types):
+        raise OperationFailure('$options has to be a string')
+
+    options = None
+    for option in search['$options']:
+        if option not in 'imxs':
+            continue
+        re_option = getattr(re, option.upper())
+        if options is None:
+            options = re_option
+        else:
+            options |= re_option
+
+    search_copy = dict(search)
+    del search_copy['$options']
+
+    if options is None:
+        return search_copy
+
+    if isinstance(search['$regex'], COMPILED_RE_TYPE):
+        keys = [k for k in iterkeys(search) if k in {'$regex', '$options'}]
+        if keys == ['$options', '$regex']:
+            raise NotImplementedError(
+                'Do not use compiled regular expressions with $options until '
+                'https://jira.mongodb.org/browse/SERVER-38621 is solved.')
+        search_copy['$regex'] = re.compile(
+            search['$regex'].pattern, search['$regex'].flags | options)
+    else:
+        search_copy['$regex'] = re.compile(search['$regex'], options)
+    return search_copy
 
 
 def operator_eq(doc_val, search_val):

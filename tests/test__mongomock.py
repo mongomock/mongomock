@@ -489,6 +489,20 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': regex})
         regex = re.compile('bob|notsam')
         self.cmp.compare_ignore_order.find({'name': regex})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': regex}})
+        upper_regex = re.compile('Bob')
+        self.cmp.compare_ignore_order.find({'name': {'$regex': upper_regex}})
+        # TODO(pascal): Use a simple dicts once the bug
+        # https://jira.mongodb.org/browse/SERVER-38621 is fixed.
+        self.cmp.compare_ignore_order.find({'name': OrderedDict([
+            ('$regex', upper_regex), ('$options', 'i')
+        ])})
+        self.cmp.compare_ignore_order.find({'name': OrderedDict([
+            ('$regex', upper_regex), ('$options', 'I')
+        ])})
+        self.cmp.compare_ignore_order.find({'name': OrderedDict([
+            ('$regex', upper_regex), ('$options', 'z')
+        ])})
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -499,6 +513,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|sam'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|notsam'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'i'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'I'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'z'}})
 
     def test__find_in_array_by_regex_object(self):
         """Test searching inside array with regular expression object."""

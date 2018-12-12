@@ -580,8 +580,36 @@ class CollectionAPITest(TestCase):
     def test__regex_options(self):
         self.db.collection.drop()
         self.db.collection.insert_one({'a': 'TADA'})
+        self.db.collection.insert_one({'a': 'TA\nDA'})
+
+        self.assertFalse(self.db.collection.find_one({'a': {'$regex': 'tada'}}))
+        self.assertTrue(self.db.collection.find_one({'a': {
+            '$regex': re.compile('tada', re.IGNORECASE),
+        }}))
+
+        self.assertTrue(self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'i'}}))
+        self.assertTrue(self.db.collection.find_one({'a': {'$regex': '^da', '$options': 'im'}}))
+        self.assertFalse(self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'I'}}))
+        self.assertTrue(self.db.collection.find_one({'a': {'$regex': 'TADA', '$options': 'z'}}))
+        self.assertTrue(self.db.collection.find_one({'a': collections.OrderedDict([
+            ('$regex', re.compile('tada')),
+            ('$options', 'i'),
+        ])}))
+        self.assertTrue(self.db.collection.find_one({'a': collections.OrderedDict([
+            ('$regex', re.compile('tada', re.IGNORECASE)),
+            ('$options', 'm'),
+        ])}))
+
+        # Bad type for $options.
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a': {'$regex': 'tada', '$options': re.I}})
+
+        # Bug https://jira.mongodb.org/browse/SERVER-38621
         with self.assertRaises(NotImplementedError):
-            self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'i'}})
+            self.db.collection.find_one({'a': collections.OrderedDict([
+                ('$options', 'i'),
+                ('$regex', re.compile('tada')),
+            ])})
 
     def test__iterate_on_find_and_update(self):
         documents = [
