@@ -43,6 +43,10 @@ def filter_applies(search_filter, document):
         for doc_val in _iter_key_candidates(key, document):
             has_candidates |= doc_val is not NOTHING
             if isinstance(search, dict):
+                if '$options' in search and '$regex' in search:
+                    raise NotImplementedError(
+                        'Although $options operator is valid in MongoDB, it is not implemented '
+                        'in Mongomock yet')
                 is_match = (all(
                     operator_string in OPERATOR_MAP and
                     OPERATOR_MAP[operator_string](doc_val, search_val) or

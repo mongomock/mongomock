@@ -577,6 +577,12 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             next(cursor)
 
+    def test__regex_options(self):
+        self.db.collection.drop()
+        self.db.collection.insert_one({'a': 'TADA'})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'i'}})
+
     def test__iterate_on_find_and_update(self):
         documents = [
             {'x': 1, 's': 0},
