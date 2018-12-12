@@ -725,12 +725,18 @@ def _handle_out_stage(in_collection, database, options):
     return in_collection
 
 
+def _handle_count_stage(in_collection, database, options):
+    if not isinstance(options, str) or options == '':
+        raise OperationFailure('the count field must be a non-empty string')
+    return [{options: len(in_collection)}]
+
+
 _PIPELINE_HANDLERS = {
     '$addFields': None,
     '$bucket': _handle_bucket_stage,
     '$bucketAuto': None,
     '$collStats': None,
-    '$count': None,
+    '$count': _handle_count_stage,
     '$currentOp': None,
     '$facet': None,
     '$geoNear': None,
