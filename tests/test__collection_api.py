@@ -2084,7 +2084,7 @@ class CollectionAPITest(TestCase):
             for i in range(5)
         ])
         # Many cases for '$count' options that should raise an operation failure.
-        cases = (None, 3, {}, '', [])
+        cases = (None, 3, {}, [], '', '$one_count', 'one.count')
         for case in cases:
             with self.assertRaises(mongomock.OperationFailure):
                 self.db.a.aggregate([{'$count': case}])

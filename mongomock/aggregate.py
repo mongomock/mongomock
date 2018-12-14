@@ -728,6 +728,10 @@ def _handle_out_stage(in_collection, database, options):
 def _handle_count_stage(in_collection, database, options):
     if not isinstance(options, str) or options == '':
         raise OperationFailure('the count field must be a non-empty string')
+    elif options.startswith('$'):
+        raise OperationFailure('the count field cannot be a $-prefixed path')
+    elif '.' in options:
+        raise OperationFailure("the count field cannot contain '.'")
     return [{options: len(in_collection)}]
 
 
