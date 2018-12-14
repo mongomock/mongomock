@@ -13,7 +13,6 @@ If i miss to include a feature in the below list, Please feel free to add to the
   * `$addFields <https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/>`_
   * `$bucketAuto <https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/>`_
   * `$collStats <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/>`_
-  * `$count <https://docs.mongodb.com/manual/reference/operator/aggregation/count/>`_
   * `$currentOp <https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/>`_
   * `$facet <https://docs.mongodb.com/manual/reference/operator/aggregation/facet/>`_
   * `$geoNear <https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/>`_

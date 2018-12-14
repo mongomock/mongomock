@@ -2065,6 +2065,30 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure):
                 self.db.a.aggregate([{'$sample': case}])
 
+    def test__aggregate_count(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'a': 1},
+            {'_id': 2, 'a': 2},
+            {'_id': 3, 'a': 1}
+        ])
+
+        actual = list(self.db.a.aggregate([
+            {'$match': {'a': 1}},
+            {'$count': 'one_count'}
+        ]))
+        self.assertEqual([{'one_count': 2}], actual)
+
+    def test__aggregate_count_errors(self):
+        self.db.a.insert_many([
+            {'_id': i}
+            for i in range(5)
+        ])
+        # Many cases for '$count' options that should raise an operation failure.
+        cases = (None, 3, {}, [], '', '$one_count', 'one.count')
+        for case in cases:
+            with self.assertRaises(mongomock.OperationFailure):
+                self.db.a.aggregate([{'$count': case}])
+
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
