@@ -3,33 +3,45 @@ try:
 except ImportError:
     class PyMongoError(Exception):
         pass
+try:
+    from pymongo.errors import OperationFailure
+except ImportError:
+    class OperationFailure(PyMongoError):
+
+        def __init__(self, message, code=None, details=None):
+            super(OperationFailure, self).__init__()
+            self._message = message
+            self._code = code
+            self._details = details
+
+        code = property(lambda self: self._code)
+        details = property(lambda self: self._details)
+
+        def __str__(self):
+            return self._message
+
+try:
+    from pymongo.errors import WriteError
+except ImportError:
+    class WriteError(OperationFailure):
+        pass
+
 
 try:
     from pymongo.errors import DuplicateKeyError
 except ImportError:
-    class DuplicateKeyError(PyMongoError):
+    class DuplicateKeyError(WriteError):
         pass
 
 try:
     from pymongo.errors import BulkWriteError
 except ImportError:
-    class BulkWriteError(PyMongoError):
+    class BulkWriteError(OperationFailure):
 
-        def __init__(self, details):
-            super(BulkWriteError, self).__init__()
-            self._details = details
+        def __init__(self, results):
+            super(BulkWriteError, self).__init__(
+                'batch op errors occurred', 65, results)
 
-        details = property(lambda self: self._details)
-
-        def __str__(self):
-            return 'batch op errors occurred'
-
-
-try:
-    from pymongo.errors import OperationFailure
-except ImportError:
-    class OperationFailure(PyMongoError):
-        pass
 
 try:
     from pymongo.errors import CollectionInvalid
@@ -59,12 +71,6 @@ try:
     from pymongo.errors import InvalidURI
 except ImportError:
     class InvalidURI(ConfigurationError):
-        pass
-
-try:
-    from pymongo.errors import WriteError
-except ImportError:
-    class WriteError(OperationFailure):
         pass
 
 from .helpers import ObjectId  # noqa

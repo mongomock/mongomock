@@ -635,6 +635,12 @@ class CollectionAPITest(TestCase):
         self.assertEqual(insert_result.inserted_id, doc['_id'])
         self.assertEqual(doc['a'], 2)
 
+    def test__update_id(self):
+        self.db.collection.insert_one({'a': 1})
+        with self.assertRaises(mongomock.WriteError):
+            self.db.collection.update_one({'a': 1}, {'$set': {'a': 2, '_id': 42}})
+        self.assertEqual(1, self.db.collection.find_one({})['a'])
+
     def test__update_one_upsert(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_one(
@@ -1886,6 +1892,18 @@ class CollectionAPITest(TestCase):
             'writeErrors': [], 'writeConcernErrors': [],
             'upserted': [{'_id': docs[0]['_id'], 'index': 0}],
             'nRemoved': 0, 'nInserted': 0})
+
+    def test__bulk_write_update_id(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 1})
+        bulk = self.db.collection.initialize_unordered_bulk_op()
+        bulk.add_update({'a': 1}, {'$set': {'a': 2, '_id': 42}})
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            bulk.execute()
+        self.assertEqual({'_id': 1, 'a': 1}, self.db.collection.find_one())
+        self.assertEqual(
+            ["After applying the update, the (immutable) field '_id' was found to have been "
+             'altered to _id: 42'],
+            [e['errmsg'] for e in err_context.exception.details['writeErrors']])
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_delete_one(self):

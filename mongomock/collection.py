@@ -301,11 +301,11 @@ class BulkOperationBuilder(object):
             exec_name = execute_func.__name__
             try:
                 op_result = execute_func()
-            except DuplicateKeyError:
+            except WriteError as error:
                 result['writeErrors'].append({
                     'index': index,
-                    'code': 11000,
-                    'errmsg': 'E11000 duplicate key error',
+                    'code': error.code,
+                    'errmsg': str(error),
                 })
                 if self.ordered:
                     break
@@ -337,7 +337,7 @@ class BulkOperationBuilder(object):
     def add_insert(self, doc):
         self.insert(doc)
 
-    def add_update(self, selector, doc, multi, upsert, collation=None,
+    def add_update(self, selector, doc, multi=False, upsert=False, collation=None,
                    array_filters=None):
         if array_filters:
             raise NotImplementedError(
@@ -419,12 +419,12 @@ class Collection(object):
             for index, item in enumerate(data):
                 try:
                     results.append(self._insert(item))
-                except DuplicateKeyError:
+                except WriteError as error:
                     raise BulkWriteError({
                         'writeErrors': [{
                             'index': index,
-                            'code': 11000,
-                            'errmsg': 'E11000 duplicate key error',
+                            'code': error.code,
+                            'errmsg': str(error),
                             'op': item,
                         }],
                         'nInserted': index,
@@ -748,13 +748,23 @@ class Collection(object):
                 upserted_id = self._insert(existing_document)
                 num_updated += 1
             elif existing_document != original_document_snapshot:
-                # Document has been modified in-place, last thing is to make sure it
-                # still respect the unique indexes and if not to revert modifications
+                # Document has been modified in-place.
+
+                # Make sure the ID was not change.
+                if original_document_snapshot.get('_id') != existing_document.get('_id'):
+                    # Rollback.
+                    self._store[original_document_snapshot['_id']] = original_document_snapshot
+                    raise WriteError(
+                        "After applying the update, the (immutable) field '_id' was found to have "
+                        'been altered to _id: {}'.format(existing_document.get('_id')))
+
+                # Make sure it still respect the unique indexes and, if not, to
+                # revert modifications
                 try:
                     self._ensure_uniques(existing_document)
                     num_updated += 1
                 except DuplicateKeyError:
-                    # Rollback
+                    # Rollback.
                     self._store[original_document_snapshot['_id']] = original_document_snapshot
                     raise
 
