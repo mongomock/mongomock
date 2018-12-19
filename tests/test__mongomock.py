@@ -938,6 +938,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'a': 1}, {'_id': ObjectId('52d669dcad547f059424f783'), 'a': 1}, upsert=True)
         self.cmp.compare.find()
 
+    def test__update_with_zero_id(self):
+        self.cmp.do.insert_one({'_id': 0})
+        self.cmp.do.replace_one({'_id': 0}, {'a': 1})
+        self.cmp.compare.find()
+
     def test__update_upsert_with_dots(self):
         self.cmp.do.update(
             {'a.b': 1}, {'$set': {'c': 2}}, upsert=True)

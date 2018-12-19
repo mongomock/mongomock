@@ -721,7 +721,7 @@ class Collection(object):
                                 raise ValueError('field names cannot start with $ [{}]'.format(k))
                         _id = spec.get('_id', existing_document.get('_id'))
                         existing_document.clear()
-                        if _id:
+                        if _id is not None:
                             existing_document['_id'] = _id
                         if BSON:
                             # bson validation
