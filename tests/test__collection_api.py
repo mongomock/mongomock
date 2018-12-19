@@ -622,6 +622,12 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.update({'_id': 1}, {'_id': 2, 'b': 2})
 
+    def test__update_empty_id(self):
+        self.db.collection.save({'_id': '', 'a': 1})
+        self.db.collection.replace_one({'_id': ''}, {'b': 1})
+        doc = self.db.collection.find_one({'_id': ''})
+        self.assertEqual(1, doc['b'])
+
     def test__update_one(self):
         insert_result = self.db.collection.insert_one({'a': 1})
         update_result = self.db.collection.update_one(
