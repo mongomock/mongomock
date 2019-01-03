@@ -120,12 +120,12 @@ class Database(object):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
-        if not dbref.collection or not dbref.id:
+        if not hasattr(dbref, 'collection') or not hasattr(dbref, 'id'):
             raise TypeError('cannot dereference a %s' % type(dbref))
         if dbref.database is not None and dbref.database != self.name:
             raise ValueError('trying to dereference a DBRef that points to '
                              'another database (%r not %r)' % (dbref.database,
-                                                               self.__name))
+                                                               self.name))
         return self[dbref.collection].find_one({'_id': dbref.id})
 
     def command(self, command, **unused_kwargs):
