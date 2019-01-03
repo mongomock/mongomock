@@ -87,10 +87,21 @@ class CollectionAPITest(TestCase):
                           self.db.create_collection, 'c')
 
     def test__create_collection_bad_names(self):
-        with self.assertRaises(mongomock.InvalidName):
-            self.db.create_collection('')
-        with self.assertRaises(mongomock.InvalidName):
-            self.db.create_collection('...')
+        with self.assertRaises(TypeError):
+            self.db.create_collection(3)
+
+        bad_names = (
+            '',
+            'foo..bar',
+            '...',
+            '$foo',
+            '.foo',
+            'bar.',
+            'foo\x00bar',
+        )
+        for name in bad_names:
+            with self.assertRaises(mongomock.InvalidName, msg=name):
+                self.db.create_collection(name)
 
     def test__lazy_create_collection(self):
         col = self.db.a
@@ -1750,7 +1761,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             [({'_id': 1, 'test_list': [{'data': 'val'}]})], list(data_in_db))
 
-    def test__rename_collectiont_to_bad_names(self):
+    def test__rename_collection_to_bad_names(self):
         coll = self.db.create_collection('a')
         self.assertRaises(TypeError, coll.rename, ['a'])
         self.assertRaises(mongomock.InvalidName, coll.rename, '.a')

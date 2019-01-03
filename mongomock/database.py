@@ -72,11 +72,23 @@ class Database(object):
         else:
             self._store[name_or_collection].drop()
 
-    def create_collection(self, name, **kwargs):
-        if name in self.list_collection_names():
-            raise CollectionInvalid('collection %s already exists' % name)
+    def _ensure_valid_collection_name(self, name):
+        # These are the same checks that are done in pymongo.
+        if not isinstance(name, string_types):
+            raise TypeError('name must be an instance of basestring')
         if not name or '..' in name:
             raise InvalidName('collection names cannot be empty')
+        if name[0] == '.' or name[-1] == '.':
+            raise InvalidName("collection names must not start or end with '.'")
+        if '$' in name:
+            raise InvalidName("collection names must not contain '$'")
+        if '\x00' in name:
+            raise InvalidName('collection names must not contain the null character')
+
+    def create_collection(self, name, **kwargs):
+        self._ensure_valid_collection_name(name)
+        if name in self.list_collection_names():
+            raise CollectionInvalid('collection %s already exists' % name)
 
         if kwargs:
             raise NotImplementedError('Special options not supported')
@@ -86,13 +98,7 @@ class Database(object):
 
     def rename_collection(self, name, new_name, dropTarget=False):
         """Changes the name of an existing collection."""
-        # These are the same checks that are done in pymongo.
-        if not isinstance(new_name, string_types):
-            raise TypeError('new_name must be an instance of basestring')
-        if new_name[0] == '.' or new_name[-1] == '.':
-            raise InvalidName("collection names must not start or end with '.'")
-        if '$' in new_name:
-            raise InvalidName("collection names must not contain '$'")
+        self._ensure_valid_collection_name(new_name)
 
         # Reference for server implementation:
         # https://docs.mongodb.com/manual/reference/command/renameCollection/
