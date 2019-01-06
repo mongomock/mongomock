@@ -1699,6 +1699,14 @@ class Cursor(object):
     def close(self):
         pass
 
+    def hint(self, unused_hint):
+        if self._emitted:
+            raise InvalidOperation('cannot set options after executing query')
+        # TODO(pascal): Once we implement $text indexes and queries, raise an
+        # exception if hint is used on a $text query.
+        # https://docs.mongodb.com/manual/reference/method/cursor.hint/#behavior
+        return self
+
     def distinct(self, key, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')

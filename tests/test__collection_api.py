@@ -181,6 +181,18 @@ class CollectionAPITest(TestCase):
         self.assertEqual(col_a2.find().count(), 1)
         self.assertEqual(self.db.a.find().count(), 1)
 
+    def test__cursor_hint(self):
+        self.db.collection.insert({'f1': {'f2': 'v'}})
+        cursor = self.db.collection.find()
+
+        self.assertEqual(cursor, cursor.hint(None))
+
+        cursor.hint('unknownIndex')
+        self.assertEqual([{'f2': 'v'}], [d['f1'] for d in cursor])
+
+        with self.assertRaises(mongomock.InvalidOperation):
+            cursor.hint(None)
+
     def test__distinct_nested_field(self):
         self.db.collection.insert({'f1': {'f2': 'v'}})
         cursor = self.db.collection.find()
