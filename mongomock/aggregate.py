@@ -7,6 +7,7 @@ import datetime
 import functools
 import itertools
 import math
+import numbers
 import random
 import six
 from six import moves
@@ -105,15 +106,24 @@ set_operators = [
 
 
 def _avg_operation(values):
-    values_list = list(values)
-    return sum(values_list) / float(max(len(list(values_list)), 1))
+    values_list = list(v for v in values if isinstance(v, numbers.Number))
+    if not values_list:
+        return None
+    return sum(values_list) / float(len(list(values_list)))
+
+
+def _group_operation(values, operator):
+    values_list = list(v for v in values if v is not None)
+    if not values_list:
+        return None
+    return operator(values_list)
 
 
 _GROUPING_OPERATOR_MAP = {
-    '$sum': lambda values: sum(val or 0 for val in values),
+    '$sum': lambda values: sum(v for v in values if isinstance(v, numbers.Number)),
     '$avg': _avg_operation,
-    '$min': lambda values: min(val or six.MAXSIZE for val in values),
-    '$max': lambda values: max(val or -six.MAXSIZE for val in values),
+    '$min': lambda values: _group_operation(values, min),
+    '$max': lambda values: _group_operation(values, max),
 }
 
 

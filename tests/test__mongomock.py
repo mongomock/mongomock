@@ -2226,11 +2226,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d'})
         pipeline = [{'$project': {
             '_id': 0,
-            'max': {'$max': [5, 9, '$a']},
-            'min': {'$min': [8, 2, 3, '$a', '$b']},
-            'avg': {'$avg': [4, 2, 3, '$a', '$b', 4]},
-            'sum': {'$sum': [4, 2, 3, '$a', '$b', {'$sum': [0, 1, '$b']}]},
+            'max': {'$max': [5, 9, '$a', None]},
+            'min': {'$min': [8, 2, None, 3, '$a', '$b']},
+            'avg': {'$avg': [4, 2, None, 3, '$a', '$b', 4]},
+            'sum': {'$sum': [4, 2, None, 3, '$a', '$b', {'$sum': [0, 1, '$b']}]},
             'maxString': {'$max': [{'$literal': '$b'}, '$c']},
+            'maxNone': {'$max': [None, None]},
+            'minNone': {'$min': [None, None]},
+            'avgNone': {'$avg': ['a', None]},
+            'sumNone': {'$sum': ['a', None]},
         }}]
         self.cmp.compare.aggregate(pipeline)
 

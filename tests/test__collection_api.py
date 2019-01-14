@@ -2393,10 +2393,10 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d'})
         actual = self.db.collection.aggregate([{'$project': {
             '_id': 1,
-            'max': {'$max': [5, 9, '$a']},
-            'min': {'$min': [8, '$a', '$b']},
-            'avg': {'$avg': [4, '$a', '$b']},
-            'sum': {'$sum': [4, '$a', '$b', {'$sum': [0, 1, '$b']}]},
+            'max': {'$max': [5, 9, '$a', None]},
+            'min': {'$min': [8, '$a', None, '$b']},
+            'avg': {'$avg': [4, '$a', '$b', 'a', 'b']},
+            'sum': {'$sum': [4, '$a', None, '$b', 'a', 'b', {'$sum': [0, 1, '$b']}]},
             'maxString': {'$max': [{'$literal': '$b'}, '$c']},
         }}])
         self.assertEqual(
