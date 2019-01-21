@@ -4,18 +4,26 @@ from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
+from mongomock import read_preferences
 from mongomock import store
 
 from six import string_types
 
+try:
+    from pymongo import ReadPreference
+    _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
+except ImportError:
+    _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
+
 
 class Database(object):
 
-    def __init__(self, client, name, _store):
+    def __init__(self, client, name, _store, read_preference=None):
         self.name = name
         self._client = client
         self._collection_accesses = {}
         self._store = _store or store.DatabaseStore()
+        self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -33,6 +41,10 @@ class Database(object):
     @property
     def client(self):
         return self._client
+
+    @property
+    def read_preference(self):
+        return self._read_preference
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
@@ -57,11 +69,15 @@ class Database(object):
                        write_concern=None, read_concern=None):
         if read_concern:
             raise NotImplementedError('Mongomock does not handle read_concern yet')
+        if read_preference is not None:
+            read_preferences.ensure_read_preference_type('read_preference', read_preference)
         try:
             return self._collection_accesses[name]
         except KeyError:
-            collection = self._collection_accesses[name] = \
-                Collection(self, write_concern=write_concern, _store=self._store[name])
+            collection = self._collection_accesses[name] = Collection(
+                self, write_concern=write_concern,
+                read_preference=read_preference or self.read_preference,
+                _store=self._store[name])
             return collection
 
     def drop_collection(self, name_or_collection, session=None):

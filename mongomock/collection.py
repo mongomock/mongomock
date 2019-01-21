@@ -36,7 +36,7 @@ except ImportError:
         BEFORE = False
         AFTER = True
 
-    _READ_PREFERENCE_PRIMARY = None
+    from mongomock.read_preferences import PRIMARY as _READ_PREFERENCE_PRIMARY
 
 from sentinels import NOTHING
 from six import iteritems
@@ -356,10 +356,11 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, database, _store, write_concern=None):
+    def __init__(self, database, _store, write_concern=None, read_preference=None):
         self.database = database
         self._store = _store
         self._write_concern = write_concern or WriteConcern()
+        self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -385,6 +386,10 @@ class Collection(object):
     @property
     def write_concern(self):
         return self._write_concern
+
+    @property
+    def read_preference(self):
+        return self._read_preference
 
     def initialize_unordered_bulk_op(self):
         return BulkOperationBuilder(self, ordered=False)
@@ -1563,13 +1568,16 @@ class Collection(object):
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if key != 'write_concern' and options.default != value:
+            if key not in ('read_preference', 'write_concern') and options.default != value:
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
 
         write_concern = kwargs.get('write_concern', self.write_concern)
-        return Collection(self.database, write_concern=write_concern, _store=self._store)
+        read_preference = kwargs.get('read_preference', self.read_preference)
+        return Collection(
+            self.database, write_concern=write_concern, read_preference=read_preference,
+            _store=self._store)
 
     def rename(self, new_name, session=None, **kwargs):
         if session:
