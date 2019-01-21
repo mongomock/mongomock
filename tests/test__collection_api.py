@@ -18,6 +18,7 @@ try:
     from bson import tz_util
     import pymongo
     from pymongo.collation import Collation
+    from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
     _HAVE_PYMONGO = True
 except ImportError:
@@ -1637,6 +1638,27 @@ class CollectionAPITest(TestCase):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertNotEqual(self.db.collection.write_concern, col2.write_concern)
         self.assertEqual({'w': 2}, col2.write_concern.document)
+
+        # Check that renaming one, renames the other.
+        col1 = self.db.collection
+        col1.rename('new_name')
+        self.assertEqual('new_name', col1.name)
+        self.assertEqual('new_name', col2.name)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__with_options_different_read_preference(self):
+        self.db.collection.insert_one({'name': 'col1'})
+        col2 = self.db.collection.with_options(read_preference=ReadPreference.NEAREST)
+        col2.insert_one({'name': 'col2'})
+
+        # Check that the two objects have the same data.
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in self.db.collection.find()})
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in col2.find()})
+
+        # Check that each object has its own read preference
+        self.assertEqual('primary', self.db.collection.read_preference.mongos_mode)
+        self.assertNotEqual(self.db.collection.read_preference, col2.read_preference)
+        self.assertEqual('nearest', col2.read_preference.mongos_mode)
 
         # Check that renaming one, renames the other.
         col1 = self.db.collection
@@ -3419,6 +3441,24 @@ class CollectionAPITest(TestCase):
             'w': 2,
             'wtimeout': 100,
         }, collection.write_concern.document, msg='Write concern is immutable')
+
+    def test__read_preference_default(self):
+        # Test various properties of the default read preference.
+        self.assertEqual(0, self.db.collection.read_preference.mode)
+        self.assertEqual('primary', self.db.collection.read_preference.mongos_mode)
+        self.assertEqual({'mode': 'primary'}, self.db.collection.read_preference.document)
+        self.assertEqual('Primary', self.db.collection.read_preference.name)
+        self.assertEqual([{}], self.db.collection.read_preference.tag_sets)
+        self.assertEqual(-1, self.db.collection.read_preference.max_staleness)
+        self.assertEqual(0, self.db.collection.read_preference.min_wire_version)
+
+        collection = self.db.get_collection('a', read_preference=self.db.collection.read_preference)
+        self.assertEqual('primary', collection.read_preference.mongos_mode)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__read_preference(self):
+        collection = self.db.get_collection('a', read_preference=ReadPreference.NEAREST)
+        self.assertEqual('nearest', collection.read_preference.mongos_mode)
 
     def test__bulk_write_unordered(self):
         bulk = self.db.collection.initialize_unordered_bulk_op()

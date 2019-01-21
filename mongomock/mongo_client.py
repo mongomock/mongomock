@@ -3,6 +3,13 @@ from .helpers import parse_dbase_from_uri
 from .store import ServerStore
 import itertools
 from mongomock import ConfigurationError
+from mongomock import read_preferences
+
+try:
+    from pymongo import ReadPreference
+    _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
+except ImportError:
+    _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
 
 class MongoClient(object):
@@ -12,7 +19,8 @@ class MongoClient(object):
     _CONNECTION_ID = itertools.count()
 
     def __init__(self, host=None, port=None, document_class=dict,
-                 tz_aware=False, connect=True, _store=None, **kwargs):
+                 tz_aware=False, connect=True, _store=None, read_preference=None,
+                 **kwargs):
         if host:
             self.host = host[0] if isinstance(host, (list, tuple)) else host
         else:
@@ -23,6 +31,9 @@ class MongoClient(object):
         self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class
+        if read_preference is not None:
+            read_preferences.ensure_read_preference_type('read_preference', read_preference)
+        self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
 
         dbase = None
 
@@ -54,6 +65,10 @@ class MongoClient(object):
     @property
     def address(self):
         return self.host, self.port
+
+    @property
+    def read_preference(self):
+        return self._read_preference
 
     def server_info(self):
         return {
@@ -92,7 +107,9 @@ class MongoClient(object):
         db = self._database_accesses.get(name)
         if db is None:
             db_store = self._store[name]
-            db = self._database_accesses[name] = Database(self, name, _store=db_store)
+            db = self._database_accesses[name] = Database(
+                self, name, read_preference=read_preference or self.read_preference,
+                _store=db_store)
         return db
 
     def get_default_database(self):

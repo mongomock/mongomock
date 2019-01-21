@@ -1,7 +1,13 @@
 import collections
-from unittest import TestCase
+from unittest import TestCase, skipIf
 
 import mongomock
+
+try:
+    from pymongo.read_preferences import ReadPreference
+    _HAVE_PYMONGO = True
+except ImportError:
+    _HAVE_PYMONGO = False
 
 
 class DatabaseAPITest(TestCase):
@@ -77,6 +83,23 @@ class DatabaseAPITest(TestCase):
     def test__get_collection(self):
         with self.assertRaises(NotImplementedError):
             self.database.get_collection('a', read_concern=3)
+
+    def test__read_preference(self):
+        self.assertEqual('Primary', self.database.read_preference.name)
+        self.assertEqual(self.database.collection.read_preference, self.database.read_preference)
+
+        with self.assertRaises(TypeError):
+            self.database.get_collection('a', read_preference='nearest')
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__get_collection_different_read_preference(self):
+        database = mongomock.MongoClient()\
+            .get_database('somedb', read_preference=ReadPreference.NEAREST)
+        self.assertEqual('Nearest', database.read_preference.name)
+        self.assertEqual(database.read_preference, database.collection.read_preference)
+
+        col = database.get_collection('col', read_preference=ReadPreference.PRIMARY)
+        self.assertEqual('Primary', col.read_preference.name)
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])
