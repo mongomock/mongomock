@@ -1908,6 +1908,14 @@ class CollectionAPITest(TestCase):
         self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find().sort('a')])
         self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find(projection=['b']).sort('a')])
 
+    def test__cursor_max_time_ms(self):
+        col = self.db.col
+        col.find().max_time_ms(15)
+        col.find().max_time_ms(None)
+
+        with self.assertRaises(TypeError):
+            col.find().max_time_ms(3.4)
+
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_insert_one(self):
         operations = [pymongo.InsertOne({'a': 1, 'b': 2})]

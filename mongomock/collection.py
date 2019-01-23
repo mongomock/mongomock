@@ -1759,6 +1759,12 @@ class Cursor(object):
     def alive(self):
         return self._emitted != self.count()
 
+    def max_time_ms(self, max_time_ms):
+        if max_time_ms is not None and not isinstance(max_time_ms, int):
+            raise TypeError('max_time_ms must be an integer or None')
+        # Currently the value is ignored as mongomock never times out.
+        return self
+
 
 def _set_updater(doc, field_name, value):
     if isinstance(value, (tuple, list)):
