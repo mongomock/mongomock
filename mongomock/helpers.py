@@ -51,13 +51,13 @@ def print_deprecation_warning(old_param_name, new_param_name):
         'purposes.' % (old_param_name, new_param_name), DeprecationWarning)
 
 
-def create_index_list(key_or_list):
+def create_index_list(key_or_list, direction=None):
     """Helper to generate a list of (key, direction) pairs.
 
        It takes such a list, or a single key, or a single key and direction.
     """
     if isinstance(key_or_list, string_types):
-        return [(key_or_list, ASCENDING)]
+        return [(key_or_list, direction or ASCENDING)]
     if not isinstance(key_or_list, (list, tuple)):
         raise TypeError('if no direction is specified, '
                         'key_or_list must be an instance of list')

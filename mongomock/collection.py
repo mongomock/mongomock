@@ -888,14 +888,18 @@ class Collection(object):
         return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
 
     def _get_dataset(self, spec, sort, fields, as_class):
-        dataset = (self._copy_only_fields(document, fields, as_class)
-                   for document in self._iter_documents(spec))
+        dataset = self._iter_documents(spec)
         if sort:
-            for sortKey, sortDirection in reversed(sort):
+            for sort_key, sort_direction in reversed(sort):
+                if sort_key == '$natural':
+                    if sort_direction < 0:
+                        dataset = iter(reversed(list(dataset)))
+                    continue
                 dataset = iter(sorted(
-                    dataset, key=lambda x: resolve_sort_key(sortKey, x),
-                    reverse=sortDirection < 0))
-        return dataset
+                    dataset, key=lambda x: resolve_sort_key(sort_key, x),
+                    reverse=sort_direction < 0))
+        for document in dataset:
+            yield self._copy_only_fields(document, fields, as_class)
 
     def _copy_field(self, obj, container):
         if isinstance(obj, list):
@@ -1612,8 +1616,8 @@ class Cursor(object):
         self._skip = skip
         self._factory_last_generated_results = None
         self._results = None
-        self._factory = functools.partial(collection._get_dataset,
-                                          spec, sort, projection, dict)
+        self._factory = functools.partial(
+            collection._get_dataset, spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self._collation = collation
@@ -1661,27 +1665,9 @@ class Cursor(object):
         self._emitted = 0
 
     def sort(self, key_or_list, direction=None):
-        if direction is None:
-            direction = 1
-
-        def _make_sort_factory_layer(upper_factory, sort_key, sort_direction):
-            if sort_key == '$natural':
-                if sort_direction >= 0:
-                    return upper_factory
-                return lambda: reversed(list(upper_factory()))
-
-            def layer():
-                return sorted(upper_factory(), key=lambda x: resolve_sort_key(sort_key, x),
-                              reverse=sort_direction < 0)
-            return layer
-
-        if isinstance(key_or_list, dict):
-            key_or_list = list(key_or_list.items())
-        if isinstance(key_or_list, (tuple, list)):
-            for sort_key, sort_direction in reversed(key_or_list):
-                self._factory = _make_sort_factory_layer(self._factory, sort_key, sort_direction)
-        else:
-            self._factory = _make_sort_factory_layer(self._factory, key_or_list, direction)
+        self._sort = helpers.create_index_list(key_or_list, direction)
+        self._factory = functools.partial(
+            self.collection._get_dataset, self._spec, self._sort, self._projection, dict)
         return self
 
     def count(self, with_limit_and_skip=False):

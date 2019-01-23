@@ -1879,11 +1879,10 @@ class CollectionAPITest(TestCase):
         coll = self.db.create_collection('a')
         coll.insert_many([{'a': 1}, {'a': 3}, {'a': 2}])
 
-        self.assertEqual([1, 2, 3], [doc['a'] for doc in coll.find().sort({'a': 1})])
-        self.assertEqual([3, 2, 1], [doc['a'] for doc in coll.find().sort({'a': -1})])
+        self.assertEqual([1, 2, 3], [doc['a'] for doc in coll.find().sort('a')])
+        self.assertEqual([3, 2, 1], [doc['a'] for doc in coll.find().sort('a', -1)])
 
-        self.assertEqual([1, 3, 2], [doc['a'] for doc in coll.find().sort({'$natural': 1})])
-        self.assertEqual([2, 3, 1], [doc['a'] for doc in coll.find().sort({'$natural': -1})])
+        self.assertEqual([1, 3, 2], [doc['a'] for doc in coll.find().sort('$natural', 1)])
         self.assertEqual([2, 3, 1], [doc['a'] for doc in coll.find().sort('$natural', -1)])
 
     def test__cursor_sort_composed(self):
@@ -1895,15 +1894,19 @@ class CollectionAPITest(TestCase):
         ])
 
         self.assertEqual(
-            [2, 1, 3],
-            [doc['_id'] for doc in coll.find().sort(collections.OrderedDict((('a', 1), ('b', 1))))])
+            [2, 1, 3], [doc['_id'] for doc in coll.find().sort((('a', 1), ('b', 1)))])
         self.assertEqual(
             [1, 2, 3],
-            [doc['_id']
-             for doc in coll.find().sort(collections.OrderedDict((('a', 1), ('b', -1))))])
+            [doc['_id'] for doc in coll.find().sort((('a', 1), ('b', -1)))])
         self.assertEqual(
-            [2, 3, 1],
-            [doc['_id'] for doc in coll.find().sort(collections.OrderedDict((('b', 1), ('a', 1))))])
+            [2, 3, 1], [doc['_id'] for doc in coll.find().sort((('b', 1), ('a', 1)))])
+
+    def test__cursor_sort_projection(self):
+        col = self.db.col
+        col.insert_many([{'a': 1, 'b': 1}, {'a': 3, 'b': 3}, {'a': 2, 'b': 2}])
+
+        self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find().sort('a')])
+        self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find(projection=['b']).sort('a')])
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_insert_one(self):
