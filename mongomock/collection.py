@@ -709,6 +709,15 @@ class Collection(object):
                                     push_results = []
                                 else:
                                     push_results = push_results[:slice_value]
+                            unused_modifiers = set(value.keys()) - {'$each', '$slice'}
+                            if unused_modifiers & {'$sort', '$position'}:
+                                raise NotImplementedError(
+                                    '{} is a valid modifier for $push but is not implemented '
+                                    'in Mongomock yet'.format(
+                                        (unused_modifiers & {'$sort', '$position'}).pop()))
+                            if unused_modifiers:
+                                raise WriteError(
+                                    'Unrecognized clause in $push: ' + unused_modifiers.pop())
                         else:
                             push_results.append(value)
                         subdocument[field] = push_results

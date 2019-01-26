@@ -907,6 +907,23 @@ class CollectionAPITest(TestCase):
         self.assertEqual([0, 1], self.db.collection.find_one()['games'][0]['scores'])
         self.assertEqual([3, 15], self.db.collection.find_one()['games'][1]['scores'])
 
+    def test__update_push_other_clauses(self):
+        self.db.collection.insert_one({'games': [{'scores': [0, 1]}, {'scores': [2, 3]}]})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_one(
+                {'games': {'$elemMatch': {'scores.0': 2}}},
+                {'$push': {'games.$.scores': {
+                    '$each': [15, 13],
+                    '$sort': 1,
+                }}})
+        with self.assertRaises(mongomock.WriteError):
+            self.db.collection.update_one(
+                {'games': {'$elemMatch': {'scores.0': 2}}},
+                {'$push': {'games.$.scores': {
+                    '$each': [15, 13],
+                    '$a_clause_that_does_not_exit': 1,
+                }}})
+
     def test__update_push_positional_nested_field(self):
         self.db.collection.insert_one({'games': [{}]})
         self.db.collection.update_one(
