@@ -907,15 +907,49 @@ class CollectionAPITest(TestCase):
         self.assertEqual([0, 1], self.db.collection.find_one()['games'][0]['scores'])
         self.assertEqual([3, 15], self.db.collection.find_one()['games'][1]['scores'])
 
+    def test__update_push_sort(self):
+        self.db.collection.insert_one(
+            {'a': {'b': [{'value': 3}, {'value': 1}, {'value': 2}]}})
+        self.db.collection.update_one({}, {'$push': {'a.b': {
+            '$each': [{'value': 4}],
+            '$sort': {'value': 1},
+        }}})
+        self.assertEqual(
+            {'b': [{'value': 1}, {'value': 2}, {'value': 3}, {'value': 4}]},
+            self.db.collection.find_one()['a'])
+
+    def test__update_push_sort_document(self):
+        self.db.collection.insert_one({'a': {'b': [3, 1, 2]}})
+        self.db.collection.update_one({}, {'$push': {'a.b': {
+            '$each': [4, 5],
+            '$sort': -1,
+        }}})
+        self.assertEqual({'b': [5, 4, 3, 2, 1]}, self.db.collection.find_one()['a'])
+
+    def test__update_push_position(self):
+        self.db.collection.insert_one(
+            {'a': {'b': [{'value': 3}, {'value': 1}, {'value': 2}]}})
+        self.db.collection.update_one({}, {'$push': {'a.b': {
+            '$each': [{'value': 4}],
+            '$position': 1,
+        }}})
+        self.assertEqual(
+            {'b': [{'value': 3}, {'value': 4}, {'value': 1}, {'value': 2}]},
+            self.db.collection.find_one()['a'])
+
+    def test__update_push_negative_position(self):
+        self.db.collection.insert_one(
+            {'a': {'b': [{'value': 3}, {'value': 1}, {'value': 2}]}})
+        self.db.collection.update_one({}, {'$push': {'a.b': {
+            '$each': [{'value': 4}],
+            '$position': -2,
+        }}})
+        self.assertEqual(
+            {'b': [{'value': 3}, {'value': 4}, {'value': 1}, {'value': 2}]},
+            self.db.collection.find_one()['a'])
+
     def test__update_push_other_clauses(self):
         self.db.collection.insert_one({'games': [{'scores': [0, 1]}, {'scores': [2, 3]}]})
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.update_one(
-                {'games': {'$elemMatch': {'scores.0': 2}}},
-                {'$push': {'games.$.scores': {
-                    '$each': [15, 13],
-                    '$sort': 1,
-                }}})
         with self.assertRaises(mongomock.WriteError):
             self.db.collection.update_one(
                 {'games': {'$elemMatch': {'scores.0': 2}}},

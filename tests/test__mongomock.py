@@ -1562,6 +1562,33 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         )
         self.cmp.compare.find()
 
+    def test__update_push_sort(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one(
+            {'a': {'b': [{'value': 3}, {'value': 1}, {'value': 2}]}})
+        self.cmp.do.update_one({}, {'$push': {'a.b': {
+            '$each': [{'value': 4}],
+            '$sort': {'value': 1},
+        }}})
+        self.cmp.compare.find()
+
+    def _compare_update_push_position(self, position):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one(
+            {'a': {'b': [{'value': 3}, {'value': 1}, {'value': 2}]}})
+        self.cmp.do.update_one({}, {'$push': {'a.b': {
+            '$each': [{'value': 4}],
+            '$position': position,
+        }}})
+        self.cmp.compare.find()
+
+    def test__update_push_position(self):
+        self._compare_update_push_position(0)
+        self._compare_update_push_position(1)
+        self._compare_update_push_position(5)
+        # TODO(pascal): Enable once we test against Mongo v3.6+
+        # self._compare_update_push_position(-2)
+
     def test__drop(self):
         self.cmp.do.insert({'name': 'another new'})
         self.cmp.do.drop()
