@@ -703,7 +703,25 @@ class Collection(object):
                             subdocument[field] = []
                         push_results = subdocument[field]
                         if isinstance(value, dict) and '$each' in value:
-                            push_results += list(value['$each'])
+                            if '$position' in value:
+                                push_results = \
+                                    push_results[0:value['$position']] + \
+                                    list(value['$each']) + \
+                                    push_results[value['$position']:]
+                            else:
+                                push_results += list(value['$each'])
+
+                            if '$sort' in value:
+                                sort_spec = value['$sort']
+                                if isinstance(sort_spec, dict):
+                                    sort_key = set(sort_spec.keys()).pop()
+                                    push_results = sorted(
+                                        push_results,
+                                        key=lambda d: helpers.get_value_by_dot(d, sort_key),
+                                        reverse=set(sort_spec.values()).pop() < 0)
+                                else:
+                                    push_results = sorted(push_results, reverse=sort_spec < 0)
+
                             if '$slice' in value:
                                 slice_value = value['$slice']
                                 if slice_value < 0:
@@ -712,12 +730,9 @@ class Collection(object):
                                     push_results = []
                                 else:
                                     push_results = push_results[:slice_value]
-                            unused_modifiers = set(value.keys()) - {'$each', '$slice'}
-                            if unused_modifiers & {'$sort', '$position'}:
-                                raise NotImplementedError(
-                                    '{} is a valid modifier for $push but is not implemented '
-                                    'in Mongomock yet'.format(
-                                        (unused_modifiers & {'$sort', '$position'}).pop()))
+
+                            unused_modifiers = \
+                                set(value.keys()) - {'$each', '$slice', '$position', '$sort'}
                             if unused_modifiers:
                                 raise WriteError(
                                     'Unrecognized clause in $push: ' + unused_modifiers.pop())
