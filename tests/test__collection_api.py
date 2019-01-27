@@ -1555,6 +1555,22 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             list(data_in_db), [{'_id': 1, 'test_list': [{'data': 'val'}]}])
 
+    def test__filter_unknown_top_level(self):
+        with self.assertRaises(mongomock.OperationFailure) as error:
+            self.db.collection.find_one({'$and': [{'$ne': False}]})
+        self.assertEqual('unknown top level operator: $ne', str(error.exception))
+
+    def test__find_or(self):
+        self.db.collection.insert_many([
+            {'x': 4},
+            {'x': [2, 4, 6, 8]},
+            {'x': [2, 3, 5, 7]},
+            {'x': {}},
+        ])
+        self.assertEqual(
+            [4, [2, 4, 6, 8], [2, 3, 5, 7]],
+            [d['x'] for d in self.db.collection.find({'$or': [{'x': 4}, {'x': 2}]})])
+
     def test__find_and_project_3_level_deep_nested_field(self):
         self.db.collection.insert({'_id': 1, 'a': {'b': {'c': 2}}})
         data_in_db = self.db.collection.find(projection=['a.b.c'])

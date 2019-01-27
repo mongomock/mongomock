@@ -26,6 +26,15 @@ def filter_applies(search_filter, document):
         raise OperationFailure('the match filter must be an expression in an object')
 
     for key, search in iteritems(search_filter):
+        # Top level operators.
+        if key == '$comment':
+            continue
+        if key in LOGICAL_OPERATOR_MAP:
+            if not search:
+                raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
+            return LOGICAL_OPERATOR_MAP[key](document, search)
+        if key.startswith('$'):
+            raise OperationFailure('unknown top level operator: ' + key)
 
         is_match = False
 
@@ -36,8 +45,6 @@ def filter_applies(search_filter, document):
         has_candidates = False
 
         if search == {'$exists': False} and not iter_key_candidates(key, document):
-            continue
-        if key == '$comment':
             continue
 
         for doc_val in iter_key_candidates(key, document):
@@ -54,10 +61,6 @@ def filter_applies(search_filter, document):
                 ) and search) or doc_val == search
             elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                 is_match = _regex(doc_val, search)
-            elif key in LOGICAL_OPERATOR_MAP:
-                if not search:
-                    raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
-                is_match = LOGICAL_OPERATOR_MAP[key](document, search)
             elif isinstance(doc_val, (list, tuple)):
                 is_match = (search in doc_val or search == doc_val)
                 if isinstance(search, ObjectId):
