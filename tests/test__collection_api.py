@@ -2091,6 +2091,26 @@ class CollectionAPITest(TestCase):
             'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
             'nRemoved': 2, 'nInserted': 0})
 
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__bulk_write_matched_count_no_changes(self):
+        self.db.collection.insert_one({'name': 'luke'})
+        result = self.db.collection.bulk_write([
+            pymongo.ReplaceOne({'name': 'luke'}, {'name': 'luke'}),
+        ])
+        self.assertEqual(1, result.matched_count)
+        self.assertEqual(0, result.modified_count)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__bulk_write_matched_count_replace_multiple_objects(self):
+        self.db.collection.insert_one({'name': 'luke'})
+        self.db.collection.insert_one({'name': 'anna'})
+        result = self.db.collection.bulk_write([
+            pymongo.ReplaceOne({'name': 'luke'}, {'name': 'Luke'}),
+            pymongo.ReplaceOne({'name': 'anna'}, {'name': 'anna'}),
+        ])
+        self.assertEqual(2, result.matched_count)
+        self.assertEqual(1, result.modified_count)
+
     def test_find_with_comment(self):
         self.db.collection.insert_one({'_id': 1})
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))

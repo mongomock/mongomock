@@ -164,10 +164,13 @@ class BulkWriteOperation(object):
             if result.get('upserted'):
                 ret_val['upserted'] = result.get('upserted')
                 ret_val['nUpserted'] = result.get('n')
+            else:
+                matched = result.get('n')
+                if matched is not None:
+                    ret_val['nMatched'] = matched
             modified = result.get('nModified')
             if modified is not None:
                 ret_val['nModified'] = modified
-                ret_val['nMatched'] = modified
             if result.get('err'):
                 ret_val['err'] = result.get('err')
             return ret_val
