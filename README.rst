@@ -190,6 +190,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * tipok
 * waskew (waskew _at_ narrativescience.com)
 * jmsantorum (jmsantorum [at] gmail [dot] com)
+* lidongyong
 
 
 .. _examples in tests: https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108

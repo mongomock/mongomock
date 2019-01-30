@@ -1343,6 +1343,8 @@ class Collection(object):
                         if is_sparse:
                             continue
                         index.append(None)
+                if is_sparse and not index:
+                    continue
                 index = tuple(index)
                 if index in indexed:
                     raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
