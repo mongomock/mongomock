@@ -131,6 +131,17 @@ class DatabaseGettingTest(TestCase):
         result = collection.find({})
         self.assertEqual(result.count(), 3)
 
+    def test__sparse_unique_index(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.create_index([('value', 1)], unique=True, sparse=True)
+
+        collection.insert({'value': 'should_be_unique'})
+        collection.insert({'simple': 'simple_without_value'})
+        collection.insert({'simple': 'simple_without_value2'})
+
+        collection.ensure_index([('value', 1)], unique=True, sparse=True)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
