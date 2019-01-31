@@ -60,7 +60,9 @@ class PatchTest(unittest.TestCase):
         'mongodb://otherserver.example.com:27017/default-db',
         'mongodb://[2001:67c:2e8:22::c100:68b]',
         'mongodb://[2001:67c:2e8:22::c100:68b]:1234',
-        'mongodb://r1.example.net:27017,r2.example.net:27017/'))
+        'mongodb://r1.example.net:27017,r2.example.net:27017/',
+        '/var/lib/mongo.sock',
+    ))
     def test__create_servers(self):
         pymongo.MongoClient('myserver.example.com', port=12345)
         pymongo.MongoClient('otherserver.example.com')
@@ -68,6 +70,7 @@ class PatchTest(unittest.TestCase):
         pymongo.MongoClient('mongodb://[2001:67c:2e8:22::c100:68b]:27017/base')
         pymongo.MongoClient('[2001:67c:2e8:22::c100:68b]', port=1234)
         pymongo.MongoClient('r1.example.net')
+        pymongo.MongoClient('/var/lib/mongo.sock')
 
         with self.assertRaises(ValueError):
             pymongo.MongoClient()

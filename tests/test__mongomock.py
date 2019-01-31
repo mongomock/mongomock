@@ -65,10 +65,13 @@ class InterfaceTest(TestCase):
         with self.assertRaises(InvalidURI):
             mongomock.MongoClient('mongodb://localhost?option')
 
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('mongodb:host2')
+
     def test__none_uri_host(self):
         self.assertIsNotNone(mongomock.MongoClient('host1'))
         self.assertIsNotNone(mongomock.MongoClient('//host2'))
-        self.assertIsNotNone(mongomock.MongoClient('mongodb:host2'))
+        self.assertIsNotNone(mongomock.MongoClient('mongodb:12'))
 
 
 class DatabaseGettingTest(TestCase):

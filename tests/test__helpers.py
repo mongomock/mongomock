@@ -3,7 +3,7 @@ import os
 
 from mongomock.helpers import hashdict
 from mongomock.helpers import get_value_by_dot, set_value_by_dot
-from mongomock.helpers import parse_dbase_from_uri
+from mongomock.helpers import parse_uri
 from mongomock.helpers import print_deprecation_warning
 from unittest import TestCase
 
@@ -78,7 +78,7 @@ def create_uri_spec_tests():
                 error = False
 
                 try:
-                    dbase = parse_dbase_from_uri(test['uri'])
+                    dbase = parse_uri(test['uri'])['database']
                 except Exception as e:
                     print(e)
                     error = True

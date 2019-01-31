@@ -16,6 +16,8 @@ except ImportError:
 
 # Cache the RegExp pattern type.
 RE_TYPE = type(re.compile(''))
+_HOST_MATCH = re.compile(r'^([^@]+@)?([^:]+|\[[^\]]+\])(:([^:]+))?$')
+_SIMPLE_HOST_MATCH = re.compile(r'^([^:]+|\[[^\]]+\])(:([^:]+))?$')
 
 try:
     from bson.tz_util import utc
@@ -156,21 +158,22 @@ def fields_list_to_dict(fields):
     return as_dict
 
 
-def parse_dbase_from_uri(uri):
-    """A simplified version of pymongo.uri_parser.parse_uri to get the dbase.
+def parse_uri(uri, default_port=27017, warn=False):
+    """A simplified version of pymongo.uri_parser.parse_uri.
 
-    Returns a string representing the database provided in the URI or None if
-    no database is provided in the URI.
+    Returns a dict with:
+     - nodelist, a tuple of (host, port)
+     - database the name of the database or None if no database is provided in the URI.
 
     An invalid MongoDB connection URI may raise an InvalidURI exception,
     however, the URI is not fully parsed and some invalid URIs may not result
     in an exception.
 
-    'mongodb://host1/database' becomes 'database'
+    'mongodb://host1/database' becomes 'host1', 27017, 'database'
 
     and
 
-    'mongodb://host1' becomes None
+    'mongodb://host1' becomes 'host1', 27017, None
     """
     SCHEME = 'mongodb://'
 
@@ -202,6 +205,35 @@ def parse_dbase_from_uri(uri):
         raise InvalidURI("A '/' is required between "
                          'the host list and any options.')
 
+    nodelist = []
+    if ',' in host_part:
+        hosts = host_part.split(',')
+    else:
+        hosts = [host_part]
+    for host in hosts:
+        match = _HOST_MATCH.match(host)
+        if not match:
+            raise ValueError(
+                "Reserved characters such as ':' must be escaped according RFC "
+                "2396. An IPv6 address literal must be enclosed in '[' and ']' "
+                'according to RFC 2732.')
+        host = match.group(2)
+        if host.startswith('[') and host.endswith(']'):
+            host = host[1:-1]
+
+        port = match.group(4)
+        if port:
+            try:
+                port = int(port)
+                if port < 0 or port > 65535:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError('Port must be an integer between 0 and 65535:', port)
+        else:
+            port = default_port
+
+        nodelist.append((host, port))
+
     if path_part and path_part[0] != '?':
         dbase, _, _ = path_part.partition('?')
         if '.' in dbase:
@@ -210,7 +242,39 @@ def parse_dbase_from_uri(uri):
     if dbase is not None:
         dbase = unquote_plus(dbase)
 
-    return dbase
+    return {'nodelist': tuple(nodelist), 'database': dbase}
+
+
+def split_hosts(hosts, default_port=27017):
+    """Split the entity into a list of tuples of host and port."""
+
+    nodelist = []
+    for entity in hosts.split(','):
+        port = default_port
+        if entity.endswith('.sock'):
+            port = None
+
+        match = _SIMPLE_HOST_MATCH.match(entity)
+        if not match:
+            raise ValueError(
+                "Reserved characters such as ':' must be escaped according RFC "
+                "2396. An IPv6 address literal must be enclosed in '[' and ']' "
+                'according to RFC 2732.')
+        host = match.group(1)
+        if host.startswith('[') and host.endswith(']'):
+            host = host[1:-1]
+
+        if match.group(3):
+            try:
+                port = int(match.group(3))
+                if port < 0 or port > 65535:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError('Port must be an integer between 0 and 65535:', port)
+
+        nodelist.append((host, port))
+
+    return nodelist
 
 
 def patch_datetime_awareness_in_document(value):

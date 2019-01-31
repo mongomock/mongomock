@@ -1,14 +1,15 @@
 from .database import Database
-from .helpers import parse_dbase_from_uri
 from .store import ServerStore
 import itertools
 from mongomock import ConfigurationError
 from mongomock import read_preferences
 
 try:
+    from pymongo.uri_parser import parse_uri, split_hosts
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
+    from .helpers import parse_uri, split_hosts
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
 
@@ -26,6 +27,7 @@ class MongoClient(object):
         else:
             self.host = self.HOST
         self.port = port or self.PORT
+
         self._tz_aware = tz_aware
         self._database_accesses = {}
         self._store = _store or ServerStore()
@@ -38,7 +40,11 @@ class MongoClient(object):
         dbase = None
 
         if '://' in self.host:
-            dbase = parse_dbase_from_uri(self.host)
+            res = parse_uri(self.host, default_port=self.port, warn=True)
+            self.host, self.port = res['nodelist'][0]
+            dbase = res['database']
+        else:
+            self.host, self.port = split_hosts(self.host, default_port=self.port)[0]
 
         self.__default_datebase_name = dbase
 

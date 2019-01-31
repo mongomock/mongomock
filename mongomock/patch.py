@@ -1,5 +1,4 @@
 from .mongo_client import MongoClient
-from mongomock import InvalidURI
 import time
 
 try:
@@ -14,9 +13,17 @@ except ImportError:
 
 try:
     import pymongo
+    from pymongo.uri_parser import parse_uri, split_hosts
     _IMPORT_PYMONGO_ERROR = None
 except ImportError as error:
+    from .helpers import parse_uri, split_hosts
     _IMPORT_PYMONGO_ERROR = error
+
+
+def _parse_any_host(host):
+    if '://' in host:
+        return parse_uri(host, warn=True)['nodelist']
+    return split_hosts(host)
 
 
 def patch(servers='localhost', on_new='error'):
@@ -55,10 +62,9 @@ def patch(servers='localhost', on_new='error'):
         PyMongoClient = pymongo.MongoClient
 
     persisted_clients = {}
-    parsed_servers = {
-        _parse_host_and_port(server)
-        for server in (servers if isinstance(servers, (list, tuple)) else [servers])
-    }
+    parsed_servers = set()
+    for server in servers if isinstance(servers, (list, tuple)) else [servers]:
+        parsed_servers.update(_parse_any_host(server))
 
     def _create_persistent_client(*args, **kwargs):
         if _IMPORT_PYMONGO_ERROR:
@@ -66,18 +72,15 @@ def patch(servers='localhost', on_new='error'):
 
         client = MongoClient(*args, **kwargs)
 
-        client_host, client_port = client.address
-        host, port = _parse_host_and_port(client_host, client_port)
-
         try:
-            persisted_client = persisted_clients[(host, port)]
+            persisted_client = persisted_clients[client.address]
             client._store = persisted_client._store
             return client
         except KeyError:
             pass
 
-        if (host, port) in parsed_servers or on_new == 'create':
-            persisted_clients[(host, port)] = client
+        if client.address in parsed_servers or on_new == 'create':
+            persisted_clients[client.address] = client
             return client
 
         if on_new == 'timeout':
@@ -93,42 +96,3 @@ def patch(servers='localhost', on_new='error'):
             'MongoDB server %s:%d does not exist.\n' % client.address + '%s' % parsed_servers)
 
     return mock.patch('pymongo.MongoClient', _create_persistent_client)
-
-
-def _parse_host_and_port(uri, default_port=27017):
-    """A simplified version of pymongo.uri_parser.parse_uri to get the dbase.
-
-    Returns a tuple of the main host and the port provided in the URI.
-
-    An invalid MongoDB connection URI may raise an InvalidURI exception,
-    however, the URI is not fully parsed and some invalid URIs may not result
-    in an exception.
-    """
-    if '://' not in uri:
-        return uri, default_port
-
-    uri = uri.split('://', 1)[1]
-
-    if '/' in uri:
-        uri = uri.split('/', 1)[0]
-
-    # TODO(pascal): Handle replica sets better. Accessing the secondary hosts
-    # should reach the same dataas the primary.
-    if ',' in uri:
-        uri = uri.split(',', 1)[0]
-
-    if ']:' in uri:
-        host, uri = uri.split(']:', 1)
-        host = host + ']'
-    elif ':' in uri and not uri.endswith(']'):
-        host, uri = uri.split(':', 1)
-    else:
-        return uri, default_port
-
-    if not uri:
-        return uri, default_port
-
-    try:
-        return host, int(uri)
-    except ValueError:
-        raise InvalidURI('Invalid URI scheme: could not parse port "%s"' % uri)

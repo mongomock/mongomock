@@ -28,3 +28,50 @@ class MongoClientApiTest(unittest.TestCase):
         client = mongomock.MongoClient(read_preference=ReadPreference.NEAREST)
         self.assertEqual(ReadPreference.NEAREST, client.db.read_preference)
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
+
+    def test__parse_url(self):
+        client = mongomock.MongoClient('mongodb://localhost:27017/')
+        self.assertEqual(('localhost', 27017), client.address)
+
+        client = mongomock.MongoClient('mongodb://localhost:1234,example.com/')
+        self.assertEqual(('localhost', 1234), client.address)
+
+        client = mongomock.MongoClient('mongodb://example.com,localhost:1234/')
+        self.assertEqual(('example.com', 27017), client.address)
+
+        client = mongomock.MongoClient('mongodb://[::1]:1234/')
+        self.assertEqual(('::1', 1234), client.address)
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('mongodb://localhost:1234:456/')
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('mongodb://localhost:123456/')
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('mongodb://localhost:mongoport/')
+
+    def test__parse_hosts(self):
+        client = mongomock.MongoClient('localhost')
+        self.assertEqual(('localhost', 27017), client.address)
+
+        client = mongomock.MongoClient('localhost:1234,example.com')
+        self.assertEqual(('localhost', 1234), client.address)
+
+        client = mongomock.MongoClient('example.com,localhost:1234')
+        self.assertEqual(('example.com', 27017), client.address)
+
+        client = mongomock.MongoClient('[::1]:1234')
+        self.assertEqual(('::1', 1234), client.address)
+
+        client = mongomock.MongoClient('/var/socket/mongo.sock')
+        self.assertEqual(('/var/socket/mongo.sock', None), client.address)
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('localhost:1234:456')
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('localhost:123456')
+
+        with self.assertRaises(ValueError):
+            mongomock.MongoClient('localhost:mongoport')
