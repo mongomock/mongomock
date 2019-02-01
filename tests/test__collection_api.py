@@ -1589,6 +1589,17 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             list(data_in_db), [{'_id': 1, 'test_list': [{'data': 'val'}]}])
 
+    def test__filter_with_ne_none(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'field1': 'baz', 'field2': 'bar'},
+            {'_id': 2, 'field1': 'baz'},
+            {'_id': 3, 'field1': 'baz', 'field2': None},
+            {'_id': 4, 'field1': 'baz', 'field2': False},
+            {'_id': 5, 'field1': 'baz', 'field2': 0},
+        ])
+        data_in_db = self.db.collection.find({'field1': 'baz', 'field2': {'$ne': None}})
+        self.assertEqual([1, 4, 5], [d['_id'] for d in data_in_db])
+
     def test__filter_unknown_top_level(self):
         with self.assertRaises(mongomock.OperationFailure) as error:
             self.db.collection.find_one({'$and': [{'$ne': False}]})

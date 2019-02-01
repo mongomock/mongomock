@@ -353,7 +353,7 @@ SORTING_OPERATOR_MAP = {
 
 OPERATOR_MAP = dict({
     '$eq': operator_eq,
-    '$ne': operator.ne,
+    '$ne': lambda dv, sv: not operator_eq(dv, sv),
     '$all': _all_op,
     '$in': _in_op,
     '$nin': lambda dv, sv: not _in_op(dv, sv),
