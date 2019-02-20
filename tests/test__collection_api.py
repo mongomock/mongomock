@@ -1622,7 +1622,6 @@ class CollectionAPITest(TestCase):
             [1, 2],
             [d['x'] for d in self.db.collection.find({}, max_time_ms=1000)])
 
-    def test__find_with_max_time_ms__validate_type(self):
         with self.assertRaises(TypeError):
             self.db.collection.find({}, max_time_ms='1000')
 

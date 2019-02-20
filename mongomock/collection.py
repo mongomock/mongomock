@@ -912,11 +912,9 @@ class Collection(object):
         spec = filter
         if spec is None:
             spec = {}
-        if max_time_ms is not None and not isinstance(max_time_ms, int):
-            raise TypeError('max_time_ms must be an integer or None')
-        # Currently the value is ignored as mongomock never times out.
+
         validate_is_mapping('filter', spec)
-        return Cursor(self, spec, sort, projection, skip, limit, collation=collation)
+        return Cursor(self, spec, sort, projection, skip, limit, collation=collation).max_time_ms(max_time_ms)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = self._iter_documents(spec)
