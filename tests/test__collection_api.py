@@ -1616,6 +1616,15 @@ class CollectionAPITest(TestCase):
             [4, [2, 4, 6, 8], [2, 3, 5, 7]],
             [d['x'] for d in self.db.collection.find({'$or': [{'x': 4}, {'x': 2}]})])
 
+    def test__find_with_max_time_ms(self):
+        self.db.collection.insert_many([{'x': 1}, {'x': 2}])
+        self.assertEqual(
+            [1, 2],
+            [d['x'] for d in self.db.collection.find({}, max_time_ms=1000)])
+
+        with self.assertRaises(TypeError):
+            self.db.collection.find({}, max_time_ms='1000')
+
     def test__find_and_project_3_level_deep_nested_field(self):
         self.db.collection.insert({'_id': 1, 'a': {'b': {'c': 2}}})
         data_in_db = self.db.collection.find(projection=['a.b.c'])
