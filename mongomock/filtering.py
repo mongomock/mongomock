@@ -29,7 +29,13 @@ def filter_applies(search_filter, document):
         # Top level operators.
         if key == '$comment':
             continue
-        if key.startswith('$') and key not in LOGICAL_OPERATOR_MAP:
+        if key in LOGICAL_OPERATOR_MAP:
+            if not search:
+                raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
+            if not LOGICAL_OPERATOR_MAP[key](document, search):
+                return False
+            continue
+        if key.startswith('$'):
             raise OperationFailure('unknown top level operator: ' + key)
 
         is_match = False
