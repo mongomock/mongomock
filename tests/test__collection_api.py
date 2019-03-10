@@ -2170,6 +2170,17 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test__find_or_and(self):
+        self.db.collection.insert_many([
+            {'x': 1, 'y': 1},
+            {'x': 2, 'y': 2},
+        ])
+        search_filter = collections.OrderedDict([
+            ('$or', [{'x': 1}, {'x': 2}]),
+            ('y', 2),
+        ])
+        self.assertEqual([2], [d['x'] for d in self.db.collection.find(search_filter)])
+
     def test__aggregate_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
         self.db.b.insert_many([
