@@ -1773,12 +1773,11 @@ class Cursor(object):
             self._skip = skip
             self._limit = limit
             return self
-        elif not isinstance(index, int):
+        if not isinstance(index, int):
             raise TypeError("index '%s' cannot be applied to Cursor instances" % index)
-        elif index < 0:
+        if index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
-        else:
-            return self._compute_results(with_limit_and_skip=True)[index]
+        return self._compute_results(with_limit_and_skip=True)[index]
 
     def __enter__(self):
         return self
