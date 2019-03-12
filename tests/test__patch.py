@@ -105,6 +105,18 @@ class PatchTest(unittest.TestCase):
         client_2.get_default_database().collection.insert_one({'name': 'Caribou'})
         self.assertEqual(['Caribou'], [d['name'] for d in client_1.db2.collection.find()])
 
+    @mongomock.patch(('my-db_client-url',))
+    def test__rename_through_another_client(self):
+        client1 = pymongo.MongoClient('mongodb://my-db_client-url/test')
+        client1.test.my_collec.insert_one({'_id': 'Previous data'})
+
+        client2 = pymongo.MongoClient('mongodb://my-db_client-url/test')
+        client2.test.drop_collection('my_collec')
+        client2.test.other_collec.insert_one({'_id': 'New data'})
+        client2.test.other_collec.rename('my_collec')
+
+        self.assertEqual(['New data'], [d['_id'] for d in client1.test.my_collec.find()])
+
 
 if __name__ == '__main__':
     unittest.main()

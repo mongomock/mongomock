@@ -1652,6 +1652,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
         self.cmp.compare.find()
 
+    def test__rename_collection(self):
+        self.cmp.do.insert_one({'_id': 1, 'foo': 'bar'})
+        self.cmp.compare.rename('new_name')
+        self.cmp.compare.find()
+
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')

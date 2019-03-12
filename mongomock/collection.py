@@ -359,9 +359,10 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, database, _store, write_concern=None, read_preference=None):
+    def __init__(self, database, name, _db_store, write_concern=None, read_preference=None):
         self.database = database
-        self._store = _store
+        self._name = name
+        self._db_store = _db_store
         self._write_concern = write_concern or WriteConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
 
@@ -380,11 +381,11 @@ class Collection(object):
 
     @property
     def full_name(self):
-        return '{0}.{1}'.format(self.database.name, self._store.name)
+        return '{0}.{1}'.format(self.database.name, self._name)
 
     @property
     def name(self):
-        return self._store.name
+        return self._name
 
     @property
     def write_concern(self):
@@ -418,6 +419,10 @@ class Collection(object):
         for document in documents:
             validate_is_mutable_mapping('document', document)
         return InsertManyResult(self._insert(documents, session), acknowledged=True)
+
+    @property
+    def _store(self):
+        return self._db_store[self._name]
 
     def _insert(self, data, session=None):
         if session:
@@ -1611,13 +1616,13 @@ class Collection(object):
         write_concern = kwargs.get('write_concern', self.write_concern)
         read_preference = kwargs.get('read_preference', self.read_preference)
         return Collection(
-            self.database, write_concern=write_concern, read_preference=read_preference,
-            _store=self._store)
+            self.database, self.name, write_concern=write_concern, read_preference=read_preference,
+            _db_store=self._db_store)
 
     def rename(self, new_name, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        self.database.rename_collection(self.name, new_name, **kwargs)
+        return self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
         if bypass_document_validation:

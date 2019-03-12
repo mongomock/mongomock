@@ -1726,12 +1726,6 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.write_concern, col2.write_concern)
         self.assertEqual({'w': 2}, col2.write_concern.document)
 
-        # Check that renaming one, renames the other.
-        col1 = self.db.collection
-        col1.rename('new_name')
-        self.assertEqual('new_name', col1.name)
-        self.assertEqual('new_name', col2.name)
-
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_different_read_preference(self):
         self.db.collection.insert_one({'name': 'col1'})
@@ -1746,12 +1740,6 @@ class CollectionAPITest(TestCase):
         self.assertEqual('primary', self.db.collection.read_preference.mongos_mode)
         self.assertNotEqual(self.db.collection.read_preference, col2.read_preference)
         self.assertEqual('nearest', col2.read_preference.mongos_mode)
-
-        # Check that renaming one, renames the other.
-        col1 = self.db.collection
-        col1.rename('new_name')
-        self.assertEqual('new_name', col1.name)
-        self.assertEqual('new_name', col2.name)
 
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
@@ -1924,11 +1912,12 @@ class CollectionAPITest(TestCase):
 
         coll.rename('other_name')
 
-        self.assertEqual('other_name', coll.name)
+        self.assertEqual('collection', coll.name)
         self.assertEqual(
             set(['other_name']), set(self.db.list_collection_names()))
-        self.assertEqual(coll, self.db.other_name)
-        data_in_db = coll.find()
+        self.assertNotEqual(coll, self.db.other_name)
+        self.assertEqual([], list(coll.find()))
+        data_in_db = self.db.other_name.find()
         self.assertEqual(
             [({'_id': 1, 'test_list': [{'data': 'val'}]})], list(data_in_db))
 

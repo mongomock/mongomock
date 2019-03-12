@@ -75,9 +75,9 @@ class Database(object):
             return self._collection_accesses[name]
         except KeyError:
             collection = self._collection_accesses[name] = Collection(
-                self, write_concern=write_concern,
+                self, name=name, write_concern=write_concern,
                 read_preference=read_preference or self.read_preference,
-                _store=self._store[name])
+                _db_store=self._store)
             return collection
 
     def drop_collection(self, name_or_collection, session=None):
@@ -129,8 +129,7 @@ class Database(object):
                     'The target collection "{0}" already exists'.format(new_name),
                     10027)
         self._store.rename(name, new_name)
-        collection = self._collection_accesses.pop(name)
-        self._collection_accesses[new_name] = collection
+        return {'ok': 1}
 
     def dereference(self, dbref, session=None):
         if session:
