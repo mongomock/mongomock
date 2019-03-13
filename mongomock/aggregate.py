@@ -706,7 +706,7 @@ def _handle_project_stage(in_collection, unused_database, options):
                 out_doc[field] = _parse_expression(value, in_doc)
             except KeyError:
                 pass
-    if (method == 'include') == (include_id is not False):
+    if (method == 'include') == (include_id is not False and include_id is not 0):
         filter_list.append('_id')
 
     if not filter_list:

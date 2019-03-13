@@ -2284,6 +2284,16 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         }}]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate_project_id_0(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert([
+            {'_id': 4},
+            {'a': 5},
+            {},
+        ])
+        pipeline = [{'$project': {'_id': 0}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_bucket(self):
         self.cmp.do.remove()
         self.cmp.do.insert_many([

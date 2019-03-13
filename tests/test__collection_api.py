@@ -2506,6 +2506,11 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 2, 'b': 3}], list(actual))
 
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0}}
+        ])
+        self.assertEqual([{'a': 2, 'b': 3}], list(actual))
+
     def test__aggregate_project_subfield(self):
         self.db.collection.insert_many([
             {'_id': 1, 'a': {'b': 3}, 'other': 1},
