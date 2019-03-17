@@ -1,5 +1,15 @@
 import unittest
 
+try:
+    from unittest import mock
+    _HAVE_MOCK = True
+except ImportError:
+    try:
+        import mock
+        _HAVE_MOCK = True
+    except ImportError:
+        _HAVE_MOCK = False
+
 import mongomock
 
 try:
@@ -75,3 +85,24 @@ class MongoClientApiTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             mongomock.MongoClient('localhost:mongoport')
+
+    @unittest.skipIf(not _HAVE_MOCK, 'mock not installed')
+    def test_database_names(self):
+        with mock.patch('warnings.warn') as mock_warn:
+            client = mongomock.MongoClient()
+            client.one_db.my_collec.insert_one({})
+            mock_warn.assert_not_called()
+            self.assertEqual(['one_db'], client.database_names())
+            self.assertEqual(1, mock_warn.call_count)
+            self.assertIn('deprecated', mock_warn.call_args[0][0])
+
+    def test_list_database_names(self):
+        client = mongomock.MongoClient()
+        self.assertEqual([], client.list_database_names())
+
+        # Query a non existant collection.
+        client.one_db.my_collec.find_one()
+        self.assertEqual([], client.list_database_names())
+
+        client.one_db.my_collec.insert_one({})
+        self.assertEqual(['one_db'], client.list_database_names())

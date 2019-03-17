@@ -3,6 +3,7 @@ from .store import ServerStore
 import itertools
 from mongomock import ConfigurationError
 from mongomock import read_preferences
+import warnings
 
 try:
     from pymongo.uri_parser import parse_uri, split_hosts
@@ -88,6 +89,10 @@ class MongoClient(object):
         }
 
     def database_names(self):
+        warnings.warn('database_names is deprecated. Use list_database_names instead.')
+        return self.list_database_names()
+
+    def list_database_names(self):
         return self._store.list_created_database_names()
 
     def drop_database(self, name_or_db):
