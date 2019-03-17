@@ -352,6 +352,13 @@ class _Parser(object):
         if operator == '$in':
             expression, array = values
             return self.parse(expression) in self.parse(array)
+        if operator == '$setUnion':
+            result = []
+            for set_value in values:
+                for value in self.parse(set_value):
+                    if value not in result:
+                        result.append(value)
+            return result
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
