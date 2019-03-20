@@ -2641,7 +2641,7 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$setUnion': [[2], [1, 2, 3]]}}},
+                {'$project': {'a': {'$setEquals': [[2], [1, 2, 3]]}}},
             ])
 
     def test__aggregate_project_rotate(self):
@@ -3611,3 +3611,23 @@ class CollectionAPITest(TestCase):
         assertCountEqual(self, [1, 2], [d['_id'] for d in self.db.collection.find()])
         self.assertEqual(2, err_context.exception.details['nInserted'])
         self.assertEqual([2], [e['index'] for e in err_context.exception.details['writeErrors']])
+
+    def test__set_union(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': ['one', 'three']},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$setUnion': [['one', 'two'], '$array']},
+            'distinct': {'$setUnion': [['one', 'two'], ['three'], ['four']]},
+            'nested': {'$setUnion': [['one', 'two'], [['one', 'two']]]},
+            'objects': {'$setUnion': [[{'a': 1}, {'b': 2}], [{'a': 1}, {'c': 3}]]},
+        }}])
+        expect = [{
+            'array': ['one', 'two', 'three'],
+            'distinct': ['one', 'two', 'three', 'four'],
+            'nested': ['one', 'two', ['one', 'two']],
+            'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
+        }]
+        self.assertEqual(expect, list(actual))
