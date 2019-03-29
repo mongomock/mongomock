@@ -20,10 +20,12 @@ except ImportError as error:
     _IMPORT_PYMONGO_ERROR = error
 
 
-def _parse_any_host(host):
+def _parse_any_host(host, default_port=27017):
+    if isinstance(host, tuple):
+        return _parse_any_host(host[0], host[1])
     if '://' in host:
         return parse_uri(host, warn=True)['nodelist']
-    return split_hosts(host)
+    return split_hosts(host, default_port=default_port)
 
 
 def patch(servers='localhost', on_new='error'):
