@@ -47,9 +47,9 @@ class PatchTest(unittest.TestCase):
         client2 = pymongo.MongoClient(host='myserver.example.com', port=12345)
         self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
 
-    @mongomock.patch(servers="test.server.com:134,test2.server.com:456")
+    @mongomock.patch(servers='test.server.com:134,test2.server.com:456')
     def test__decorator_with_servers(self):
-        for host, port in zip(["test.server.com,test2.server.com"], [134, 456]):
+        for host, port in zip(['test.server.com,test2.server.com'], [134, 456]):
             client1 = pymongo.MongoClient(host=host, port=port)
             client1.db.coll.insert_one({'name': 'Pascal'})
 
