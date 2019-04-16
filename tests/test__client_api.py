@@ -92,7 +92,7 @@ class MongoClientApiTest(unittest.TestCase):
             client = mongomock.MongoClient()
             client.one_db.my_collec.insert_one({})
             mock_warn.assert_not_called()
-            self.assertEqual(['one_db'], client.database_names())
+            self.assertEqual(['one_db'], client.list_database_names())
             self.assertEqual(1, mock_warn.call_count)
             self.assertIn('deprecated', mock_warn.call_args[0][0])
 

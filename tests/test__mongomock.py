@@ -2682,6 +2682,6 @@ class DatabasesNamesTest(TestCase):
     def test__database_names(self):
         self.client.unit.tests.insert({'foo': 'bar'})
         self.client.foo.bar.insert({'unit': 'test'})
-        names = self.client.database_names()
+        names = self.client.list_database_names()
         self.assertIsInstance(names, list)
         self.assertEqual(sorted(['foo', 'unit']), sorted(names))
