@@ -47,6 +47,19 @@ class PatchTest(unittest.TestCase):
         client2 = pymongo.MongoClient(host='myserver.example.com', port=12345)
         self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
 
+    @mongomock.patch(servers="test.server.com:134,test2.server.com:456")
+    def test__decorator_with_servers(self):
+        for host, port in zip(["test.server.com,test2.server.com"], [134, 456]):
+            client1 = pymongo.MongoClient(host=host, port=port)
+            client1.db.coll.insert_one({'name': 'Pascal'})
+
+            client2 = pymongo.MongoClient(host=host, port=port)
+            self.assertEqual(['db'], client2.list_database_names())
+            self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
+            client2.db.coll.drop()
+
+            self.assertEqual(None, client1.db.coll.find_one())
+
     @mongomock.patch()
     def test__error_new(self):
         # Valid because using the default server which was whitelisted by default.

@@ -80,7 +80,7 @@ mongomock.patch:
 
 .. code-block:: python
 
-  @mongomock.patch(servers=(('server.example.com', 27017),))
+  @mongomock.patch(servers='server.example.com:27017,server2.example.com:9999')
   def test_increate_votes_endpoint():
     objects = [dict(votes=1), dict(votes=2), ...]
     client = pymongo.MongoClient('server.example.com')
