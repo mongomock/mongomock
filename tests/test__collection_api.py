@@ -2610,21 +2610,32 @@ class CollectionAPITest(TestCase):
             'upper': {'$toUpper': '$a'},
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '', 'lower': 'hello', 'upper': 'HELLO'}],
+            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '',
+              'lower': 'hello', 'upper': 'HELLO'}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_misc_operations_objectid(self):
+        _id = ObjectId()
+        self.db.collection.insert_one({
+            'a': _id
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'toString': {'$toString': '$a'},
+        }}])
+        self.assertEqual(
+            [{'toString': str(_id)}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_misc_operations(self):
-        _id = ObjectId()
         self.db.collection.insert_one({
-            'a': _id,
-            'b': 3,
+            'a': 3,
         })
         actual = self.db.collection.aggregate([{'$project': {
-            'toString1': {'$toString': '$a'},
-            'toString2': {'$toString': '$b'},
+            'toString': {'$toString': '$a'},
         }}])
         self.assertEqual(
-            [{'toString1': str(_id), 'toString2': '3'}],
+            [{'toString': '3'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_unrecognized(self):
