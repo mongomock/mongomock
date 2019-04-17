@@ -2607,6 +2607,7 @@ class CollectionAPITest(TestCase):
             'concat': {'$concat': ['$a', ' Dear ', '$b']},
             'sub1': {'$substr': ['$a', 0, 4]},
             'sub2': {'$substr': ['$a', -1, 3]},
+            'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
             'upper': {'$toUpper': '$a'},
@@ -2614,7 +2615,7 @@ class CollectionAPITest(TestCase):
             'toStr': {'$toString': '$c'}
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '', 'lower': 'hello',
+            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '', 'sub3': 'llo', 'lower': 'hello',
               'lower_err': '', 'upper': 'HELLO', 'upper_err': '', 'toStr': '3'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
