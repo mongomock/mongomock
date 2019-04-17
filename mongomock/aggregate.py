@@ -86,8 +86,6 @@ string_operators = [
     '$substr',
     '$toLower',
     '$toUpper',
-]
-misc_operators = [
     '$toString',
 ]
 comparison_operators = [
@@ -162,8 +160,6 @@ class _Parser(object):
                 return self._handle_set_operator(k, v)
             if k in string_operators:
                 return self._handle_string_operator(k, v)
-            if k in misc_operators:
-                return self._handle_misc_operator(k, v)
             if k in boolean_operators + \
                     text_search_operators + projection_operators:
                 raise NotImplementedError(
@@ -263,24 +259,18 @@ class _Parser(object):
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
 
-    def _handle_misc_operator(self, operator, values):
-        if operator == '$toString':
-            parsed = self.parse(values)
-            return str(parsed) if parsed is not None else None
-            # This should never happen: it is only a safe fallback if something went wrong.
-        raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid operator for the aggregation "
-            'pipeline, it is currently not implemented  in Mongomock.' % operator)
-
     def _handle_string_operator(self, operator, values):
         if operator == '$toLower':
-            return str(self.parse(values)).lower()
+            parsed = self.parse(values)
+            return str(parsed).lower() if parsed is not None else ''
         if operator == '$toUpper':
-            return str(self.parse(values)).upper()
+            parsed = self.parse(values)
+            return str(parsed).upper() if parsed is not None else ''
         if operator == '$concat':
             return ''.join([str(self.parse(value)) for value in values])
         if operator == '$substr':
-            assert len(values) == 3, 'substr must have 3 items'
+            if len(values) != 3:
+                raise OperationFailure('substr must have 3 items')
             string = str(self.parse(values[0]))
             first = self.parse(values[1])
             length = self.parse(values[2])
@@ -289,9 +279,13 @@ class _Parser(object):
             second = len(string) if length < 0 else first + length
             return string[first:second]
         if operator == '$strcasecmp':
-            assert len(values) == 2, 'strcasecmp must have 2 items'
+            if len(values) != 2:
+                raise OperationFailure('strcasecmp must have 2 items')
             a, b = str(self.parse(values[0])), str(self.parse(values[1]))
             return 0 if a == b else -1 if a < b else 1
+        if operator == '$toString':
+            parsed = self.parse(values)
+            return str(parsed) if parsed is not None else None
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid string operator for the aggregation "

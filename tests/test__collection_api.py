@@ -2601,41 +2601,33 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({
             'a': 'Hello',
             'b': 'World',
+            'c': 3
         })
         actual = self.db.collection.aggregate([{'$project': {
             'concat': {'$concat': ['$a', ' Dear ', '$b']},
             'sub1': {'$substr': ['$a', 0, 4]},
             'sub2': {'$substr': ['$a', -1, 3]},
             'lower': {'$toLower': '$a'},
+            'lower_err': {'$toLower': None},
             'upper': {'$toUpper': '$a'},
+            'upper_err': {'$toUpper': None},
+            'toStr': {'$toString': '$c'}
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '',
-              'lower': 'hello', 'upper': 'HELLO'}],
+            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '', 'lower': 'hello',
+              'lower_err': '', 'upper': 'HELLO', 'upper_err': '', 'toStr': '3'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-    def test__aggregate_misc_operations_objectid(self):
-        _id = ObjectId()
+    def test__aggregate_tostr_operation_objectid(self):
         self.db.collection.insert_one({
-            'a': _id
+            'a': ObjectId('5abcfad1fbc93d00080cfe66')
         })
         actual = self.db.collection.aggregate([{'$project': {
             'toString': {'$toString': '$a'},
         }}])
         self.assertEqual(
-            [{'toString': str(_id)}],
-            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
-
-    def test__aggregate_misc_operations(self):
-        self.db.collection.insert_one({
-            'a': 3,
-        })
-        actual = self.db.collection.aggregate([{'$project': {
-            'toString': {'$toString': '$a'},
-        }}])
-        self.assertEqual(
-            [{'toString': '3'}],
+            [{'toString': '5abcfad1fbc93d00080cfe66'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_unrecognized(self):
