@@ -15,7 +15,7 @@ from mongomock.write_concern import WriteConcern
 
 try:
     from bson.errors import InvalidDocument
-    from bson import tz_util
+    from bson import tz_util, ObjectId
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -2595,6 +2595,36 @@ class CollectionAPITest(TestCase):
         }}])
         self.assertEqual(
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_string_operations(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'concat': {'$concat': ['$a', ' Dear ', '$b']},
+            'sub1': {'$substr': ['$a', 0, 4]},
+            'sub2': {'$substr': ['$a', -1, 3]},
+            'lower': {'$toLower': '$a'},
+            'upper': {'$toUpper': '$a'},
+        }}])
+        self.assertEqual(
+            [{'concat': 'Hello Dear World', 'sub1': 'Hell', 'sub2': '', 'lower': 'hello', 'upper': 'HELLO'}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_misc_operations(self):
+        _id = ObjectId()
+        self.db.collection.insert_one({
+            'a': _id,
+            'b': 3,
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'toString1': {'$toString': '$a'},
+            'toString2': {'$toString': '$b'},
+        }}])
+        self.assertEqual(
+            [{'toString1': str(_id), 'toString2': '3'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_unrecognized(self):
