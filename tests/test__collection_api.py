@@ -15,7 +15,7 @@ from mongomock.write_concern import WriteConcern
 
 try:
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId
+    from bson import tz_util
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
