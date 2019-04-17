@@ -175,8 +175,6 @@ def _in_op(doc_val, search_val):
 def _not_op(d, k, s):
     if isinstance(s, dict):
         for key in s.keys():
-            if key == '$regex':
-                raise OperationFailure('$not cannot have a regex')
             if key not in OPERATOR_MAP and key not in LOGICAL_OPERATOR_MAP:
                 raise OperationFailure('unknown operator: %s' % key)
     elif isinstance(s, type(re.compile(''))):

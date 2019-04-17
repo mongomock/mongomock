@@ -3047,6 +3047,17 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_one({'a': {'$not': {'b': 3}}})
 
+    def test_filter_not_regex(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': 'b'},
+            # Starts with a: should be excluded.
+            {'_id': 2, 'a': 'a'},
+            {'_id': 3, 'a': 'ba'},
+            {'_id': 4}
+        ])
+        results = self.db.collection.find({'a': {'$not': {'$regex': '^a'}}})
+        self.assertEqual({1, 3, 4}, {doc['_id'] for doc in results})
+
     def test_insert_many_bulk_write_error(self):
         collection = self.db.collection
         with self.assertRaises(mongomock.BulkWriteError) as cm:

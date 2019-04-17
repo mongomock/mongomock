@@ -130,6 +130,18 @@ class PatchTest(unittest.TestCase):
 
         self.assertEqual(['New data'], [d['_id'] for d in client1.test.my_collec.find()])
 
+    @mongomock.patch(servers=(('server.example.com', 27017),))
+    def test__tuple_server_host_and_port(self):
+        objects = [dict(votes=1), dict(votes=2)]
+        client = pymongo.MongoClient('server.example.com')
+        client.db.collection.insert_many(objects)
+
+        collection = pymongo.MongoClient('server.example.com').db.collection
+        for document in collection.find():
+            collection.update_one(document, {'$set': {'votes': document['votes'] + 1}})
+
+        self.assertEqual([2, 3], sorted(d.get('votes') for d in client.db.collection.find()))
+
 
 if __name__ == '__main__':
     unittest.main()

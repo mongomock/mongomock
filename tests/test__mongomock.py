@@ -632,11 +632,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             self.fake_collection.find({'name': {'$not': True}}).count()
 
         with self.assertRaises(OperationFailure):
-            self.mongo_collection.find({'name': {'$not': {'$regex': ''}}}).count()
-        with self.assertRaises(OperationFailure):
-            self.fake_collection.find({'name': {'$not': {'$regex': ''}}}).count()
-
-        with self.assertRaises(OperationFailure):
             self.mongo_collection.find({'name': {'$not': []}}).count()
         with self.assertRaises(OperationFailure):
             self.fake_collection.find({'name': {'$not': []}}).count()
