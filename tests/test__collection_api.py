@@ -2619,7 +2619,7 @@ class CollectionAPITest(TestCase):
               'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'upper': 'HELLO', 'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
-    # TODO: Re-enable once TRAVIS supports MongoDB 4
+    # TODO(ymoran00): Re-enable once TRAVIS supports MongoDB 4
     # @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     # def test__aggregate_tostr_operation_objectid(self):
     #     self.db.collection.insert_one({

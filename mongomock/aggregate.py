@@ -284,7 +284,7 @@ class _Parser(object):
                 raise OperationFailure('strcasecmp must have 2 items')
             a, b = str(self.parse(values[0])), str(self.parse(values[1]))
             return 0 if a == b else -1 if a < b else 1
-        # TODO: Re-enable once TRAVIS supports MongoDB 4
+        # TODO(ymoran00): Re-enable once TRAVIS supports MongoDB 4
         # if operator == '$toString':
         #     parsed = self.parse(values)
         #     return str(parsed) if parsed is not None else None
