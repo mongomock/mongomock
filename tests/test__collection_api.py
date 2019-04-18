@@ -15,7 +15,7 @@ from mongomock.write_concern import WriteConcern
 
 try:
     from bson.errors import InvalidDocument
-    from bson import tz_util
+    from bson import tz_util, ObjectId
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -2611,26 +2611,50 @@ class CollectionAPITest(TestCase):
             'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
+            'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
             'upper_err': {'$toUpper': None},
         }}])
         self.assertEqual(
             [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
-              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'upper': 'HELLO', 'upper_err': ''}],
+              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1, 'upper': 'HELLO', 'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
-    # TODO(ymoran00): Re-enable once TRAVIS supports MongoDB 4
-    # @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-    # def test__aggregate_tostr_operation_objectid(self):
-    #     self.db.collection.insert_one({
-    #         'a': ObjectId('5abcfad1fbc93d00080cfe66')
-    #     })
-    #     actual = self.db.collection.aggregate([{'$project': {
-    #         'toString': {'$toString': '$a'},
-    #     }}])
-    #     self.assertEqual(
-    #         [{'toString': '5abcfad1fbc93d00080cfe66'}],
-    #         [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+    def test__strcmp_not_enough_params(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+        })
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'cmp': {'$strcasecmp': ['s']}}}
+            ])
+        self.assertEqual(
+            'strcasecmp must have 2 items',
+            str(err.exception))
+
+    def test__substr_not_enough_params(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+        })
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'sub': {'$substr': ['$a', 1]}}}
+            ])
+        self.assertEqual(
+            'substr must have 3 items',
+            str(err.exception))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_tostr_operation_objectid(self):
+        self.db.collection.insert_one({
+            'a': ObjectId('5abcfad1fbc93d00080cfe66')
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'toString': {'$toString': '$a'},
+        }}])
+        self.assertEqual(
+            [{'toString': '5abcfad1fbc93d00080cfe66'}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_unrecognized(self):
         self.db.collection.insert_one({})

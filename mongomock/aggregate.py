@@ -86,7 +86,7 @@ string_operators = [
     '$substr',
     '$toLower',
     '$toUpper',
-    # '$toString',
+    '$toString',
 ]
 comparison_operators = [
     '$cmp',
@@ -284,10 +284,9 @@ class _Parser(object):
                 raise OperationFailure('strcasecmp must have 2 items')
             a, b = str(self.parse(values[0])), str(self.parse(values[1]))
             return 0 if a == b else -1 if a < b else 1
-        # TODO(ymoran00): Re-enable once TRAVIS supports MongoDB 4
-        # if operator == '$toString':
-        #     parsed = self.parse(values)
-        #     return str(parsed) if parsed is not None else None
+        if operator == '$toString':
+            parsed = self.parse(values)
+            return str(parsed) if parsed is not None else None
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid string operator for the aggregation "
