@@ -2275,8 +2275,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'maxNone': {'$max': [None, None]},
             'minNone': {'$min': [None, None]},
             'avgNone': {'$avg': ['a', None]},
-            'sumNone': {'$sum': ['a', None]},
-            'toString':{'$toString': '$a'}
+            'sumNone': {'$sum': ['a', None]}
         }}]
         self.cmp.compare.aggregate(pipeline)
 
