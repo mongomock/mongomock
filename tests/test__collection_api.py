@@ -2617,7 +2617,8 @@ class CollectionAPITest(TestCase):
         }}])
         self.assertEqual(
             [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
-              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1, 'upper': 'HELLO', 'upper_err': ''}],
+              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1,
+              'upper': 'HELLO', 'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__strcmp_not_enough_params(self):
