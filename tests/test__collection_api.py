@@ -14,6 +14,7 @@ import mongomock
 from mongomock.write_concern import WriteConcern
 
 try:
+    from bson import codec_options
     from bson.errors import InvalidDocument
     from bson import tz_util
     import pymongo
@@ -1741,6 +1742,15 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.read_preference, col2.read_preference)
         self.assertEqual('nearest', col2.read_preference.mongos_mode)
 
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__codec_options(self):
+        self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
+
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__codec_options_without_pymongo(self):
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.codec_options  # pylint: disable=pointless-statement
+
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
 
@@ -3084,12 +3094,10 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert({'a': {'b'}})
-        if IS_PYPY:
-            expect = "cannot convert value of type <type 'set'> to bson"
-        elif six.PY2:
-            expect = "Cannot encode object: set(['b'])"
+        if IS_PYPY or six.PY2:
+            expect = "cannot encode object: set(['b']), of type: <type 'set'>"
         else:
-            expect = "Cannot encode object: {'b'}"
+            expect = "cannot encode object: {'b'}, of type: <class 'set'>"
         self.assertEqual(str(cm.exception), expect)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')

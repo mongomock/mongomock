@@ -10,10 +10,12 @@ from mongomock import store
 from six import string_types
 
 try:
+    from bson import codec_options as bson_codec_options
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
+    bson_codec_options = None
 
 
 class Database(object):
@@ -45,6 +47,14 @@ class Database(object):
     @property
     def read_preference(self):
         return self._read_preference
+
+    @property
+    def codec_options(self):
+        if not bson_codec_options:
+            raise NotImplementedError(
+                'The codec options are not implemented in mongomock alone, you need to import '
+                'the pymongo library as well.')
+        return bson_codec_options.CodecOptions()
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
@@ -152,3 +162,27 @@ class Database(object):
         # and OperationFailure if the command is not valid.
         raise NotImplementedError(
             'command is a valid Database method but is not implemented in Mongomock yet')
+
+    def with_options(
+            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+
+        if codec_options:
+            if not bson_codec_options:
+                raise NotImplementedError(
+                    'The codec options are not implemented in mongomock alone, you need to import '
+                    'the pymongo library as well.')
+            if codec_options != bson_codec_options.CodecOptions():
+                raise NotImplementedError('The codec options are not implemented yet')
+
+        if write_concern:
+            raise NotImplementedError(
+                'write_concern is a valid parameter for with_options but is not implemented yet in '
+                'mongomock')
+
+        if read_concern:
+            raise NotImplementedError(
+                'read_concern is a valid parameter for with_options but is not implemented yet in'
+                'mongomock')
+
+        return Database(
+            self._client, self.name, self._store, read_preference=self.read_preference)

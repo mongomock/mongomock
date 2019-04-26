@@ -4,6 +4,7 @@ from unittest import TestCase, skipIf
 import mongomock
 
 try:
+    from bson import codec_options
     from pymongo.read_preferences import ReadPreference
     _HAVE_PYMONGO = True
 except ImportError:
@@ -100,6 +101,39 @@ class DatabaseAPITest(TestCase):
 
         col = database.get_collection('col', read_preference=ReadPreference.PRIMARY)
         self.assertEqual('Primary', col.read_preference.name)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__codec_options(self):
+        self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
+
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__codec_options_without_pymongo(self):
+        with self.assertRaises(NotImplementedError):
+            self.database.codec_options  # pylint: disable=pointless-statement
+
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(codec_options=3)
+
+    def test__with_options(self):
+        other = self.database.with_options(read_preference=self.database.read_preference)
+        self.assertNotEqual(other, self.database)
+
+        self.database.coll.insert_one({'_id': 42})
+        self.assertEqual({'_id': 42}, other.coll.find_one())
+
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(write_concern=3)
+
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(read_concern=3)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__with_options_pymongo(self):
+        self.database.with_options(codec_options=codec_options.CodecOptions())
+        self.database.with_options()
+
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])
