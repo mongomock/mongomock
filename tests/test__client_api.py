@@ -13,6 +13,7 @@ except ImportError:
 import mongomock
 
 try:
+    from bson import codec_options
     from pymongo.read_preferences import ReadPreference
     _HAVE_PYMONGO = True
 except ImportError:
@@ -38,6 +39,17 @@ class MongoClientApiTest(unittest.TestCase):
         client = mongomock.MongoClient(read_preference=ReadPreference.NEAREST)
         self.assertEqual(ReadPreference.NEAREST, client.db.read_preference)
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
+
+    @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__codec_options(self):
+        client = mongomock.MongoClient()
+        self.assertEqual(codec_options.CodecOptions(), client.codec_options)
+
+    @unittest.skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__codec_options_without_pymongo(self):
+        client = mongomock.MongoClient()
+        with self.assertRaises(NotImplementedError):
+            client.codec_options  # pylint: disable=pointless-statement
 
     def test__parse_url(self):
         client = mongomock.MongoClient('mongodb://localhost:27017/')

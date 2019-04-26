@@ -16,8 +16,11 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON, Timestamp
+    from bson import codec_options
+    _DEFAULT_CODEC_OPTIONS = codec_options.CodecOptions()
 except ImportError:
-    json_utils = SON = BSON = Timestamp = None
+    codec_options = json_utils = SON = BSON = Timestamp = None
+    _DEFAULT_CODEC_OPTIONS = None
 try:
     import execjs
 except ImportError:
@@ -67,7 +70,7 @@ _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'at
 
 _WITH_OPTIONS_KWARGS = {
     'codec_options': _KwargOption(
-        'bson.codec_options.CodecOptions', None,
+        'bson.codec_options.CodecOptions', _DEFAULT_CODEC_OPTIONS,
         ('document_class', 'tz_aware', 'uuid_representation')),
     'read_preference': _KwargOption(
         'pymongo.read_preference.ReadPreference', _READ_PREFERENCE_PRIMARY,
@@ -394,6 +397,14 @@ class Collection(object):
     @property
     def read_preference(self):
         return self._read_preference
+
+    @property
+    def codec_options(self):
+        if not codec_options:
+            raise NotImplementedError(
+                'The codec options are not implemented in mongomock alone, you need to import '
+                'the pymongo library as well.')
+        return codec_options.CodecOptions()
 
     def initialize_unordered_bulk_op(self):
         return BulkOperationBuilder(self, ordered=False)
