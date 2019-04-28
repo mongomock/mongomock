@@ -4,7 +4,6 @@ import bisect
 import collections
 import copy
 import datetime
-import functools
 import itertools
 import math
 import numbers
@@ -375,8 +374,12 @@ def _accumulate_group(output_fields, group_list):
         if field == '_id':
             continue
         for operator, key in six.iteritems(value):
-            key_getter = functools.partial(_parse_expression, key)
-            values = [key_getter(doc) for doc in group_list]
+            values = []
+            for doc in group_list:
+                try:
+                    values.append(_parse_expression(key, doc))
+                except KeyError:
+                    continue
             if operator in _GROUPING_OPERATOR_MAP:
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$first':

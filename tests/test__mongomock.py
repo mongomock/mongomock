@@ -2238,6 +2238,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ])
         self.assertEqual(set_result, set_expected)
 
+    def test__aggregate_add_to_set_missing_value(self):
+        self.cmp.do.remove()
+        data = [
+            {'a': {'c': '1', 'd': 1}, 'b': 1},
+            {'a': {'c': '1', 'd': 2}}
+        ]
+        self.cmp.do.insert_many(data)
+        pipeline = [
+            {'$group': {'_id': 'a.c', 'nb': {'$addToSet': 'b'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate32(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([

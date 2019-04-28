@@ -3650,3 +3650,19 @@ class CollectionAPITest(TestCase):
             'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
         }]
         self.assertEqual(expect, list(actual))
+
+    def test__add_to_set_missing_value(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'key1': 'a', 'my_key': 1},
+            {'key1': 'a'},
+        ])
+        actual = collection.aggregate([{'$group': {
+            '_id': {'key1': '$key1'},
+            'my_keys': {'$addToSet': '$my_key'},
+        }}])
+        expect = [{
+            '_id': {'key1': 'a'},
+            'my_keys': [1],
+        }]
+        self.assertEqual(expect, list(actual))
