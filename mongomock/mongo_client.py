@@ -6,12 +6,14 @@ from mongomock import read_preferences
 import warnings
 
 try:
+    from bson import codec_options as bson_codec_options
     from pymongo.uri_parser import parse_uri, split_hosts
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     from .helpers import parse_uri, split_hosts
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
+    bson_codec_options = None
 
 
 class MongoClient(object):
@@ -76,6 +78,14 @@ class MongoClient(object):
     @property
     def read_preference(self):
         return self._read_preference
+
+    @property
+    def codec_options(self):
+        if not bson_codec_options:
+            raise NotImplementedError(
+                'The codec options are not implemented in mongomock alone, you need to import '
+                'the pymongo/bson library as well.')
+        return bson_codec_options.CodecOptions()
 
     def server_info(self):
         return {
