@@ -6,6 +6,8 @@ import copy
 import datetime
 import functools
 import itertools
+import warnings
+
 import math
 import numbers
 import random
@@ -277,6 +279,9 @@ class _Parser(object):
             length = self.parse(values[2])
             if string is None or first < 0:
                 return ''
+            if length < 0:
+                warnings.warn('Negative length given to $substr is accepted only until '
+                              'MongoDB 3.7. This behavior will vhange in the future.')
             second = len(string) if length < 0 else first + length
             return string[first:second]
         if operator == '$strcasecmp':
