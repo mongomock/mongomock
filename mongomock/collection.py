@@ -266,7 +266,7 @@ class BulkOperationBuilder(object):
 
     def insert(self, doc):
         def exec_insert():
-            self.collection.insert(doc)
+            self.collection.insert_one(doc)
             return {'nInserted': 1}
         self.executors.append(exec_insert)
 
