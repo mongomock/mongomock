@@ -17,7 +17,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$currentOp <https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/>`_
   * `$facet <https://docs.mongodb.com/manual/reference/operator/aggregation/facet/>`_
   * `$geoNear <https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/>`_
-  * `$graphLookup <https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup>`_
   * `$indexStats <https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/>`_
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_
   * `$listSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/>`_

@@ -2184,6 +2184,36 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate27b(self):
+        # test $graphLookup stage
+        self.cmp.do.remove()
+
+        data = [
+            {'_id': ObjectId(),
+             'name': 'a', 'child': 'b', 'val': 2},
+            {'_id': ObjectId(),
+             'name': 'b', 'child': 'c', 'val': 3},
+            {'_id': ObjectId(),
+             'name': 'c', 'child': None, 'val': 4},
+            {'_id': ObjectId(),
+             'name': 'd', 'child': 'a', 'val': 5}
+        ]
+        for item in data:
+            self.cmp.do.insert(item)
+        pipeline = [
+            {'$match': {'name': 'a'}},
+            {'$graphLookup': {
+                'from': self.collection_name,
+                'startWith': '$child',
+                'connectFromField': 'child',
+                'connectToField': 'name',
+                'as': 'lookup'
+            }},
+            {'$unwind': '$lookup'},
+            {'$sort': {'lookup.name': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate28(self):
         pipeline = [{'$group': {
             '_id': '$b',
