@@ -730,6 +730,19 @@ def _project_by_spec(doc, proj_spec, is_include):
     return output
 
 
+def _handle_replace_root_stage(in_collections, unused_database, options):
+    if 'newRoot' not in options:
+        raise OperationFailure(
+            "Parameter 'newRoot' is missing for $replaceRoot operation.")
+    new_root = options['newRoot']
+    try:
+        result = [_parse_expression(new_root, doc) for doc in in_collections]
+    except KeyError:
+        raise OperationFailure(
+            'Could not complete $replaceRoot with given expression.')
+    return result
+
+
 def _handle_project_stage(in_collection, unused_database, options):
     filter_list = []
     method = None
@@ -820,7 +833,7 @@ _PIPELINE_HANDLERS = {
     '$out': _handle_out_stage,
     '$project': _handle_project_stage,
     '$redact': None,
-    '$replaceRoot': None,
+    '$replaceRoot': _handle_replace_root_stage,
     '$sample': _handle_sample_stage,
     '$skip': lambda c, d, o: c[o:],
     '$sort': _handle_sort_stage,
