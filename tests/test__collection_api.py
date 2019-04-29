@@ -2291,6 +2291,351 @@ class CollectionAPITest(TestCase):
             "Although '.' is valid in the 'localField' and 'as' parameters ",
             str(err.exception))
 
+    def test__aggregate_graph_lookup_behaves_as_lookup(self):
+        self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
+        self.db.b.insert_many([
+            {'_id': 2, 'should': 'include'},
+            {'_id': 3, 'should': 'skip'},
+            {'_id': 4, 'should': 'include'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$arr',
+                'connectFromField': 'should',
+                'connectToField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'arr': [2, 4],
+            'b': [
+                {'_id': 2, 'should': 'include'},
+                {'_id': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_basic(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'include'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$item',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'item': 2,
+            'b': [
+                {'_id': 2, 'parent': 3, 'should': 'include'},
+                {'_id': 3, 'parent': 4, 'should': 'include'},
+                {'_id': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_depth_field(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'include'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$item',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'depthField': 'dpth',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'item': 2,
+            'b': [
+                {'_id': 2, 'parent': 3, 'should': 'include', 'dpth': 0},
+                {'_id': 3, 'parent': 4, 'should': 'include', 'dpth': 1},
+                {'_id': 4, 'should': 'include', 'dpth': 2}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_multiple_connections(self):
+        self.db.a.insert_one({'_id': 1, 'parent_name': 'b'})
+        self.db.b.insert_many([
+            {'_id': 2, 'name': 'a', 'parent': 'b', 'should': 'include'},
+            {'_id': 3, 'name': 'b', 'should': 'skip'},
+            {'_id': 4, 'name': 'c', 'parent': 'b', 'should': 'include'},
+            {'_id': 5, 'name': 'd', 'parent': 'c', 'should': 'include'},
+            {'_id': 6, 'name': 'e', 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$parent_name',
+                'connectFromField': 'name',
+                'connectToField': 'parent',
+                'depthField': 'dpth',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'parent_name': 'b',
+            'b': [
+                {'_id': 2, 'name': 'a', 'parent': 'b', 'should': 'include', 'dpth': 0},
+                {'_id': 4, 'name': 'c', 'parent': 'b', 'should': 'include', 'dpth': 0},
+                {'_id': 5, 'name': 'd', 'parent': 'c', 'should': 'include', 'dpth': 1},
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_cyclic_pointers(self):
+        self.db.a.insert_one({'_id': 1, 'parent_name': 'b'})
+        self.db.b.insert_many([
+            {'_id': 2, 'name': 'a', 'parent': 'b', 'should': 'include'},
+            {'_id': 3, 'name': 'b', 'parent': 'a', 'should': 'include'},
+            {'_id': 4, 'name': 'c', 'parent': 'b', 'should': 'include'},
+            {'_id': 5, 'name': 'd', 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$parent_name',
+                'connectFromField': 'name',
+                'connectToField': 'parent',
+                'depthField': 'dpth',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'parent_name': 'b',
+            'b': [
+                {'_id': 2, 'name': 'a', 'parent': 'b', 'should': 'include', 'dpth': 0},
+                {'_id': 4, 'name': 'c', 'parent': 'b', 'should': 'include', 'dpth': 0},
+                {'_id': 3, 'name': 'b', 'parent': 'a', 'should': 'include', 'dpth': 1}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_restrict_search(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'skip'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$item',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'restrictSearchWithMatch': {'should': 'include'},
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'item': 2,
+            'b': [
+                {'_id': 2, 'parent': 3, 'should': 'include'},
+                {'_id': 3, 'parent': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_max_depth(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'skip'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$item',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'maxDepth': 1,
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'item': 2,
+            'b': [
+                {'_id': 2, 'parent': 3, 'should': 'include'},
+                {'_id': 3, 'parent': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
+    def test__aggregate_graph_lookup_max_depth_0(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'skip'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$item',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'maxDepth': 0,
+                'as': 'b'
+            }}
+        ])
+        lookup_res = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': 'item',
+                'foreignField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual(list(lookup_res), list(actual))
+
+    def test__aggregate_graph_lookup_from_array(self):
+        self.db.a.insert_one({'_id': 1, 'items': [2, 8]})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'include'},
+            {'_id': 5, 'should': 'skip'},
+            {'_id': 6, 'should': 'include'},
+            {'_id': 7, 'should': 'skip'},
+            {'_id': 8, 'parent': 6, 'should': 'include'},
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': '$items',
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'as': 'b'
+            }}
+        ])
+        expected_list = [
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'include'},
+            {'_id': 6, 'should': 'include'},
+            {'_id': 8, 'parent': 6, 'should': 'include'}
+        ]
+        result_list = list(actual)[0]['b']
+
+        def sorter(doc):
+            return doc['_id']
+        self.assertTrue(len(expected_list) == len(result_list) and
+                        sorted(expected_list, key=sorter) == sorted(result_list, key=sorter))
+
+    def test__aggregate_graph_lookup_missing_operator(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 'arr',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Must specify 'connectToField' field for a $graphLookup",
+            str(err.exception))
+
+    def test__aggregate_graphlookup_operator_not_string(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 1,
+                    'connectToField': '_id',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Argument 'connectFromField' to $graphLookup must be string",
+            str(err.exception))
+
+    def test__aggregate_graph_lookup_restrict_not_dict(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 'parent',
+                    'connectToField': '_id',
+                    'restrictSearchWithMatch': 3,
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Argument 'restrictSearchWithMatch' to $graphLookup must be a Dictionary",
+            str(err.exception))
+
+    def test__aggregate_graph_lookup_max_depth_not_number(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 'parent',
+                    'connectToField': '_id',
+                    'maxDepth': 's',
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Argument 'maxDepth' to $graphLookup must be a number",
+            str(err.exception))
+
+    def test__aggregate_graph_lookup_depth_filed_not_string(self):
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 'parent',
+                    'connectToField': '_id',
+                    'depthField': 4,
+                    'as': 'b'
+                }}
+            ])
+        self.assertEqual(
+            "Argument 'depthField' to $graphlookup must be a string",
+            str(err.exception))
+
+    def test__aggregate_graph_lookup_dot_in_connect_from_field(self):
+        with self.assertRaises(NotImplementedError) as err:
+            self.db.a.aggregate([
+                {'$graphLookup': {
+                    'from': 'arr',
+                    'startWith': '$_id',
+                    'connectFromField': 'parent.id',
+                    'connectToField': '_id',
+                    'as': 'b'
+                }}
+            ])
+        self.assertIn(
+            "Although '.' is valid in the 'connectFromField' parameter",
+            str(err.exception))
+
     def test__aggregate_sample(self):
         self.db.a.insert_many([
             {'_id': i}
