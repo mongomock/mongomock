@@ -277,11 +277,15 @@ class _Parser(object):
             string = str(self.parse(values[0]))
             first = self.parse(values[1])
             length = self.parse(values[2])
-            if string is None or first < 0:
+            if string is None:
+                return ''
+            if first < 0:
+                warnings.warn('Negative starting point given to $substr is accepted only until '
+                              'MongoDB 3.7. This behavior will change in the future.')
                 return ''
             if length < 0:
                 warnings.warn('Negative length given to $substr is accepted only until '
-                              'MongoDB 3.7. This behavior will vhange in the future.')
+                              'MongoDB 3.7. This behavior will change in the future.')
             second = len(string) if length < 0 else first + length
             return string[first:second]
         if operator == '$strcasecmp':
