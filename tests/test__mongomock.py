@@ -2281,14 +2281,12 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def test__aggregate34(self):
         self.cmp.do.drop()
-        self.cmp.do.insert_one({'_id': 1, 'a': 'Hellp', 'b': 'World'})
+        self.cmp.do.insert_one({'_id': 1, 'a': 'Hello', 'b': 'World'})
         pipeline = [{'$project': {
             '_id': 0,
             'concat': {'$concat': ['$a', ' Dear ', '$b']},
             'concat_none': {'$concat': ['$a', None, '$b']},
             'sub1': {'$substr': ['$a', 0, 4]},
-            'sub2': {'$substr': ['$a', -1, 3]},
-            'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
