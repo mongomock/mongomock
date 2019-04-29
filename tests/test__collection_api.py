@@ -2948,6 +2948,21 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find(filters)
         self.assertEqual([doc['_id'] for doc in results], [7, 8])
 
+    def test__filter_eq_on_array(self):
+        """$eq on array matches if one element of the array matches."""
+        collection = self.db.collection
+        collection.insert_many([
+            {'_id': 1, 'shape': [{'color': 'red'}]},
+            {'_id': 2, 'shape': [{'color': 'yellow'}]},
+            {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
+            {'_id': 4, 'shape': [{'size': 3}]},
+            {'_id': 5},
+            {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
+        ])
+
+        results = self.db.collection.find({'shape.color': {'$eq': 'red'}})
+        self.assertEqual([1, 3, 6], [doc['_id'] for doc in results])
+
     def test__filter_ne_on_array(self):
         """$ne and $nin on array only matches if no element of the array matches."""
         collection = self.db.collection
@@ -2957,6 +2972,7 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
             {'_id': 4, 'shape': [{'size': 3}]},
             {'_id': 5},
+            {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
         ])
 
         # $ne

@@ -357,6 +357,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__find_by_document(self):
         self.cmp.do.insert({'name': 'new', 'doc': {'key': 'val'}})
         self.cmp.do.insert({'name': 'another new'})
+        self.cmp.do.insert({'name': 'new', 'doc': {'key': ['val']}})
+        self.cmp.do.insert({'name': 'new', 'doc': {'key': ['val', 'other val']}})
         self.cmp.compare_ignore_order.find()
         self.cmp.compare.find({'doc': {'key': 'val'}})
         self.cmp.compare.find({'doc': {'key': {'$eq': 'val'}}})
@@ -735,6 +737,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
             {'_id': 4, 'shape': [{'size': 3}]},
             {'_id': 5},
+            {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
+            {'_id': 7, 'shape': {'color': 'red'}},
+            {'_id': 8, 'shape': {'color': ['blue', 'yellow']}},
         ])
 
         self.cmp.compare_ignore_order.find({'shape.color': {'$ne': 'red'}})
