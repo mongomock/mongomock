@@ -289,13 +289,12 @@ def _size_op(doc_val, search_val):
     return search_val == 1 if doc_val else 0
 
 
-def _list_expand(f):
+def _list_expand(f, negative=False):
     def func(doc_val, search_val):
-        if isinstance(doc_val, list):
-            for val in doc_val:
-                if f(val, search_val):
-                    return True
-            return False
+        if isinstance(doc_val, (list, tuple)):
+            if negative:
+                return all(f(val, search_val) for val in doc_val)
+            return any(f(val, search_val) for val in doc_val)
         return f(doc_val, search_val)
     return func
 
@@ -356,8 +355,8 @@ SORTING_OPERATOR_MAP = {
 
 
 OPERATOR_MAP = dict({
-    '$eq': operator_eq,
-    '$ne': lambda dv, sv: not operator_eq(dv, sv),
+    '$eq': _list_expand(operator_eq),
+    '$ne': _list_expand(lambda dv, sv: not operator_eq(dv, sv), negative=True),
     '$all': _all_op,
     '$in': _in_op,
     '$nin': lambda dv, sv: not _in_op(dv, sv),
