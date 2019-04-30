@@ -16,7 +16,7 @@ from mongomock.write_concern import WriteConcern
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util
+    from bson import tz_util, ObjectId
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -2605,6 +2605,66 @@ class CollectionAPITest(TestCase):
         }}])
         self.assertEqual(
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_string_operations(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'concat': {'$concat': ['$a', ' Dear ', '$b']},
+            'concat_none': {'$concat': ['$a', None, '$b']},
+            'sub1': {'$substr': ['$a', 0, 4]},
+            'sub2': {'$substr': ['$a', -1, 3]},
+            'sub3': {'$substr': ['$a', 2, -1]},
+            'lower': {'$toLower': '$a'},
+            'lower_err': {'$toLower': None},
+            'strcasecmp': {'$strcasecmp': ['$a', '$b']},
+            'upper': {'$toUpper': '$a'},
+            'upper_err': {'$toUpper': None},
+        }}])
+        self.assertEqual(
+            [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
+              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1,
+              'upper': 'HELLO', 'upper_err': ''}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__strcmp_not_enough_params(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+        })
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'cmp': {'$strcasecmp': ['s']}}}
+            ])
+        self.assertEqual(
+            'strcasecmp must have 2 items',
+            str(err.exception))
+
+    def test__substr_not_enough_params(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+        })
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.collection.aggregate([
+                {'$project': {'sub': {'$substr': ['$a', 1]}}}
+            ])
+        self.assertEqual(
+            'substr must have 3 items',
+            str(err.exception))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_tostr_operation_objectid(self):
+        self.db.collection.insert_one({
+            'a': ObjectId('5abcfad1fbc93d00080cfe66')
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'toString': {'$toString': '$a'},
+        }}])
+        self.assertEqual(
+            [{'toString': '5abcfad1fbc93d00080cfe66'}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_unrecognized(self):

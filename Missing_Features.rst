@@ -29,7 +29,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
     * `$subtract <https://docs.mongodb.com/manual/reference/operator/aggregation/subtract/>`_
   * Boolean operators ($and, $or, $not)
   * Some set operators ($setEquals, $setIntersection, $setDifference, …)
-  * String operators ($concat, $strcasecmp, $substr, …)
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray, $slice)

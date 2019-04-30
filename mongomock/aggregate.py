@@ -8,6 +8,8 @@ import itertools
 import math
 import numbers
 import random
+import warnings
+
 import six
 from six import moves
 
@@ -85,6 +87,7 @@ string_operators = [
     '$substr',
     '$toLower',
     '$toUpper',
+    '$toString',
 ]
 comparison_operators = [
     '$cmp',
@@ -156,7 +159,9 @@ class _Parser(object):
                 return self._handle_conditional_operator(k, v)
             if k in set_operators:
                 return self._handle_set_operator(k, v)
-            if k in boolean_operators + string_operators + \
+            if k in string_operators:
+                return self._handle_string_operator(k, v)
+            if k in boolean_operators + \
                     text_search_operators + projection_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
@@ -254,6 +259,46 @@ class _Parser(object):
             "Although '%s' is a valid comparison operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
+
+    def _handle_string_operator(self, operator, values):
+        if operator == '$toLower':
+            parsed = self.parse(values)
+            return str(parsed).lower() if parsed is not None else ''
+        if operator == '$toUpper':
+            parsed = self.parse(values)
+            return str(parsed).upper() if parsed is not None else ''
+        if operator == '$concat':
+            parsed_list = [self.parse(value) for value in values]
+            return None if None in parsed_list else ''.join([str(x) for x in parsed_list])
+        if operator == '$substr':
+            if len(values) != 3:
+                raise OperationFailure('substr must have 3 items')
+            string = str(self.parse(values[0]))
+            first = self.parse(values[1])
+            length = self.parse(values[2])
+            if string is None:
+                return ''
+            if first < 0:
+                warnings.warn('Negative starting point given to $substr is accepted only until '
+                              'MongoDB 3.7. This behavior will change in the future.')
+                return ''
+            if length < 0:
+                warnings.warn('Negative length given to $substr is accepted only until '
+                              'MongoDB 3.7. This behavior will change in the future.')
+            second = len(string) if length < 0 else first + length
+            return string[first:second]
+        if operator == '$strcasecmp':
+            if len(values) != 2:
+                raise OperationFailure('strcasecmp must have 2 items')
+            a, b = str(self.parse(values[0])), str(self.parse(values[1]))
+            return 0 if a == b else -1 if a < b else 1
+        if operator == '$toString':
+            parsed = self.parse(values)
+            return str(parsed) if parsed is not None else None
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid string operator for the aggregation "
+            'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
     def _handle_date_operator(self, operator, values):
         out_value = self.parse(values)
