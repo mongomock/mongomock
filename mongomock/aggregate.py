@@ -5,11 +5,12 @@ import collections
 import copy
 import datetime
 import itertools
-import warnings
 
 import math
 import numbers
 import random
+import warnings
+
 import six
 from six import moves
 
