@@ -820,14 +820,12 @@ def _project_by_spec(doc, proj_spec, is_include):
 
 def _handle_replace_root_stage(in_collections, unused_database, options):
     if 'newRoot' not in options:
-        raise OperationFailure(
-            "Parameter 'newRoot' is missing for $replaceRoot operation.")
+        raise OperationFailure("Parameter 'newRoot' is missing for $replaceRoot operation.")
     new_root = options['newRoot']
     try:
         result = [_parse_expression(new_root, doc) for doc in in_collections]
     except KeyError:
-        raise OperationFailure(
-            'Could not complete $replaceRoot with given expression.')
+        raise OperationFailure('Could not complete $replaceRoot with given expression.')
     return result
 
 
