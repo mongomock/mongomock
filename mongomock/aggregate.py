@@ -498,15 +498,15 @@ def _handle_lookup_stage(in_collection, database, options):
     foreign_field = options['foreignField']
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
-    for doc in in_collection:
+    out_doc = copy.deepcopy(in_collection)
+    for doc in out_doc:
         query = doc.get(local_field)
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
-        # TODO(pascal): Do not modify the input collection.
         doc[local_name] = [foreign_doc for foreign_doc in matches]
 
-    return in_collection
+    return out_doc
 
 
 def _handle_graph_lookup_stage(in_collection, database, options):
@@ -519,22 +519,19 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     if not isinstance(options.get('depthField', ''), six.string_types):
         raise OperationFailure(
             "Argument 'depthField' to $graphlookup must be a string")
-    for operator in ('from', 'startWith', 'connectFromField', 'connectToField', 'as'):
+    if 'startWith' not in options:
+        raise OperationFailure(
+            "Must specify 'startWith' field for a $graphLookup")
+    for operator in ('as', 'connectFromField', 'connectToField', 'from'):
         if operator not in options:
             raise OperationFailure(
                 "Must specify '%s' field for a $graphLookup" % operator)
         if not isinstance(options[operator], six.string_types):
             raise OperationFailure(
                 "Argument '%s' to $graphLookup must be string" % operator)
-        if operator in ('as', 'connectFromField', 'connectToField') and \
-                options[operator].startswith('$'):
-            raise OperationFailure(
-                "FieldPath field names may not start with '$'")
-        if operator == 'startWith' and \
-                not options[operator].startswith('$'):
-            raise OperationFailure(
-                "Field ref names must start with '$'")
-        if operator in ('connectFromField', 'startWith', 'as') and \
+        if options[operator].startswith('$'):
+            raise OperationFailure("FieldPath field names may not start with '$'")
+        if operator in ('connectFromField', 'as') and \
                 '.' in options[operator]:
             raise NotImplementedError(
                 "Although '.' is valid in the '%s' "
@@ -542,7 +539,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 'pipeline, it is currently not implemented in Mongomock.' % operator)
 
     foreign_name = options['from']
-    start_with = options['startWith'][1:]
+    start_with = options['startWith']
     connect_from_field = options['connectFromField']
     connect_to_field = options['connectToField']
     local_name = options['as']
@@ -550,46 +547,37 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     depth_field = options.get('depthField', None)
     restrict_search_with_match = options.get('restrictSearchWithMatch', {})
     foreign_collection = database.get_collection(foreign_name)
-    for doc in in_collection:
+    out_doc = copy.deepcopy(in_collection)
+
+    def find_matches_for_depth(query):
+        if isinstance(query, list):
+            query = {'$in': query}
+        matches = foreign_collection.find({connect_to_field: query})
+        new_matches = []
+        for new_match in matches:
+            if filtering.filter_applies(restrict_search_with_match, new_match) \
+                    and new_match['_id'] not in found_items:
+                if depth_field is not None:
+                    new_match[depth_field] = depth
+                new_matches.append(new_match)
+                found_items.add(new_match['_id'])
+        return new_matches
+
+    for doc in out_doc:
         found_items = set()
-        if start_with in doc:
-            query = doc.get(start_with)
-            if isinstance(query, list):
-                query = {'$in': query}
-            matches = foreign_collection.find({connect_to_field: query})
-            # TODO(pascal): Do not modify the input collection.
-            newly_discovered_matches = []
-            for new_match in matches:
-                if filtering.filter_applies(restrict_search_with_match, new_match):
-                    if depth_field is not None:
-                        new_match[depth_field] = 0
-                    newly_discovered_matches.append(new_match)
-                    found_items.add(new_match['_id'])
-            doc[local_name] = newly_discovered_matches
-        else:
-            doc[local_name] = []
-        origin_matches = doc[local_name]
-        depth = 1
-        while origin_matches and (max_depth is None or depth <= max_depth):
+        depth = 0
+        result = _parse_expression(start_with, doc)
+        newly_discovered_matches = find_matches_for_depth(result)
+        origin_matches = doc[local_name] = newly_discovered_matches
+        while origin_matches and (max_depth is None or depth < max_depth):
+            depth += 1
             newly_discovered_matches = []
             for match in origin_matches:
-                query = match.get(connect_from_field)
-                if isinstance(query, list):
-                    query = {'$in': query}
-                # if filter:
-                #     if filtering.filter_applies(o, doc)
-                result = foreign_collection.find({connect_to_field: query})
-                for new_match in result:
-                    if filtering.filter_applies(restrict_search_with_match, new_match)\
-                            and new_match['_id'] not in found_items:
-                        if depth_field is not None:
-                            new_match[depth_field] = depth
-                        found_items.add(new_match['_id'])
-                        newly_discovered_matches.append(new_match)
-            doc[local_name] += [new_match for new_match in newly_discovered_matches]
+                result = match.get(connect_from_field)
+                newly_discovered_matches += find_matches_for_depth(result)
+            doc[local_name] += newly_discovered_matches
             origin_matches = newly_discovered_matches
-            depth += 1
-    return in_collection
+    return out_doc
 
 
 def _handle_group_stage(in_collection, unused_database, options):
@@ -892,13 +880,13 @@ _PIPELINE_HANDLERS = {
     '$currentOp': None,
     '$facet': None,
     '$geoNear': None,
+    '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
     '$indexStats': None,
     '$limit': lambda c, d, o: c[:o],
     '$listLocalSessions': None,
     '$listSessions': None,
     '$lookup': _handle_lookup_stage,
-    '$graphLookup': _handle_graph_lookup_stage,
     '$match': lambda c, d, o: [doc for doc in c if filtering.filter_applies(o, doc)],
     '$out': _handle_out_stage,
     '$project': _handle_project_stage,

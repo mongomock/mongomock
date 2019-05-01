@@ -2343,6 +2343,33 @@ class CollectionAPITest(TestCase):
             ]
         }], list(actual))
 
+    def test__aggregate_graph_lookup_expression_start_with(self):
+        self.db.a.insert_one({'_id': 1, 'item': 2})
+        self.db.b.insert_many([
+            {'_id': 2, 'parent': 3, 'should': 'include'},
+            {'_id': 3, 'parent': 4, 'should': 'include'},
+            {'_id': 4, 'should': 'include'},
+            {'_id': 5, 'should': 'skip'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$graphLookup': {
+                'from': 'b',
+                'startWith': {'$add': [1, 1]},
+                'connectFromField': 'parent',
+                'connectToField': '_id',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([{
+            '_id': 1,
+            'item': 2,
+            'b': [
+                {'_id': 2, 'parent': 3, 'should': 'include'},
+                {'_id': 3, 'parent': 4, 'should': 'include'},
+                {'_id': 4, 'should': 'include'}
+            ]
+        }], list(actual))
+
     def test__aggregate_graph_lookup_depth_field(self):
         self.db.a.insert_one({'_id': 1, 'item': 2})
         self.db.b.insert_many([
