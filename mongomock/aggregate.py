@@ -786,7 +786,8 @@ def _handle_out_stage(in_collection, database, options):
     out_collection = database.get_collection(options)
     if out_collection.count() > 0:
         out_collection.drop()
-    out_collection.insert_many(in_collection)
+    if in_collection:
+        out_collection.insert_many(in_collection)
     return in_collection
 
 

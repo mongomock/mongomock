@@ -230,6 +230,16 @@ class _CollectionComparisonTest(TestCase):
             'real': self.mongo_collection,
         })
 
+    def _create_compare_for_collection(self, collection_name, db_name=None):
+        if not db_name:
+            db_name = self.db_name
+        mongo_collection = self.mongo_conn[db_name][collection_name]
+        fake_collection = self.fake_conn[db_name][collection_name]
+        return MultiCollection({
+            'fake': fake_collection,
+            'real': mongo_collection,
+        })
+
     def _connect_to_local_mongodb(self, num_retries=60):
         """Performs retries on connection refused errors (for travis-ci builds)"""
         for retry in range(num_retries):
@@ -2531,6 +2541,16 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'input': '$items',
             'cond': {'$lt': ['$$this.price', 100]},
         }}}}])
+
+    def test__aggregate_no_entries(self):
+        pipeline = [
+            {'$match': {'a': {'$eq': 'Never going to happen'}}},
+            {'$out': 'new_collection'},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+        cmp = self._create_compare_for_collection('new_collection')
+        cmp.compare.find()
 
 
 def _LIMIT(*args):
