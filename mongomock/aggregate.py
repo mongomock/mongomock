@@ -503,10 +503,79 @@ def _handle_lookup_stage(in_collection, database, options):
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
-        # TODO(pascal): Do not modify the input collection.
         doc[local_name] = [foreign_doc for foreign_doc in matches]
 
     return in_collection
+
+
+def _handle_graph_lookup_stage(in_collection, database, options):
+    if not isinstance(options.get('maxDepth', 0), six.integer_types):
+        raise OperationFailure(
+            "Argument 'maxDepth' to $graphLookup must be a number")
+    if not isinstance(options.get('restrictSearchWithMatch', {}), dict):
+        raise OperationFailure(
+            "Argument 'restrictSearchWithMatch' to $graphLookup must be a Dictionary")
+    if not isinstance(options.get('depthField', ''), six.string_types):
+        raise OperationFailure(
+            "Argument 'depthField' to $graphlookup must be a string")
+    if 'startWith' not in options:
+        raise OperationFailure(
+            "Must specify 'startWith' field for a $graphLookup")
+    for operator in ('as', 'connectFromField', 'connectToField', 'from'):
+        if operator not in options:
+            raise OperationFailure(
+                "Must specify '%s' field for a $graphLookup" % operator)
+        if not isinstance(options[operator], six.string_types):
+            raise OperationFailure(
+                "Argument '%s' to $graphLookup must be string" % operator)
+        if options[operator].startswith('$'):
+            raise OperationFailure("FieldPath field names may not start with '$'")
+        if operator in ('connectFromField', 'as') and \
+                '.' in options[operator]:
+            raise NotImplementedError(
+                "Although '.' is valid in the '%s' "
+                'parameter for the $graphLookup stage of the aggregation '
+                'pipeline, it is currently not implemented in Mongomock.' % operator)
+
+    foreign_name = options['from']
+    start_with = options['startWith']
+    connect_from_field = options['connectFromField']
+    connect_to_field = options['connectToField']
+    local_name = options['as']
+    max_depth = options.get('maxDepth', None)
+    depth_field = options.get('depthField', None)
+    restrict_search_with_match = options.get('restrictSearchWithMatch', {})
+    foreign_collection = database.get_collection(foreign_name)
+    out_doc = copy.deepcopy(in_collection)  # TODO(pascal): speed the deep copy
+
+    def _find_matches_for_depth(query):
+        if isinstance(query, list):
+            query = {'$in': query}
+        matches = foreign_collection.find({connect_to_field: query})
+        new_matches = []
+        for new_match in matches:
+            if filtering.filter_applies(restrict_search_with_match, new_match) \
+                    and new_match['_id'] not in found_items:
+                if depth_field is not None:
+                    new_match = collections.OrderedDict(new_match, **{depth_field: depth})
+                new_matches.append(new_match)
+                found_items.add(new_match['_id'])
+        return new_matches
+
+    for doc in out_doc:
+        found_items = set()
+        depth = 0
+        result = _parse_expression(start_with, doc)
+        origin_matches = doc[local_name] = _find_matches_for_depth(result)
+        while origin_matches and (max_depth is None or depth < max_depth):
+            depth += 1
+            newly_discovered_matches = []
+            for match in origin_matches:
+                match_target = match.get(connect_from_field)
+                newly_discovered_matches += _find_matches_for_depth(match_target)
+            doc[local_name] += newly_discovered_matches
+            origin_matches = newly_discovered_matches
+    return out_doc
 
 
 def _handle_group_stage(in_collection, unused_database, options):
@@ -810,7 +879,7 @@ _PIPELINE_HANDLERS = {
     '$currentOp': None,
     '$facet': None,
     '$geoNear': None,
-    '$graphLookup': None,
+    '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
     '$indexStats': None,
     '$limit': lambda c, d, o: c[:o],
