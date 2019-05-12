@@ -498,15 +498,14 @@ def _handle_lookup_stage(in_collection, database, options):
     foreign_field = options['foreignField']
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
-    out_doc = copy.deepcopy(in_collection)
-    for doc in out_doc:
+    for doc in in_collection:
         query = doc.get(local_field)
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
         doc[local_name] = [foreign_doc for foreign_doc in matches]
 
-    return out_doc
+    return in_collection
 
 
 def _handle_graph_lookup_stage(in_collection, database, options):
@@ -547,9 +546,9 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     depth_field = options.get('depthField', None)
     restrict_search_with_match = options.get('restrictSearchWithMatch', {})
     foreign_collection = database.get_collection(foreign_name)
-    out_doc = copy.deepcopy(in_collection)
+    out_doc = copy.deepcopy(in_collection)  # TODO(pascal): speed the deep copy
 
-    def find_matches_for_depth(query):
+    def _find_matches_for_depth(query):
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({connect_to_field: query})
@@ -558,7 +557,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
             if filtering.filter_applies(restrict_search_with_match, new_match) \
                     and new_match['_id'] not in found_items:
                 if depth_field is not None:
-                    new_match[depth_field] = depth
+                    new_match = collections.OrderedDict(new_match, **{depth_field: depth})
                 new_matches.append(new_match)
                 found_items.add(new_match['_id'])
         return new_matches
@@ -567,14 +566,13 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         found_items = set()
         depth = 0
         result = _parse_expression(start_with, doc)
-        newly_discovered_matches = find_matches_for_depth(result)
-        origin_matches = doc[local_name] = newly_discovered_matches
+        origin_matches = doc[local_name] = _find_matches_for_depth(result)
         while origin_matches and (max_depth is None or depth < max_depth):
             depth += 1
             newly_discovered_matches = []
             for match in origin_matches:
-                result = match.get(connect_from_field)
-                newly_discovered_matches += find_matches_for_depth(result)
+                match_target = match.get(connect_from_field)
+                newly_discovered_matches += _find_matches_for_depth(match_target)
             doc[local_name] += newly_discovered_matches
             origin_matches = newly_discovered_matches
     return out_doc
