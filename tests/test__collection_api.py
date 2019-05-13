@@ -2284,6 +2284,21 @@ class CollectionAPITest(TestCase):
             'Could not complete $replaceRoot with given expression.',
             str(err.exception))
 
+    def test__aggregate_replace_root_static(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}}
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {
+                'newRoot': {'document': 'new'}
+            }}
+        ])
+        self.assertListEqual([
+            {'document': 'new'},
+            {'document': 'new'}
+        ], list(actual))
+
     def test__aggregate_replace_root_expression(self):
         self.db.a.insert_many([
             {'_id': 1, 'first_name': 'Gary', 'last_name': 'Sheffield', 'city': 'New York'},

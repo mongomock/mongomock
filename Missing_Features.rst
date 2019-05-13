@@ -20,7 +20,11 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_
   * `$listSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/>`_
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
+  * `$replaceRoot <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/>`_ - missing dot reference support.
 * Operators within the aggregate pipeline:
+  * Arithmetic operations on dates:
+    * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
+    * `$subtract <https://docs.mongodb.com/manual/reference/operator/aggregation/subtract/>`_
   * Boolean operators ($and, $or, $not)
   * Some set operators ($setEquals, $setIntersection, $setDifference, …)
   * Text search operator ($meta)
