@@ -681,7 +681,15 @@ class Collection(object):
                             arr_copy = copy.deepcopy(arr)
                             if isinstance(value, dict):
                                 for obj in arr_copy:
-                                    if filter_applies(value, obj):
+                                    try:
+                                        is_matching = filter_applies(value, obj)
+                                    except OperationFailure:
+                                        is_matching = False
+                                    if is_matching:
+                                        arr.remove(obj)
+                                        continue
+
+                                    if filter_applies({field: value}, {field: obj}):
                                         arr.remove(obj)
                             else:
                                 for obj in arr_copy:

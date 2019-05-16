@@ -973,6 +973,21 @@ class CollectionAPITest(TestCase):
             {'$push': {'games.$': 15}})
         self.assertEqual([[0], [1, 15]], self.db.collection.find_one()['games'])
 
+    def test__update_pull_filter_operator(self):
+        self.db.collection.insert_one({'b': 0, 'arr': [0, 1, 2, 3, 4]})
+        self.db.collection.update_one({}, {'$pull': {'arr': {'$gt': 2}}})
+        self.assertEqual({'b': 0, 'arr': [0, 1, 2]}, self.db.collection.find_one({}, {'_id': 0}))
+
+    def test__update_pull_filter_operator_on_subdocs(self):
+        self.db.collection.insert_one({'arr': [{'size': 0}, {'size': 1}]})
+        self.db.collection.update_one({}, {'$pull': {'arr': {'size': {'$gte': 1}}}})
+        self.assertEqual({'arr': [{'size': 0}]}, self.db.collection.find_one({}, {'_id': 0}))
+
+    def test__update_pull_in(self):
+        self.db.collection.insert_one({'b': 0, 'arr': ['a1', 'a2']})
+        self.db.collection.update_one({}, {'$pull': {'arr': {'$in': ['a1']}}})
+        self.assertEqual({'b': 0, 'arr': ['a2']}, self.db.collection.find_one({}, {'_id': 0}))
+
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])
