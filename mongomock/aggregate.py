@@ -132,8 +132,9 @@ _GROUPING_OPERATOR_MAP = {
 class _Parser(object):
     """Helper to parse expressions within the aggregate pipeline."""
 
-    def __init__(self, doc_dict, user_vars=None):
+    def __init__(self, doc_dict, user_vars=None, ignore_missing_keys=False):
         self._doc_dict = doc_dict
+        self._ignore_missing_keys = ignore_missing_keys
         self._user_vars = user_vars or {}
 
     def parse(self, expression):
@@ -167,7 +168,13 @@ class _Parser(object):
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
                 raise OperationFailure("Unrecognized expression '%s'" % k)
-            value_dict[k] = self.parse(v)
+            try:
+                value = self.parse(v)
+            except KeyError:
+                if self._ignore_missing_keys:
+                    continue
+                raise
+            value_dict[k] = value
 
         return value_dict
 
@@ -355,7 +362,11 @@ class _Parser(object):
             cond = value['cond']
             return [
                 item for item in input_array
-                if _Parser(self._doc_dict, dict(self._user_vars, **{fieldname: item})).parse(cond)
+                if _Parser(
+                    self._doc_dict,
+                    dict(self._user_vars, **{fieldname: item}),
+                    ignore_missing_keys=self._ignore_missing_keys,
+                ).parse(cond)
             ]
 
         raise NotImplementedError(
@@ -408,9 +419,17 @@ class _Parser(object):
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
 
-def _parse_expression(expression, doc_dict):
-    """Parse an expression."""
-    return _Parser(doc_dict).parse(expression)
+def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
+    """Parse an expression.
+
+    Args:
+        expression: an Aggregate Expression, see
+            https://docs.mongodb.com/manual/meta/aggregation-quick-reference/#aggregation-expressions.
+        doc_dict: the document on which to evaluate the expression.
+        ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
+            if it is possible.
+    """
+    return _Parser(doc_dict, ignore_missing_keys=ignore_missing_keys).parse(expression)
 
 
 def _accumulate_group(output_fields, group_list):
