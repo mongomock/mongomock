@@ -2009,6 +2009,16 @@ class CollectionAPITest(TestCase):
         self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find().sort('a')])
         self.assertEqual([1, 2, 3], [doc['b'] for doc in col.find(projection=['b']).sort('a')])
 
+    def test__cursor_sort_dicts(self):
+        col = self.db.col
+        col.insert_many([
+            {'_id': 1, 'b': {'value': 1}},
+            {'_id': 2, 'b': {'value': 3}},
+            {'_id': 3, 'b': {'value': 2}},
+        ])
+
+        self.assertEqual([1, 3, 2], [doc['_id'] for doc in col.find().sort('b')])
+
     def test__cursor_max_time_ms(self):
         col = self.db.col
         col.find().max_time_ms(15)

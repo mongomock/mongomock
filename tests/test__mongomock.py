@@ -2687,6 +2687,15 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
                 [('root.0.b', 1), ('root.0.a', -1),
                  ('root.0.c', 1)])).find()
 
+    def test__sort_dict(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_many([
+            {'a': 1, 'b': {'value': 1, 'other': True}},
+            {'a': 2, 'b': {'value': 3}},
+            {'a': 3, 'b': {'value': 2, 'other': False}},
+        ])
+        self.cmp.compare(_SORT('b')).find()
+
     def test__close(self):
         # Does nothing - just make sure it exists and takes the right args
         self.cmp.do(lambda cursor: cursor.close()).find()
