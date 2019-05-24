@@ -415,6 +415,42 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_many([{'a': 1}, 'a'])
         self.assert_document_count(0)
 
+    def test__insert_many_write_errors(self):
+        self.db.collection.insert_one({'_id': 'a'})
+
+        # Insert many, but the first one is a duplicate.
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            self.db.collection.insert_many([{'_id': 'a', 'culprit': True}, {'_id': 'b'}])
+        error_details = err_context.exception.details
+        self.assertEqual({'nInserted', 'writeErrors'}, set(error_details.keys()))
+        self.assertEqual(0, error_details['nInserted'])
+        self.assertEqual(
+            [{'_id': 'a', 'culprit': True}],
+            [e['op'] for e in error_details['writeErrors']])
+
+        # Insert many, and only the second one is a duplicate.
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            self.db.collection.insert_many([{'_id': 'c'}, {'_id': 'a', 'culprit': True}])
+        error_details = err_context.exception.details
+        self.assertEqual({'nInserted', 'writeErrors'}, set(error_details.keys()))
+        self.assertEqual(1, error_details['nInserted'])
+        self.assertEqual(
+            [{'_id': 'a', 'culprit': True}],
+            [e['op'] for e in error_details['writeErrors']])
+
+        # Insert many, with ordered=False.
+        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+            self.db.collection.insert_many([
+                {'_id': 'a', 'culprit': True},
+                {'_id': 'b'},
+                {'_id': 'c', 'culprit': True},
+            ], ordered=False)
+        error_details = err_context.exception.details
+        self.assertEqual({'nInserted', 'writeErrors'}, set(error_details.keys()))
+        self.assertEqual([0, 2], sorted(e['index'] for e in error_details['writeErrors']))
+        self.assertEqual(1, error_details['nInserted'])
+        self.assertEqual({'a', 'b', 'c'}, {doc['_id'] for doc in self.db.collection.find()})
+
     def test__count(self):
         self.db.collection.insert_many([
             {'a': 1, 's': 0},

@@ -429,30 +429,41 @@ class Collection(object):
         documents = list(documents)
         for document in documents:
             validate_is_mutable_mapping('document', document)
-        return InsertManyResult(self._insert(documents, session), acknowledged=True)
+        return InsertManyResult(
+            self._insert(documents, session, ordered=ordered),
+            acknowledged=True)
 
     @property
     def _store(self):
         return self._db_store[self._name]
 
-    def _insert(self, data, session=None):
+    def _insert(self, data, session=None, ordered=True):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
         if not isinstance(data, Mapping):
             results = []
+            write_errors = []
+            num_inserted = 0
             for index, item in enumerate(data):
                 try:
                     results.append(self._insert(item))
                 except WriteError as error:
-                    raise BulkWriteError({
-                        'writeErrors': [{
-                            'index': index,
-                            'code': error.code,
-                            'errmsg': str(error),
-                            'op': item,
-                        }],
-                        'nInserted': index,
+                    write_errors.append({
+                        'index': index,
+                        'code': error.code,
+                        'errmsg': str(error),
+                        'op': item,
                     })
+                    if ordered:
+                        break
+                    else:
+                        continue
+                num_inserted += 1
+            if write_errors:
+                raise BulkWriteError({
+                    'writeErrors': write_errors,
+                    'nInserted': num_inserted,
+                })
             return results
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
