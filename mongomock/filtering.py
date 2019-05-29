@@ -35,6 +35,8 @@ def filter_applies(search_filter, document):
             if not LOGICAL_OPERATOR_MAP[key](document, search):
                 return False
             continue
+        if key == '$expr':
+            raise NotImplementedError('The $expr operator is not implemented in mongomock yet')
         if key.startswith('$'):
             raise OperationFailure('unknown top level operator: ' + key)
 

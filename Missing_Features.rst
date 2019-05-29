@@ -10,7 +10,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
 * session options
 * codec options
 * Operations of the aggregate pipeline:
-
   * `$addFields <https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/>`_
   * `$bucketAuto <https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/>`_
   * `$collStats <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/>`_
@@ -31,5 +30,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray, $slice)
+* Operators within the query language (find):
+  * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`
 * `map_reduce <https://docs.mongodb.com/manual/reference/command/mapReduce/>`_ options (``scope`` and ``finalize``)
 * Database `command <https://docs.mongodb.com/manual/reference/command/>`_ method except for the ``ping`` command.

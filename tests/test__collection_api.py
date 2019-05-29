@@ -2230,6 +2230,12 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test_find_with_expr(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 5})
+        with self.assertRaises(NotImplementedError) as err:
+            list(self.db.collection.find({'$expr': {'$lt': ['$a', 6]}}))
+        self.assertIn('The $expr operator', str(err.exception))
+
     def test__find_or_and(self):
         self.db.collection.insert_many([
             {'x': 1, 'y': 1},
