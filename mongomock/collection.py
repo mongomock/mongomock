@@ -959,6 +959,9 @@ class Collection(object):
                     if sort_direction < 0:
                         dataset = iter(reversed(list(dataset)))
                     continue
+                if sort_key.startswith('$'):
+                    raise NotImplementedError(
+                        'Sorting by {} is not implemented in mongomock yet'.format(sort_key))
                 dataset = iter(sorted(
                     dataset, key=lambda x: resolve_sort_key(sort_key, x),
                     reverse=sort_direction < 0))

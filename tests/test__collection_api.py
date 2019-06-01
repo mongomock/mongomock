@@ -2022,6 +2022,10 @@ class CollectionAPITest(TestCase):
         self.assertEqual([1, 3, 2], [doc['a'] for doc in coll.find().sort('$natural', 1)])
         self.assertEqual([2, 3, 1], [doc['a'] for doc in coll.find().sort('$natural', -1)])
 
+        with self.assertRaises(NotImplementedError) as err:
+            list(coll.find().sort('$text_score'))
+        self.assertIn('$text_score', str(err.exception))
+
     def test__cursor_sort_composed(self):
         coll = self.db.create_collection('a')
         coll.insert_many([
