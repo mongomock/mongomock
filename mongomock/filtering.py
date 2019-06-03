@@ -22,72 +22,124 @@ def filter_applies(search_filter, document):
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    if not isinstance(search_filter, dict):
-        raise OperationFailure('the match filter must be an expression in an object')
+    return _Filterer().apply(search_filter, document)
 
-    for key, search in iteritems(search_filter):
-        # Top level operators.
-        if key == '$comment':
-            continue
-        if key in LOGICAL_OPERATOR_MAP:
-            if not search:
-                raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
-            if not LOGICAL_OPERATOR_MAP[key](document, search):
-                return False
-            continue
-        if key == '$expr':
-            raise NotImplementedError('The $expr operator is not implemented in mongomock yet')
-        if key.startswith('$'):
-            raise OperationFailure('unknown top level operator: ' + key)
 
-        is_match = False
+class _Filterer(object):
+    """An object to help applying a filter, using the MongoDB query language."""
 
-        is_checking_negative_match = \
-            isinstance(search, dict) and {'$ne', '$nin'} & set(search.keys())
-        is_checking_positive_match = \
-            not isinstance(search, dict) or (set(search.keys()) - {'$ne', '$nin'})
-        has_candidates = False
+    def __init__(self):
+        self._operator_map = dict({
+            '$eq': _list_expand(operator_eq),
+            '$ne': _list_expand(lambda dv, sv: not operator_eq(dv, sv), negative=True),
+            '$all': self._all_op,
+            '$in': _in_op,
+            '$nin': lambda dv, sv: not _in_op(dv, sv),
+            '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
+            '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
+            '$elemMatch': self._elem_match_op,
+            '$size': _size_op,
+            '$type': _type_op
+        }, **{
+            key: _not_nothing_and(_list_expand(_compare_objects(op)))
+            for key, op in iteritems(SORTING_OPERATOR_MAP)
+        })
 
-        if search == {'$exists': False} and not iter_key_candidates(key, document):
-            continue
+    def apply(self, search_filter, document):
+        if not isinstance(search_filter, dict):
+            raise OperationFailure('the match filter must be an expression in an object')
 
-        for doc_val in iter_key_candidates(key, document):
-            has_candidates |= doc_val is not NOTHING
-            if isinstance(search, dict):
-                if '$options' in search and '$regex' in search:
-                    search = _combine_regex_options(search)
-                is_match = (all(
-                    operator_string in OPERATOR_MAP and
-                    OPERATOR_MAP[operator_string](doc_val, search_val) or
-                    operator_string == '$not' and
-                    _not_op(document, key, search_val)
-                    for operator_string, search_val in iteritems(search)
-                ) and search) or doc_val == search
-            elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
-                is_match = _regex(doc_val, search)
-            elif key in LOGICAL_OPERATOR_MAP:
+        for key, search in iteritems(search_filter):
+            # Top level operators.
+            if key == '$comment':
+                continue
+            if key in LOGICAL_OPERATOR_MAP:
                 if not search:
                     raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
-                is_match = LOGICAL_OPERATOR_MAP[key](document, search)
-            elif isinstance(doc_val, (list, tuple)):
-                is_match = (search in doc_val or search == doc_val)
-                if isinstance(search, ObjectId):
-                    is_match |= (str(search) in doc_val)
-            else:
-                is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
+                if not LOGICAL_OPERATOR_MAP[key](document, search, self.apply):
+                    return False
+                continue
+            if key == '$expr':
+                raise NotImplementedError('The $expr operator is not implemented in mongomock yet')
+            if key.startswith('$'):
+                raise OperationFailure('unknown top level operator: ' + key)
 
-            # When checking negative match, all the elements should match.
-            if is_checking_negative_match and not is_match:
+            is_match = False
+
+            is_checking_negative_match = \
+                isinstance(search, dict) and {'$ne', '$nin'} & set(search.keys())
+            is_checking_positive_match = \
+                not isinstance(search, dict) or (set(search.keys()) - {'$ne', '$nin'})
+            has_candidates = False
+
+            if search == {'$exists': False} and not iter_key_candidates(key, document):
+                continue
+
+            for doc_val in iter_key_candidates(key, document):
+                has_candidates |= doc_val is not NOTHING
+                if isinstance(search, dict):
+                    if '$options' in search and '$regex' in search:
+                        search = _combine_regex_options(search)
+                    is_match = (all(
+                        operator_string in self._operator_map and
+                        self._operator_map[operator_string](doc_val, search_val) or
+                        operator_string == '$not' and
+                        self._not_op(document, key, search_val)
+                        for operator_string, search_val in iteritems(search)
+                    ) and search) or doc_val == search
+                elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
+                    is_match = _regex(doc_val, search)
+                elif key in LOGICAL_OPERATOR_MAP:
+                    if not search:
+                        raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
+                    is_match = LOGICAL_OPERATOR_MAP[key](document, search, self.apply)
+                elif isinstance(doc_val, (list, tuple)):
+                    is_match = (search in doc_val or search == doc_val)
+                    if isinstance(search, ObjectId):
+                        is_match |= (str(search) in doc_val)
+                else:
+                    is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
+
+                # When checking negative match, all the elements should match.
+                if is_checking_negative_match and not is_match:
+                    return False
+
+                # If not checking negative matches, the first match is enouh for this criteria.
+                if is_match and not is_checking_negative_match:
+                    break
+
+            if not is_match and (has_candidates or is_checking_positive_match):
                 return False
 
-            # If not checking negative matches, the first match is enouh for this criteria.
-            if is_match and not is_checking_negative_match:
-                break
+        return True
 
-        if not is_match and (has_candidates or is_checking_positive_match):
+    def _not_op(self, d, k, s):
+        if isinstance(s, dict):
+            for key in s.keys():
+                if key not in self._operator_map and key not in LOGICAL_OPERATOR_MAP:
+                    raise OperationFailure('unknown operator: %s' % key)
+        elif isinstance(s, type(re.compile(''))):
+            pass
+        else:
+            raise OperationFailure('$not needs a regex or a document')
+        return not self.apply({k: s}, d)
+
+    def _elem_match_op(self, doc_val, query):
+        if not isinstance(doc_val, list):
             return False
+        if not isinstance(query, dict):
+            raise OperationFailure('$elemMatch needs an Object')
+        return any(self.apply(query, item) for item in doc_val)
 
-    return True
+    def _all_op(self, doc_val, search_val):
+        dv = _force_list(doc_val)
+        matches = []
+        for x in search_val:
+            if isinstance(x, dict) and '$elemMatch' in x:
+                matches.append(self._elem_match_op(doc_val, x['$elemMatch']))
+            else:
+                matches.append(x in dv)
+        return all(matches)
 
 
 def iter_key_candidates(key, doc):
@@ -150,17 +202,6 @@ def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
 
 
-def _all_op(doc_val, search_val):
-    dv = _force_list(doc_val)
-    matches = []
-    for x in search_val:
-        if isinstance(x, dict) and '$elemMatch' in x:
-            matches.append(_elem_match_op(doc_val, x['$elemMatch']))
-        else:
-            matches.append(x in dv)
-    return all(matches)
-
-
 def _in_op(doc_val, search_val):
     if doc_val is NOTHING and None in search_val:
         return True
@@ -172,18 +213,6 @@ def _in_op(doc_val, search_val):
         if (is_regex and _regex(doc_val, x)) or (x in doc_val):
             return True
     return False
-
-
-def _not_op(d, k, s):
-    if isinstance(s, dict):
-        for key in s.keys():
-            if key not in OPERATOR_MAP and key not in LOGICAL_OPERATOR_MAP:
-                raise OperationFailure('unknown operator: %s' % key)
-    elif isinstance(s, type(re.compile(''))):
-        pass
-    else:
-        raise OperationFailure('$not needs a regex or a document')
-    return not filter_applies({k: s}, d)
 
 
 def _not_nothing_and(f):
@@ -269,14 +298,6 @@ def _get_compare_type(val):
         (val, type(val)))
 
 
-def _elem_match_op(doc_val, query):
-    if not isinstance(doc_val, list):
-        return False
-    if not isinstance(query, dict):
-        raise OperationFailure('$elemMatch needs an Object')
-    return any(filter_applies(query, item) for item in doc_val)
-
-
 def _regex(doc_val, regex):
     if not (isinstance(doc_val, (string_types, list)) or isinstance(doc_val, RE_TYPE)):
         return False
@@ -356,28 +377,12 @@ SORTING_OPERATOR_MAP = {
 }
 
 
-OPERATOR_MAP = dict({
-    '$eq': _list_expand(operator_eq),
-    '$ne': _list_expand(lambda dv, sv: not operator_eq(dv, sv), negative=True),
-    '$all': _all_op,
-    '$in': _in_op,
-    '$nin': lambda dv, sv: not _in_op(dv, sv),
-    '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
-    '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
-    '$elemMatch': _elem_match_op,
-    '$size': _size_op,
-    '$type': _type_op
-}, **{
-    key: _not_nothing_and(_list_expand(_compare_objects(op)))
-    for key, op in iteritems(SORTING_OPERATOR_MAP)
-})
-
-
 LOGICAL_OPERATOR_MAP = {
-    '$or': lambda d, subq: any(filter_applies(q, d) for q in subq),
-    '$and': lambda d, subq: all(filter_applies(q, d) for q in subq),
-    '$nor': lambda d, subq: all(not filter_applies(q, d) for q in subq),
+    '$or': lambda d, subq, filter_func: any(filter_func(q, d) for q in subq),
+    '$and': lambda d, subq, filter_func: all(filter_func(q, d) for q in subq),
+    '$nor': lambda d, subq, filter_func: all(not filter_func(q, d) for q in subq),
 }
+
 
 TYPE_MAP = {
     'double': (float,),
