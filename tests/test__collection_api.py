@@ -2259,7 +2259,7 @@ class CollectionAPITest(TestCase):
     def test__aggregate_replace_root(self):
         self.db.a.insert_many([
             {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
-            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}}
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
         ])
         actual = self.db.a.aggregate([
             {'$replaceRoot': {'newRoot': '$pets'}}
@@ -2267,6 +2267,19 @@ class CollectionAPITest(TestCase):
         self.assertListEqual([
             {'dogs': 2, 'cats': 3},
             {'hamsters': 3, 'cats': 4}
+        ], list(actual))
+
+    def test__aggregate_replace_root_use_dots(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': {'male': 1}}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': {'female': 5}}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {'newRoot': '$pets.cats'}}
+        ])
+        self.assertListEqual([
+            {'male': 1},
+            {'female': 5}
         ], list(actual))
 
     def test__aggregate_replace_root_non_existing(self):
@@ -2280,9 +2293,24 @@ class CollectionAPITest(TestCase):
                     'newRoot': '$not_here'
                 }}
             ])
-        self.assertEqual(
-            'Could not complete $replaceRoot with given expression.',
-            str(err.exception))
+        self.assertIn('expression', str(err.exception))
+
+    def test__aggregate_replace_root_missing_in_expr(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+            {'_id': 3, 'pets': {'cats': 5}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {
+                'newRoot': {'dogs': '$pets.dogs', 'hamsters': '$pets.hamsters'},
+            }}
+        ])
+        self.assertEqual([
+            {'dogs': 2},
+            {'hamsters': 3},
+            {},
+        ], list(actual))
 
     def test__aggregate_replace_root_static(self):
         self.db.a.insert_many([
@@ -2333,6 +2361,16 @@ class CollectionAPITest(TestCase):
             {'cell': '555-653-6527'},
             {'cell': '555-445-8767'}
         ], list(actual))
+
+    def test__aggregate_replace_root_wrong_options(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+        ])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.a.aggregate([
+                {'$replaceRoot': {'new_root': '$pets'}}
+            ])
 
     def test__aggregate_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
