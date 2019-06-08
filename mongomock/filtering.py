@@ -77,7 +77,7 @@ class _Filterer(object):
 
             for doc_val in iter_key_candidates(key, document):
                 has_candidates |= doc_val is not NOTHING
-                if isinstance(search, dict):
+                if isinstance(search, dict) and all(key.startswith('$') for key in search.keys()):
                     if '$options' in search and '$regex' in search:
                         search = _combine_regex_options(search)
                     is_match = (all(

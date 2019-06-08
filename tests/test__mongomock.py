@@ -505,6 +505,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'_id': 'some_id', 'a': [{'b': 1, 'c': 2}]})
         self.cmp.compare.find_one({'a.b': 1})
 
+    def test__find_dict_in_nested_list(self):
+        # See #539
+        self.cmp.do.insert_one({'a': {'b': [{'c': 1}]}})
+        self.cmp.compare.find({'a.b': {'c': 1}})
+
     def test__find_by_regex_object(self):
         """Test searching with regular expression objects."""
         bob = {'name': 'bob'}

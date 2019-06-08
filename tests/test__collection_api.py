@@ -1759,6 +1759,10 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 1})
 
+    def test__find_dict_in_nested_list(self):
+        self.db.collection.insert_one({'a': {'b': [{'c': 1}]}})
+        self.assertTrue(self.db.collection.find_one({'a.b': {'c': 1}}))
+
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
