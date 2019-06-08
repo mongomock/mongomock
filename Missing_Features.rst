@@ -32,6 +32,8 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Array operators ($concatArrays, $isArray, $slice)
 * Operators within the query language (find):
   * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`
+  * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`
   * `$text <https://docs.mongodb.com/manual/reference/operator/query/text/>` search
+  * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`
 * `map_reduce <https://docs.mongodb.com/manual/reference/command/mapReduce/>`_ options (``scope`` and ``finalize``)
 * Database `command <https://docs.mongodb.com/manual/reference/command/>`_ method except for the ``ping`` command.

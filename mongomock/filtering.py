@@ -14,6 +14,7 @@ except ImportError:
     NoneType = type(None)
 
 COMPILED_RE_TYPE = type(re.compile('a'))
+_TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
 
 
 def filter_applies(search_filter, document):
@@ -59,8 +60,9 @@ class _Filterer(object):
                 if not LOGICAL_OPERATOR_MAP[key](document, search, self.apply):
                     return False
                 continue
-            if key == '$expr':
-                raise NotImplementedError('The $expr operator is not implemented in mongomock yet')
+            if key in _TOP_LEVEL_OPERATORS:
+                raise NotImplementedError(
+                    'The {} operator is not implemented in mongomock yet'.format(key))
             if key.startswith('$'):
                 raise OperationFailure('unknown top level operator: ' + key)
 

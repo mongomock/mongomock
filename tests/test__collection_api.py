@@ -3240,6 +3240,17 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_one({'arr': {'$elemMatch': None}})
 
+    def test__find_where(self):
+        self.db.collection.insert_many([
+            {'name': 'Anya'},
+            {'name': 'Bob'},
+        ])
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.find_one({
+                '$where':
+                'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
+            })
+
     def test__unwind_no_prefix(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         with self.assertRaises(ValueError) as err:
