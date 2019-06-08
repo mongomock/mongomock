@@ -1796,6 +1796,7 @@ class CollectionAPITest(TestCase):
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
+        self.db.collection.with_options(codec_options.CodecOptions())
 
     @skipIf(_HAVE_PYMONGO, 'pymongo installed')
     def test__codec_options_without_pymongo(self):

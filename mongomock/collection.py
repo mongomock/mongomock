@@ -16,10 +16,10 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON, Timestamp
-    from bson import codec_options
-    _DEFAULT_CODEC_OPTIONS = codec_options.CodecOptions()
+    from bson import codec_options as bson_codec_options
+    _DEFAULT_CODEC_OPTIONS = bson_codec_options.CodecOptions()
 except ImportError:
-    codec_options = json_utils = SON = BSON = Timestamp = None
+    bson_codec_options = json_utils = SON = BSON = Timestamp = None
     _DEFAULT_CODEC_OPTIONS = None
 try:
     import execjs
@@ -400,11 +400,11 @@ class Collection(object):
 
     @property
     def codec_options(self):
-        if not codec_options:
+        if not bson_codec_options:
             raise NotImplementedError(
                 'The codec options are not implemented in mongomock alone, you need to import '
                 'the pymongo library as well.')
-        return codec_options.CodecOptions()
+        return bson_codec_options.CodecOptions()
 
     def initialize_unordered_bulk_op(self):
         return BulkOperationBuilder(self, ordered=False)
@@ -1627,16 +1627,12 @@ class Collection(object):
         in_collection = [doc for doc in self.find()]
         return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
-    def with_options(self, **kwargs):
-        forbidden_kwargs = set(kwargs.keys()) - set(_WITH_OPTIONS_KWARGS)
-        if forbidden_kwargs:
-            raise TypeError(
-                "with_options() got an unexpected keyword argument '%s'" % forbidden_kwargs.pop())
-
-        for key, value in iteritems(kwargs):
+    def with_options(
+            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+        for key, options in iteritems(_WITH_OPTIONS_KWARGS):
+            value = locals()[key]
             if value is None:
                 continue
-            options = _WITH_OPTIONS_KWARGS[key]
             for attr in options.attrs:
                 if not hasattr(value, attr):
                     raise TypeError(
@@ -1646,8 +1642,6 @@ class Collection(object):
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
 
-        write_concern = kwargs.get('write_concern', self.write_concern)
-        read_preference = kwargs.get('read_preference', self.read_preference)
         return Collection(
             self.database, self.name, write_concern=write_concern, read_preference=read_preference,
             _db_store=self._db_store)
