@@ -19,7 +19,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$indexStats <https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/>`_
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_
   * `$listSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/>`_
-  * `$replaceRoot <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/>`_
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:

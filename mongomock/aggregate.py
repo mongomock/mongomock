@@ -10,6 +10,7 @@ import numbers
 import random
 import warnings
 
+from sentinels import NOTHING
 import six
 from six import moves
 
@@ -818,6 +819,24 @@ def _project_by_spec(doc, proj_spec, is_include):
     return output
 
 
+def _handle_replace_root_stage(in_collection, unused_database, options):
+    if 'newRoot' not in options:
+        raise OperationFailure("Parameter 'newRoot' is missing for $replaceRoot operation.")
+    new_root = options['newRoot']
+    out_collection = []
+    for doc in in_collection:
+        try:
+            new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
+        except KeyError:
+            new_doc = NOTHING
+        if not isinstance(new_doc, dict):
+            raise OperationFailure(
+                "'newRoot' expression must evaluate to an object, but resulting value was: {}"
+                .format(new_doc))
+        out_collection.append(new_doc)
+    return out_collection
+
+
 def _handle_project_stage(in_collection, unused_database, options):
     filter_list = []
     method = None
@@ -909,7 +928,7 @@ _PIPELINE_HANDLERS = {
     '$out': _handle_out_stage,
     '$project': _handle_project_stage,
     '$redact': None,
-    '$replaceRoot': None,
+    '$replaceRoot': _handle_replace_root_stage,
     '$sample': _handle_sample_stage,
     '$skip': lambda c, d, o: c[o:],
     '$sort': _handle_sort_stage,

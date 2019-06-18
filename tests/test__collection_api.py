@@ -2256,6 +2256,122 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([2], [d['x'] for d in self.db.collection.find(search_filter)])
 
+    def test__aggregate_replace_root(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {'newRoot': '$pets'}}
+        ])
+        self.assertListEqual([
+            {'dogs': 2, 'cats': 3},
+            {'hamsters': 3, 'cats': 4}
+        ], list(actual))
+
+    def test__aggregate_replace_root_use_dots(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': {'male': 1}}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': {'female': 5}}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {'newRoot': '$pets.cats'}}
+        ])
+        self.assertListEqual([
+            {'male': 1},
+            {'female': 5}
+        ], list(actual))
+
+    def test__aggregate_replace_root_non_existing(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}}
+        ])
+        with self.assertRaises(mongomock.OperationFailure) as err:
+            self.db.a.aggregate([
+                {'$replaceRoot': {
+                    'newRoot': '$not_here'
+                }}
+            ])
+        self.assertIn('expression', str(err.exception))
+
+    def test__aggregate_replace_root_missing_in_expr(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+            {'_id': 3, 'pets': {'cats': 5}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {
+                'newRoot': {'dogs': '$pets.dogs', 'hamsters': '$pets.hamsters'},
+            }}
+        ])
+        self.assertEqual([
+            {'dogs': 2},
+            {'hamsters': 3},
+            {},
+        ], list(actual))
+
+    def test__aggregate_replace_root_static(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}}
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot': {
+                'newRoot': {'document': 'new'}
+            }}
+        ])
+        self.assertListEqual([
+            {'document': 'new'},
+            {'document': 'new'}
+        ], list(actual))
+
+    def test__aggregate_replace_root_expression(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'first_name': 'Gary', 'last_name': 'Sheffield', 'city': 'New York'},
+            {'_id': 2, 'first_name': 'Nancy', 'last_name': 'Walker', 'city': 'Anaheim'},
+            {'_id': 3, 'first_name': 'Peter', 'last_name': 'Sumner', 'city': 'Toledo'}
+        ])
+        actual = self.db.a.aggregate([
+            {'$replaceRoot':
+             {'newRoot':
+              {'full_name':
+               {'$concat': ['$first_name', ' ', '$last_name']}}}}
+        ])
+        self.assertListEqual([
+            {'full_name': 'Gary Sheffield'},
+            {'full_name': 'Nancy Walker'},
+            {'full_name': 'Peter Sumner'}
+        ], list(actual))
+
+    def test__aggregate_replace_root_with_array(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'name': 'Susan', 'phones':
+             [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
+            {'_id': 2, 'name': 'Mark', 'phones':
+             [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
+        ])
+        actual = self.db.a.aggregate([
+            {'$unwind': '$phones'},
+            {'$match': {'phones.cell': {'$exists': True}}},
+            {'$replaceRoot': {'newRoot': '$phones'}}
+        ])
+        self.assertListEqual([
+            {'cell': '555-653-6527'},
+            {'cell': '555-445-8767'}
+        ], list(actual))
+
+    def test__aggregate_replace_root_wrong_options(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+        ])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.a.aggregate([
+                {'$replaceRoot': {'new_root': '$pets'}}
+            ])
+
     def test__aggregate_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
         self.db.b.insert_many([

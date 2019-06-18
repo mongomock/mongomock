@@ -2593,6 +2593,35 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         cmp = self._create_compare_for_collection('new_collection')
         cmp.compare.find()
 
+    def test__replace_root(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {
+                '_id': 1,
+                'fruit': ['apples', 'oranges'],
+                'in_stock': {'oranges': 20, 'apples': 60},
+                'on_order': {'oranges': 35, 'apples': 75},
+            },
+            {
+                '_id': 2,
+                'vegetables': ['beets', 'yams'],
+                'in_stock': {'beets': 130, 'yams': 200},
+                'on_order': {'beets': 90, 'yams': 145},
+            },
+        ])
+        self.cmp.compare.aggregate([{'$replaceRoot': {'newRoot': '$in_stock'}}])
+
+    def test__replace_root_new_document(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {'_id': 1, 'first_name': 'Gary', 'last_name': 'Sheffield', 'city': 'New York'},
+            {'_id': 2, 'first_name': 'Nancy', 'last_name': 'Walker', 'city': 'Anaheim'},
+            {'_id': 3, 'first_name': 'Peter', 'last_name': 'Sumner', 'city': 'Toledo'},
+        ])
+        self.cmp.compare.aggregate([{'$replaceRoot': {'newRoot': {
+            'full_name': {'$concat': ['$first_name', '$last_name']},
+        }}}])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
