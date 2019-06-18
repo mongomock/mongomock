@@ -1728,7 +1728,10 @@ class Cursor(object):
         self._emitted = 0
 
     def sort(self, key_or_list, direction=None):
-        self._sort = helpers.create_index_list(key_or_list, direction)
+        sort = helpers.create_index_list(key_or_list, direction)
+        if not sort:
+            raise ValueError('key_or_list must not be the empty list')
+        self._sort = sort
         self._factory = functools.partial(
             self.collection._get_dataset, self._spec, self._sort, self._projection, dict)
         return self

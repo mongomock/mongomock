@@ -2031,6 +2031,11 @@ class CollectionAPITest(TestCase):
             list(coll.find().sort('$text_score'))
         self.assertIn('$text_score', str(err.exception))
 
+        cursor = coll.find()
+        with self.assertRaises(ValueError) as err:
+            cursor.sort([])
+        self.assertIn('empty list', str(err.exception))
+
     def test__cursor_sort_composed(self):
         coll = self.db.create_collection('a')
         coll.insert_many([
