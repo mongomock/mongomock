@@ -4,18 +4,21 @@ cache: pip
 python:
   - 3.5
 env:
-  - TOX_ENV=py27
-  - TOX_ENV=py27-mock-pymongo-pyexecjs
-  - TOX_ENV=pypy-mock-pymongo-pyexecjs
-  - TOX_ENV=py34-pymongo-pyexecjs
-  - TOX_ENV=py35-pymongo-pyexecjs
-  - TOX_ENV=py36-pymongo-pyexecjs
-  - TOX_ENV=py37
-  - TOX_ENV=py37-pymongo
-  - TOX_ENV=py37-pyexecjs
-  - TOX_ENV=py37-pymongo-pyexecjs
-  - TOX_ENV=pep8
-  - TOX_ENV=pylint
+  global:
+    - MONGODB=4.1.1
+  matrix:
+    - TOX_ENV=py27
+    - TOX_ENV=py27-mock-pymongo-pyexecjs
+    - TOX_ENV=pypy-mock-pymongo-pyexecjs
+    - TOX_ENV=py34-pymongo-pyexecjs
+    - TOX_ENV=py35-pymongo-pyexecjs
+    - TOX_ENV=py36-pymongo-pyexecjs
+    - TOX_ENV=py37
+    - TOX_ENV=py37-pymongo
+    - TOX_ENV=py37-pyexecjs
+    - TOX_ENV=py37-pymongo-pyexecjs
+    - TOX_ENV=pep8
+    - TOX_ENV=pylint
 matrix:
     # Run all under 3.5 and pypy under pypy, temporary, to be rolled back once trusty fixes it
     include:
@@ -48,16 +51,22 @@ matrix:
           env: TOX_ENV=py37-pyexecjs
         - python: 3.5
           env: TOX_ENV=py37-pymongo-pyexecjs
-services:
-  - mongodb
 script:
   - tox -e $TOX_ENV
 before_install:
   - "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10"
   - "sudo apt-get update"
 before_script:
+  - mkdir ${PWD}/mongodb-linux-x86_64-${MONGODB}/data
+  - ${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-${MONGODB}/mongodb.log --fork
   - "until nc -z localhost 27017; do echo Waiting for MongoDB; sleep 1; done"
-install: pip install tox
+after_script:
+  - pkill mongod
+install:
+  - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-${MONGODB}.tgz
+  - tar xzf mongodb-linux-x86_64-${MONGODB}.tgz
+  - ${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/mongod --version
+  - pip install tox
 deploy:
   provider: pypi
   user: vmalloc
