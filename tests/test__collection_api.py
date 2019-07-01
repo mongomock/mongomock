@@ -3602,6 +3602,25 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find(filters)
         self.assertEqual([doc['_id'] for doc in results], [7, 8])
 
+    def test__all_size(self):
+        self.db.collection.insert_many([
+            {
+                'code': 'ijk',
+                'tags': ['electronics', 'school'],
+                'qty': [{'size': 'M', 'num': 100, 'color': 'green'}],
+            },
+            {
+                'code': 'efg',
+                'tags': ['school', 'book'],
+                'qty': [
+                    {'size': 'S', 'num': 10, 'color': 'blue'},
+                    {'size': 'M', 'num': 100, 'color': 'blue'},
+                    {'size': 'L', 'num': 100, 'color': 'green'},
+                ],
+            },
+        ])
+        self.assertEqual(1, self.db.collection.count_documents({'qty.size': {'$all': ['M', 'L']}}))
+
     def test__filter_eq_on_array(self):
         """$eq on array matches if one element of the array matches."""
         collection = self.db.collection

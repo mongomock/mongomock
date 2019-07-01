@@ -1,4 +1,5 @@
 from datetime import datetime
+import itertools
 
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
@@ -77,6 +78,11 @@ class _Filterer(object):
             if search == {'$exists': False} and not iter_key_candidates(key, document):
                 continue
 
+            if isinstance(search, dict) and '$all' in search:
+                if not self._all_op(iter_key_candidates(key, document), search['$all']):
+                    return False
+                continue
+
             for doc_val in iter_key_candidates(key, document):
                 has_candidates |= doc_val is not NOTHING
                 if isinstance(search, dict) and all(key.startswith('$') for key in search.keys()):
@@ -134,6 +140,8 @@ class _Filterer(object):
         return any(self.apply(query, item) for item in doc_val)
 
     def _all_op(self, doc_val, search_val):
+        if isinstance(doc_val, list) and doc_val and isinstance(doc_val[0], list):
+            doc_val = list(itertools.chain.from_iterable(doc_val))
         dv = _force_list(doc_val)
         matches = []
         for x in search_val:

@@ -866,6 +866,25 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # self.cmp.compare.find_one(
         #     {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c.e', 0), ('b.c', 0)]))
 
+    def test__find_all(self):
+        self.cmp.do.insert_many([
+            {
+                'code': 'ijk',
+                'tags': ['electronics', 'school'],
+                'qty': [{'size': 'M', 'num': 100, 'color': 'green'}],
+            },
+            {
+                'code': 'efg',
+                'tags': ['school', 'book'],
+                'qty': [
+                    {'size': 'S', 'num': 10, 'color': 'blue'},
+                    {'size': 'M', 'num': 100, 'color': 'blue'},
+                    {'size': 'L', 'num': 100, 'color': 'green'},
+                ],
+            },
+        ])
+        self.cmp.compare.find({'qty.size': {'$all': ['M', 'L']}})
+
     # def test__as_class(self):
     #     class MyDict(dict):
     #         pass
