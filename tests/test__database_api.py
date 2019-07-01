@@ -103,6 +103,12 @@ class DatabaseAPITest(TestCase):
         self.assertEqual('Primary', col.read_preference.name)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__get_collection_different_codec_options(self):
+        database = mongomock.MongoClient().somedb
+        with self.assertRaises(NotImplementedError):
+            database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
 
@@ -114,13 +120,10 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(codec_options=3)
 
+        with self.assertRaises(NotImplementedError):
+            self.database.get_collection('a', codec_options=3)
+
     def test__with_options(self):
-        other = self.database.with_options(read_preference=self.database.read_preference)
-        self.assertNotEqual(other, self.database)
-
-        self.database.coll.insert_one({'_id': 42})
-        self.assertEqual({'_id': 42}, other.coll.find_one())
-
         with self.assertRaises(NotImplementedError):
             self.database.with_options(write_concern=3)
 
@@ -129,11 +132,22 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
+        other = self.database.with_options(read_preference=self.database.NEAREST)
+        self.assertNotEqual(other, self.database)
+
+        self.database.coll.insert_one({'_id': 42})
+        self.assertEqual({'_id': 42}, other.coll.find_one())
+
         self.database.with_options(codec_options=codec_options.CodecOptions())
         self.database.with_options()
 
         with self.assertRaises(NotImplementedError):
             self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
+
+        tz_aware_db = mongomock.MongoClient(tz_aware=True).somedb
+        self.assertIs(
+            tz_aware_db,
+            tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)))
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])

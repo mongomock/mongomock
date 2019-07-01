@@ -20,12 +20,13 @@ except ImportError:
 
 class Database(object):
 
-    def __init__(self, client, name, _store, read_preference=None):
+    def __init__(self, client, name, _store, read_preference=None, codec_options=None):
         self.name = name
         self._client = client
         self._collection_accesses = {}
         self._store = _store or store.DatabaseStore()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
+        self._codec_options = codec_options
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -54,7 +55,7 @@ class Database(object):
             raise NotImplementedError(
                 'The codec options are not implemented in mongomock alone, you need to import '
                 'the pymongo library as well.')
-        return bson_codec_options.CodecOptions()
+        return self._codec_options
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
@@ -81,13 +82,23 @@ class Database(object):
             raise NotImplementedError('Mongomock does not handle read_concern yet')
         if read_preference is not None:
             read_preferences.ensure_read_preference_type('read_preference', read_preference)
+        if codec_options and codec_options != self._codec_options:
+            if not bson_codec_options:
+                raise NotImplementedError(
+                    'The codec options are not implemented in mongomock alone, you need to import '
+                    'the pymongo library as well.')
+            if codec_options != self._codec_options:
+                raise NotImplementedError('The codec options are not implemented yet')
         try:
-            return self._collection_accesses[name]
+            return self._collection_accesses[name].with_options(
+                codec_options=codec_options or self._codec_options,
+                read_preference=read_preference or self.read_preference,
+                read_concern=read_concern, write_concern=write_concern)
         except KeyError:
             collection = self._collection_accesses[name] = Collection(
                 self, name=name, write_concern=write_concern,
                 read_preference=read_preference or self.read_preference,
-                _db_store=self._store)
+                codec_options=codec_options or self._codec_options, _db_store=self._store, )
             return collection
 
     def drop_collection(self, name_or_collection, session=None):
@@ -171,7 +182,8 @@ class Database(object):
                 raise NotImplementedError(
                     'The codec options are not implemented in mongomock alone, you need to import '
                     'the pymongo library as well.')
-            if codec_options != bson_codec_options.CodecOptions():
+            if codec_options != self._codec_options:
+                # TODO(pascal): Support change of tz_aware in codec_options.
                 raise NotImplementedError('The codec options are not implemented yet')
 
         if write_concern:
@@ -184,5 +196,10 @@ class Database(object):
                 'read_concern is a valid parameter for with_options but is not implemented yet in'
                 'mongomock')
 
+        if read_preference is None or read_preference == self._read_preference:
+            return self
+
         return Database(
-            self._client, self.name, self._store, read_preference=self.read_preference)
+            self._client, self.name, self._store,
+            read_preference=read_preference or self._read_preference,
+            codec_options=codec_options or self._codec_options)

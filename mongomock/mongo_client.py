@@ -32,6 +32,10 @@ class MongoClient(object):
         self.port = port or self.PORT
 
         self._tz_aware = tz_aware
+        if bson_codec_options:
+            self._codec_options = bson_codec_options.CodecOptions(tz_aware=tz_aware)
+        else:
+            self._codec_options = None
         self._database_accesses = {}
         self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
@@ -85,7 +89,7 @@ class MongoClient(object):
             raise NotImplementedError(
                 'The codec options are not implemented in mongomock alone, you need to import '
                 'the pymongo/bson library as well.')
-        return bson_codec_options.CodecOptions()
+        return self._codec_options
 
     def server_info(self):
         return {
@@ -130,7 +134,7 @@ class MongoClient(object):
             db_store = self._store[name]
             db = self._database_accesses[name] = Database(
                 self, name, read_preference=read_preference or self.read_preference,
-                _store=db_store)
+                codec_options=self._codec_options, _store=db_store)
         return db
 
     def get_default_database(self):

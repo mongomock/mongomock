@@ -362,12 +362,16 @@ class BulkOperationBuilder(object):
 
 class Collection(object):
 
-    def __init__(self, database, name, _db_store, write_concern=None, read_preference=None):
+    def __init__(
+            self, database, name, _db_store, write_concern=None, read_preference=None,
+            codec_options=None):
         self.database = database
         self._name = name
         self._db_store = _db_store
         self._write_concern = write_concern or WriteConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
+        self._codec_options = codec_options
+        self._read_concern = None
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -404,7 +408,7 @@ class Collection(object):
             raise NotImplementedError(
                 'The codec options are not implemented in mongomock alone, you need to import '
                 'the pymongo library as well.')
-        return bson_codec_options.CodecOptions()
+        return self._codec_options
 
     def initialize_unordered_bulk_op(self):
         return BulkOperationBuilder(self, ordered=False)
@@ -1629,22 +1633,29 @@ class Collection(object):
 
     def with_options(
             self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+        has_changes = False
         for key, options in iteritems(_WITH_OPTIONS_KWARGS):
             value = locals()[key]
-            if value is None:
+            if value is None or value == getattr(self, '_' + key):
                 continue
+            has_changes = True
             for attr in options.attrs:
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if key not in ('read_preference', 'write_concern') and options.default != value:
+            if key in ('codec_options', 'read_concern') and options.default != value:
+                # TODO(pascal): Support change of tz_aware in codec_options.
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
                     'in Mongomock' % key)
 
+        if not has_changes:
+            return self
+
         return Collection(
-            self.database, self.name, write_concern=write_concern, read_preference=read_preference,
-            _db_store=self._db_store)
+            self.database, self.name, write_concern=write_concern or self._write_concern,
+            read_preference=read_preference or self._read_preference,
+            codec_options=codec_options or self._codec_options, _db_store=self._db_store)
 
     def rename(self, new_name, session=None, **kwargs):
         if session:
@@ -1690,6 +1701,7 @@ class Cursor(object):
     def _compute_results(self, with_limit_and_skip=False):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
+            # TODO(pascal): Check collection's codec_options instead of reaching to the client.
             if self.collection.database.client._tz_aware:
                 results = [helpers.make_datetime_timezone_aware_in_document(x)
                            for x in self._factory()]
