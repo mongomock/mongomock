@@ -65,7 +65,7 @@ the test simply becomes:
      collection = mongomock.MongoClient().db.collection
      objects = [dict(votes=1), dict(votes=2), ...]
      for obj in objects:
-         obj['_id'] = collection.insert_one(obj)
+         obj['_id'] = collection.insert_one(obj).inserted_id
      increase_votes(collection)
      for obj in objects:
          stored_obj = collection.find_one({'_id': obj['_id']})
