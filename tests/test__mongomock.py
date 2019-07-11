@@ -2083,6 +2083,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate_on_no_data(self):
+        pipeline = [
+            {'$sort': {'date': 1}},
+            {'$group': {
+                '_id': None,
+                'last_unkown': {'$last': '$unkown_field'},
+                'first_unknown': {'$first': '$unknown_field'},
+            }},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate14(self):
         pipeline = [
             {'$sort': {'date': 1}},

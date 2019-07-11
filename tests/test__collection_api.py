@@ -3894,6 +3894,25 @@ class CollectionAPITest(TestCase):
             }]
         self.assertEqual(expect, list(actual))
 
+    def test__agregate_first_on_empty(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'a': 1, 'b': 1},
+            {'a': 1, 'b': 2},
+            {'a': 2},
+            {'a': 2},
+        ])
+        actual = collection.aggregate([{'$group': {
+            '_id': '$a',
+            'firstB': {'$first': '$b'},
+            'lastB': {'$last': '$b'},
+        }}])
+        expect = [
+            {'_id': 1, 'firstB': 1, 'lastB': 2},
+            {'_id': 2, 'firstB': None, 'lastB': None},
+        ]
+        self.assertEqual(expect, list(actual))
+
     def test__aggregate_group_scalar_key(self):
         collection = self.db.collection
         collection.insert_many(

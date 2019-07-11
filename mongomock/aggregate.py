@@ -448,9 +448,9 @@ def _accumulate_group(output_fields, group_list):
             if operator in _GROUPING_OPERATOR_MAP:
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$first':
-                doc_dict[field] = values[0]
+                doc_dict[field] = values[0] if values else None
             elif operator == '$last':
-                doc_dict[field] = values[-1]
+                doc_dict[field] = values[-1] if values else None
             elif operator == '$addToSet':
                 value = []
                 val_it = (val or None for val in values)
