@@ -4269,6 +4269,115 @@ class CollectionAPITest(TestCase):
                 self.db.collection.aggregate(
                     [{'$project': {'filtered_items': {'$filter': option}}}])
 
+    def test__aggregate_slice(self):
+        self.db.collection.drop()
+        collection = self.db.collection
+        self.db.collection.insert_many([
+            {
+                '_id': 0,
+                'items': list(range(10)),
+            },
+            {
+                '_id': 1,
+                'items': list(range(10, 20)),
+            },
+            {
+                '_id': 2,
+                'items': list(range(20, 30)),
+            },
+        ])
+
+        empty = [
+            {'_id': 0, 'slice': []},
+            {'_id': 1, 'slice': []},
+            {'_id': 2, 'slice': []}
+        ]
+        self.assertEqual(empty, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 0]}}}
+        ])))
+
+        first_five = [
+            {'_id': 0, 'slice': list(range(5))},
+            {'_id': 1, 'slice': list(range(10, 15))},
+            {'_id': 2, 'slice': list(range(20, 25))}
+        ]
+        self.assertEqual(first_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 5]}}}
+        ])))
+        self.assertEqual(first_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 0, 5]}}}
+        ])))
+        self.assertEqual(first_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -10, 5]}}}
+        ])))
+
+        full = [
+            {'_id': 0, 'slice': list(range(10))},
+            {'_id': 1, 'slice': list(range(10, 20))},
+            {'_id': 2, 'slice': list(range(20, 30))}
+        ]
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 10]}}}
+        ])))
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 10000]}}}
+        ])))
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 0, 10000]}}}
+        ])))
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -10]}}}
+        ])))
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -10000]}}}
+        ])))
+        self.assertEqual(full, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -10, 10]}}}
+        ])))
+
+        last_five = [
+            {'_id': 0, 'slice': list(range(5, 10))},
+            {'_id': 1, 'slice': list(range(15, 20))},
+            {'_id': 2, 'slice': list(range(25, 30))}
+        ]
+        self.assertEqual(last_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', 5, 5]}}}
+        ])))
+        self.assertEqual(last_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -5]}}}
+        ])))
+        self.assertEqual(last_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', -5, 5]}}}
+        ])))
+
+    def test__aggregate_slice_wrong(self):
+        # inserts an item otherwise the slice is not even evaluated
+        self.db.collection.insert_one(
+            {
+                '_id': 0,
+                'items': list(range(10)),
+            }
+        )
+        options = [
+            {},
+            [],
+            [0],
+            [0, 0],
+            ['$items'],
+            ['$items', 0, 0],
+            ['$items', 1, 0],
+            ['$items', 0, -1],
+            ['$items', -1, -1],
+            ['items', 0],
+            ['items', 'foo'],
+            ['items', 0, 'bar'],
+            '$items',
+        ]
+        for option in options:
+            with self.assertRaises(mongomock.OperationFailure, msg=option):
+                self.db.collection.aggregate(
+                    [{'$project': {'slice': {'$slice': option}}}])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)

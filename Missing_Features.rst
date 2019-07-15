@@ -28,7 +28,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Some set operators ($setEquals, $setIntersection, $setDifference, …)
   * Text search operator ($meta)
   * Projection operators ($map, $let)
-  * Array operators ($concatArrays, $isArray, $slice)
+  * Array operators ($concatArrays, $isArray)
 * Operators within the query language (find):
   * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`
   * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`
