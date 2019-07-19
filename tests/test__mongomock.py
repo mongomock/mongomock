@@ -2403,6 +2403,25 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [{'$project': {'_id': 0}}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate_project_array_subfield(self):
+        self.cmp.do.insert_many([
+            {'a': [{'b': 1, 'c': 2, 'd': 3}], 'e': 4},
+            {'a': [{'c': 12, 'd': 13}], 'e': 14},
+            {'a': [{'b': 21, 'd': 23}], 'e': 24},
+            {'a': [{'b': 31, 'c': 32}], 'e': 34},
+            {'a': [{'b': 41}], 'e': 44},
+            {'a': [{'c': 51}], 'e': 54},
+            {'a': [{'d': 51}], 'e': 54},
+            {'a': [{'b': 61, 'c': 62, 'd': 63}, 65, 'foobar',
+                   {'b': 66, 'c': 67, 'd': 68}], 'e': 64},
+            {'a': []},
+            {'a': [1, 2, 3, 4]},
+            {'a': 'foobar'},
+            {'a': 5},
+        ])
+        pipeline = [{'$project': {'a.b': 1, 'a.c': 1, '_id': 0}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_bucket(self):
         self.cmp.do.remove()
         self.cmp.do.insert_many([
