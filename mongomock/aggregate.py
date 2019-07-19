@@ -369,6 +369,38 @@ class _Parser(object):
                     ignore_missing_keys=self._ignore_missing_keys,
                 ).parse(cond)
             ]
+        if operator == '$slice':
+            if not isinstance(value, list):
+                raise OperationFailure('$slice only supports a list as its argument')
+            if len(value) < 2 or len(value) > 3:
+                raise OperationFailure('Expression $slice takes at least 2 arguments, and at most '
+                                       '3, but {} were passed in'.format(len(value)))
+            array_value = self.parse(value[0])
+            if not isinstance(array_value, list):
+                raise OperationFailure(
+                    'First argument to $slice must be an array, but is of type: {}'
+                    .format(type(array_value)))
+            for num, v in zip(('Second', 'Third'), value[1:]):
+                if not isinstance(v, six.integer_types):
+                    raise OperationFailure(
+                        '{} argument to $slice must be numeric, but is of type: {}'
+                        .format(num, type(v)))
+            if len(value) > 2 and value[2] <= 0:
+                raise OperationFailure('Third argument to $slice must be '
+                                       'positive: {}'.format(value[2]))
+
+            start = value[1]
+            if start < 0:
+                if len(value) > 2:
+                    stop = len(array_value) + start + value[2]
+                else:
+                    stop = None
+            elif len(value) > 2:
+                stop = start + value[2]
+            else:
+                stop = start
+                start = 0
+            return array_value[start:stop]
 
         raise NotImplementedError(
             "Although '%s' is a valid array operator for the "

@@ -2613,6 +2613,60 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'cond': {'$lt': ['$$this.price', 100]},
         }}}}])
 
+    def test__aggregate_slice(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {
+                '_id': 0,
+                'items': list(range(10)),
+            },
+            {
+                '_id': 1,
+                'items': list(range(10, 20)),
+            },
+            {
+                '_id': 2,
+                'items': list(range(20, 30)),
+            },
+        ])
+
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 0]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 5]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 10]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 0, 1]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 0, 5]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 5, 1]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 5, 5]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', 0, 10000]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', -5]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', -10]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', -5, 5]
+        }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', -10, 5]
+        }}}])
+
     def test__aggregate_no_entries(self):
         pipeline = [
             {'$match': {'a': {'$eq': 'Never going to happen'}}},
