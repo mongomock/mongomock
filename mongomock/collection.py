@@ -1369,7 +1369,7 @@ class Collection(object):
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 
-        index_string = helpers.gen_index_name(index_list)
+        index_name = kwargs.pop('name', helpers.gen_index_name(index_list))
         index_dict = {'key': index_list}
         if is_sparse:
             index_dict['sparse'] = True
@@ -1394,9 +1394,9 @@ class Collection(object):
                     raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                 indexed.add(index)
 
-        self._store.indexes[index_string] = index_dict
+        self._store.indexes[index_name] = index_dict
 
-        return index_string
+        return index_name
 
     def create_indexes(self, indexes, session=None):
         for index in indexes:

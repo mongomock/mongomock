@@ -1430,6 +1430,13 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert({'value': 1})
         self.assertEqual(self.db.collection.find({}).count(), 3)
 
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_index_with_name(self):
+        name = self.db.collection.create_index([('value', 1)], name='index_name')
+        self.assertEqual('index_name', name)
+        self.db.collection.ensure_index([('value', 1)], name='index_name')
+        self.assertEqual({'_id_', 'index_name'}, set(self.db.collection.index_information().keys()))
+
     def test__insert_empty_doc_idx_information(self):
         self.db.collection.insert({})
 
