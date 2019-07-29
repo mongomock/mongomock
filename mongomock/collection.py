@@ -1408,7 +1408,8 @@ class Collection(object):
                 index.document['key'].items(),
                 session=session,
                 unique=index.document.get('unique', False),
-                sparse=index.document.get('sparse', False))
+                sparse=index.document.get('sparse', False),
+                name=index.document.get('name'))
             for index in indexes
         ]
 
