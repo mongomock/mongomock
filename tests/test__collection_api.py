@@ -1295,6 +1295,15 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_indexes_names(self):
+        indexes = [
+            pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], name='index_name'),
+            pymongo.operations.IndexModel([('name', pymongo.ASCENDING)], unique=True)
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(['index_name', 'name_1'], index_names)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__ensure_uniq_idxs_with_ascending_ordering(self):
         self.db.collection.ensure_index([('value', pymongo.ASCENDING)], unique=True)
 
@@ -1429,6 +1438,13 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert({'value': 1})
         self.assertEqual(self.db.collection.find({}).count(), 3)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_index_with_name(self):
+        name = self.db.collection.create_index([('value', 1)], name='index_name')
+        self.assertEqual('index_name', name)
+        self.db.collection.ensure_index([('value', 1)], name='index_name')
+        self.assertEqual({'_id_', 'index_name'}, set(self.db.collection.index_information().keys()))
 
     def test__insert_empty_doc_idx_information(self):
         self.db.collection.insert({})
