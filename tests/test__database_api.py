@@ -26,15 +26,6 @@ class DatabaseAPITest(TestCase):
         self.database['_users'].insert_one({'a': 1})
         self.assertEqual(1, self.database['_users'].find_one().get('a'))
 
-    def test__collection_names(self):
-        self.database.a.create_index('foo')
-        self.database['system.bar'].create_index('foo')
-        self.assertEqual(['a'], self.database.collection_names(include_system_collections=False))
-
-    def test__list_collection_names(self):
-        self.database.test1.create_index('foo')
-        self.assertEqual(['test1'], self.database.list_collection_names())
-
     def test__session(self):
         with self.assertRaises(NotImplementedError):
             self.database.list_collection_names(session=1)
@@ -148,6 +139,55 @@ class DatabaseAPITest(TestCase):
         self.assertIs(
             tz_aware_db,
             tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)))
+
+    def test__collection_names(self):
+        self.database.create_collection('a')
+        self.database.create_collection('b')
+        self.assertEqual(set(self.database.collection_names()), set(['a', 'b']))
+
+        self.database.c.drop()
+        self.assertEqual(set(self.database.collection_names()), set(['a', 'b']))
+
+    def test__list_collection_names(self):
+        self.database.create_collection('a')
+        self.database.create_collection('b')
+        self.assertEqual(set(self.database.list_collection_names()), set(['a', 'b']))
+
+        self.database.c.drop()
+        self.assertEqual(set(self.database.list_collection_names()), set(['a', 'b']))
+
+    def test__create_collection(self):
+        coll = self.database.create_collection('c')
+        self.assertIs(self.database.c, coll)
+        self.assertRaises(mongomock.CollectionInvalid,
+                          self.database.create_collection, 'c')
+
+    def test__create_collection_bad_names(self):
+        with self.assertRaises(TypeError):
+            self.database.create_collection(3)
+        with self.assertRaises(TypeError):
+            self.database[3]  # pylint: disable=pointless-statement
+
+        bad_names = (
+            '',
+            'foo..bar',
+            '...',
+            '$foo',
+            '.foo',
+            'bar.',
+            'foo\x00bar',
+        )
+        for name in bad_names:
+            with self.assertRaises(mongomock.InvalidName, msg=name):
+                self.database.create_collection(name)
+            with self.assertRaises(mongomock.InvalidName, msg=name):
+                self.database[name]  # pylint: disable=pointless-statement
+
+    def test__lazy_create_collection(self):
+        col = self.database.a
+        self.assertEqual(set(self.database.list_collection_names()), set())
+        col.insert({'foo': 'bar'})
+        self.assertEqual(set(self.database.list_collection_names()), set(['a']))
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])

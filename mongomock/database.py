@@ -95,6 +95,7 @@ class Database(object):
                 read_preference=read_preference or self.read_preference,
                 read_concern=read_concern, write_concern=write_concern)
         except KeyError:
+            self._ensure_valid_collection_name(name)
             collection = self._collection_accesses[name] = Collection(
                 self, name=name, write_concern=write_concern,
                 read_preference=read_preference or self.read_preference,

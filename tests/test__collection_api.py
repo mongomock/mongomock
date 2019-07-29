@@ -67,51 +67,6 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.coll.name, 'coll')
         self.assertEqual(self.db.coll.full_name, 'somedb.coll')
 
-    def test__collection_names(self):
-        self.db.create_collection('a')
-        self.db.create_collection('b')
-        self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
-
-        self.db.c.drop()
-        self.assertEqual(set(self.db.collection_names()), set(['a', 'b']))
-
-    def test__list_collection_names(self):
-        self.db.create_collection('a')
-        self.db.create_collection('b')
-        self.assertEqual(set(self.db.list_collection_names()), set(['a', 'b']))
-
-        self.db.c.drop()
-        self.assertEqual(set(self.db.list_collection_names()), set(['a', 'b']))
-
-    def test__create_collection(self):
-        coll = self.db.create_collection('c')
-        self.assertIs(self.db.c, coll)
-        self.assertRaises(mongomock.CollectionInvalid,
-                          self.db.create_collection, 'c')
-
-    def test__create_collection_bad_names(self):
-        with self.assertRaises(TypeError):
-            self.db.create_collection(3)
-
-        bad_names = (
-            '',
-            'foo..bar',
-            '...',
-            '$foo',
-            '.foo',
-            'bar.',
-            'foo\x00bar',
-        )
-        for name in bad_names:
-            with self.assertRaises(mongomock.InvalidName, msg=name):
-                self.db.create_collection(name)
-
-    def test__lazy_create_collection(self):
-        col = self.db.a
-        self.assertEqual(set(self.db.list_collection_names()), set())
-        col.insert({'foo': 'bar'})
-        self.assertEqual(set(self.db.list_collection_names()), set(['a']))
-
     def test__cursor_collection(self):
         self.assertIs(self.db.a.find().collection, self.db.a)
 
