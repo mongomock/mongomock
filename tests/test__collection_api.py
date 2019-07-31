@@ -3146,6 +3146,40 @@ class CollectionAPITest(TestCase):
             [{'_id': 1, 'max': 9, 'min': 2, 'avg': 3, 'sum': 13, 'maxString': '$d'}],
             list(actual))
 
+    def test__aggregate_project_array_subfield(self):
+        self.db.collection.insert_many([
+            {'a': [{'b': 1, 'c': 2, 'd': 3}], 'e': 4},
+            {'a': [{'c': 12, 'd': 13}], 'e': 14},
+            {'a': [{'b': 21, 'd': 23}], 'e': 24},
+            {'a': [{'b': 31, 'c': 32}], 'e': 34},
+            {'a': [{'b': 41}], 'e': 44},
+            {'a': [{'c': 51}], 'e': 54},
+            {'a': [{'d': 51}], 'e': 54},
+            {'a': [{'b': 61, 'c': 62, 'd': 63}, 65, 'foobar',
+                   {'b': 66, 'c': 67, 'd': 68}], 'e': 64},
+            {'a': []},
+            {'a': [1, 2, 3, 4]},
+            {'a': 'foobar'},
+            {'a': 5},
+        ])
+        actual = self.db.collection.aggregate([
+            {'$project': {'a.b': 1, 'a.c': 1, '_id': 0}}
+        ])
+        self.assertEqual(list(actual), [
+            {'a': [{'b': 1, 'c': 2}]},
+            {'a': [{'c': 12}]},
+            {'a': [{'b': 21}]},
+            {'a': [{'b': 31, 'c': 32}]},
+            {'a': [{'b': 41}]},
+            {'a': [{'c': 51}]},
+            {'a': [{}]},
+            {'a': [{'b': 61, 'c': 62}, {'b': 66, 'c': 67}]},
+            {'a': []},
+            {'a': []},
+            {},
+            {},
+        ])
+
     def test__aggregate_arithmetic(self):
         self.db.collection.insert_one({
             'a': 1.5,

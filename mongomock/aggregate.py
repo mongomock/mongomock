@@ -845,6 +845,9 @@ def _project_by_spec(doc, proj_spec, is_include):
 
         if isinstance(value, dict):
             output[key] = _project_by_spec(value, proj_spec[key], is_include)
+        elif isinstance(value, list):
+            output[key] = [_project_by_spec(array_value, proj_spec[key], is_include)
+                           for array_value in value if isinstance(array_value, dict)]
         elif not is_include:
             output[key] = value
 
