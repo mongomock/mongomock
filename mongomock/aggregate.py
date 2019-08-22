@@ -890,10 +890,9 @@ def _handle_project_stage(in_collection, unused_database, options):
             raise OperationFailure(
                 'Bad projection specification, cannot include fields '
                 'or add computed fields during an exclusion projection: %s' % options)
-        if field == '_id':
-            continue
         if value in (0, 1, True, False):
-            filter_list.append(field)
+            if field != '_id':
+                filter_list.append(field)
             continue
         if not new_fields_collection:
             new_fields_collection = [{} for unused_doc in in_collection]
