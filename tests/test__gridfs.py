@@ -65,7 +65,7 @@ class GridFsTest(TestCase):
         self.assertEqual(ffile.read(), rfile.read())
         fake_doc = self.get_fake_file(fid)
         mongo_doc = self.get_mongo_file(rid)
-        self.assertSameFile(mongo_doc, fake_doc)
+        self.assertSameFile(mongo_doc, fake_doc, maxDeltaSeconds=5)
 
     def test__delete_exists_small(self):
         fid = self.fake_gridfs.put(GenFile(50))
@@ -132,11 +132,13 @@ class GridFsTest(TestCase):
         with self.assertRaises(errors.FileExists):
             self.fake_gridfs.put(GenFile(2, 3), _id='12345')
 
-    def assertSameFile(self, real, fake):
+    def assertSameFile(self, real, fake, maxDeltaSeconds=1):
         self.assertEqual(real['md5'], fake['md5'])
         self.assertEqual(real['length'], fake['length'])
         self.assertEqual(real['chunkSize'], fake['chunkSize'])
-        self.assertTrue(abs(real['uploadDate'] - fake['uploadDate']).seconds <= 1)
+        self.assertLessEqual(
+            abs(real['uploadDate'] - fake['uploadDate']).seconds, maxDeltaSeconds,
+            msg='real: %s, fake: %s' % (real['uploadDate'], fake['uploadDate']))
 
     def get_mongo_file(self, i):
         return self.mongo_conn[self.db_name]['fs']['files'].find_one({'_id': i})
