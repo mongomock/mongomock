@@ -47,25 +47,29 @@ class GridFsTest(TestCase):
         self.fake_conn.close()
 
     def test__put_get_small(self):
+        before = time.time()
         fid = self.fake_gridfs.put(GenFile(50))
         rid = self.real_gridfs.put(GenFile(50))
+        after = time.time()
         ffile = self.fake_gridfs.get(fid)
         rfile = self.real_gridfs.get(rid)
         self.assertEqual(ffile.read(), rfile.read())
         fake_doc = self.get_fake_file(fid)
         mongo_doc = self.get_mongo_file(rid)
-        self.assertSameFile(mongo_doc, fake_doc)
+        self.assertSameFile(mongo_doc, fake_doc, max_delta_seconds=after - before + 1)
 
     def test__put_get_big(self):
         # 500k files are bigger than doc size limit
+        before = time.time()
         fid = self.fake_gridfs.put(GenFile(500000, 10))
         rid = self.real_gridfs.put(GenFile(500000, 10))
+        after = time.time()
         ffile = self.fake_gridfs.get(fid)
         rfile = self.real_gridfs.get(rid)
         self.assertEqual(ffile.read(), rfile.read())
         fake_doc = self.get_fake_file(fid)
         mongo_doc = self.get_mongo_file(rid)
-        self.assertSameFile(mongo_doc, fake_doc, max_delta_seconds=10)
+        self.assertSameFile(mongo_doc, fake_doc, max_delta_seconds=after - before + 1)
 
     def test__delete_exists_small(self):
         fid = self.fake_gridfs.put(GenFile(50))
