@@ -218,6 +218,8 @@ def _force_list(v):
 
 
 def _in_op(doc_val, search_val):
+    if not isinstance(search_val, (list, tuple)):
+        raise OperationFailure('$in needs an array')
     if doc_val is NOTHING and None in search_val:
         return True
     doc_val = _force_list(doc_val)

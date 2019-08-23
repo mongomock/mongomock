@@ -1744,6 +1744,11 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'a': {'b': [{'c': 1}]}})
         self.assertTrue(self.db.collection.find_one({'a.b': {'c': 1}}))
 
+    def test__find_in_not_a_list(self):
+        self.db.collection.insert_one({'a': 'a'})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a': {'$in': 'not a list'}})
+
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
