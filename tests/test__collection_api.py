@@ -3335,6 +3335,13 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'_id': 1, 'a': 2, 'b': 1, 'c': 3}], list(actual))
 
+    def test__aggregate_mixed_expression(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$literal': False, 'hint': False}}},
+            ])
+
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
