@@ -11,7 +11,6 @@ from unittest import TestCase, skipIf
 import warnings
 
 import mongomock
-from mongomock.write_concern import WriteConcern
 
 try:
     from bson import codec_options
@@ -21,9 +20,11 @@ try:
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
+    from pymongo.write_concern import WriteConcern
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.collection import ReturnDocument
+    from mongomock.write_concern import WriteConcern
     _HAVE_PYMONGO = False
 
 

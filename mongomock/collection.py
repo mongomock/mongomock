@@ -77,7 +77,7 @@ _WITH_OPTIONS_KWARGS = {
         ('document', 'mode', 'mongos_mode', 'max_staleness')),
     'write_concern': _KwargOption(
         'pymongo.write_concern.WriteConcern', WriteConcern(),
-        ('acknowledged', 'document', 'is_server_default')),
+        ('acknowledged', 'document')),
     'read_concern': _KwargOption(
         'pymongo.read_concern.ReadConcern', None,
         ('document', 'level', 'ok_for_legacy'))
