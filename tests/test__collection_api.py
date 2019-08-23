@@ -1,6 +1,7 @@
 import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
+from distutils import version  # pylint: disable=no-name-in-module
 import platform
 import random
 import re
@@ -3813,6 +3814,8 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert({'a': {'b'}})
+        if version.LooseVersion(pymongo.version) < version.LooseVersion('3.8'):
+            return
         if IS_PYPY or six.PY2:
             expect = "cannot encode object: set(['b']), of type: <type 'set'>"
         else:

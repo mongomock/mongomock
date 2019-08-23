@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import copy
 import datetime
+from distutils import version  # pylint: disable=no-name-in-module
 import re
 from six import assertCountEqual
 import time
@@ -20,9 +21,11 @@ try:
     import pymongo
     from pymongo import MongoClient as PymongoClient
     _HAVE_PYMONGO = True
+    _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
 except ImportError:
     from mongomock.object_id import ObjectId
     _HAVE_PYMONGO = False
+    _PYMONGO_VERSION = version.LooseVersion('0.0')
 try:
     from bson.code import Code
     from bson.son import SON
@@ -329,6 +332,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count()
         self.cmp.compare.count({'a': 1})
 
+    @skipIf(
+        _PYMONGO_VERSION < version.LooseVersion('3.8'),
+        'older version of pymongo does not have count_documents')
     def test__count_documents(self):
         self.cmp.compare.count_documents({})
         self.cmp.do.insert_one({'a': 1})
@@ -337,6 +343,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count_documents({})
         self.cmp.compare.count_documents({'a': 1})
 
+    @skipIf(
+        _PYMONGO_VERSION < version.LooseVersion('3.8'),
+        'older version of pymongo does not have estimated_document_count')
     def test__estimated_document_count(self):
         self.cmp.compare.estimated_document_count()
         self.cmp.do.insert({'a': 1})
