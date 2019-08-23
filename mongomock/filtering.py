@@ -8,7 +8,7 @@ import numbers
 import operator
 import re
 from sentinels import NOTHING
-from six import iteritems, iterkeys, string_types
+from six import iteritems, iterkeys, string_types, PY3
 try:
     from types import NoneType
 except ImportError:
@@ -287,6 +287,14 @@ def bson_compare(op, a, b, can_compare_types=True):
     if isinstance(a, NoneType):
         return op(0, 0)
 
+    # bson handles bytes as binary in python3+:
+    # https://api.mongodb.com/python/current/api/bson/index.html
+    if PY3 and isinstance(a, bytes):
+        # Performs the same operation as described by:
+        # https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#bindata
+        if len(a) != len(b):
+            return op(len(a), len(b))
+        # bytes is always treated as subtype 0 by the bson library
     return op(a, b)
 
 
@@ -309,6 +317,9 @@ def _get_compare_type(val):
         return 20
     if isinstance(val, (tuple, list)):
         return 25
+    if isinstance(val, bytes):
+        assert PY3
+        return 30
     if isinstance(val, ObjectId):
         return 35
     if isinstance(val, datetime):

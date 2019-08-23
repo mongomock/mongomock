@@ -694,6 +694,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'_id': 8, 'counts': {}},
             {'_id': 9, 'counts': {'circles': 'three'}},
             {'_id': 10, 'counts': {'circles': None}},
+            {'_id': 11, 'counts': {'circles': b'bytes'}},
         ])
         self.cmp.compare_ignore_order.find({'counts': {'$gt': {'circles': 1}}})
 
@@ -817,7 +818,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove()
         for data in ({'a': 1},
                      {'a': 2, 'b': -2},
-                     {'a': 3, 'b': 4}):
+                     {'a': 3, 'b': 4},
+                     {'a': 4, 'b': b'bin1'},
+                     {'a': 4, 'b': b'bin2'},
+                     {'a': 4, 'b': b'alongbin1'},
+                     {'a': 4, 'b': b'alongbin2'},
+                     {'a': 4, 'b': b'zlongbin1'},
+                     {'a': 4, 'b': b'zlongbin2'}):
             self.cmp.do.insert(data)
         self.cmp.compare.find(sort=[('b', 1)])
         self.cmp.compare.find(sort=[('b', -1)])
