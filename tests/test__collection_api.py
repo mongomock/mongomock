@@ -16,7 +16,7 @@ import mongomock
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId
+    from bson import tz_util, ObjectId, Regex
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -3746,6 +3746,33 @@ class CollectionAPITest(TestCase):
 
         query = {'counts': {'$gt': {'circles': re.compile('3')}}}
         self.assertFalse(list(collection.find(query)))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__filter_bson_regex(self):
+        self.db.collection.insert_many([
+            {'_id': 'a'},
+            {'_id': 'A'},
+            {'_id': 'abc'},
+            {'_id': 'b'},
+            {'_id': 'ba'},
+        ])
+        results = self.db.collection.find({'_id': Regex('^a', 'i')})
+        self.assertEqual({'a', 'A', 'abc'}, {doc['_id'] for doc in results})
+
+        self.db.tada.drop()
+        self.db.tada.insert_one({'a': 'TADA'})
+        self.db.tada.insert_one({'a': 'TA\nDA'})
+        self.assertTrue(self.db.tada.find_one({'a': {
+            '$regex': Regex('tada', re.IGNORECASE),
+        }}))
+        self.assertTrue(self.db.tada.find_one({'a': collections.OrderedDict([
+            ('$regex', Regex('tada')),
+            ('$options', 'i'),
+        ])}))
+        self.assertTrue(self.db.tada.find_one({'a': collections.OrderedDict([
+            ('$regex', Regex('tada', re.IGNORECASE)),
+            ('$options', 'm'),
+        ])}))
 
     def test__filter_objects_comparison_unknown_type(self):
         self.db.collection.insert_one({'counts': 3})

@@ -14,7 +14,12 @@ try:
 except ImportError:
     NoneType = type(None)
 
-COMPILED_RE_TYPE = type(re.compile('a'))
+try:
+    from bson import Regex
+    _RE_TYPES = (RE_TYPE, Regex)
+except ImportError:
+    _RE_TYPES = (RE_TYPE,)
+
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
 
 
@@ -38,7 +43,7 @@ class _Filterer(object):
             '$in': _in_op,
             '$nin': lambda dv, sv: not _in_op(dv, sv),
             '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
-            '$regex': _not_nothing_and(lambda dv, sv: _regex(dv, re.compile(sv))),
+            '$regex': _not_nothing_and(_regex),
             '$elemMatch': self._elem_match_op,
             '$size': _size_op,
             '$type': _type_op
@@ -100,7 +105,7 @@ class _Filterer(object):
                         self._not_op(document, key, search_val)
                         for operator_string, search_val in iteritems(search)
                     ) and search
-                elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
+                elif isinstance(search, _RE_TYPES) and isinstance(doc_val, (string_types, list)):
                     is_match = _regex(doc_val, search)
                 elif key in LOGICAL_OPERATOR_MAP:
                     if not search:
@@ -223,7 +228,7 @@ def _in_op(doc_val, search_val):
     if doc_val is NOTHING and None in search_val:
         return True
     doc_val = _force_list(doc_val)
-    is_regex_list = [isinstance(x, COMPILED_RE_TYPE) for x in search_val]
+    is_regex_list = [isinstance(x, _RE_TYPES) for x in search_val]
     if not any(is_regex_list):
         return any(x in search_val for x in doc_val)
     for x, is_regex in zip(search_val, is_regex_list):
@@ -308,7 +313,7 @@ def _get_compare_type(val):
         return 35
     if isinstance(val, datetime):
         return 45
-    if isinstance(val, RE_TYPE):
+    if isinstance(val, _RE_TYPES):
         return 50
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
@@ -318,6 +323,11 @@ def _get_compare_type(val):
 def _regex(doc_val, regex):
     if not (isinstance(doc_val, (string_types, list)) or isinstance(doc_val, RE_TYPE)):
         return False
+    if isinstance(regex, string_types):
+        regex = re.compile(regex)
+    if not isinstance(regex, RE_TYPE):
+        # bson.Regex
+        regex = regex.try_compile()
     return any(
         regex.search(item) for item in _force_list(doc_val)
         if isinstance(item, string_types))
@@ -367,14 +377,19 @@ def _combine_regex_options(search):
     if options is None:
         return search_copy
 
-    if isinstance(search['$regex'], COMPILED_RE_TYPE):
+    if isinstance(search['$regex'], _RE_TYPES):
         keys = [k for k in iterkeys(search) if k in {'$regex', '$options'}]
         if keys == ['$options', '$regex']:
             raise NotImplementedError(
                 'Do not use compiled regular expressions with $options until '
                 'https://jira.mongodb.org/browse/SERVER-38621 is solved.')
-        search_copy['$regex'] = re.compile(
-            search['$regex'].pattern, search['$regex'].flags | options)
+        if isinstance(search['$regex'], RE_TYPE):
+            search_copy['$regex'] = re.compile(
+                search['$regex'].pattern, search['$regex'].flags | options)
+        else:
+            # bson.Regex
+            regex = search['$regex']
+            search_copy['$regex'] = regex.__class__(regex.pattern, regex.flags | options)
     else:
         search_copy['$regex'] = re.compile(search['$regex'], options)
     return search_copy
