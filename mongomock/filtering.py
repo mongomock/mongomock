@@ -85,16 +85,21 @@ class _Filterer(object):
 
             for doc_val in iter_key_candidates(key, document):
                 has_candidates |= doc_val is not NOTHING
-                if isinstance(search, dict) and all(key.startswith('$') for key in search.keys()):
+                is_ops_filter = search and isinstance(search, dict) and \
+                    all(key.startswith('$') for key in search.keys())
+                if is_ops_filter:
                     if '$options' in search and '$regex' in search:
                         search = _combine_regex_options(search)
-                    is_match = (all(
+                    unknown_operators = set(search) - set(self._operator_map) - {'$not'}
+                    if unknown_operators:
+                        raise OperationFailure('unknown operator: ' + list(unknown_operators)[0])
+                    is_match = all(
                         operator_string in self._operator_map and
                         self._operator_map[operator_string](doc_val, search_val) or
                         operator_string == '$not' and
                         self._not_op(document, key, search_val)
                         for operator_string, search_val in iteritems(search)
-                    ) and search) or doc_val == search
+                    ) and search
                 elif isinstance(search, RE_TYPE) and isinstance(doc_val, (string_types, list)):
                     is_match = _regex(doc_val, search)
                 elif key in LOGICAL_OPERATOR_MAP:

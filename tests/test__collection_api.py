@@ -1628,6 +1628,15 @@ class CollectionAPITest(TestCase):
             self.db.collection.find_one({'$and': [{'$ne': False}]})
         self.assertEqual('unknown top level operator: $ne', str(error.exception))
 
+    def test__filter_unknown_op(self):
+        with self.assertRaises(mongomock.OperationFailure) as error:
+            self.db.collection.find_one({'a': {'$foo': 3}})
+        self.assertEqual('unknown operator: $foo', str(error.exception))
+
+    def test__filter_on_dict(self):
+        self.db.collection.insert_one({'doc': {}})
+        self.assertTrue(self.db.collection.find_one({'doc': {}}))
+
     def test__find_or(self):
         self.db.collection.insert_many([
             {'x': 4},
