@@ -774,6 +774,14 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assertEqual(update_result.modified_count, 0)
 
+    def test__update_positional_all(self):
+        self.db.collection.insert_one({'a': [1, 2, 3]})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_one(
+                {},
+                update={'$inc': {'a.$[]': 10}}
+            )
+
     def test__rename_one_foo_to_bar(self):
         input_ = {'_id': 1, 'foo': 'bar'}
         expected = {'_id': 1, 'bar': 'bar'}

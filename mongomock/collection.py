@@ -1126,6 +1126,9 @@ class Collection(object):
                                 break
                         continue
 
+                if field_name_parts[-1] == '$[]':
+                    raise NotImplementedError(
+                        'Mongomock does not support the all positional operator yet')
                 updater(subdocument, field_name_parts[-1], v)
                 continue
             # otherwise, we handle it the standard way
