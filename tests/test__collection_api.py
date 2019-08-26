@@ -3740,9 +3740,12 @@ class CollectionAPITest(TestCase):
             {'_id': 11, 'counts': {'circles': mongomock.ObjectId()}},
             # Document kept: datetimes are more than numbers.
             {'_id': 12, 'counts': {'circles': datetime.now()}},
+            # Document kept: BinData are more than numbers.
+            {'_id': 13, 'counts': {'circles': b'binary'}},
         ])
         results = collection.find(query)
-        self.assertEqual({1, 2, 5, 9, 11, 12}, {doc['_id'] for doc in results})
+        self.assertEqual(
+            {1, 2, 5, 9, 11, 12, 13}, {doc['_id'] for doc in results})
 
         query = {'counts': {'$gt': {'circles': re.compile('3')}}}
         self.assertFalse(list(collection.find(query)))
