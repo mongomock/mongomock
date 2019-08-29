@@ -1,3 +1,5 @@
+import os
+
 import mongomock
 
 try:
@@ -183,11 +185,13 @@ class BulkOperationsTest(TestCase):
 
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class BulkOperationsWithPymongoTest(BulkOperationsTest):
     test_with_pymongo = True
 
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class CollectionComparisonTest(TestCase):
 
     def setUp(self):

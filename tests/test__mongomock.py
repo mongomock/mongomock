@@ -2,6 +2,7 @@ from collections import OrderedDict
 import copy
 import datetime
 from distutils import version  # pylint: disable=no-name-in-module
+import os
 import re
 from six import assertCountEqual
 import time
@@ -30,7 +31,7 @@ try:
     from bson.code import Code
     from bson.son import SON
     import execjs  # noqa pylint: disable=unused-import
-    _HAVE_MAP_REDUCE = True
+    _HAVE_MAP_REDUCE = any(r.is_available() for r in execjs.runtimes().values())
 except ImportError:
     _HAVE_MAP_REDUCE = False
 from tests.multicollection import MultiCollection
@@ -213,6 +214,7 @@ class DatabaseGettingTest(TestCase):
 
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class _CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation
 

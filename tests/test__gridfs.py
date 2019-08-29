@@ -1,3 +1,4 @@
+import os
 import time
 import unittest
 from unittest import TestCase, skipIf
@@ -27,6 +28,7 @@ except ImportError:
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_GRIDFS, 'gridfs not installed')
+@skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class GridFsTest(TestCase):
 
     def setUp(self):
