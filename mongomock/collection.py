@@ -1750,6 +1750,9 @@ class Cursor(object):
         return self
 
     def count(self, with_limit_and_skip=False):
+        warnings.warn(
+            'count is deprecated. Use Collection.count_documents instead.',
+            DeprecationWarning, stacklevel=2)
         results = self._compute_results(with_limit_and_skip)
         return len(results)
 
