@@ -136,7 +136,7 @@ class _Filterer(object):
             for key in s.keys():
                 if key not in self._operator_map and key not in LOGICAL_OPERATOR_MAP:
                     raise OperationFailure('unknown operator: %s' % key)
-        elif isinstance(s, type(re.compile(''))):
+        elif isinstance(s, _RE_TYPES):
             pass
         else:
             raise OperationFailure('$not needs a regex or a document')

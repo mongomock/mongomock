@@ -29,6 +29,7 @@ except ImportError:
     _PYMONGO_VERSION = version.LooseVersion('0.0')
 try:
     from bson.code import Code
+    from bson.regex import Regex
     from bson.son import SON
     import execjs  # noqa pylint: disable=unused-import
     _HAVE_MAP_REDUCE = any(r.is_available() for r in execjs.runtimes().values())
@@ -651,6 +652,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': {'$not': {'$eq': 'dan'}}})
 
         self.cmp.compare_ignore_order.find({'name': {'$not': re.compile('dan')}})
+        self.cmp.compare_ignore_order.find({'name': {'$not': Regex('dan')}})
 
     def test__find_not_exceptions(self):
         self.cmp.do.insert(dict(noise='longhorn'))
