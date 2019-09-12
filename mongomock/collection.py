@@ -1378,6 +1378,7 @@ class Collection(object):
         if is_unique:
             index_dict['unique'] = True
             indexed = set()
+            indexed_list = []
             for doc in self._store.documents:
                 index = []
                 for key, unused_order in index_list:
@@ -1390,9 +1391,15 @@ class Collection(object):
                 if is_sparse and not index:
                     continue
                 index = tuple(index)
-                if index in indexed:
-                    raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
-                indexed.add(index)
+                try:
+                    if index in indexed:
+                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+                    indexed.add(index)
+                except TypeError:
+                    # index is not hashable.
+                    if index in indexed_list:
+                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+                    indexed_list.append(index)
 
         self._store.indexes[index_name] = index_dict
 

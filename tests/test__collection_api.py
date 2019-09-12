@@ -1377,6 +1377,16 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.update({'_id': 1}, {'$set': {'a.b': 2}})
 
+    def test_unique_index_on_dict(self):
+        self.db.collection.insert_one({'_id': 1, 'a': {'b': 1}})
+        self.db.collection.insert_one({'_id': 2, 'a': {'b': 2}})
+
+        self.db.collection.ensure_index([('a', 1)], unique=True)
+
+        self.db.collection.insert_one({'_id': 3, 'a': {'b': 3}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'_id': 4, 'a': {'b': 2}})
+
     def test_sparse_unique_index_dup(self):
         self.db.collection.ensure_index([('value', 1)], unique=True, sparse=True)
 
