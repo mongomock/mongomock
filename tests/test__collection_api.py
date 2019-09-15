@@ -2350,10 +2350,10 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_replace_root_with_array(self):
         self.db.a.insert_many([
-            {'_id': 1, 'name': 'Susan', 'phones':
-                [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
-            {'_id': 2, 'name': 'Mark', 'phones':
-                [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
+            {'_id': 1, 'name': 'Susan',
+             'phones': [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
+            {'_id': 2, 'name': 'Mark',
+             'phones': [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
         ])
         actual = self.db.a.aggregate([
             {'$unwind': '$phones'},
@@ -2943,10 +2943,10 @@ class CollectionAPITest(TestCase):
             }
         ])
 
-        actual = collection.aggregate([{'$group': {'_id': "$year"}},
-                                       {"$facet": {"grouped_and_limited": [{'$limit': 1}],
-                                                   "groups_count": [{"$count": "total_count"}],
-                                                   "grouped_and_unlimited": []}
+        actual = collection.aggregate([{'$group': {'_id': '$year'}},
+                                       {'$facet': {'grouped_and_limited': [{'$limit': 1}],
+                                                   'groups_count': [{'$count': 'total_count'}],
+                                                   'grouped_and_unlimited': []}
                                         }])
         expect = [{'grouped_and_limited': [{'_id': 1902}],
                    'grouped_and_unlimited': [{'_id': 1902}, {'_id': 1926}],
