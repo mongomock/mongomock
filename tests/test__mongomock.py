@@ -2542,6 +2542,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$count': 'my_count'}
         ])
 
+    def test__aggregate_facet(self):
+        self.cmp.do.insert_many([
+            {'_id': i} for i in range(5)
+        ])
+        self.cmp.compare.aggregate([
+            {"$facet": {"pipeline_a": [{'$count': 'my_count'}],
+                        "pipeline_b": [{'$group': {'_id': None}}]}}
+        ])
+
     def test__aggregate_project_rotate(self):
         self.cmp.do.insert_one({'_id': 1, 'a': 1, 'b': 2, 'c': 3})
         self.cmp.compare.aggregate([
