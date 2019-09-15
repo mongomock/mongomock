@@ -152,6 +152,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Diego Garcia
 * Dmitriy Kostochko
 * Drew Winstel
+* Eddie Linder
 * Edward D'Souza
 * Emily Rosengren
 * Eugene Chernyshov

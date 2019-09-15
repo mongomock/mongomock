@@ -945,10 +945,8 @@ def _handle_count_stage(in_collection, database, options):
 def _handle_facet_stage(in_collection, database, options):
     out_collection_by_pipeline = {}
     for pipeline_title, pipeline in options.items():
-        out_collection_by_pipeline[pipeline_title] = list(process_pipeline(in_collection,
-                                                                           database,
-                                                                           pipeline,
-                                                                           None))
+        out_collection_by_pipeline[pipeline_title] = list(process_pipeline(
+            in_collection, database, pipeline, None))
     return [out_collection_by_pipeline]
 
 

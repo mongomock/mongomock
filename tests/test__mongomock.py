@@ -2547,8 +2547,9 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'_id': i} for i in range(5)
         ])
         self.cmp.compare.aggregate([
-            {'$facet': {'pipeline_a': [{'$count': 'my_count'}],
-                        'pipeline_b': [{'$group': {'_id': None}}]}}
+            {'$facet': {
+                'pipeline_a': [{'$count': 'my_count'}],
+                'pipeline_b': [{'$group': {'_id': None}}]}}
         ])
 
     def test__aggregate_project_rotate(self):

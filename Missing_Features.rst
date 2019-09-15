@@ -14,7 +14,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$bucketAuto <https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/>`_
   * `$collStats <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/>`_
   * `$currentOp <https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/>`_
-  * `$facet <https://docs.mongodb.com/manual/reference/operator/aggregation/facet/>`_
   * `$geoNear <https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/>`_
   * `$indexStats <https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/>`_
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_

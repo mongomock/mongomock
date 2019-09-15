@@ -30,6 +30,7 @@ except ImportError:
 
     _HAVE_PYMONGO = False
 
+
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
 
@@ -2943,14 +2944,18 @@ class CollectionAPITest(TestCase):
             }
         ])
 
-        actual = collection.aggregate([{'$group': {'_id': '$year'}},
-                                       {'$facet': {'grouped_and_limited': [{'$limit': 1}],
-                                                   'groups_count': [{'$count': 'total_count'}],
-                                                   'grouped_and_unlimited': []}
-                                        }])
-        expect = [{'grouped_and_limited': [{'_id': 1902}],
-                   'grouped_and_unlimited': [{'_id': 1902}, {'_id': 1926}],
-                   'groups_count': [{'total_count': 2}]}]
+        actual = collection.aggregate([
+            {'$group': {'_id': '$year'}},
+            {'$facet': {
+                'grouped_and_limited': [{'$limit': 1}],
+                'groups_count': [{'$count': 'total_count'}],
+                'grouped_and_unlimited': []}
+            }])
+        expect = [{
+            'grouped_and_limited': [{'_id': 1902}],
+            'grouped_and_unlimited': [{'_id': 1902}, {'_id': 1926}],
+            'groups_count': [{'total_count': 2}]
+        }]
         self.assertEqual(expect, list(actual))
 
     def test__aggregate_project_array_size(self):
