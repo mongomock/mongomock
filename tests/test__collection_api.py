@@ -2338,10 +2338,10 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'first_name': 'Peter', 'last_name': 'Sumner', 'city': 'Toledo'}
         ])
         actual = self.db.a.aggregate([
-            {'$replaceRoot': {
-                'newRoot': {
-                    'full_name': {
-                        '$concat': ['$first_name', ' ', '$last_name']}}}}
+            {'$replaceRoot':
+             {'newRoot':
+              {'full_name':
+               {'$concat': ['$first_name', ' ', '$last_name']}}}}
         ])
         self.assertListEqual([
             {'full_name': 'Gary Sheffield'},
@@ -2351,10 +2351,10 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_replace_root_with_array(self):
         self.db.a.insert_many([
-            {'_id': 1, 'name': 'Susan',
-             'phones': [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
-            {'_id': 2, 'name': 'Mark',
-             'phones': [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
+            {'_id': 1, 'name': 'Susan', 'phones':
+             [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
+            {'_id': 2, 'name': 'Mark', 'phones':
+             [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
         ])
         actual = self.db.a.aggregate([
             {'$unwind': '$phones'},
@@ -3454,7 +3454,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.find_one({
                 '$where':
-                    'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
+                'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
             })
 
     def test__unwind_no_prefix(self):
