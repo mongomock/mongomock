@@ -2338,10 +2338,10 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'first_name': 'Peter', 'last_name': 'Sumner', 'city': 'Toledo'}
         ])
         actual = self.db.a.aggregate([
-            {'$replaceRoot':
-                 {'newRoot':
-                      {'full_name':
-                           {'$concat': ['$first_name', ' ', '$last_name']}}}}
+            {'$replaceRoot': {
+                'newRoot': {
+                    'full_name': {
+                        '$concat': ['$first_name', ' ', '$last_name']}}}}
         ])
         self.assertListEqual([
             {'full_name': 'Gary Sheffield'},
@@ -2949,8 +2949,8 @@ class CollectionAPITest(TestCase):
             {'$facet': {
                 'grouped_and_limited': [{'$limit': 1}],
                 'groups_count': [{'$count': 'total_count'}],
-                'grouped_and_unlimited': []}
-            }])
+                'grouped_and_unlimited': []}}
+        ])
         expect = [{
             'grouped_and_limited': [{'_id': 1902}],
             'grouped_and_unlimited': [{'_id': 1902}, {'_id': 1926}],
