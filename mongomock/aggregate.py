@@ -942,6 +942,14 @@ def _handle_count_stage(in_collection, database, options):
     return [{options: len(in_collection)}]
 
 
+def _handle_facet_stage(in_collection, database, options):
+    out_collection_by_pipeline = {}
+    for pipeline_title, pipeline in options.items():
+        out_collection_by_pipeline[pipeline_title] = list(process_pipeline(
+            in_collection, database, pipeline, None))
+    return [out_collection_by_pipeline]
+
+
 _PIPELINE_HANDLERS = {
     '$addFields': None,
     '$bucket': _handle_bucket_stage,
@@ -949,7 +957,7 @@ _PIPELINE_HANDLERS = {
     '$collStats': None,
     '$count': _handle_count_stage,
     '$currentOp': None,
-    '$facet': None,
+    '$facet': _handle_facet_stage,
     '$geoNear': None,
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,

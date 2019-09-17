@@ -22,10 +22,12 @@ try:
     from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
     from pymongo.write_concern import WriteConcern
+
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.collection import ReturnDocument
     from mongomock.write_concern import WriteConcern
+
     _HAVE_PYMONGO = False
 
 
@@ -2762,6 +2764,7 @@ class CollectionAPITest(TestCase):
 
         def sorter(doc):
             return doc['_id']
+
         self.assertTrue(len(expected_list) == len(result_list) and
                         sorted(expected_list, key=sorter) == sorted(result_list, key=sorter))
 
@@ -2913,6 +2916,47 @@ class CollectionAPITest(TestCase):
         for case in cases:
             with self.assertRaises(mongomock.OperationFailure):
                 self.db.a.aggregate([{'$count': case}])
+
+    def test__aggregate_facet(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_many([
+            {
+                '_id': 1,
+                'title': 'The Pillars of Society',
+                'artist': 'Grosz',
+                'year': 1926,
+                'price': 199.99,
+            },
+            {
+                '_id': 2,
+                'title': 'Melancholy III',
+                'artist': 'Munch',
+                'year': 1902,
+                'price': 200.00,
+            },
+            {
+                '_id': 3,
+                'title': 'Melancholy III',
+                'artist': 'Munch',
+                'year': 1902,
+                'price': 200.00,
+            }
+        ])
+
+        actual = collection.aggregate([
+            {'$group': {'_id': '$year'}},
+            {'$facet': {
+                'grouped_and_limited': [{'$limit': 1}],
+                'groups_count': [{'$count': 'total_count'}],
+                'grouped_and_unlimited': []}}
+        ])
+        expect = [{
+            'grouped_and_limited': [{'_id': 1902}],
+            'grouped_and_unlimited': [{'_id': 1902}, {'_id': 1926}],
+            'groups_count': [{'total_count': 2}]
+        }]
+        self.assertEqual(expect, list(actual))
 
     def test__aggregate_project_array_size(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
