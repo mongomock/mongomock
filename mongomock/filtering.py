@@ -352,7 +352,7 @@ def _size_op(doc_val, search_val):
 
 def _list_expand(f, negative=False):
     def func(doc_val, search_val):
-        if isinstance(doc_val, (list, tuple)):
+        if isinstance(doc_val, (list, tuple)) and not isinstance(search_val, (list, tuple)):
             if negative:
                 return all(f(val, search_val) for val in doc_val)
             return any(f(val, search_val) for val in doc_val)

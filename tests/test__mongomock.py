@@ -769,9 +769,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
             {'_id': 7, 'shape': {'color': 'red'}},
             {'_id': 8, 'shape': {'color': ['blue', 'yellow']}},
+            {'_id': 9, 'shape': {'color': ['red']}},
         ])
 
         self.cmp.compare_ignore_order.find({'shape.color': {'$ne': 'red'}})
+        self.cmp.compare_ignore_order.find({'shape.color': {'$ne': ['red']}})
         self.cmp.compare_ignore_order.find({'shape.color': {'$nin': ['blue', 'red']}})
 
     def test__find_ne_multiple_keys(self):

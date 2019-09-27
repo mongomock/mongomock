@@ -3737,6 +3737,10 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find({'shape.color': {'$ne': 'red'}})
         self.assertEqual([2, 4, 5], [doc['_id'] for doc in results])
 
+        # $ne
+        results = self.db.collection.find({'shape.color': {'$ne': ['red', 'yellow']}})
+        self.assertEqual([1, 2, 3, 4, 5], [doc['_id'] for doc in results])
+
         # $nin
         results = self.db.collection.find({'shape.color': {'$nin': ['blue', 'red']}})
         self.assertEqual([2, 4, 5], [doc['_id'] for doc in results])
