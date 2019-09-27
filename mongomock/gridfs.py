@@ -10,7 +10,7 @@ def enable_gridfs_integration():
     overloading this builtins makes the code really slow.
     """
 
-    import builtins
+    import builtins  # pylint: disable=import-outside-toplevel
     from importlib import import_module
     from pymongo.collection import Collection as PyMongoCollection
     from pymongo.database import Database as PyMongoDatabase
