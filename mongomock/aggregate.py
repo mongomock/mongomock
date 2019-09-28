@@ -143,6 +143,12 @@ class _Parser(object):
         if not isinstance(expression, dict):
             return self._parse_basic_expression(expression)
 
+        if len(expression) > 1 and any(key.startswith('$') for key in expression):
+            raise OperationFailure(
+                'an expression specification must contain exactly one field, '
+                'the name of the expression. Found %d fields in %s'
+                % (len(expression), expression))
+
         value_dict = {}
         for k, v in six.iteritems(expression):
             if k in arithmetic_operators:
