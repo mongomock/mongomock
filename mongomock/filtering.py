@@ -23,6 +23,20 @@ except ImportError:
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
 
 
+_NOT_IMPLEMENTED_OPERATORS = {
+    '$bitsAllClear',
+    '$bitsAllSet',
+    '$bitsAnyClear',
+    '$bitsAnySet',
+    '$geoIntersects',
+    '$geoWithin',
+    '$maxDistance',
+    '$minDistance',
+    '$near',
+    '$nearSphere',
+}
+
+
 def filter_applies(search_filter, document):
     """Applies given filter
 
@@ -97,6 +111,11 @@ class _Filterer(object):
                         search = _combine_regex_options(search)
                     unknown_operators = set(search) - set(self._operator_map) - {'$not'}
                     if unknown_operators:
+                        not_implemented_operators = unknown_operators & _NOT_IMPLEMENTED_OPERATORS
+                        if not_implemented_operators:
+                            raise NotImplementedError(
+                                "'%s' is a valid operation but it is not supported by Mongomock "
+                                'yet.' % list(not_implemented_operators)[0])
                         raise OperationFailure('unknown operator: ' + list(unknown_operators)[0])
                     is_match = all(
                         operator_string in self._operator_map and

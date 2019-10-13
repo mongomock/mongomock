@@ -4611,3 +4611,11 @@ class CollectionAPITest(TestCase):
             'my_keys': [1],
         }]
         self.assertEqual(expect, list(actual))
+
+    def test__not_implemented_operator(self):
+        collection = self.db.collection
+        with self.assertRaises(NotImplementedError):
+            collection.find_one({'geometry': {'$geoIntersects': {'$geometry': {
+                'coordinates': [-122.4194, 37.7749],
+                'type': "<GeoJSONGeometryType.Point: 'Point'>",
+            }}}})
