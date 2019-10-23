@@ -19,17 +19,17 @@ matrix:
     - python: 3.6
       env: TOX_ENV=py36-pymongo-pyexecjs
     - python: 3.7
-      env: TOX_ENV=py37
-    - python: 3.7
-      env: TOX_ENV=py37-pymongo
-    - python: 3.7
-      env: TOX_ENV=py37-pyexecjs
-    - python: 3.7
-      env: TOX_ENV=py37-pymongo361-pyexecjs
-    - python: 3.7
       env: TOX_ENV=py37-pymongo-pyexecjs
-    - python: 3.7
-      env: TOX_ENV=py37
+    - python: 3.8
+      env: TOX_ENV=py38
+    - python: 3.8
+      env: TOX_ENV=py38-pymongo
+    - python: 3.8
+      env: TOX_ENV=py38-pyexecjs
+    - python: 3.8
+      env: TOX_ENV=py38-pymongo361-pyexecjs
+    - python: 3.8
+      env: TOX_ENV=py38-pymongo-pyexecjs
     - env: TOX_ENV=pep8
     - env: TOX_ENV=pylint
 script:
