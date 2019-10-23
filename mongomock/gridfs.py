@@ -10,12 +10,14 @@ def enable_gridfs_integration():
     overloading this builtins makes the code really slow.
     """
 
-    import builtins  # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel
+    import builtins
     from importlib import import_module
     from pymongo.collection import Collection as PyMongoCollection
     from pymongo.database import Database as PyMongoDatabase
     from mongomock import Database as MongoMockDatabase, Collection as MongoMockCollection
     from mongomock.collection import Cursor as MongoMockCursor
+    # pylint: enable=import-outside-toplevel
 
     def isinstance_patched(object, classinfo):
         if isinstance(classinfo, tuple):
