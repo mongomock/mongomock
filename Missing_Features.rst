@@ -18,7 +18,13 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$indexStats <https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/>`_
   * `$listLocalSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/>`_
   * `$listSessions <https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/>`_
+  * `$merge <https://docs.mongodb.com/manual/reference/operator/aggregation/merge/>`_
+  * `$planCacheStats <https://docs.mongodb.com/manual/reference/operator/aggregation/planCacheStats/>`_
+  * `$redact <https://docs.mongodb.com/manual/reference/operator/aggregation/redact/>`_
+  * `$replaceWith <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceWith/>`_
+  - `$set <https://docs.mongodb.com/manual/reference/operator/aggregation/set/>` _
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
+  - `$unset <https://docs.mongodb.com/manual/reference/operator/aggregation/unset/>` _
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
