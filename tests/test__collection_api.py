@@ -4619,3 +4619,10 @@ class CollectionAPITest(TestCase):
                 'coordinates': [-122.4194, 37.7749],
                 'type': "<GeoJSONGeometryType.Point: 'Point'>",
             }}}})
+
+    def test__not_implemented_methods(self):
+        collection = self.db.collection
+        with self.assertRaises(NotImplementedError):
+            collection.find_raw_batches()
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate_raw_batches([{'$unwind': '$phones'}])

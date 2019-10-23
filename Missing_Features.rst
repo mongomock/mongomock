@@ -41,3 +41,4 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`
 * `map_reduce <https://docs.mongodb.com/manual/reference/command/mapReduce/>`_ options (``scope`` and ``finalize``)
 * Database `command <https://docs.mongodb.com/manual/reference/command/>`_ method except for the ``ping`` command.
+* Raw Batch BSON operations (`aggregate_raw_batches` and `find_raw_batches`)

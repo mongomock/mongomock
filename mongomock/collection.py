@@ -1684,6 +1684,18 @@ class Collection(object):
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)
 
+    def find_raw_batches(
+            self, filter=None, projection=None, skip=0, limit=0, no_cursor_timeout=False,
+            cursor_type=None, sort=None, allow_partial_results=False,
+            oplog_replay=False, modifiers=None, batch_size=0, manipulate=True, collation=None,
+            hint=None, max_scan=None, max_time_ms=None, max=None, min=None, return_key=False,
+            how_record_id=False, snapshot=False, comment=None):
+        raise NotImplementedError('find_raw_batches method is not implemented in mongomock yet')
+
+    def aggregate_raw_batches(self, pipeline, **kwargs):
+        raise NotImplementedError(
+            'aggregate_raw_batches method is not implemented in mongomock yet')
+
 
 class Cursor(object):
 
