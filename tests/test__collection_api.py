@@ -2,6 +2,7 @@ import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
 from distutils import version  # pylint: disable=no-name-in-module
+import math
 import platform
 import random
 import re
@@ -33,6 +34,20 @@ except ImportError:
 
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
+
+
+class UTCPlus2(tzinfo):
+    def fromutc(self, dt):
+        return dt + self.utcoffset(dt)
+
+    def tzname(self, dt):
+        return '<dummy UTC+2>'
+
+    def utcoffset(self, dt):
+        return timedelta(hours=2)
+
+    def dst(self, dt):
+        return timedelta()
 
 
 class CollectionAPITest(TestCase):
@@ -1852,20 +1867,7 @@ class CollectionAPITest(TestCase):
         self.assert_document_count(0)
 
     def test__mix_tz_naive_aware(self):
-        class TZ(tzinfo):
-            def fromutc(self, dt):
-                return dt + self.utcoffset(dt)
-
-            def tzname(self, dt):
-                return '<dummy UTC+2>'
-
-            def utcoffset(self, dt):
-                return timedelta(seconds=2 * 3600)
-
-            def dst(self, dt):
-                return timedelta()
-
-        utc2tz = TZ()
+        utc2tz = UTCPlus2()
         naive = datetime(1999, 12, 31, 22)
         aware = datetime(2000, 1, 1, tzinfo=utc2tz)
         self.db.collection.insert({'date_aware': aware, 'date_naive': naive})
@@ -1886,20 +1888,7 @@ class CollectionAPITest(TestCase):
             client = mongomock.MongoClient(tz_aware=tz_awarness)
             db = client['somedb']
 
-            class TZ(tzinfo):
-                def fromutc(self, dt):
-                    return dt + self.utcoffset(dt)
-
-                def tzname(self, dt):
-                    return '<dummy UTC+2>'
-
-                def utcoffset(self, dt):
-                    return timedelta(seconds=2 * 3600)
-
-                def dst(self, dt):
-                    return timedelta()
-
-            utc2tz = TZ()
+            utc2tz = UTCPlus2()
             naive = datetime(2000, 1, 1, 2, 0, 0)
             aware = datetime(2000, 1, 1, 4, 0, 0, tzinfo=utc2tz)
             if tz_awarness:
@@ -4626,3 +4615,56 @@ class CollectionAPITest(TestCase):
             collection.find_raw_batches()
         with self.assertRaises(NotImplementedError):
             collection.aggregate_raw_batches([{'$unwind': '$phones'}])
+
+    def test__insert_do_not_modify_input(self):
+        collection = self.db.collection
+        document = {
+            'number': 3,
+            'object': {'a': 1},
+            'date': datetime(2000, 1, 1, 12, 30, 30, 12745, tzinfo=UTCPlus2()),
+        }
+        original_document = copy.deepcopy(document)
+
+        collection.insert_one(document)
+
+        self.assertNotEqual(
+            original_document, document, msg='Document has been modified')
+
+        self.assertEqual(
+            dict(original_document, _id=None), dict(document, _id=None),
+            msg='The only modification is adding the _id.')
+
+        # Comparing stored document and the original one: the dates are modified.
+        stored_document = collection.find_one()
+        del stored_document['_id']
+        self.assertEqual(
+            dict(original_document, date=None), dict(stored_document, date=None))
+        if six.PY2:
+            with self.assertRaises(TypeError):
+                self.assertNotEqual(original_document, stored_document)
+        else:
+            self.assertNotEqual(
+                original_document, stored_document,
+                msg='The document is not the same because the date TZ has been stripped of and the '
+                'microseconds truncated.')
+            self.assertNotEqual(
+                original_document['date'].timestamp(), stored_document['date'].timestamp())
+            self.assertEqual(
+                math.floor(original_document['date'].timestamp() * 1000),
+                stored_document['date'].timestamp() * 1000)
+
+        # The objects are not linked: modifying the inserted document or the fetched one will
+        # have no effect on future retrievals.
+        document['object']['new_key'] = 42
+        fetched_document = stored_document
+        fetched_document['object']['new_key'] = 'post-find'
+
+        stored_document = collection.find_one()
+        del stored_document['_id']
+        self.assertNotEqual(
+            document, stored_document,
+            msg='Modifying the inserted document afterwards does not modify the stored document.')
+        self.assertNotEqual(
+            fetched_document, stored_document,
+            msg='Modifying the found document afterwards does not modify the stored document.')
+        self.assertEqual(dict(original_document, date=None), dict(stored_document, date=None))

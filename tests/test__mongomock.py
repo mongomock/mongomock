@@ -214,6 +214,20 @@ class DatabaseGettingTest(TestCase):
             c.get_default_database()
 
 
+class UTCPlus2(datetime.tzinfo):
+    def fromutc(self, dt):
+        return dt + self.utcoffset(dt)
+
+    def tzname(self, dt):
+        return '<dummy UTC+2>'
+
+    def utcoffset(self, dt):
+        return datetime.timedelta(hours=2)
+
+    def dst(self, dt):
+        return datetime.timedelta()
+
+
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class _CollectionComparisonTest(TestCase):
@@ -2772,6 +2786,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$replaceRoot': {'newRoot': {
             'full_name': {'$concat': ['$first_name', '$last_name']},
         }}}])
+
+    def test__insert_date_with_timezone(self):
+        self.cmp.do.insert_one({
+            'dateNoTz': datetime.datetime(2000, 1, 1, 12, 30, 30, 12745),
+            'dateTz': datetime.datetime(
+                2000, 1, 1, 12, 30, 30, 12745,
+                tzinfo=UTCPlus2()),
+        })
+        self.cmp.compare.find_one()
 
 
 def _LIMIT(*args):

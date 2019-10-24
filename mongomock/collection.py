@@ -475,11 +475,6 @@ class Collection(object):
                 })
             return results
 
-        # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
-        # but we need to stick to it), so we must patch in-place the data dict
-        for key in data.keys():
-            data[key] = helpers.patch_datetime_awareness_in_document(data[key])
-
         if not all(isinstance(k, string_types) for k in data):
             raise ValueError('Document keys must be strings')
 
@@ -487,14 +482,20 @@ class Collection(object):
             # bson validation
             BSON.encode(data, check_keys=True)
 
+        # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
+        # but we need to stick to it), so we must patch in-place the data dict
         if '_id' not in data:
             data['_id'] = ObjectId()
+
         object_id = data['_id']
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._store:
             raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
-        self._store[object_id] = self._internalize_dict(data)
+
+        data = helpers.patch_datetime_awareness_in_document(data)
+
+        self._store[object_id] = data
         try:
             self._ensure_uniques(data)
         except DuplicateKeyError:
