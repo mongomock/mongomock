@@ -185,6 +185,14 @@ class _Parser(object):
 
         return value_dict
 
+    def parse_many(self, values):
+        for value in values:
+            try:
+                yield self.parse(value)
+            except KeyError:
+                if self._ignore_missing_keys:
+                    yield None
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
@@ -243,7 +251,7 @@ class _Parser(object):
 
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
-            return _GROUPING_OPERATOR_MAP[operator](self.parse(val) for val in values)
+            return _GROUPING_OPERATOR_MAP[operator](self.parse_many(values))
         if operator == '$arrayElemAt':
             key, index = values
             array = self._parse_basic_expression(key)
@@ -282,7 +290,7 @@ class _Parser(object):
             parsed = self.parse(values)
             return str(parsed).upper() if parsed is not None else ''
         if operator == '$concat':
-            parsed_list = [self.parse(value) for value in values]
+            parsed_list = list(self.parse_many(values))
             return None if None in parsed_list else ''.join([str(x) for x in parsed_list])
         if operator == '$substr':
             if len(values) != 3:
@@ -928,6 +936,27 @@ def _handle_project_stage(in_collection, unused_database, options):
     return out_collection
 
 
+def _handle_add_fields_stage(in_collection, unused_database, options):
+    if not options:
+        raise OperationFailure(
+            'Invalid $addFields :: caused by :: specification must have at least one field')
+    out_collection = [dict(doc) for doc in in_collection]
+    for field, value in six.iteritems(options):
+        for in_doc, out_doc in zip(in_collection, out_collection):
+            try:
+                out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+            except KeyError:
+                continue
+            parts = field.split('.')
+            for subfield in parts[:-1]:
+                out_doc[subfield] = out_doc.get(subfield, {})
+                if not isinstance(out_doc[subfield], dict):
+                    out_doc[subfield] = {}
+                out_doc = out_doc[subfield]
+            out_doc[parts[-1]] = out_value
+    return out_collection
+
+
 def _handle_out_stage(in_collection, database, options):
     # TODO(MetrodataTeam): should leave the origin collection unchanged
     out_collection = database.get_collection(options)
@@ -957,7 +986,7 @@ def _handle_facet_stage(in_collection, database, options):
 
 
 _PIPELINE_HANDLERS = {
-    '$addFields': None,
+    '$addFields': _handle_add_fields_stage,
     '$bucket': _handle_bucket_stage,
     '$bucketAuto': None,
     '$collStats': None,
@@ -981,7 +1010,7 @@ _PIPELINE_HANDLERS = {
     '$replaceRoot': _handle_replace_root_stage,
     '$replaceWith': None,
     '$sample': _handle_sample_stage,
-    '$set': None,
+    '$set': _handle_add_fields_stage,
     '$skip': lambda c, d, o: c[o:],
     '$sort': _handle_sort_stage,
     '$sortByCount': None,
