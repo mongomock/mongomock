@@ -9,6 +9,7 @@ import math
 import numbers
 import random
 import warnings
+import re
 
 from sentinels import NOTHING
 import six
@@ -314,7 +315,29 @@ class _Parser(object):
             "Although '%s' is a valid string operator for the aggregation "
             'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
-    def _handle_date_operator(self, operator, values):
+    def _handle_date_operator(self, operator, values):      
+        if operator == "$dateToString":
+            if isinstance(values, dict):
+                valid_values_keys = ["format","date"]
+                if all(k in values.keys() for k in valid_values_keys):
+                    date=self._parse_basic_expression(values["date"])
+                    if not isinstance(values["format"], str):
+                        raise OperationFailure('Format specifier must be a string')
+                    if "%L" in values["format"]:
+                        raise NotImplementedError('Although %L is a valid format specifier '
+                            'it is currently not implemented in Mongomock.')
+                    invalid_format_specifier = re.search("%[^dGHjLmMSuUVwY%]", values["format"])
+                    if invalid_format_specifier is not None:
+                        raise OperationFailure('Invalid format character %s in format string' % invalid_format_specifier.group())
+
+                    warnings.warn("mongomock: date format output might be different from mongo date format output")
+                    
+                    return date.strftime(values["format"])
+                else:
+                    raise OperationFailure('dateToString must only have 2 items- format and date')
+            else:
+                raise OperationFailure('dateToString must have dict of 2 items- format and date')
+
         out_value = self.parse(values)
         if operator == '$dayOfYear':
             return out_value.timetuple().tm_yday
