@@ -10,7 +10,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
 * session options
 * codec options
 * Operations of the aggregate pipeline:
-  * `$addFields <https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/>`_
   * `$bucketAuto <https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/>`_
   * `$collStats <https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/>`_
   * `$currentOp <https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/>`_
@@ -22,9 +21,8 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$planCacheStats <https://docs.mongodb.com/manual/reference/operator/aggregation/planCacheStats/>`_
   * `$redact <https://docs.mongodb.com/manual/reference/operator/aggregation/redact/>`_
   * `$replaceWith <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceWith/>`_
-  - `$set <https://docs.mongodb.com/manual/reference/operator/aggregation/set/>` _
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
-  - `$unset <https://docs.mongodb.com/manual/reference/operator/aggregation/unset/>` _
+  * `$unset <https://docs.mongodb.com/manual/reference/operator/aggregation/unset/>` _
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_

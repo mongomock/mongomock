@@ -2796,6 +2796,21 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         })
         self.cmp.compare.find_one()
 
+    def test__aggregate_add_fields(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_many([
+            {'a': 1, 'b': 2},
+            {},
+            {'nested': {'foo': 1}},
+            {'nested': 'not nested'},
+        ])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'a': 3,
+            'c': {'$sum': [3, '$a', '$b']},
+            'd': '$d',
+            'nested.foo': 5,
+        }}])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

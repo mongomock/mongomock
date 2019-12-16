@@ -3288,6 +3288,88 @@ class CollectionAPITest(TestCase):
               'upper': 'HELLO', 'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_add_fields(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$addFields': {
+            'sum': {'$add': [15, '$a', '$b', '$c']},
+        }}])
+        self.assertEqual(
+            [{'sum': 20.5, 'a': 1.5, 'b': 2, 'c': 2}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_set(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$set': {
+            'sum': {'$add': [15, '$a', '$b', '$c']},
+            'prod': {'$multiply': [5, '$a', '$b', '$c']},
+            'trunc': {'$trunc': '$a'},
+        }}])
+        self.assertEqual(
+            [{'sum': 20.5, 'prod': 30, 'trunc': 1, 'a': 1.5, 'b': 2, 'c': 2}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_set_empty(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$set': {}}])
+
+    def test__aggregate_set_override(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$set': {
+            'a': {'$add': [15, '$a', '$b', '$c']},
+        }}])
+        self.assertEqual(
+            [{'a': 20.5, 'b': 2, 'c': 2}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_set_error(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+        })
+        actual = self.db.collection.aggregate([{'$set': {
+            'sumA': {'$sum': [15, '$a']},
+            'sum': {'$sum': [15, '$a', '$b', '$c']},
+            'bCopy': '$b',
+        }}])
+        self.assertEqual(
+            [{'a': 1.5, 'sumA': 16.5, 'sum': 16.5}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_set_subfield(self):
+        self.db.collection.insert_many([
+            {'a': {'b': 1}},
+            {'b': 2},
+            {'a': {'b': 3, 'c': 4}},
+            {'a': 1},
+        ])
+        actual = self.db.collection.aggregate([{'$set': {
+            'a.c': 3,
+        }}])
+        self.assertEqual(
+            [
+                {'a': {'b': 1, 'c': 3}},
+                {'a': {'c': 3}, 'b': 2},
+                {'a': {'b': 3, 'c': 3}},
+                {'a': {'c': 3}},
+            ],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
     def test__strcmp_not_enough_params(self):
         self.db.collection.insert_one({
             'a': 'Hello',
