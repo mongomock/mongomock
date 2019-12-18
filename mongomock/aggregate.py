@@ -240,7 +240,8 @@ class _Parser(object):
             assert len(values) == 2, 'subtract must have only 2 items'
             value_0 = self.parse(values[0])
             value_1 = self.parse(values[1])
-            if isinstance(value_0, datetime.datetime) and isinstance(value_1, (int, float)):
+            if isinstance(value_0, datetime.datetime) and \
+                    isinstance(value_1, (six.integer_types, float)):
                 value_1 = datetime.timedelta(milliseconds=value_1)
             res = value_0 - value_1
             if isinstance(res, datetime.timedelta):
