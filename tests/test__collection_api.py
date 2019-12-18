@@ -4360,6 +4360,15 @@ class CollectionAPITest(TestCase):
         }}])
         self.assertEqual([4020], [d['since'] for d in actual])
 
+    def test__aggregate_subtract_milliseconds_from_date(self):
+        self.db.collection.insert_one({
+            'date': datetime(2014, 7, 4, 13, 0, 4, 20000),
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'since': {'$subtract': ['$date', 1000]},
+        }}])
+        self.assertEqual([datetime(2014, 7, 4, 13, 0, 3, 20000)], [d['since'] for d in actual])
+
     def test__aggregate_system_variables(self):
         self.db.collection.insert_many([
             {'_id': 1},

@@ -238,7 +238,12 @@ class _Parser(object):
             return math.sqrt(self.parse(values))
         if operator == '$subtract':
             assert len(values) == 2, 'subtract must have only 2 items'
-            res = self.parse(values[0]) - self.parse(values[1])
+            value_0 = self.parse(values[0])
+            value_1 = self.parse(values[1])
+            if isinstance(value_0, datetime.datetime) and \
+                    isinstance(value_1, (six.integer_types, float)):
+                value_1 = datetime.timedelta(milliseconds=value_1)
+            res = value_0 - value_1
             if isinstance(res, datetime.timedelta):
                 return round(res.total_seconds() * 1000)
             return res
