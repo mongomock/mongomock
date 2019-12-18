@@ -26,7 +26,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
-    * `$subtract <https://docs.mongodb.com/manual/reference/operator/aggregation/subtract/>`_
   * Boolean operators ($and, $or, $not)
   * Some set operators ($setEquals, $setIntersection, $setDifference, …)
   * Text search operator ($meta)
