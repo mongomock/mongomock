@@ -257,7 +257,7 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
 
 
 class BulkOperationBuilder(object):
-    def __init__(self, collection, ordered=False):
+    def __init__(self, collection, ordered=False, bypass_document_validation=False):
         self.collection = collection
         self.ordered = ordered
         self.results = {}
@@ -265,13 +265,15 @@ class BulkOperationBuilder(object):
         self.done = False
         self._insert_returns_nModified = True
         self._update_returns_nModified = True
+        self._bypass_document_validation = bypass_document_validation
 
     def find(self, selector):
         return BulkWriteOperation(self, selector)
 
     def insert(self, doc):
         def exec_insert():
-            self.collection.insert_one(doc)
+            self.collection.insert_one(
+                doc, bypass_document_validation=self._bypass_document_validation)
             return {'nInserted': 1}
         self.executors.append(exec_insert)
 
@@ -415,11 +417,13 @@ class Collection(object):
                 'the pymongo library as well.')
         return self._codec_options
 
-    def initialize_unordered_bulk_op(self):
-        return BulkOperationBuilder(self, ordered=False)
+    def initialize_unordered_bulk_op(self, bypass_document_validation=False):
+        return BulkOperationBuilder(
+            self, ordered=False, bypass_document_validation=bypass_document_validation)
 
-    def initialize_ordered_bulk_op(self):
-        return BulkOperationBuilder(self, ordered=True)
+    def initialize_ordered_bulk_op(self, bypass_document_validation=False):
+        return BulkOperationBuilder(
+            self, ordered=True, bypass_document_validation=bypass_document_validation)
 
     def insert(self, data, manipulate=True, check_keys=True,
                continue_on_error=False, **kwargs):
@@ -428,16 +432,18 @@ class Collection(object):
         validate_write_concern_params(**kwargs)
         return self._insert(data)
 
-    def insert_one(self, document, session=None):
-        validate_is_mutable_mapping('document', document)
+    def insert_one(self, document, bypass_document_validation=False, session=None):
+        if not bypass_document_validation:
+            validate_is_mutable_mapping('document', document)
         return InsertOneResult(self._insert(document, session), acknowledged=True)
 
-    def insert_many(self, documents, ordered=True, session=None):
+    def insert_many(self, documents, ordered=True, bypass_document_validation=False, session=None):
         if not isinstance(documents, Iterable) or not documents:
             raise TypeError('documents must be a non-empty list')
         documents = list(documents)
-        for document in documents:
-            validate_is_mutable_mapping('document', document)
+        if not bypass_document_validation:
+            for document in documents:
+                validate_is_mutable_mapping('document', document)
         return InsertManyResult(
             self._insert(documents, session, ordered=ordered),
             acknowledged=True)
@@ -535,19 +541,26 @@ class Collection(object):
             sub_doc = sub_doc[part]
         return True
 
-    def update_one(self, filter, update, upsert=False, session=None):
-        validate_ok_for_update(update)
+    def update_one(
+            self, filter, update, upsert=False, bypass_document_validation=False, session=None):
+        if not bypass_document_validation:
+            validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert, session=session),
                             acknowledged=True)
 
-    def update_many(self, filter, update, upsert=False, session=None):
-        validate_ok_for_update(update)
+    def update_many(
+            self, filter, update, upsert=False, bypass_document_validation=False, session=None):
+        if not bypass_document_validation:
+            validate_ok_for_update(update)
         return UpdateResult(self._update(filter, update, upsert=upsert,
                                          multi=True, session=session),
                             acknowledged=True)
 
-    def replace_one(self, filter, replacement, upsert=False, session=None):
-        validate_ok_for_replace(replacement)
+    def replace_one(
+            self, filter, replacement, upsert=False, bypass_document_validation=False,
+            session=None):
+        if not bypass_document_validation:
+            validate_ok_for_replace(replacement)
         return UpdateResult(self._update(filter, replacement, upsert=upsert, session=session),
                             acknowledged=True)
 
