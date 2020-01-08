@@ -4763,15 +4763,14 @@ class CollectionAPITest(TestCase):
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_string(self):
         collection = self.db.collection
-        collection.insert_many([
-            {
-                '_id': ObjectId('5dd6a8f302c91829ef248162'),
-                'boolean_true': True,
-                'boolean_false': False,
-                'integer': 100,
-                'date': datetime(2018, 3, 27, 0, 58, 51, 538000),
-            }
-        ])
+        collection.insert_one({
+            '_id': ObjectId('5dd6a8f302c91829ef248162'),
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'date': datetime(2018, 3, 27, 0, 58, 51, 538000),
+        })
+
         actual = collection.aggregate(
             [
                 {
@@ -4799,15 +4798,13 @@ class CollectionAPITest(TestCase):
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_int(self):
         collection = self.db.collection
-        collection.insert_many([
-            {
-                'boolean_true': True,
-                'boolean_false': False,
-                'integer': 100,
-                'double': 1.999,
-                'decimal': decimal128.Decimal128('5.5000')
-            }
-        ])
+        collection.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000')
+        })
         actual = collection.aggregate(
             [
                 {

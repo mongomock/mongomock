@@ -18,6 +18,7 @@ from mongomock import OperationFailure
 from tests.utils import DBRef
 
 try:
+    from bson import decimal128
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
@@ -2810,6 +2811,57 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'd': '$d',
             'nested.foo': 5,
         }}])
+
+    def test_aggregate_to_string(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            '_id': ObjectId('5dd6a8f302c91829ef248162'),
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'date': datetime.datetime(2018, 3, 27, 0, 58, 51, 538000),
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    '_id': {'$toString': '$_id'},
+                    'boolean_true': {'$toString': '$boolean_true'},
+                    'boolean_false': {'$toString': '$boolean_false'},
+                    'integer': {'$toString': '$integer'},
+                    'date': {'$toString': '$date'},
+                    'none': {'$toString': '$notexist'}
+                }
+            }
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test_aggregate_to_int(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000')
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'boolean_true': {'$toInt': '$boolean_true'},
+                    'boolean_false': {'$toInt': '$boolean_false'},
+                    'integer': {'$toInt': '$integer'},
+                    'double': {'$toInt': '$double'},
+                    'decimal': {'$toInt': '$decimal'}
+                }
+            },
+            {
+                '$project': {
+                    '_id': 0
+                }
+
+            }
+        ]
+        self.cmp.compare.aggregate(pipeline)
 
 
 def _LIMIT(*args):
