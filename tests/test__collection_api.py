@@ -17,7 +17,7 @@ import mongomock
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex
+    from bson import tz_util, ObjectId, Regex, decimal128
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -4759,3 +4759,76 @@ class CollectionAPITest(TestCase):
             fetched_document, stored_document,
             msg='Modifying the found document afterwards does not modify the stored document.')
         self.assertEqual(dict(original_document, date=None), dict(stored_document, date=None))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_to_string(self):
+        collection = self.db.collection
+        collection.insert_one({
+            '_id': ObjectId('5dd6a8f302c91829ef248162'),
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'date': datetime(2018, 3, 27, 0, 58, 51, 538000),
+        })
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        '_id': {'$toString': '$_id'},
+                        'boolean_true': {'$toString': '$boolean_true'},
+                        'boolean_false': {'$toString': '$boolean_false'},
+                        'integer': {'$toString': '$integer'},
+                        'date': {'$toString': '$date'},
+                        'none': {'$toString': '$notexist'}
+                    }
+                }
+            ]
+        )
+        expect = [{
+            '_id': '5dd6a8f302c91829ef248162',
+            'boolean_true': 'true',
+            'boolean_false': 'false',
+            'integer': '100',
+            'date': '2018-03-27T00:58:51.538Z',
+            'none': None
+        }]
+        self.assertEqual(expect, list(actual))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_to_int(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000')
+        })
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'boolean_true': {'$toInt': '$boolean_true'},
+                        'boolean_false': {'$toInt': '$boolean_false'},
+                        'integer': {'$toInt': '$integer'},
+                        'double': {'$toInt': '$double'},
+                        'decimal': {'$toInt': '$decimal'}
+                    }
+                },
+                {
+                    '$project': {
+                        '_id': 0
+                    }
+
+                }
+            ]
+        )
+        expect = [{
+            'boolean_true': 1,
+            'boolean_false': 0,
+            'integer': 100,
+            'double': 1,
+            'decimal': 5
+        }]
+        self.assertEqual(expect, list(actual))

@@ -19,6 +19,12 @@ from mongomock import filtering
 from mongomock import helpers
 from mongomock import OperationFailure
 
+try:
+    from bson import decimal128
+    decimal_support = True
+except ImportError:
+    decimal_support = False
+
 _random = random.Random()
 
 
@@ -88,7 +94,6 @@ string_operators = [
     '$substr',
     '$toLower',
     '$toUpper',
-    '$toString',
 ]
 comparison_operators = [
     '$cmp',
@@ -105,6 +110,11 @@ set_operators = [
     '$setIsSubset',
     '$anyElementTrue',
     '$allElementsTrue',
+]
+
+type_convertion_operators = [
+    '$toString',
+    '$toInt'
 ]
 
 
@@ -169,6 +179,8 @@ class _Parser(object):
                 return self._handle_set_operator(k, v)
             if k in string_operators:
                 return self._handle_string_operator(k, v)
+            if k in type_convertion_operators:
+                return self._handle_type_convertion_operator(k, v)
             if k in boolean_operators + \
                     text_search_operators + projection_operators:
                 raise NotImplementedError(
@@ -319,9 +331,6 @@ class _Parser(object):
                 raise OperationFailure('strcasecmp must have 2 items')
             a, b = str(self.parse(values[0])), str(self.parse(values[1]))
             return 0 if a == b else -1 if a < b else 1
-        if operator == '$toString':
-            parsed = self.parse(values)
-            return str(parsed) if parsed is not None else None
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid string operator for the aggregation "
@@ -425,6 +434,28 @@ class _Parser(object):
             "Although '%s' is a valid array operator for the "
             'aggregation pipeline, it is currently not implemented '
             'in Mongomock.' % operator)
+
+    def _handle_type_convertion_operator(self, operator, values):
+        if operator == '$toString':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
+            if isinstance(parsed, bool):
+                return str(parsed).lower()
+            if isinstance(parsed, datetime.datetime):
+                return parsed.isoformat()[:-3] + 'Z'
+            return str(parsed)
+
+        if operator == '$toInt':
+            parsed = self.parse(values)
+            if decimal_support:
+                if isinstance(parsed, decimal128.Decimal128):
+                    return int(parsed.to_decimal())
+                return int(parsed)
+            raise NotImplementedError(
+                'You need to import the pymongo library to support decimal128 type.'
+            )
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
