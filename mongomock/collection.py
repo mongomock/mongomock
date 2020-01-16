@@ -1357,10 +1357,9 @@ class Collection(object):
         if unknown_kwargs:
             raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
 
-        count = len(list(self._iter_documents(filter)))
-        if limit is None:
-            return count - skip
-        return min(count - skip, limit)
+        doc_num = len(list(self._iter_documents(filter)))
+        count = max(doc_num - skip, 0)
+        return count if limit is None else min(count, limit)
 
     def estimated_document_count(self, **kwargs):
         if kwargs.pop('session', None):

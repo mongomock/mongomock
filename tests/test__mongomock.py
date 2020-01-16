@@ -360,6 +360,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'a': 0})
         self.cmp.compare.count_documents({})
         self.cmp.compare.count_documents({'a': 1})
+        self.cmp.compare.count_documents({}, skip=10)
+        self.cmp.compare.count_documents({}, skip=0)
+        self.cmp.compare.count_documents({}, skip=10, limit=100)
+        self.cmp.compare.count_documents({}, skip=10, limit=3)
 
     @skipIf(
         _PYMONGO_VERSION < version.LooseVersion('3.8'),
