@@ -1041,7 +1041,7 @@ class Collection(object):
                         skip = op_value[0]
                         limit = op_value[1]
                         if skip < 0:
-                            skip = len(doc_copy[field]) - skip
+                            skip = len(doc_copy[field]) + skip
                         last = min(skip + limit, len(doc_copy[field]))
                         slice_ = slice(skip, last)
                     elif isinstance(op_value, int):
@@ -1049,10 +1049,10 @@ class Collection(object):
                         start = 0
                         end = len(doc_copy[field])
                         if count < 0:
-                            start = max(0, len(doc_copy[field]) - count)
+                            start = max(0, len(doc_copy[field]) + count)
                         else:
                             end = min(count, len(doc_copy[field]))
-                        slice_ = slice(skip, last)
+                        slice_ = slice(start, end)
 
                     if slice_:
                         doc_copy[field] = doc_copy[field][slice_]
