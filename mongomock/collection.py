@@ -1033,11 +1033,12 @@ class Collection(object):
 
             if '$slice' in op:
                 if isinstance(doc_copy[field], list):
-                    op_value = op['$slice']           
-                    slice_ = None        
+                    op_value = op['$slice']
+                    slice_ = None
                     if isinstance(op_value, list):
                         if len(op_value) != 2:
-                            raise OperationFailure('Unsupported slice format {} for slicing operation: {}'.format(op_value, op))
+                            raise OperationFailure(
+                                'Unsupported slice format {} for slicing operation: {}'.format(op_value, op))
                         skip = op_value[0]
                         limit = op_value[1]
                         if skip < 0:
@@ -1057,9 +1058,11 @@ class Collection(object):
                     if slice_:
                         doc_copy[field] = doc_copy[field][slice_]
                     else:
-                        raise OperationFailure('Unsupported slice value {} for slicing operation: {}'.format(op_value, op))
+                        raise OperationFailure(
+                            'Unsupported slice value {} for slicing operation: {}'.format(op_value, op))
                 else:
-                    raise OperationFailure('Unsupported type {} for slicing operation: {}'.format(type(doc_copy[field]), op))
+                    raise OperationFailure(
+                        'Unsupported type {} for slicing operation: {}'.format(type(doc_copy[field]), op))
 
             if '$elemMatch' in op:
                 if isinstance(doc_copy[field], list):
