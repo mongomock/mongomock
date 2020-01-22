@@ -1029,6 +1029,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'Array'}, projection={
             'name': 1, 'values': {'$slice': [-3, 10]}})
 
+    def test__projection_slice_list_select_subfield(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [
+            {'num': 0, 'val': 1}, {'num': 1, 'val': 2}]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'values.num': 1, 'values': {'$slice': 1}})
+
     def test__projection_slice_list_wrong_num_slice(self):
         self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
         try:
