@@ -1029,6 +1029,18 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'name': 'Array'}, projection={
                               'name': 1, 'values': {'$slice': [-3, 10]}})
 
+    def test__projection_slice_list_wrong_num_slice(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        with self.assertRaises(ValueError):
+            self.cmp.compare.find({'name': 'Array'}, projection={
+                'name': 1, 'values': {'$slice': [-3, 10, 1]}})
+
+    def test__projection_slice_list_wrong_type(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        with self.assertRaises(ValueError):
+            self.cmp.compare.find({'name': 'Array'}, projection={
+                'name': 1, 'values': {'$slice': [1.0]}})
+
     def test__remove(self):
         """Test the remove method."""
         self.cmp.do.insert({'value': 1})
