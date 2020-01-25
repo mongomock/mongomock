@@ -358,6 +358,15 @@ class _Parser(object):
             return out_value.second
         if operator == '$millisecond':
             return int(out_value.microsecond / 1000)
+        if operator == '$dateToString':
+            if '%L' in out_value['format']:
+                raise NotImplementedError(
+                    'Although %L is a valid date format for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            return out_value['date'].strftime(out_value['format'])
+
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '
