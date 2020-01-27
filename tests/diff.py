@@ -11,7 +11,7 @@ class _NO_VALUE(object):
 NO_VALUE = _NO_VALUE()
 
 _SUPPORTED_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
-    string_types + integer_types + (text_type, bytes)
+    string_types + integer_types + (text_type, bytes) + (type,)
 
 if python_version() < '3.0':
     dict_type = dict
