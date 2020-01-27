@@ -5,6 +5,9 @@ import functools
 from mongomock.helpers import RE_TYPE
 
 
+_COMPARE_EXCEPTIONS = 'exceptions'
+
+
 class MultiCollection(object):
 
     def __init__(self, conns):
@@ -14,6 +17,7 @@ class MultiCollection(object):
         self.compare = Foreach(self.conns, compare=True)
         self.compare_ignore_order = Foreach(
             self.conns, compare=True, ignore_order=True)
+        self.compare_exceptions = Foreach(self.conns, compare=_COMPARE_EXCEPTIONS)
 
 
 class Foreach(object):
@@ -57,15 +61,30 @@ class ForeachMethod(object):
         self.___decorators = decorators
         self.___sort_by = sort_by
 
+    def _call(self, obj, args, kwargs):
+        # copying the args and kwargs is important, because pymongo changes
+        # the dicts (fits them with the _id)
+        return self.___apply_decorators(
+            getattr(obj, self.___method_name)(*_deepcopy(args), **_deepcopy(kwargs)))
+
+    def _get_exception_type(self, obj, args, kwargs, name):
+        try:
+            self._call(obj, args, kwargs)
+            assert False, 'No exception raised for ' + name
+        except Exception as err:
+            return type(err)
+
     def __call__(self, *args, **kwargs):
-        results = dict(
-            # copying the args and kwargs is important, because pymongo changes
-            # the dicts (fits them with the _id)
-            (name, self.___apply_decorators(
-                getattr(obj, self.___method_name)(
-                    *_deepcopy(args), **_deepcopy(kwargs))))
-            for name, obj in self.___objs.items()
-        )
+        if self.___compare == _COMPARE_EXCEPTIONS:
+            results = dict(
+                (name, self._get_exception_type(obj, args, kwargs, name=name))
+                for name, obj in self.___objs.items()
+            )
+        else:
+            results = dict(
+                (name, self._call(obj, args, kwargs))
+                for name, obj in self.___objs.items()
+            )
         if self.___compare:
             _assert_no_diff(results, ignore_order=self.___ignore_order, sort_by=self.___sort_by)
         return results

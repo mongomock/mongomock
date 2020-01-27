@@ -364,6 +364,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count_documents({}, skip=0)
         self.cmp.compare.count_documents({}, skip=10, limit=100)
         self.cmp.compare.count_documents({}, skip=10, limit=3)
+        self.cmp.compare_exceptions.count_documents({}, limit='one')
+        self.cmp.compare_exceptions.count_documents({}, limit='1')
 
     @skipIf(
         _PYMONGO_VERSION < version.LooseVersion('3.8'),
@@ -1203,13 +1205,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'some_field': 'B', 'data': [0, 0]})
 
-        try:
-            self.cmp.do.update({'name': 'bob'}, {'$set': {'data.-3': 1}})
-            assert False
-        except mongomock.WriteError:
-            self.cmp.compare.find()
-        except Exception:
-            assert False
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$set': {'data.-3': 1}})
 
     def test__set_subdocuments_positional(self):
         self.cmp.do.insert({'name': 'bob', 'subdocs': [
@@ -1272,13 +1268,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__inc_subdocument_array_bad_neg_index_after_dot(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'data': [0, 0]})
-        try:
-            self.cmp.do.update({'name': 'bob'}, {'$inc': {'data.-3': 1}})
-            assert False
-        except mongomock.WriteError:
-            self.cmp.compare.find()
-        except Exception:
-            assert False
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$inc': {'data.-3': 1}})
 
     def test__inc_subdocument_positional(self):
         self.cmp.do.remove()
@@ -1718,10 +1708,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__empty_logical_operators(self):
         for operator in mongomock.filtering.LOGICAL_OPERATOR_MAP:
-            try:
-                self.cmp.compare_ignore_order.find({operator: []})
-            except Exception as e:
-                assert isinstance(e, mongomock.OperationFailure)
+            self.cmp.compare_exceptions.find({operator: []})
 
     def test__rename(self):
         input_ = {'_id': 1, 'foo': 'bar'}
