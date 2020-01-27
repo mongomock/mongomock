@@ -3440,14 +3440,6 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$dateToString': {
-                    'date': datetime.now(),
-                    'format': '%L'
-                }}}},
-            ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
                 {'$project': {'a': {'$concatArrays': [[0, 1], [2, 3]]}}},
             ])
 
@@ -4858,3 +4850,48 @@ class CollectionAPITest(TestCase):
             'start_date': '2011/11/04 00:05',
         }]
         self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {
+                    'date': datetime.now(),
+                    'format': '%L'
+                }}}},
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {
+                    'date': datetime.now(),
+                    'format': '%m',
+                    'onNull': 'a'
+                }}}},
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {
+                    'date': datetime.now(),
+                    'format': '%m',
+                    'timezone': 'America/New_York'
+                }}}},
+            ])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {
+                    'date': datetime.now(),
+                }}}},
+            ])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$dateToString': {
+                    'format': '%m',
+                }}}},
+            ])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate(
+                [{'$project': {'a': {'$dateToString': '10'}}}]
+            )
