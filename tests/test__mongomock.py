@@ -1003,6 +1003,60 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
 
+    def test__projection_slice_int_first(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={'name': 1, 'values': {'$slice': 1}})
+
+    def test__projection_slice_int_last(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={'name': 1, 'values': {'$slice': -1}})
+
+    def test__projection_slice_list_pos(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [3, 1]}})
+
+    def test__projection_slice_list_neg(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [-3, 1]}})
+
+    def test__projection_slice_list_pos_to_end(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [3, 10]}})
+
+    def test__projection_slice_list_neg_to_end(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [-3, 10]}})
+
+    def test__projection_slice_list_select_subfield(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [
+            {'num': 0, 'val': 1}, {'num': 1, 'val': 2}]})
+        self.cmp.compare.find({'name': 'Array'}, projection={
+            'values.num': 1, 'values': {'$slice': 1}})
+
+    def test__projection_slice_list_wrong_num_slice(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [-3, 10, 1]}})
+
+    def test__projection_slice_list_wrong_slice_type(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [1.0]}})
+
+    def test__projection_slice_list_wrong_slice_value_type(self):
+        self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': '3'}})
+
+    def test__projection_slice_list_wrong_value_type(self):
+        self.cmp.do.insert({'name': 'Array', 'values': 0})
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': 1}})
+
     def test__remove(self):
         """Test the remove method."""
         self.cmp.do.insert({'value': 1})

@@ -1007,7 +1007,7 @@ class Collection(object):
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
         result = {}
-        allowed_projection_operators = {'$elemMatch'}
+        allowed_projection_operators = {'$elemMatch', '$slice'}
         for key, value in iteritems(fields):
             if isinstance(value, dict):
                 for op in value:
@@ -1030,6 +1030,40 @@ class Collection(object):
                 else:
                     # field doesn't exist in original document, no work to do
                     continue
+
+            if '$slice' in op:
+                if not isinstance(doc_copy[field], list):
+                    raise OperationFailure(
+                        'Unsupported type {} for slicing operation: {}'.format(
+                            type(doc_copy[field]), op))
+                op_value = op['$slice']
+                slice_ = None
+                if isinstance(op_value, list):
+                    if len(op_value) != 2:
+                        raise OperationFailure(
+                            'Unsupported slice format {} for slicing operation: {}'.format(
+                                op_value, op))
+                    skip, limit = op_value
+                    if skip < 0:
+                        skip = len(doc_copy[field]) + skip
+                    last = min(skip + limit, len(doc_copy[field]))
+                    slice_ = slice(skip, last)
+                elif isinstance(op_value, int):
+                    count = op_value
+                    start = 0
+                    end = len(doc_copy[field])
+                    if count < 0:
+                        start = max(0, len(doc_copy[field]) + count)
+                    else:
+                        end = min(count, len(doc_copy[field]))
+                    slice_ = slice(start, end)
+
+                if slice_:
+                    doc_copy[field] = doc_copy[field][slice_]
+                else:
+                    raise OperationFailure(
+                        'Unsupported slice value {} for slicing operation: {}'.format(
+                            op_value, op))
 
             if '$elemMatch' in op:
                 if isinstance(doc_copy[field], list):
