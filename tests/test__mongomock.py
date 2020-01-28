@@ -1039,27 +1039,18 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__projection_slice_list_wrong_num_slice(self):
         self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
-        try:
-            self.cmp.compare.find({'name': 'Array'}, projection={
-                'name': 1, 'values': {'$slice': [-3, 10, 1]}})
-        except Exception as e:
-            assert isinstance(e, mongomock.OperationFailure)
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [-3, 10, 1]}})
 
     def test__projection_slice_list_wrong_slice_type(self):
         self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
-        try:
-            self.cmp.compare.find({'name': 'Array'}, projection={
-                'name': 1, 'values': {'$slice': [1.0]}})
-        except Exception as e:
-            assert isinstance(e, mongomock.OperationFailure)
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': [1.0]}})
 
     def test__projection_slice_list_wrong_value_type(self):
         self.cmp.do.insert({'name': 'Array', 'values': 0})
-        try:
-            self.cmp.compare.find({'name': 'Array'}, projection={
-                'name': 1, 'values': {'$slice': 1}})
-        except Exception as e:
-            assert isinstance(e, mongomock.OperationFailure)
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
+            'name': 1, 'values': {'$slice': 1}})
 
     def test__remove(self):
         """Test the remove method."""
