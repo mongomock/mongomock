@@ -1050,7 +1050,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__projection_slice_list_wrong_slice_value_type(self):
         self.cmp.do.insert({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
         self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
-            'name': 1, 'values': {'$slice': "1"}})
+            'name': 1, 'values': {'$slice': '3'}})
 
     def test__projection_slice_list_wrong_value_type(self):
         self.cmp.do.insert({'name': 'Array', 'values': 0})
