@@ -364,7 +364,7 @@ class _Parser(object):
                     '$dateToString operator must correspond a dict'
                     'that has "format" and "date" field.'
                 )
-            if 'format' not in values.keys() or 'date' not in values.keys():
+            if not isinstance(values, dict) or not {'format', 'date'} <= set(values):
                 raise OperationFailure(
                     '$dateToString operator must correspond a dict'
                     'that has "format" and "date" field.'
@@ -375,7 +375,7 @@ class _Parser(object):
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
-            if 'onNull' in values.keys():
+            if 'onNull' in values:
                 raise NotImplementedError(
                     'Although onNull is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
