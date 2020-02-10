@@ -358,6 +358,37 @@ class _Parser(object):
             return out_value.second
         if operator == '$millisecond':
             return int(out_value.microsecond / 1000)
+        if operator == '$dateToString':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$dateToString operator must correspond a dict'
+                    'that has "format" and "date" field.'
+                )
+            if not isinstance(values, dict) or not {'format', 'date'} <= set(values):
+                raise OperationFailure(
+                    '$dateToString operator must correspond a dict'
+                    'that has "format" and "date" field.'
+                )
+            if '%L' in out_value['format']:
+                raise NotImplementedError(
+                    'Although %L is a valid date format for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'onNull' in values:
+                raise NotImplementedError(
+                    'Although onNull is a valid field for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'timezone' in values.keys():
+                raise NotImplementedError(
+                    'Although timezone is a valid field for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            return out_value['date'].strftime(out_value['format'])
+
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '

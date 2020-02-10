@@ -2908,6 +2908,23 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_date_to_string(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'start_date': datetime.datetime(2011, 11, 4, 0, 5, 23)
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'start_date': {
+                        '$dateToString': {'format': '%Y/%m/%d %H:%M', 'date': '$start_date'}
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
