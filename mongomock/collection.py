@@ -15,11 +15,11 @@ import time
 import warnings
 
 try:
-    from bson import json_util, SON, BSON, Timestamp
+    from bson import json_util, SON, BSON
     from bson import codec_options as bson_codec_options
     _DEFAULT_CODEC_OPTIONS = bson_codec_options.CodecOptions()
 except ImportError:
-    bson_codec_options = json_utils = SON = BSON = Timestamp = None
+    bson_codec_options = json_utils = SON = BSON = None
     _DEFAULT_CODEC_OPTIONS = None
 try:
     import execjs
@@ -1967,25 +1967,10 @@ def _min_updater(doc, field_name, value):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
-_LAST_TIMESTAMP_INC = []
-
-
-def _get_current_timestamp():
-    if not Timestamp:
-        raise NotImplementedError('timestamp is not supported. Import pymongo to use it.')
-    now = int(time.time())
-    if _LAST_TIMESTAMP_INC and _LAST_TIMESTAMP_INC[0] == now:
-        _LAST_TIMESTAMP_INC[1] += 1
-    else:
-        del _LAST_TIMESTAMP_INC[:]
-        _LAST_TIMESTAMP_INC.extend([now, 1])
-    return Timestamp(now, _LAST_TIMESTAMP_INC[1])
-
-
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
-            doc[field_name] = _get_current_timestamp()
+            doc[field_name] = helpers.get_current_timestamp()
         else:
             doc[field_name] = datetime.utcnow()
 
