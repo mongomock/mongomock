@@ -17,7 +17,7 @@ import mongomock
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex, decimal128
+    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
@@ -1959,6 +1959,17 @@ class CollectionAPITest(TestCase):
 
         self.assertLessEqual(before, doc['updated_at'].as_datetime())
         self.assertLessEqual(doc['updated_at'].as_datetime(), after)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__insert_zero_timestamp(self):
+        self.db.collection.drop()
+        before = datetime.now(tz_util.utc) - timedelta(seconds=1)
+        self.db.collection.insert_one({'zero': Timestamp(0, 0)})
+        after = datetime.now(tz_util.utc)
+
+        doc = self.db.collection.find_one()
+        self.assertLessEqual(before, doc['zero'].as_datetime())
+        self.assertLessEqual(doc['zero'].as_datetime(), after)
 
     def test__rename_collection(self):
         self.db.collection.insert({'_id': 1, 'test_list': [{'data': 'val'}]})

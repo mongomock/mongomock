@@ -4,6 +4,7 @@ from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import iteritems, string_types
+import time
 import warnings
 
 
@@ -11,8 +12,10 @@ import warnings
 # in this module but is made available for callers of this module.
 try:
     from bson import ObjectId  # pylint: disable=unused-import
+    from bson import Timestamp
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
+    Timestamp = None
 
 # Cache the RegExp pattern type.
 RE_TYPE = type(re.compile(''))
@@ -277,6 +280,22 @@ def split_hosts(hosts, default_port=27017):
     return nodelist
 
 
+_LAST_TIMESTAMP_INC = []
+
+
+def get_current_timestamp():
+    """Get the current timestamp as a bson Timestamp object."""
+    if not Timestamp:
+        raise NotImplementedError('timestamp is not supported. Import pymongo to use it.')
+    now = int(time.time())
+    if _LAST_TIMESTAMP_INC and _LAST_TIMESTAMP_INC[0] == now:
+        _LAST_TIMESTAMP_INC[1] += 1
+    else:
+        del _LAST_TIMESTAMP_INC[:]
+        _LAST_TIMESTAMP_INC.extend([now, 1])
+    return Timestamp(now, _LAST_TIMESTAMP_INC[1])
+
+
 def patch_datetime_awareness_in_document(value):
     # MongoDB is supposed to stock everything as timezone naive utc date
     # Hence we have to convert incoming datetimes to avoid errors while
@@ -293,6 +312,8 @@ def patch_datetime_awareness_in_document(value):
         if value.tzinfo:
             return (value - value.utcoffset()).replace(tzinfo=None, microsecond=mongo_us)
         return value.replace(microsecond=mongo_us)
+    if Timestamp and isinstance(value, Timestamp) and not value.time and not value.inc:
+        return get_current_timestamp()
     return value
 
 
