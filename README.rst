@@ -168,6 +168,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Julian Hille
 * Krzysztof Płocharz
 * Lyon Zhang
+* `Lucas Rangel Cezimbra <https://github.com/Lrcezimbra/>`_
 * Marc Prewitt
 * Marcin Barczynski
 * Marian Galik

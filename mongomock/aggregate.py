@@ -583,6 +583,12 @@ class _Parser(object):
                     if value not in result:
                         result.append(value)
             return result
+        if operator == '$setEquals':
+            set_values = [set(self.parse(value)) for value in values]
+            for set1, set2 in itertools.combinations(set_values, 2):
+                if set1 != set2:
+                    return False
+            return True
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
