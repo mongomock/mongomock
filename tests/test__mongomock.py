@@ -471,6 +471,15 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'_id': id, 'l_string': {'$not': {'$size': 0}}})
         self.cmp.compare.find({'_id': id, 'l_tuple': {'$size': 2}})
 
+    def test__size_with_all(self):
+        objs = [{'list': ['a']}, {'list': ['a', 123]}, {'list': ['a', 123, 'xyz']}]
+        self.cmp.do.insert_many(objs)
+        self.cmp.compare.find({'list': {'$all': ['a']}})
+        self.cmp.compare.find({'list': {'$all': ['a', 123]}})
+        self.cmp.compare.find({'list': {'$all': ['a'], '$size': 1}})
+        self.cmp.compare.find({'list': {'$all': ['a', 123], '$size': 2}})
+        self.cmp.compare.find({'list': {'$all': ['a', 123, 'xyz'], '$size': 3}})
+
     def test__regex_match_non_string(self):
         id = ObjectId()
         self.cmp.do.insert({
