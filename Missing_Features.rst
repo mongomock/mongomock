@@ -32,10 +32,11 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray)
 * Operators within the query language (find):
-  * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`
-  * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`
-  * `$text <https://docs.mongodb.com/manual/reference/operator/query/text/>` search
-  * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`
+  * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`_
+  * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`_
+  * `$text <https://docs.mongodb.com/manual/reference/operator/query/text/>`_ search
+  * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`_
 * `map_reduce <https://docs.mongodb.com/manual/reference/command/mapReduce/>`_ options (``scope`` and ``finalize``)
 * Database `command <https://docs.mongodb.com/manual/reference/command/>`_ method except for the ``ping`` command.
 * Raw Batch BSON operations (`aggregate_raw_batches` and `find_raw_batches`)
+* `Expiring Data <https://docs.mongodb.com/manual/tutorial/expire-data/>`_

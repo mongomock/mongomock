@@ -1245,6 +1245,10 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index({'value': 1})
 
+    def test__create_ttl_index(self):
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.create_index([('value', 1)], expireAfterSeconds=3600)
+
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
         with self.assertRaises(TypeError):
