@@ -100,7 +100,9 @@ class _Filterer(object):
             if isinstance(search, dict) and '$all' in search:
                 if not self._all_op(iter_key_candidates(key, document), search['$all']):
                     return False
-                continue
+                # if there are no query operators then continue
+                if len(search) == 1:
+                    continue
 
             for doc_val in iter_key_candidates(key, document):
                 has_candidates |= doc_val is not NOTHING
