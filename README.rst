@@ -130,7 +130,7 @@ Branching model
 
 The branching model used for this project follows the `gitflow workflow`_.  This means that pull requests
 should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
-the legacy 2.x branch than your pull request should go into the `support/2.x` branch.
+the legacy 2.x branch then your pull request should go into the `support/2.x` branch.
 
 Acknowledgements
 ----------------
