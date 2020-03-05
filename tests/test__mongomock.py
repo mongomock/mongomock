@@ -1431,6 +1431,44 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 {'$addToSet': {'shirt.color': {'$each': ['green', 'yellow']}}})
             self.cmp.compare.find({'name': 'bob'})
 
+    def test__pop(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat': 1}})
+        self.cmp.compare.find({'name': 'bob'})
+
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat': -1}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pop_invalid_type(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': 'green'})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': 1}})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': -1}})
+
+    def test__pop_invalid_syntax(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': ['green']})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': 2}})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': '5'}})
+
+    def test__pop_array_in_array(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [['green']]})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat.0': 1}})
+
+    def test__pop_document_in_array(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'hat': ['green']}]})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat.0.hat': 1}})
+
+    def test__pop_invalid_document_in_array(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [{'hat': 'green'}]})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat.0.hat': 1}})
+
     def test__pull(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob'})
