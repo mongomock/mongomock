@@ -243,7 +243,7 @@ class _CollectionComparisonTest(TestCase):
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = 'mongomock___testing_db'
         self.collection_name = 'mongomock___testing_collection'
-        self.mongo_conn[self.db_name][self.collection_name].drop()
+        self.mongo_conn.drop_database(self.db_name)
         self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
         self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
         self.cmp = MultiCollection({
