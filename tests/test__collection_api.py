@@ -2464,18 +2464,33 @@ class CollectionAPITest(TestCase):
             str(err.exception))
 
     def test__aggregate_lookup_dot_in_local_field(self):
-        with self.assertRaises(NotImplementedError) as err:
-            self.db.a.aggregate([
-                {'$lookup': {
-                    'from': 'b',
-                    'localField': 'should.fail',
-                    'foreignField': 'arr',
-                    'as': 'b'
-                }}
-            ])
-        self.assertIn(
-            "Although '.' is valid in the 'localField' and 'as' parameters",
-            str(err.exception))
+        self.db.a.insert_many([
+            {'_id': 2, 'should': {'do': 'join'}},
+            {'_id': 3, 'should': {'do': 'not_join'}},
+            {'_id': 4, 'should': 'skip'},
+        ])
+        self.db.b.insert_many([
+            {'_id': 2, 'should': 'join'},
+            {'_id': 3, 'should': 'join'},
+            {'_id': 4, 'should': 'skip'},
+        ])
+        actual = self.db.a.aggregate([
+            {'$lookup': {
+                'from': 'b',
+                'localField': 'should.do',
+                'foreignField': 'should',
+                'as': 'b'
+            }}
+        ])
+        self.assertEqual([
+            {
+                '_id': 2,
+                'b': [{'_id': 2, 'should': 'join'}, {'_id': 3, 'should': 'join'}],
+                'should': {'do': 'join'}
+            },
+            {'_id': 3, 'b': [], 'should': {'do': 'not_join'}},
+            {'_id': 4, 'b': [], 'should': 'skip'}
+        ], list(actual))
 
     def test__aggregate_lookup_dot_in_as(self):
         with self.assertRaises(NotImplementedError) as err:
@@ -2488,7 +2503,7 @@ class CollectionAPITest(TestCase):
                 }}
             ])
         self.assertIn(
-            "Although '.' is valid in the 'localField' and 'as' parameters ",
+            "Although '.' is valid in the 'as' parameters ",
             str(err.exception))
 
     def test__aggregate_graph_lookup_behaves_as_lookup(self):

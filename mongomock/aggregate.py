@@ -601,6 +601,29 @@ def _fix_sort_key(key_getter):
     return fixed_getter
 
 
+def _get_local_field_val(dct, path):
+    """Getting value from a dict by using a dot-separated chain of keys
+
+        >>> _get_local_field_val({'a': {'b': 3}}, 'a')
+        {'b': 3}
+        >>> _get_local_field_val({'a': {'b': 3}}, 'a.b')
+        3
+        >>> _get_local_field_val({'a': {'b': 3, 'c': {'d': 5}}}, 'a.c.d')
+        5
+        >>> _get_local_field_val({'a': {'b': 3}}, 'a.c')
+        >>> _get_local_field_val({'a': 1}, 'a.c')
+        >>> _get_local_field_val({'a': 1}, 'b')
+    """
+    path = path.split('.')
+    for comp in path[:-1]:
+        dct = dct.get(comp, {})
+        if not isinstance(dct, collections.Mapping):
+            dct = {}
+            break
+
+    return dct.get(path[-1])
+
+
 def _handle_lookup_stage(in_collection, database, options):
     for operator in ('let', 'pipeline'):
         if operator in options:
@@ -619,10 +642,10 @@ def _handle_lookup_stage(in_collection, database, options):
                 options[operator].startswith('$'):
             raise OperationFailure(
                 "FieldPath field names may not start with '$'")
-        if operator in ('localField', 'as') and \
+        if operator == 'as' and \
                 '.' in options[operator]:
             raise NotImplementedError(
-                "Although '.' is valid in the 'localField' and 'as' "
+                "Although '.' is valid in the 'as' "
                 'parameters for the lookup stage of the aggregation '
                 'pipeline, it is currently not implemented in Mongomock.')
 
@@ -632,7 +655,7 @@ def _handle_lookup_stage(in_collection, database, options):
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
-        query = doc.get(local_field)
+        query = _get_local_field_val(doc, local_field)
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
