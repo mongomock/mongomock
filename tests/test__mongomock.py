@@ -2607,6 +2607,26 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'default': 'Other',
         }}])
 
+    def test__aggregate_lookup_dot_in_local_field(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_many([
+            {'_id': 2, 'should': {'do': 'join'}},
+            {'_id': 3, 'should': {'do': 'not_join'}},
+            {'_id': 4, 'should': 'skip'},
+            {'_id': 5, 'should': 'join'},
+            {'_id': 6, 'should': 'join'},
+            {'_id': 7, 'should': 'skip'},
+        ])
+        pipeline = [
+            {'$lookup': {
+                'from': self.collection_name,
+                'localField': 'should.do',
+                'foreignField': 'should',
+                'as': 'b'
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_count(self):
         self.cmp.do.insert_many([
             {'_id': i} for i in range(5)
