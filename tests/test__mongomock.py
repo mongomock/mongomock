@@ -2239,6 +2239,19 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test_aggregate_project_with_missing_subfields(self):
+        self.cmp.do.insert_many([
+            {'a': {'b': 3}, 'other': 1},
+            {'a': {'b': {'c': 4}, 'd': 5}},
+            {'a': {'c': 3, 'd': 5}},
+            {'b': {'c': 3}},
+            {'a': 5},
+        ])
+        pipeline = [
+            {'$project': {'_id': False, 'e': '$a.b.c'}}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_unwind_project_id(self):
         self.cmp.do.insert_one({
             '_id': 'id0',
