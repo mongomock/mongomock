@@ -980,7 +980,7 @@ def _handle_project_stage(in_collection, unused_database, options):
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
             try:
-                out_doc[field] = _parse_expression(value, in_doc)
+                out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
             except KeyError:
                 pass
     if (method == 'include') == (include_id is not False and include_id is not 0):
