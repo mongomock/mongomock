@@ -15,11 +15,11 @@ import time
 import warnings
 
 try:
-    from bson import json_util, SON, BSON
+    from bson import json_util, SON, BSON, Timestamp
     from bson import codec_options as bson_codec_options
     _DEFAULT_CODEC_OPTIONS = bson_codec_options.CodecOptions()
 except ImportError:
-    bson_codec_options = json_utils = SON = BSON = None
+    bson_codec_options = json_utils = SON = BSON = Timestamp = None
     _DEFAULT_CODEC_OPTIONS = None
 try:
     import execjs
@@ -655,13 +655,8 @@ class Collection(object):
                             continue
                         # push to array in a nested attribute
                         else:
-                            # create nested attributes if they do not exist
-                            subdocument = existing_document
-                            for field_part in nested_field_list[:-1]:
-                                if field_part not in subdocument:
-                                    subdocument[field_part] = {}
-
-                                subdocument = subdocument[field_part]
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
@@ -739,12 +734,9 @@ class Collection(object):
                                     obj for obj in arr if obj not in value]
                             continue
                         else:
-                            subdocument = existing_document
-                            for nested_field in nested_field_list[:-1]:
-                                if nested_field not in subdocument:
-                                    break
-                                subdocument = subdocument[nested_field]
-
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
+                            
                             if nested_field_list[-1] in subdocument:
                                 arr = subdocument[nested_field_list[-1]]
                                 subdocument[nested_field_list[-1]] = [
@@ -1007,7 +999,7 @@ class Collection(object):
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
         result = {}
-        allowed_projection_operators = {'$elemMatch', '$slice'}
+        allowed_projection_operators = {'$elemMatch'}
         for key, value in iteritems(fields):
             if isinstance(value, dict):
                 for op in value:
@@ -1030,40 +1022,6 @@ class Collection(object):
                 else:
                     # field doesn't exist in original document, no work to do
                     continue
-
-            if '$slice' in op:
-                if not isinstance(doc_copy[field], list):
-                    raise OperationFailure(
-                        'Unsupported type {} for slicing operation: {}'.format(
-                            type(doc_copy[field]), op))
-                op_value = op['$slice']
-                slice_ = None
-                if isinstance(op_value, list):
-                    if len(op_value) != 2:
-                        raise OperationFailure(
-                            'Unsupported slice format {} for slicing operation: {}'.format(
-                                op_value, op))
-                    skip, limit = op_value
-                    if skip < 0:
-                        skip = len(doc_copy[field]) + skip
-                    last = min(skip + limit, len(doc_copy[field]))
-                    slice_ = slice(skip, last)
-                elif isinstance(op_value, int):
-                    count = op_value
-                    start = 0
-                    end = len(doc_copy[field])
-                    if count < 0:
-                        start = max(0, len(doc_copy[field]) + count)
-                    else:
-                        end = min(count, len(doc_copy[field]))
-                    slice_ = slice(start, end)
-
-                if slice_:
-                    doc_copy[field] = doc_copy[field][slice_]
-                else:
-                    raise OperationFailure(
-                        'Unsupported slice value {} for slicing operation: {}'.format(
-                            op_value, op))
 
             if '$elemMatch' in op:
                 if isinstance(doc_copy[field], list):
@@ -1417,8 +1375,6 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if 'expireAfterSeconds' in kwargs:
-            raise NotImplementedError('Mongomock does not handle TTL index yet')
         index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
@@ -1969,10 +1925,25 @@ def _min_updater(doc, field_name, value):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
+_LAST_TIMESTAMP_INC = []
+
+
+def _get_current_timestamp():
+    if not Timestamp:
+        raise NotImplementedError('timestamp is not supported. Import pymongo to use it.')
+    now = int(time.time())
+    if _LAST_TIMESTAMP_INC and _LAST_TIMESTAMP_INC[0] == now:
+        _LAST_TIMESTAMP_INC[1] += 1
+    else:
+        del _LAST_TIMESTAMP_INC[:]
+        _LAST_TIMESTAMP_INC.extend([now, 1])
+    return Timestamp(now, _LAST_TIMESTAMP_INC[1])
+
+
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
-            doc[field_name] = helpers.get_current_timestamp()
+            doc[field_name] = _get_current_timestamp()
         else:
             doc[field_name] = datetime.utcnow()
 
