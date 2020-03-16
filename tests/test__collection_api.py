@@ -3083,6 +3083,17 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{}], list(actual))
 
+    def test__aggregate_project_missing_nested_fields(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': {'c': 1}})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': collections.OrderedDict([
+                ('_id', False),
+                ('nested_dictionary', {'c': '$b.c', 'd': '$b.d'})
+            ])}
+        ])
+        self.assertEqual([{'nested_dictionary': {'c': 1}}], list(actual))
+
     def test__aggregate_project_out(self):
         self.db.collection.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
         self.db.collection.insert_one({'_id': 2, 'arr': {'a': 4, 'b': 5}})
