@@ -663,6 +663,10 @@ class Collection(object):
 
                                 subdocument = subdocument[field_part]
 
+                            # get subdocument with $ oprator support
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
+
                             # we're pushing a list
                             push_results = []
                             if nested_field_list[-1] in subdocument:
@@ -739,11 +743,8 @@ class Collection(object):
                                     obj for obj in arr if obj not in value]
                             continue
                         else:
-                            subdocument = existing_document
-                            for nested_field in nested_field_list[:-1]:
-                                if nested_field not in subdocument:
-                                    break
-                                subdocument = subdocument[nested_field]
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
 
                             if nested_field_list[-1] in subdocument:
                                 arr = subdocument[nested_field_list[-1]]
