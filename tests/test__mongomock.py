@@ -1453,6 +1453,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'name': 'bob', 'hat': ['green']})
         self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': 2}})
         self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat': '5'}})
+        self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat.-1': 1}})
 
     def test__pop_array_in_array(self):
         self.cmp.do.remove()
