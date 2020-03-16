@@ -619,10 +619,10 @@ def _handle_lookup_stage(in_collection, database, options):
                 options[operator].startswith('$'):
             raise OperationFailure(
                 "FieldPath field names may not start with '$'")
-        if operator in ('localField', 'as') and \
+        if operator == 'as' and \
                 '.' in options[operator]:
             raise NotImplementedError(
-                "Although '.' is valid in the 'localField' and 'as' "
+                "Although '.' is valid in the 'as' "
                 'parameters for the lookup stage of the aggregation '
                 'pipeline, it is currently not implemented in Mongomock.')
 
@@ -632,7 +632,10 @@ def _handle_lookup_stage(in_collection, database, options):
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
-        query = doc.get(local_field)
+        try:
+            query = helpers.get_value_by_dot(doc, local_field)
+        except KeyError:
+            query = None
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
