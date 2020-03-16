@@ -656,17 +656,16 @@ class Collection(object):
                         # push to array in a nested attribute
                         else:
                             # create nested attributes if they do not exist
-                            if '$' not in nested_field_list:
-                                subdocument = existing_document
-                                for field_part in nested_field_list[:-1]:
-                                    if field_part not in subdocument:
-                                        subdocument[field_part] = {}
+                            subdocument = existing_document
+                            for field_part in nested_field_list[:-1]:
+                                if field_part not in subdocument:
+                                    subdocument[field_part] = {}
 
-                                    subdocument = subdocument[field_part]
-                            else:
-                                # get subdocument with $ oprator support
-                                subdocument, _ = self._get_subdocument(
-                                    existing_document, spec, nested_field_list)
+                                subdocument = subdocument[field_part]
+
+                            # get subdocument with $ oprator support
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
