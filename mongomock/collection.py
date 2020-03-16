@@ -666,7 +666,7 @@ class Collection(object):
                             else:
                                 # get subdocument with $ oprator support
                                 subdocument, _ = self._get_subdocument(
-                                    existing_document, spec, nested_field_list[:-1])
+                                    existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
@@ -745,7 +745,7 @@ class Collection(object):
                             continue
                         else:
                             subdocument, _ = self._get_subdocument(
-                                existing_document, spec, nested_field_list[-1])
+                                existing_document, spec, nested_field_list)
 
                             if nested_field_list[-1] in subdocument:
                                 arr = subdocument[nested_field_list[-1]]
