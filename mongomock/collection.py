@@ -655,6 +655,15 @@ class Collection(object):
                             continue
                         # push to array in a nested attribute
                         else:
+                            # create nested attributes if they do not exist
+                            subdocument = existing_document
+                            for field_part in nested_field_list[:-1]:
+                                if field_part not in subdocument:
+                                    subdocument[field_part] = {}
+
+                                subdocument = subdocument[field_part]
+
+                            # get subdocument allowing $
                             subdocument, _ = self._get_subdocument(
                                 existing_document, spec, nested_field_list)
 
@@ -734,6 +743,7 @@ class Collection(object):
                                     obj for obj in arr if obj not in value]
                             continue
                         else:
+                            # get subdocument allowing $
                             subdocument, _ = self._get_subdocument(
                                 existing_document, spec, nested_field_list)
                             
