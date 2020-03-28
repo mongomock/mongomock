@@ -4832,6 +4832,83 @@ class CollectionAPITest(TestCase):
         self.assertEqual(expect, list(actual))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_to_decimal(self):
+        collection = self.db.collection
+        collection.insert_one({
+            '_id': ObjectId('5dd6a8f302c91829ef248161'),
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000'),
+            'str_base_10_numeric': '123',
+            'str_not_numeric': '123a123',
+            'datetime': datetime.utcfromtimestamp(0),
+        })
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'boolean_true': {'$toDecimal': '$boolean_true'},
+                        'boolean_false': {'$toDecimal': '$boolean_false'},
+                        'integer': {'$toDecimal': '$integer'},
+                        'double': {'$toDecimal': '$double'},
+                        'decimal': {'$toDecimal': '$decimal'},
+                        'str_base_10_numeric': {'$toDecimal': '$str_base_10_numeric'},
+                        'datetime': {'$toDecimal': '$datetime'},
+                    }
+                },
+                {
+                    '$project': {
+                        '_id': 0
+                    }
+                }
+            ]
+        )
+        expect = [{
+            'boolean_true': decimal128.Decimal128('0').to_decimal(),
+            'boolean_false': decimal128.Decimal128('1').to_decimal(),
+            'integer': decimal128.Decimal128('100').to_decimal(),
+            'double': decimal128.Decimal128('1.999').to_decimal(),
+            'decimal': decimal128.Decimal128('5.5000').to_decimal(),
+            'str_base_10_numeric': decimal128.Decimal128('123').to_decimal(),
+            'str_not_numeric': '123a123',
+            'datetime': decimal128.Decimal128('0.0').to_decimal(),
+        }]
+        self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'str_not_numeric': {'$toDecimal': '$str_not_numeric'}
+                        }
+                    },
+                    {
+                        '$project': {
+                            '_id': 0
+                        }
+                    }
+                ]
+            )
+        with self.assertRaises(TypeError):
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            '_id': {'$toDecimal': '$_id'}
+                        }
+                    },
+                    {
+                        '$project': {
+                            '_id': 0
+                        }
+                    }
+                ]
+            )
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_int(self):
         collection = self.db.collection
         collection.insert_one({

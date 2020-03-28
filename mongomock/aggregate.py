@@ -114,7 +114,8 @@ set_operators = [
 
 type_convertion_operators = [
     '$toString',
-    '$toInt'
+    '$toInt',
+    '$toDecimal',
 ]
 
 
@@ -487,6 +488,35 @@ class _Parser(object):
             raise NotImplementedError(
                 'You need to import the pymongo library to support decimal128 type.'
             )
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
+        if operator == '$toDecimal':
+            if not decimal_support:
+                raise NotImplementedError(
+                    'You need to import the pymongo library to support decimal128 type.'
+                )
+            parsed = self.parse(values)
+            decimal_value = None
+            if isinstance(parsed, bool):
+                parsed = '0' if parsed is True else '1'
+                decimal_value = decimal128.Decimal128(parsed)
+            elif isinstance(parsed, float) or isinstance(parsed, int):
+                decimal_value = decimal128.Decimal128(str(parsed))
+            elif isinstance(parsed, decimal128.Decimal128):
+                decimal_value = parsed
+            elif isinstance(parsed, str):
+                if parsed.isdigit():
+                    decimal_value = decimal128.Decimal128(parsed)
+                else:
+                    raise OperationFailure(
+                        "Failed to parse number '%s' in $convert with no onError value:"
+                        'Failed to parse string to decimal' % parsed)
+            elif isinstance(parsed, datetime.datetime):
+                epoch = datetime.datetime.utcfromtimestamp(0)
+                decimal_value = decimal128.Decimal128(str((parsed - epoch).total_seconds() * 1000))
+            else:
+                raise TypeError(" '%s' type is not supported" % type(parsed))
+            return decimal_value.to_decimal()
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
