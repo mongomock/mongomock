@@ -2927,7 +2927,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
     def test__aggregate_to_decimal(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one({
-            '_id': ObjectId('5dd6a8f302c91829ef248161'),
             'boolean_true': True,
             'boolean_false': False,
             'integer': 100,

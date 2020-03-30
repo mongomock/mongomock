@@ -4870,16 +4870,16 @@ class CollectionAPITest(TestCase):
             ]
         )
         expect = [{
-            'boolean_true': decimal128.Decimal128('1').to_decimal(),
-            'boolean_false': decimal128.Decimal128('0').to_decimal(),
-            'integer': decimal128.Decimal128('100').to_decimal(),
-            'double': decimal128.Decimal128('1.999').to_decimal(),
-            'decimal': decimal128.Decimal128('5.5000').to_decimal(),
-            'str_base_10_numeric': decimal128.Decimal128('123').to_decimal(),
-            'str_negative_number': decimal128.Decimal128('-23').to_decimal(),
-            'str_decimal_number': decimal128.Decimal128('1.99').to_decimal(),
+            'boolean_true': decimal128.Decimal128('1'),
+            'boolean_false': decimal128.Decimal128('0'),
+            'integer': decimal128.Decimal128('100'),
+            'double': decimal128.Decimal128('1.99900000000000'),
+            'decimal': decimal128.Decimal128('5.5000'),
+            'str_base_10_numeric': decimal128.Decimal128('123'),
+            'str_negative_number': decimal128.Decimal128('-23'),
+            'str_decimal_number': decimal128.Decimal128('1.99'),
             'str_not_numeric': '123a123',
-            'datetime': decimal128.Decimal128('0.0').to_decimal(),
+            'datetime': decimal128.Decimal128('0'),
         }]
         self.assertEqual(expect, list(actual))
 

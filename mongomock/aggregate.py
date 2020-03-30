@@ -500,8 +500,12 @@ class _Parser(object):
             if isinstance(parsed, bool):
                 parsed = '1' if parsed is True else '0'
                 decimal_value = decimal128.Decimal128(parsed)
-            elif isinstance(parsed, float) or isinstance(parsed, int):
+            elif isinstance(parsed, int):
                 decimal_value = decimal128.Decimal128(str(parsed))
+            elif isinstance(parsed, float):
+                exp = decimal.Decimal('.00000000000000')
+                decimal_value = decimal.Decimal(str(parsed)).quantize(exp)
+                decimal_value = decimal128.Decimal128(decimal_value)
             elif isinstance(parsed, decimal128.Decimal128):
                 decimal_value = parsed
             elif isinstance(parsed, str):
@@ -513,10 +517,11 @@ class _Parser(object):
                         'Failed to parse string to decimal' % parsed)
             elif isinstance(parsed, datetime.datetime):
                 epoch = datetime.datetime.utcfromtimestamp(0)
-                decimal_value = decimal128.Decimal128(str((parsed - epoch).total_seconds() * 1000))
+                string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.')[0]
+                decimal_value = decimal128.Decimal128(string_micro_seconds)
             else:
                 raise TypeError(" '%s' type is not supported" % type(parsed))
-            return decimal_value.to_decimal()
+            return decimal_value
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
