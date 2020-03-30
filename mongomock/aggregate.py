@@ -4,6 +4,7 @@ import bisect
 import collections
 import copy
 import datetime
+import decimal
 import itertools
 import math
 import numbers
@@ -496,18 +497,17 @@ class _Parser(object):
                     'You need to import the pymongo library to support decimal128 type.'
                 )
             parsed = self.parse(values)
-            decimal_value = None
             if isinstance(parsed, bool):
-                parsed = '0' if parsed is True else '1'
+                parsed = '1' if parsed is True else '0'
                 decimal_value = decimal128.Decimal128(parsed)
             elif isinstance(parsed, float) or isinstance(parsed, int):
                 decimal_value = decimal128.Decimal128(str(parsed))
             elif isinstance(parsed, decimal128.Decimal128):
                 decimal_value = parsed
             elif isinstance(parsed, str):
-                if parsed.isdigit():
+                try:
                     decimal_value = decimal128.Decimal128(parsed)
-                else:
+                except decimal.InvalidOperation:
                     raise OperationFailure(
                         "Failed to parse number '%s' in $convert with no onError value:"
                         'Failed to parse string to decimal' % parsed)

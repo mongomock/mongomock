@@ -4842,6 +4842,8 @@ class CollectionAPITest(TestCase):
             'double': 1.999,
             'decimal': decimal128.Decimal128('5.5000'),
             'str_base_10_numeric': '123',
+            'str_negative_number': '-23',
+            'str_decimal_number': '1.99',
             'str_not_numeric': '123a123',
             'datetime': datetime.utcfromtimestamp(0),
         })
@@ -4855,6 +4857,8 @@ class CollectionAPITest(TestCase):
                         'double': {'$toDecimal': '$double'},
                         'decimal': {'$toDecimal': '$decimal'},
                         'str_base_10_numeric': {'$toDecimal': '$str_base_10_numeric'},
+                        'str_negative_number': {'$toDecimal': '$str_negative_number'},
+                        'str_decimal_number': {'$toDecimal': '$str_decimal_number'},
                         'datetime': {'$toDecimal': '$datetime'},
                     }
                 },
@@ -4866,12 +4870,14 @@ class CollectionAPITest(TestCase):
             ]
         )
         expect = [{
-            'boolean_true': decimal128.Decimal128('0').to_decimal(),
-            'boolean_false': decimal128.Decimal128('1').to_decimal(),
+            'boolean_true': decimal128.Decimal128('1').to_decimal(),
+            'boolean_false': decimal128.Decimal128('0').to_decimal(),
             'integer': decimal128.Decimal128('100').to_decimal(),
             'double': decimal128.Decimal128('1.999').to_decimal(),
             'decimal': decimal128.Decimal128('5.5000').to_decimal(),
             'str_base_10_numeric': decimal128.Decimal128('123').to_decimal(),
+            'str_negative_number': decimal128.Decimal128('-23').to_decimal(),
+            'str_decimal_number': decimal128.Decimal128('1.99').to_decimal(),
             'str_not_numeric': '123a123',
             'datetime': decimal128.Decimal128('0.0').to_decimal(),
         }]

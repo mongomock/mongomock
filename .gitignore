@@ -51,6 +51,3 @@ flycheck-*
 
 ### vim
 .ropeproject/
-
-### env path
-/env/
