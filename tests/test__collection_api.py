@@ -4914,6 +4914,30 @@ class CollectionAPITest(TestCase):
                 ]
             )
 
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__aggregate_to_decimal_without_pymongo(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+        })
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'boolean_true': {'$toDecimal': '$boolean_true'},
+                            'boolean_false': {'$toDecimal': '$boolean_false'},
+                        }
+                    },
+                    {
+                        '$project': {
+                            '_id': 0
+                        }
+                    }
+                ]
+            )
+
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_int(self):
         collection = self.db.collection

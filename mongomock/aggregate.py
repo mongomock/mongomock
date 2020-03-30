@@ -520,7 +520,7 @@ class _Parser(object):
                 string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.')[0]
                 decimal_value = decimal128.Decimal128(string_micro_seconds)
             else:
-                raise TypeError(" '%s' type is not supported" % type(parsed))
+                raise TypeError("'%s' type is not supported" % type(parsed))
             return decimal_value
 
     def _handle_conditional_operator(self, operator, values):
