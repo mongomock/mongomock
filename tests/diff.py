@@ -1,6 +1,14 @@
 import datetime
+import decimal
 from platform import python_version
+
 from six import integer_types, string_types, text_type
+
+try:
+    from bson import decimal128
+    _HAVE_PYMONGO = True
+except ImportError:
+    _HAVE_PYMONGO = False
 
 
 class _NO_VALUE(object):
@@ -10,8 +18,13 @@ class _NO_VALUE(object):
 # we don't use NOTHING because it might be returned from various APIs
 NO_VALUE = _NO_VALUE()
 
-_SUPPORTED_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
+_SUPPORTED_BASE_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
     string_types + integer_types + (text_type, bytes) + (type,)
+
+if _HAVE_PYMONGO:
+    _SUPPORTED_TYPES = _SUPPORTED_BASE_TYPES + (decimal.Decimal, decimal128.Decimal128)
+else:
+    _SUPPORTED_TYPES = _SUPPORTED_BASE_TYPES
 
 if python_version() < '3.0':
     dict_type = dict

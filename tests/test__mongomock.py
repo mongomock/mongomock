@@ -2924,6 +2924,38 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate_to_decimal(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000'),
+            'str_base_10_numeric': '123',
+            'str_negative_number': '-23',
+            'str_decimal_number': '1.99',
+            'str_not_numeric': '123a123',
+            'datetime': datetime.datetime.utcfromtimestamp(0),
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'boolean_true': {'$toDecimal': '$boolean_true'},
+                    'boolean_false': {'$toDecimal': '$boolean_false'},
+                    'integer': {'$toDecimal': '$integer'},
+                    'double': {'$toDecimal': '$double'},
+                    'decimal': {'$toDecimal': '$decimal'},
+                    'str_base_10_numeric': {'$toDecimal': '$str_base_10_numeric'},
+                    'str_negative_number': {'$toDecimal': '$str_negative_number'},
+                    'str_decimal_number': {'$toDecimal': '$str_decimal_number'},
+                    'datetime': {'$toDecimal': '$datetime'},
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_to_int(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one({
