@@ -481,7 +481,10 @@ class _Parser(object):
             return str(parsed)
 
         if operator == '$toInt':
-            parsed = self.parse(values)
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
             if decimal_support:
                 if isinstance(parsed, decimal128.Decimal128):
                     return int(parsed.to_decimal())
@@ -496,7 +499,10 @@ class _Parser(object):
                 raise NotImplementedError(
                     'You need to import the pymongo library to support decimal128 type.'
                 )
-            parsed = self.parse(values)
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
             if isinstance(parsed, bool):
                 parsed = '1' if parsed is True else '0'
                 decimal_value = decimal128.Decimal128(parsed)

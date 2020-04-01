@@ -4860,6 +4860,7 @@ class CollectionAPITest(TestCase):
                         'str_negative_number': {'$toDecimal': '$str_negative_number'},
                         'str_decimal_number': {'$toDecimal': '$str_decimal_number'},
                         'datetime': {'$toDecimal': '$datetime'},
+                        'not_exist_field': {'$toDecimal': '$not_exist_field'},
                     }
                 },
                 {
@@ -4880,6 +4881,7 @@ class CollectionAPITest(TestCase):
             'str_decimal_number': decimal128.Decimal128('1.99'),
             'str_not_numeric': '123a123',
             'datetime': decimal128.Decimal128('0'),
+            'not_exist_field': None,
         }]
         self.assertEqual(expect, list(actual))
 
@@ -4956,7 +4958,8 @@ class CollectionAPITest(TestCase):
                         'boolean_false': {'$toInt': '$boolean_false'},
                         'integer': {'$toInt': '$integer'},
                         'double': {'$toInt': '$double'},
-                        'decimal': {'$toInt': '$decimal'}
+                        'decimal': {'$toInt': '$decimal'},
+                        'not_exist': {'$toInt': '$not_exist'},
                     }
                 },
                 {
@@ -4972,7 +4975,8 @@ class CollectionAPITest(TestCase):
             'boolean_false': 0,
             'integer': 100,
             'double': 1,
-            'decimal': 5
+            'decimal': 5,
+            'not_exist': None,
         }]
         self.assertEqual(expect, list(actual))
 

@@ -2950,6 +2950,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'str_negative_number': {'$toDecimal': '$str_negative_number'},
                     'str_decimal_number': {'$toDecimal': '$str_decimal_number'},
                     'datetime': {'$toDecimal': '$datetime'},
+                    'not_exist_field': {'$toDecimal': '$not_exist_field'},
                 }
             },
             {'$project': {'_id': 0}},
@@ -2972,7 +2973,8 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'boolean_false': {'$toInt': '$boolean_false'},
                     'integer': {'$toInt': '$integer'},
                     'double': {'$toInt': '$double'},
-                    'decimal': {'$toInt': '$decimal'}
+                    'decimal': {'$toInt': '$decimal'},
+                    'not_exist': {'$toInt': '$not_exist'},
                 }
             },
             {
