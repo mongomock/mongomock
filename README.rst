@@ -21,7 +21,7 @@ The above code can be tested in several ways:
 1. It can be tested against a real mongodb instance with pymongo.
 2. It can receive a record-replay style mock as an argument. In this manner we record the
    expected calls (find, and then a series of updates), and replay them later.
-3. It can receive a carefully hand-crafted mock responding to find() and update() appropriately.
+3. It can receive a carefully hand-crafted mock responding to ``find()`` and ``update()`` appropriately.
 
 Option number 1 is obviously the best approach here, since we are testing against a real mongodb
 instance. However, a mongodb instance needs to be set up for this, and cleaned before/after the
@@ -45,7 +45,7 @@ since they replicate the series of calls made in the code, violating the DRY rul
      increase_votes(collection_mock)
      verify()
 
-Let's assume the code changes one day, because the author just learned about the '$inc' instruction:
+Let's assume the code changes one day, because the author just learned about the ``'$inc'`` instruction:
 
 .. code-block:: python
 
@@ -69,14 +69,14 @@ the test simply becomes:
      increase_votes(collection)
      for obj in objects:
          stored_obj = collection.find_one({'_id': obj['_id']})
-         stored_obj['votes'] -= 1
+         stored_obj['votes'] += 1
          assert stored_obj == obj # by comparing all fields we make sure only votes changed
 
-This code checks *increase_votes* with respect to its functionality, not syntax or algorithm, and
+This code checks ``increase_votes`` with respect to its functionality, not syntax or algorithm, and
 therefore is much more robust as a test.
 
 If the code to be tested is creating the connection itself with pymongo, you can use
-mongomock.patch:
+``mongomock.patch``:
 
 .. code-block:: python
 
