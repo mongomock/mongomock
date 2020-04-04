@@ -1,10 +1,11 @@
 language: python
-sudo: true
 cache: pip
+os: linux
+dist: xenial
 env:
   global:
     - MONGODB=4.1.1
-matrix:
+jobs:
   include:
     - python: 2.7
       env: TOX_ENV=py27
@@ -50,7 +51,7 @@ install:
   - pip install tox
 deploy:
   provider: pypi
-  user: vmalloc
+  username: vmalloc
   distributions: "bdist_wheel sdist"
   password:
     secure: sNOkUNFfWKGsRy4BI+1jyqycZGSMiXTLtpCrX1mTuvjddbndULrHL3ecIPsCno49/nPR4Gww+e9U3HXc8LKJ9qR4mJ8bVCNiHO5GlGVnpV+wdGh9LVnsU1LWwuD8uWlLyTSOKP+ZmerCw7tGACYiv0e9zp8SqZXCH6VS+sAGFxU=
