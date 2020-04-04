@@ -8,6 +8,7 @@ import random
 import re
 import six
 from six import assertCountEqual, text_type
+import sys
 import time
 from unittest import TestCase, skipIf
 import warnings
@@ -27,6 +28,7 @@ try:
     _HAVE_PYMONGO = True
 except ImportError:
     from mongomock.collection import ReturnDocument
+    from mongomock import ObjectId
     from mongomock.write_concern import WriteConcern
 
     _HAVE_PYMONGO = False
@@ -1625,6 +1627,40 @@ class CollectionAPITest(TestCase):
         self.assertEqual(cursor2_result, cursor_result)
         self.assertEqual(cursor3_result, cursor_result)
         self.assertEqual(cursor4_result, cursor_result)
+
+    @skipIf(sys.version_info < (3, 7), 'Older versions of Python cannot copy regex partterns')
+    def test__sort_mixed_types(self):
+        self.db.collection.insert_many([
+            {'type': 'bool', 'a': True},
+            {'type': 'datetime', 'a': datetime.now()},
+            {'type': 'dict', 'a': {'a': 1}},
+            {'type': 'emptyList', 'a': []},
+            {'type': 'int', 'a': 1},
+            {'type': 'listOfList', 'a': [[1, 2], [3, 4]]},
+            {'type': 'missing'},
+            {'type': 'None', 'a': None},
+            {'type': 'ObjectId', 'a': ObjectId()},
+            {'type': 'regex', 'a': re.compile('a')},
+            {'type': 'repeatedInt', 'a': [1, 2]},
+            {'type': 'string', 'a': 'a'},
+            {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
+        ])
+        cursor = self.db.collection.find({}, sort=[('a', 1), ('type', 1)])
+        self.assertEqual([
+            'emptyList',
+            'None',
+            'missing',
+            'int',
+            'repeatedInt',
+            'string',
+            'dict',
+            'listOfList',
+            'tupleOfTuple',
+            'ObjectId',
+            'bool',
+            'datetime',
+            'regex',
+        ], [doc['type'] for doc in cursor])
 
     def test__avoid_change_data_after_set(self):
         test_data = {'test': ['test_data']}

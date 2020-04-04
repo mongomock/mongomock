@@ -1,11 +1,12 @@
 import datetime
 import decimal
 from platform import python_version
+import re
 
 from six import integer_types, string_types, text_type
 
 try:
-    from bson import decimal128
+    from bson import decimal128, Regex
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
@@ -19,7 +20,7 @@ class _NO_VALUE(object):
 NO_VALUE = _NO_VALUE()
 
 _SUPPORTED_BASE_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
-    string_types + integer_types + (text_type, bytes) + (type,)
+    string_types + integer_types + (text_type, bytes, type, type(re.compile('')),)
 
 if _HAVE_PYMONGO:
     _SUPPORTED_TYPES = _SUPPORTED_BASE_TYPES + (decimal.Decimal, decimal128.Decimal128)
@@ -35,13 +36,13 @@ else:
 
 def diff(a, b, path=None):
     path = _make_path(path)
-    if isinstance(a, (list, tuple)):
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
         return _diff_sequences(a, b, path)
     if type(a).__name__ == 'SON':
         a = dict(a)
     if type(b).__name__ == 'SON':
         b = dict(b)
-    if isinstance(a, dict_type):
+    if isinstance(a, dict_type) and isinstance(b, dict_type):
         return _diff_dicts(a, b, path)
     if type(a).__name__ == 'ObjectId':
         a = str(a)
@@ -51,6 +52,13 @@ def diff(a, b, path=None):
         a = int(a)
     if type(b).__name__ == 'Int64':
         b = int(b)
+    if _HAVE_PYMONGO and isinstance(a, Regex):
+        a = a.try_compile()
+    if _HAVE_PYMONGO and isinstance(b, Regex):
+        b = b.try_compile()
+    if isinstance(a, (list, tuple)) or isinstance(b, (list, tuple)) or \
+            isinstance(a, dict_type) or isinstance(b, dict_type):
+        return [(path[:], a, b)]
     if not isinstance(a, _SUPPORTED_TYPES):
         raise NotImplementedError(
             'Unsupported diff type: {0}'.format(type(a)))  # pragma: no cover

@@ -5,6 +5,7 @@ from distutils import version  # pylint: disable=no-name-in-module
 import os
 import re
 from six import assertCountEqual
+import sys
 import time
 from unittest import TestCase, skipIf
 
@@ -919,6 +920,25 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # This one is not implemented in mongmock yet.
         # self.cmp.compare.find_one(
         #     {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c.e', 0), ('b.c', 0)]))
+
+    @skipIf(sys.version_info < (3, 7), 'Older versions of Python cannot copy regex partterns')
+    def test__sort_mixed_types(self):
+        self.cmp.do.insert_many([
+            {'type': 'bool', 'a': True},
+            {'type': 'datetime', 'a': datetime.datetime.now()},
+            {'type': 'dict', 'a': {'a': 1}},
+            {'type': 'emptyList', 'a': []},
+            {'type': 'int', 'a': 1},
+            {'type': 'listOfList', 'a': [[1, 2], [3, 4]]},
+            {'type': 'missing'},
+            {'type': 'None', 'a': None},
+            {'type': 'ObjectId', 'a': ObjectId()},
+            {'type': 'regex', 'a': re.compile('a')},
+            {'type': 'repeatedInt', 'a': [1, 2]},
+            {'type': 'string', 'a': 'a'},
+            {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
+        ])
+        self.cmp.compare.find({}, sort=[('a', 1), ('type', 1)])
 
     def test__find_all(self):
         self.cmp.do.insert_many([
@@ -3105,9 +3125,9 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__sort_dict(self):
         self.cmp.do.remove()
         self.cmp.do.insert_many([
-            {'a': 1, 'b': {'value': 1, 'other': True}},
-            {'a': 2, 'b': {'value': 3}},
-            {'a': 3, 'b': {'value': 2, 'other': False}},
+            {'a': 1, 'b': OrderedDict([('value', 1), ('other', True)])},
+            {'a': 2, 'b': OrderedDict([('value', 3)])},
+            {'a': 3, 'b': OrderedDict([('value', 2), ('other', False)])},
         ])
         self.cmp.compare(_SORT('b')).find()
 

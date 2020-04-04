@@ -481,7 +481,13 @@ def resolve_sort_key(key, doc):
     value = resolve_key(key, doc)
     # see http://docs.mongodb.org/manual/reference/method/cursor.sort/#ascending-descending-sort
     if value is NOTHING:
-        return 0, BsonComparable(None)
+        return 1, BsonComparable(None)
+
+    # List or tuples are sorted solely by their first value.
+    if isinstance(value, (tuple, list)):
+        if not value:
+            return 0, BsonComparable(None)
+        return 1, BsonComparable(value[0])
 
     return 1, BsonComparable(value)
 
