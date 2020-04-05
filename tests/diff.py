@@ -2,6 +2,7 @@ import datetime
 import decimal
 from platform import python_version
 import re
+import uuid
 
 from six import integer_types, string_types, text_type
 
@@ -19,7 +20,7 @@ class _NO_VALUE(object):
 # we don't use NOTHING because it might be returned from various APIs
 NO_VALUE = _NO_VALUE()
 
-_SUPPORTED_BASE_TYPES = (float, bool, str, datetime.datetime, type(None)) + \
+_SUPPORTED_BASE_TYPES = (float, bool, str, datetime.datetime, type(None), uuid.UUID) + \
     string_types + integer_types + (text_type, bytes, type, type(re.compile('')),)
 
 if _HAVE_PYMONGO:
