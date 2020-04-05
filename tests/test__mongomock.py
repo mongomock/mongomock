@@ -8,6 +8,7 @@ from six import assertCountEqual
 import sys
 import time
 from unittest import TestCase, skipIf
+import uuid
 
 import mongomock
 from mongomock import ConfigurationError
@@ -937,8 +938,18 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'type': 'repeatedInt', 'a': [1, 2]},
             {'type': 'string', 'a': 'a'},
             {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
+            {'type': 'uuid', 'a': uuid.UUID(int=3)},
         ])
         self.cmp.compare.find({}, sort=[('a', 1), ('type', 1)])
+
+    def test__find_sort_uuid(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_many([
+            {'_id': uuid.UUID(int=3), 'timestamp': 99, 'a': 1},
+            {'_id': uuid.UUID(int=1), 'timestamp': 100, 'a': 3},
+            {'_id': uuid.UUID(int=2), 'timestamp': 100, 'a': 2},
+        ])
+        self.cmp.compare.find({}, sort=[('timestamp', 1), ('_id', 1)])
 
     def test__find_all(self):
         self.cmp.do.insert_many([

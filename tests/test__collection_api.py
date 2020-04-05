@@ -11,6 +11,7 @@ from six import assertCountEqual, text_type
 import sys
 import time
 from unittest import TestCase, skipIf
+import uuid
 import warnings
 
 import mongomock
@@ -1644,6 +1645,7 @@ class CollectionAPITest(TestCase):
             {'type': 'repeatedInt', 'a': [1, 2]},
             {'type': 'string', 'a': 'a'},
             {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
+            {'type': 'uuid', 'a': uuid.UUID(int=3)},
         ])
         cursor = self.db.collection.find({}, sort=[('a', 1), ('type', 1)])
         self.assertEqual([
@@ -1656,11 +1658,21 @@ class CollectionAPITest(TestCase):
             'dict',
             'listOfList',
             'tupleOfTuple',
+            'uuid',
             'ObjectId',
             'bool',
             'datetime',
             'regex',
         ], [doc['type'] for doc in cursor])
+
+    def test__sort_by_uuid(self):
+        self.db.collection.insert_many([
+            {'_id': uuid.UUID(int=3), 'timestamp': 99, 'a': 1},
+            {'_id': uuid.UUID(int=1), 'timestamp': 100, 'a': 2},
+            {'_id': uuid.UUID(int=2), 'timestamp': 100, 'a': 3},
+        ])
+        cursor = self.db.collection.find({}, sort=[('timestamp', 1), ('_id', 1)])
+        self.assertEqual([1, 2, 3], [doc['a'] for doc in cursor])
 
     def test__avoid_change_data_after_set(self):
         test_data = {'test': ['test_data']}
@@ -4197,6 +4209,19 @@ class CollectionAPITest(TestCase):
             {'$group': {'_id': '$a'}},
         ])
         assertCountEqual(self, [{'_id': 1}, {'_id': 2}], list(actual))
+
+    def test__aggregate_group_uuid_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'uuid_field': uuid.uuid4()},
+                {'uuid_field': uuid.uuid4()},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$uuid_field'}},
+        ])
+        self.assertEqual(2, len(list(actual)))
 
     def test__aggregate_group_missing_key(self):
         collection = self.db.collection

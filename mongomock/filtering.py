@@ -1,5 +1,6 @@
 from datetime import datetime
 import itertools
+import uuid
 
 from .helpers import ObjectId, RE_TYPE
 from . import OperationFailure
@@ -338,6 +339,8 @@ def _get_compare_type(val):
         return 20
     if isinstance(val, (tuple, list)):
         return 25
+    if isinstance(val, uuid.UUID):
+        return 30
     if isinstance(val, bytes):
         assert PY3
         return 30
