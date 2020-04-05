@@ -134,8 +134,22 @@ def _group_operation(values, operator):
     return operator(values_list)
 
 
+def _sum_operation(values):
+    values_list = list()
+    if decimal_support:
+        for v in values:
+            if isinstance(v, numbers.Number):
+                values_list.append(v)
+            elif isinstance(v, decimal128.Decimal128):
+                values_list.append(v.to_decimal())
+    else:
+        values_list = list(v for v in values if isinstance(v, numbers.Number))
+    sum_value = sum(values_list)
+    return decimal128.Decimal128(sum_value) if isinstance(sum_value, decimal.Decimal) else sum_value
+
+
 _GROUPING_OPERATOR_MAP = {
-    '$sum': lambda values: sum(v for v in values if isinstance(v, numbers.Number)),
+    '$sum': _sum_operation,
     '$avg': _avg_operation,
     '$min': lambda values: _group_operation(values, min),
     '$max': lambda values: _group_operation(values, max),
