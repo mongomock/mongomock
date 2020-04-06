@@ -182,6 +182,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Srinivas Reddy Thatiparthy
 * Taras Boiko
 * Todd Tomkinson
+* `Xinyan Lu <https://github.com/lxy1992/>`_
 * Zachary Carter
 * catty (ca77y _at_ live.com)
 * emosenkis
