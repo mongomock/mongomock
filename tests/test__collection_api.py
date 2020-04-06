@@ -4194,7 +4194,7 @@ class CollectionAPITest(TestCase):
             list(actual)
         )
 
-    def test_aggregate_group_sum(self):
+    def test__aggregate_group_sum(self):
         collection = self.db.collection
         collection.insert_many([
             {'group': 'one'},
@@ -4221,6 +4221,25 @@ class CollectionAPITest(TestCase):
             'count': 8,
             'countData': 4,
             'countDataExists': 5,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_group_sum_for_decimal(self):
+        collection = self.db.collection
+        collection.drop()
+        decimal_value = decimal128.Decimal128('4')
+        collection.insert_one({'_id': 1, 'a': 2, 'b': 3, 'c': '$d', 'd': decimal_value})
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'sum': {'$sum': [4, 2, None, 3, '$a', '$b', '$d', {'$sum': [0, 1, '$b']}]},
+            'sum_no_decimal': {'$sum': [4, 2, None, 3, '$a', '$b', {'$sum': [0, 1, '$b']}]},
+            'sumNone': {'$sum': ['a', None]},
+        }}])
+        expect = [{
+            'sum': decimal128.Decimal128('22'),
+            'sum_no_decimal': 18,
+            'sumNone': 0,
         }]
         self.assertEqual(expect, list(actual))
 

@@ -2514,6 +2514,22 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         }}]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate35(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            '_id': 1,
+            'a': 2,
+            'b': 3,
+            'c': '$d',
+            'd': decimal128.Decimal128('4')
+        })
+        pipeline = [{'$project': {
+            '_id': 0,
+            'sum': {'$sum': [4, 2, None, 3, '$a', '$b', '$d', {'$sum': [0, 1, '$b']}]},
+            'sumNone': {'$sum': ['a', None]},
+        }}]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_project_id_0(self):
         self.cmp.do.remove()
         self.cmp.do.insert([
