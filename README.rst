@@ -195,7 +195,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * lidongyong
 
 
-.. _examples in tests: https://github.com/vmalloc/mongomock/blob/master/tests/test__mongomock.py#L108
+.. _examples in tests: https://github.com/mongomock/mongomock/blob/develop/tests/test__mongomock.py
 
 .. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
 
