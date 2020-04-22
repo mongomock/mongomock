@@ -5271,3 +5271,12 @@ class CollectionAPITest(TestCase):
         for item in items:
             with self.assertRaises(mongomock.OperationFailure):
                 collection.aggregate(item)
+
+    def test_set_no_content(self):
+        collection = self.db.collection
+        collection.insert_one({'a': 1})
+        with self.assertRaises(mongomock.WriteError):
+            collection.update_one({}, {'$set': {}})
+
+        with self.assertRaises(mongomock.WriteError):
+            collection.update_one({'b': 'will-never-exist'}, {'$set': {}})

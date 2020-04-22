@@ -1188,6 +1188,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                                upsert=True)
         self.cmp.compare.find()
 
+        self.cmp.compare_exceptions.update_one({}, {'$set': {}})
+        self.cmp.compare_exceptions.update_one({'a': 'does-not-exist'}, {'$set': {}})
+        self.cmp.compare_exceptions.update_one({'a': 'does-not-exist'}, {'$set': {}}, upsert=True)
+
     def test__update_many(self):
         self.cmp.do.insert_many([{'a': 1, 'b': 0},
                                  {'a': 2, 'b': 0}])
