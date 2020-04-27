@@ -119,7 +119,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
 
 .. code-block:: bash
 
- git clone git@github.com:vmalloc/mongomock.git
+ git clone git@github.com:mongomock/mongomock.git
  pip install tox
  cd mongomock
  tox
@@ -135,7 +135,7 @@ the legacy 2.x branch then your pull request should go into the `support/2.x` br
 Acknowledgements
 ----------------
 
-Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by `Martin Domke <https://github.com/mdomke`. It is currently being developed and maintained by `Pascal Corpet <https://github.com/pcorpet>`_ .
+Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by `Martin Domke <https://github.com/mdomke>`. It is currently being developed and maintained by `Pascal Corpet <https://github.com/pcorpet>`_ .
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing bugs:
 
