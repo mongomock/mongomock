@@ -1821,6 +1821,21 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.rename('new_name')
         self.cmp.compare.find()
 
+    def test__set_equals(self):
+        self.cmp.do.insert_many([
+            {'array': ['one', 'three']},
+        ])
+        self.cmp.compare.aggregate([{'$project': {
+            '_id': 0,
+            'same_array': {'$setEquals': ['$array', '$array']},
+            'eq_array': {'$setEquals': [['one', 'three'], '$array']},
+            'ne_array': {'$setEquals': [['one', 'two'], '$array']},
+            'eq_in_another_order': {'$setEquals': [['one', 'two'], ['two', 'one']]},
+            'ne_in_another_order': {'$setEquals': [['one', 'two'], ['three', 'one', 'two']]},
+            'three_equal': {'$setEquals': [['one', 'two'], ['two', 'one'], ['one', 'two']]},
+            'three_not_equal': {'$setEquals': [['one', 'three'], ['two', 'one'], ['two', 'one']]},
+        }}])
+
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
