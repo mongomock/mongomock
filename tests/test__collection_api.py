@@ -3534,7 +3534,7 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$setEquals': [[2], [1, 2, 3]]}}},
+                {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
     def test__aggregate_project_rotate(self):
@@ -4789,6 +4789,32 @@ class CollectionAPITest(TestCase):
             'distinct': ['one', 'two', 'three', 'four'],
             'nested': ['one', 'two', ['one', 'two']],
             'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__set_equals(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': ['one', 'three']},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'same_array': {'$setEquals': ['$array', '$array']},
+            'eq_array': {'$setEquals': [['one', 'three'], '$array']},
+            'ne_array': {'$setEquals': [['one', 'two'], '$array']},
+            'eq_in_another_order': {'$setEquals': [['one', 'two'], ['two', 'one']]},
+            'ne_in_another_order': {'$setEquals': [['one', 'two'], ['three', 'one', 'two']]},
+            'three_equal': {'$setEquals': [['one', 'two'], ['two', 'one'], ['one', 'two']]},
+            'three_not_equal': {'$setEquals': [['one', 'three'], ['two', 'one'], ['two', 'one']]},
+        }}])
+        expect = [{
+            'same_array': True,
+            'eq_array': True,
+            'ne_array': False,
+            'eq_in_another_order': True,
+            'ne_in_another_order': False,
+            'three_equal': True,
+            'three_not_equal': False,
         }]
         self.assertEqual(expect, list(actual))
 
