@@ -117,6 +117,7 @@ type_convertion_operators = [
     '$toString',
     '$toInt',
     '$toDecimal',
+    '$arrayToObject'
 ]
 
 
@@ -542,6 +543,32 @@ class _Parser(object):
             else:
                 raise TypeError("'%s' type is not supported" % type(parsed))
             return decimal_value
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
+        if operator == '$arrayToObject':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
+
+            if parsed is None:
+                return None
+
+            if not isinstance(parsed, (list, tuple)):
+                raise OperationFailure(
+                    '$arrayToObject requires an array input, found: {}'.format(type(parsed))
+                )
+
+            if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
+                return {d['k']: d['v'] for d in parsed}
+
+            if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in parsed):
+                return dict(parsed)
+
+            raise OperationFailure(
+                'arrays used with $arrayToObject must contain documents '
+                'with k and v fields or two-element arrays'
+            )
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':

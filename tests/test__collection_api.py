@@ -5153,3 +5153,103 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate(
                 [{'$project': {'a': {'$dateToString': '10'}}}]
             )
+
+    def test__aggregate_array_to_object(self):
+        collection = self.db.collection
+        collection.insert_many([{
+            'items': [['a', 1], ['b', 2], ['c', 3], ['a', 4]]
+        }, {
+            'items': (['a', 1], ['b', 2], ['c', 3], ['a', 4])
+        }, {
+            'items': [('a', 1), ('b', 2), ('c', 3), ('a', 4)]
+        }, {
+            'items': (('a', 1), ('b', 2), ('c', 3), ('a', 4))
+        }, {
+            'items': [['a', 1], ('b', 2), ['c', 3], ('a', 4)]
+        }, {
+            'items': (['a', 1], ('b', 2), ['c', 3], ('a', 4))
+        }, {
+            'items': [{'k': 'a', 'v': 1}, {'k': 'b', 'v': 2},
+                      {'k': 'c', 'v': 3}, {'k': 'a', 'v': 4}],
+        }, {
+            'items': [],
+        }, {
+            'items': (),
+        }, {
+            'items': None,
+        }])
+
+        actual = collection.aggregate([
+            {'$project': {
+                'items': {'$arrayToObject': '$items'},
+                'not_exists': {'$arrayToObject': '$nothing'},
+                '_id': 0
+            }}
+        ])
+
+        expect = [{
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {'a': 4, 'b': 2, 'c': 3},
+            'not_exists': None
+        }, {
+            'items': {},
+            'not_exists': None
+        }, {
+            'items': {},
+            'not_exists': None
+        }, {
+            'items': None,
+            'not_exists': None
+        }]
+        self.assertEqual(expect, list(actual))
+
+        # All of these items should trigger an error
+        items = [[
+            {'$addFields': {'items': ''}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': 100}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a', 'b', 'c'], ['d', 2]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a'], ['b', 2]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [[]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{'k': 'a', 'v': 1, 't': 't'}, {'k': 'b', 'v': 2}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{'v': 1, 't': 't'}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a', 1], {'k': 'b', 'v': 2}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ]]
+
+        for item in items:
+            with self.assertRaises(mongomock.OperationFailure):
+                collection.aggregate(item)
