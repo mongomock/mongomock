@@ -64,6 +64,7 @@ from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
+from mongomock.read_concern import ReadConcern
 from mongomock import WriteError
 
 if hasattr(time, 'perf_counter'):
@@ -84,7 +85,7 @@ _WITH_OPTIONS_KWARGS = {
         'pymongo.write_concern.WriteConcern', WriteConcern(),
         ('acknowledged', 'document')),
     'read_concern': _KwargOption(
-        'pymongo.read_concern.ReadConcern', None,
+        'pymongo.read_concern.ReadConcern', ReadConcern(),
         ('document', 'level', 'ok_for_legacy'))
 }
 
@@ -370,15 +371,15 @@ class BulkOperationBuilder(object):
 class Collection(object):
 
     def __init__(
-            self, database, name, _db_store, write_concern=None, read_preference=None,
-            codec_options=None):
+            self, database, name, _db_store, write_concern=None, read_concern=None,
+            read_preference=None, codec_options=None):
         self.database = database
         self._name = name
         self._db_store = _db_store
         self._write_concern = write_concern or WriteConcern()
+        self._read_concern = read_concern or ReadConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
         self._codec_options = codec_options
-        self._read_concern = None
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -404,6 +405,10 @@ class Collection(object):
     @property
     def write_concern(self):
         return self._write_concern
+
+    @property
+    def read_concern(self):
+        return self._read_concern
 
     @property
     def read_preference(self):
@@ -1705,7 +1710,7 @@ class Collection(object):
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if key in ('codec_options', 'read_concern') and options.default != value:
+            if key in ('codec_options') and options.default != value:
                 # TODO(pascal): Support change of tz_aware in codec_options.
                 raise NotImplementedError(
                     '%s is a valid parameter for with_options but it is currently not implemented '
@@ -1716,6 +1721,7 @@ class Collection(object):
 
         return Collection(
             self.database, self.name, write_concern=write_concern or self._write_concern,
+            read_concern=read_concern or self._read_concern,
             read_preference=read_preference or self._read_preference,
             codec_options=codec_options or self._codec_options, _db_store=self._db_store)
 
