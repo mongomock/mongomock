@@ -29,8 +29,8 @@ try:
 
     _HAVE_PYMONGO = True
 except ImportError:
-    from mongomock.read_concern import ReadConcern
     from mongomock.collection import ReturnDocument
+    from mongomock.read_concern import ReadConcern
     from mongomock import ObjectId
     from mongomock.write_concern import WriteConcern
 
