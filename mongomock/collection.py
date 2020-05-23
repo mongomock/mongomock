@@ -62,9 +62,9 @@ from mongomock.results import BulkWriteResult
 from mongomock.results import DeleteResult
 from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
+from mongomock.read_concern import ReadConcern
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
-from mongomock.read_concern import ReadConcern
 from mongomock import WriteError
 
 if hasattr(time, 'perf_counter'):

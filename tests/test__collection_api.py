@@ -22,17 +22,17 @@ try:
     from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
     import pymongo
     from pymongo.collation import Collation
+    from pymongo.read_concern import ReadConcern
     from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
-    from pymongo.read_concern import ReadConcern
     from pymongo.write_concern import WriteConcern
 
     _HAVE_PYMONGO = True
 except ImportError:
+    from mongomock.read_concern import ReadConcern
     from mongomock.collection import ReturnDocument
     from mongomock import ObjectId
     from mongomock.write_concern import WriteConcern
-    from mongomock.read_concern import ReadConcern
 
     _HAVE_PYMONGO = False
 
