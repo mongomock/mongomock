@@ -97,7 +97,7 @@ class Database(object):
         except KeyError:
             self._ensure_valid_collection_name(name)
             collection = self._collection_accesses[name] = Collection(
-                self, name=name, write_concern=write_concern,
+                self, name=name, read_concern=read_concern, write_concern=write_concern,
                 read_preference=read_preference or self.read_preference,
                 codec_options=codec_options or self._codec_options, _db_store=self._store, )
             return collection

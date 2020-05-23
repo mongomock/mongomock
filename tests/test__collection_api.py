@@ -22,6 +22,7 @@ try:
     from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
     import pymongo
     from pymongo.collation import Collation
+    from pymongo.read_concern import ReadConcern
     from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
     from pymongo.write_concern import WriteConcern
@@ -30,6 +31,7 @@ try:
 except ImportError:
     from mongomock.collection import ReturnDocument
     from mongomock import ObjectId
+    from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
 
     _HAVE_PYMONGO = False
@@ -1833,6 +1835,8 @@ class CollectionAPITest(TestCase):
         self.db.collection.with_options(read_preference=None)
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
         self.db.collection.with_options(write_concern=WriteConcern(w=1))
+        self.db.collection.with_options(read_concern=self.db.collection.read_concern)
+        self.db.collection.with_options(read_concern=ReadConcern(level='local'))
 
     def test__with_options_different_write_concern(self):
         self.db.collection.insert_one({'name': 'col1'})
@@ -1847,6 +1851,20 @@ class CollectionAPITest(TestCase):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertNotEqual(self.db.collection.write_concern, col2.write_concern)
         self.assertEqual({'w': 2}, col2.write_concern.document)
+
+    def test__with_options_different_read_concern(self):
+        self.db.collection.insert_one({'name': 'col1'})
+        col2 = self.db.collection.with_options(read_concern=ReadConcern(level='majority'))
+        col2.insert_one({'name': 'col2'})
+
+        # Check that the two objects have the same data.
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in self.db.collection.find()})
+        self.assertEqual({'col1', 'col2'}, {d['name'] for d in col2.find()})
+
+        # Check that each object has its own read concern.
+        self.assertEqual({}, self.db.collection.read_concern.document)
+        self.assertNotEqual(self.db.collection.read_concern, col2.read_concern)
+        self.assertEqual({'level': 'majority'}, col2.read_concern.document)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_different_read_preference(self):
