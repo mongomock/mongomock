@@ -18,6 +18,4 @@ class ReadConcern(object):
         return self._document.copy()
 
     def __eq__(self, other):
-        if isinstance(other, ReadConcern):
-            return self.document == other.document
-        return NotImplemented
+        return other.document == self.document

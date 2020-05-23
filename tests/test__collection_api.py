@@ -24,6 +24,7 @@ try:
     from pymongo.collation import Collation
     from pymongo.read_preferences import ReadPreference
     from pymongo import ReturnDocument
+    from pymongo.read_concern import ReadConcern
     from pymongo.write_concern import WriteConcern
 
     _HAVE_PYMONGO = True
@@ -1851,7 +1852,7 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.write_concern, col2.write_concern)
         self.assertEqual({'w': 2}, col2.write_concern.document)
 
-    def test__with_options_different_write_readconcern(self):
+    def test__with_options_different_read_concern(self):
         self.db.collection.insert_one({'name': 'col1'})
         col2 = self.db.collection.with_options(read_concern=ReadConcern(level='majority'))
         col2.insert_one({'name': 'col2'})
@@ -1860,7 +1861,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual({'col1', 'col2'}, {d['name'] for d in self.db.collection.find()})
         self.assertEqual({'col1', 'col2'}, {d['name'] for d in col2.find()})
 
-        # Check that each object has its own write concern.
+        # Check that each object has its own read concern.
         self.assertEqual({}, self.db.collection.read_concern.document)
         self.assertNotEqual(self.db.collection.read_concern, col2.read_concern)
         self.assertEqual({'level': 'majority'}, col2.read_concern.document)
