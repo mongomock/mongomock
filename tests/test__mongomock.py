@@ -3065,6 +3065,79 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_array_to_object(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([{
+            'items': [['a', 1], ['b', 2], ['c', 3], ['a', 4]]
+        }, {
+            'items': (['a', 1], ['b', 2], ['c', 3], ['a', 4])
+        }, {
+            'items': [('a', 1), ('b', 2), ('c', 3), ('a', 4)]
+        }, {
+            'items': (('a', 1), ('b', 2), ('c', 3), ('a', 4))
+        }, {
+            'items': [['a', 1], ('b', 2), ['c', 3], ('a', 4)]
+        }, {
+            'items': (['a', 1], ('b', 2), ['c', 3], ('a', 4))
+        }, {
+            'items': [{'k': 'a', 'v': 1}, {'k': 'b', 'v': 2},
+                      {'k': 'c', 'v': 3}, {'k': 'a', 'v': 4}]
+        }, {
+            'items': []
+        }, {
+            'items': ()
+        }, {
+            'items': None
+        }])
+
+        pipeline = [
+            {
+                '$project': {
+                    'items': {
+                        '$arrayToObject': '$items'
+                    },
+                    'not_exists': {
+                        '$arrayToObject': '$nothing'
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+        # All of these items should trigger an error
+        items = [[
+            {'$addFields': {'items': ''}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': 100}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a', 'b', 'c'], ['d', 2]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a'], ['b', 2]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [[]]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{'k': 'a', 'v': 1, 't': 't'}, {'k': 'b', 'v': 2}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{'v': 1, 't': 't'}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [{}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [['a', 1], {'k': 'b', 'v': 2}]}},
+            {'$project': {'items': {'$arrayToObject': '$items'}, '_id': 0}}
+        ]]
+
+        for item in items:
+            self.cmp.compare_exceptions.aggregate(item)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
