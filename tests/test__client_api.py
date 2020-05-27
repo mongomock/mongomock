@@ -123,3 +123,9 @@ class MongoClientApiTest(unittest.TestCase):
 
         client.one_db.my_collec.insert_one({})
         self.assertEqual(['one_db'], client.list_database_names())
+
+    def test_client_implements_context_managers(self):
+        with mongomock.MongoClient() as client:
+            client.one_db.my_collec.insert_one({})
+            result = client.one_db.my_collec.find_one({})
+            self.assertTrue(result)

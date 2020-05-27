@@ -61,6 +61,12 @@ class MongoClient(object):
     def __getattr__(self, attr):
         return self[attr]
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def __repr__(self):
         return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
 
