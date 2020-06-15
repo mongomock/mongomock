@@ -19,7 +19,7 @@ import mongomock
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
+    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_concern import ReadConcern
@@ -4323,6 +4323,26 @@ class CollectionAPITest(TestCase):
             [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
             list(actual)
         )
+
+    def test__aggregate_group_dbref_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '2')},
+                {'myref': DBRef('b', '1')},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$myref'}}
+        ])
+        expect = [
+            {'_id': DBRef('b', '1')},
+            {'_id': DBRef('a', '2')},
+            {'_id': DBRef('a', '1')},
+        ]
+        assertCountEqual(self, expect, list(actual))
 
     def test__aggregate_group_sum(self):
         collection = self.db.collection
