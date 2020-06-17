@@ -66,33 +66,51 @@ project_operators = [
     '$stdDevSamp',
     '$arrayElemAt',
 ]
+control_flow_operators = [
+    '$switch',
+]
 projection_operators = ['$map', '$let', '$literal']
 date_operators = [
-    '$dayOfYear',
+    '$dateToString',
     '$dayOfMonth',
     '$dayOfWeek',
-    '$year',
-    '$month',
-    '$week',
+    '$dayOfYear',
     '$hour',
-    '$minute',
-    '$second',
+    '$isoDayOfWeek',
+    '$isoWeek',
+    '$isoWeekYear',
     '$millisecond',
-    '$dateToString',
+    '$minute',
+    '$month',
+    '$second',
+    '$week',
+    '$year',
 ]
 conditional_operators = ['$cond', '$ifNull']
 array_operators = [
     '$concatArrays',
     '$filter',
+    '$indexOfArray',
     '$isArray',
+    '$range',
+    '$reduce',
+    '$reverseArray',
     '$size',
     '$slice',
+    '$zip',
 ]
 text_search_operators = ['$meta']
 string_operators = [
     '$concat',
+    '$indexOfBytes',
+    '$indexOfCP',
+    '$split',
     '$strcasecmp',
+    '$strLenBytes',
+    '$strLenCP',
     '$substr',
+    '$substrBytes',
+    '$substrCP',
     '$toLower',
     '$toUpper',
 ]
@@ -199,7 +217,7 @@ class _Parser(object):
             if k in type_convertion_operators:
                 return self._handle_type_convertion_operator(k, v)
             if k in boolean_operators + \
-                    text_search_operators + projection_operators:
+                    text_search_operators + projection_operators + control_flow_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
