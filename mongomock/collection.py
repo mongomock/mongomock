@@ -584,6 +584,12 @@ class Collection(object):
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
         validate_is_mapping('document', document)
+        for operator in _updaters:
+            if not document.get(operator, True):
+                raise WriteError(
+                    "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
+                    % (operator, operator),
+                )
 
         updated_existing = False
         upserted_id = None
