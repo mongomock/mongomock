@@ -76,7 +76,7 @@ This code checks *increase_votes* with respect to its functionality, not syntax 
 therefore is much more robust as a test.
 
 If the code to be tested is creating the connection itself with pymongo, you can use
-mongomock.patch:
+mongomock.patch (NOTE: you should use `pymongo.MongoClient(...)` here rather than `from pymongo import MongoClient`):
 
 .. code-block:: python
 
