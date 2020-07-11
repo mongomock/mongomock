@@ -31,15 +31,17 @@ _random = random.Random()
 
 group_operators = [
     '$addToSet',
+    '$avg',
     '$first',
     '$last',
     '$max',
+    '$mergeObjects',
     '$min',
-    '$avg',
     '$push',
-    '$sum',
     '$stdDevPop',
-    '$stdDevSamp']
+    '$stdDevSamp',
+    '$sum',
+]
 arithmetic_operators = [
     '$abs',
     '$add',
@@ -98,6 +100,9 @@ array_operators = [
     '$size',
     '$slice',
     '$zip',
+]
+object_operators = [
+    '$mergeObjects',
 ]
 text_search_operators = ['$meta']
 string_operators = [
@@ -217,7 +222,10 @@ class _Parser(object):
             if k in type_convertion_operators:
                 return self._handle_type_convertion_operator(k, v)
             if k in boolean_operators + \
-                    text_search_operators + projection_operators + control_flow_operators:
+                    text_search_operators + \
+                    projection_operators + \
+                    control_flow_operators + \
+                    object_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
