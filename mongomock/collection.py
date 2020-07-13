@@ -231,7 +231,7 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
 
     if not is_include:
         for key, val in iteritems(doc):
-            doc_copy[key] = val
+            doc_copy[key] = copy.deepcopy(val)
 
     for key, spec in iteritems(combined_projection_spec):
         if key == '$':
