@@ -40,7 +40,7 @@ since they replicate the series of calls made in the code, violating the DRY rul
      record()
      collection_mock.find().AndReturn(objects)
      for obj in objects:
-         collection_mock.update_one(document, {'$set': {'votes': document['votes']}})
+         collection_mock.update_one(obj, {'$set': {'votes': obj['votes']}})
      replay()
      increase_votes(collection_mock)
      verify()
