@@ -216,6 +216,8 @@ class _Parser(object):
                 return self._handle_array_operator(k, v)
             if k in conditional_operators:
                 return self._handle_conditional_operator(k, v)
+            if k in control_flow_operators:
+                return self._handle_control_flow_operator(k, v)
             if k in set_operators:
                 return self._handle_set_operator(k, v)
             if k in string_operators:
@@ -225,7 +227,6 @@ class _Parser(object):
             if k in boolean_operators + \
                     text_search_operators + \
                     projection_operators + \
-                    control_flow_operators + \
                     object_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
@@ -620,6 +621,24 @@ class _Parser(object):
                 condition_value = False
             expression = true_case if condition_value else false_case
             return self.parse(expression)
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid conditional operator for the "
+            'aggregation pipeline, it is currently not implemented '
+            ' in Mongomock.' % operator)
+
+    def _handle_control_flow_operator(self, operator, values):
+        if operator == '$switch':
+            branches = values['branches']
+            default = values.get('default')
+            for branch in branches:
+                try:
+                    case = self.parse(branch['case'])
+                except KeyError:
+                    case = False
+                if case:
+                    return self.parse(branch['then'])
+            return self.parse(default)
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid conditional operator for the "

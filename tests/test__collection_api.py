@@ -3136,6 +3136,59 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'full_description': 'Title 3'},
         ], list(actual))
 
+    def test__aggregate_switch(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+        # Expressions taken directly from official documentation:
+        # https://docs.mongodb.com/manual/reference/operator/aggregation/switch/
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': {
+                'doc_example_1': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                            {'case': {'$lt': ['$a', 5]}, 'then': 'less than'},
+                        ],
+                    }
+                },
+                'doc_example_2': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'doc_example_3': {
+                    '$switch': {
+                        'branches': [
+                            {'case': 'this is true', 'then': 'first case'},
+                            {'case': False, 'then': 'second case'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'missing_field': {
+                    '$switch': {
+                        'branches': [
+                            {'case': '$missing_field', 'then': 'first case'},
+                            {'case': True, 'then': '$missing_field'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+            }},
+        ])
+        expected = {
+            '_id': 1,
+            'doc_example_1': 'less than',
+            'doc_example_2': 'did not match',
+            'doc_example_3': 'first case',
+        }
+        self.assertEqual([expected], list(actual))
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
