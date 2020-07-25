@@ -369,10 +369,14 @@ class _Parser(object):
             values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
             return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
-            key, index = values
+            key, value = values
             array = self._parse_basic_expression(key)
-            index = self.parse(index)
-            return array[index]
+            index = self.parse(value)
+            try:
+                return array[index]
+            except IndexError as error:
+                raise KeyError('Array have length less than index value') from error
+
         raise NotImplementedError("Although '%s' is a valid project operator for the "
                                   'aggregation pipeline, it is currently not implemented '
                                   'in Mongomock.' % operator)

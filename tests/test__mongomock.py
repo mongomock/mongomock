@@ -3189,6 +3189,20 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_array_eleme_at(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {'values_list': [1, 2]},
+            {'values_list': [1, 2, 3]},
+        ])
+
+        self.cmp.compare.aggregate([{
+            '$project': {
+                'first_user_id': {'$arrayElemAt': ['$values_list', 2]},
+                'other_user_id': {'$arrayElemAt': ['$values_list', -1]},
+            },
+        }])
+
     def test_aggregate_bug_607(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/607."""
         self.cmp.do.drop()
