@@ -1981,6 +1981,36 @@ def _min_updater(doc, field_name, value):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
+def _pop_updater(doc, field_name, value):
+    if value not in {1, -1}:
+        raise WriteError('$pop expects 1 or -1, found: ' + str(value))
+
+    if isinstance(doc, dict):
+        if isinstance(doc[field_name], (tuple, list)):
+            doc[field_name] = list(doc[field_name])
+            _pop_from_list(doc[field_name], value)
+            return
+        raise WriteError('Path contains element of non-array type')
+
+    if isinstance(doc, list):
+        field_index = int(field_name)
+        if field_index < 0:
+            raise WriteError('Negative index provided')
+        if field_index >= len(doc):
+            return
+        _pop_from_list(doc[field_index], value)
+
+
+def _pop_from_list(list_instance, mongo_pop_value):
+    if not list_instance:
+        return
+
+    if mongo_pop_value == 1:
+        list_instance.pop()
+    elif mongo_pop_value == -1:
+        list_instance.pop(0)
+
+
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
@@ -1995,4 +2025,5 @@ _updaters = {
     '$inc': _inc_updater,
     '$max': _max_updater,
     '$min': _min_updater,
+    '$pop': _pop_updater
 }
