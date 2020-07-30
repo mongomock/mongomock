@@ -1459,16 +1459,30 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': [['green']]})
         self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat.0': 1}})
+        self.cmp.compare.find({'name': 'bob'})
+
+    def test__pop_too_far_in_array(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': [['green']]})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat.50': 1}})
+        self.cmp.compare.find({'name': 'bob'})
 
     def test__pop_document_in_array(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': [{'hat': ['green']}]})
         self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat.0.hat': 1}})
+        self.cmp.compare.find({'name': 'bob'})
 
     def test__pop_invalid_document_in_array(self):
         self.cmp.do.remove()
         self.cmp.do.insert({'name': 'bob', 'hat': [{'hat': 'green'}]})
         self.cmp.compare_exceptions.update({'name': 'bob'}, {'$pop': {'hat.0.hat': 1}})
+
+    def test__pop_empty(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert({'name': 'bob', 'hat': []})
+        self.cmp.do.update({'name': 'bob'}, {'$pop': {'hat': 1}})
+        self.cmp.compare.find({'name': 'bob'})
 
     def test__pull(self):
         self.cmp.do.remove()

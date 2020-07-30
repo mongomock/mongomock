@@ -998,6 +998,30 @@ class CollectionAPITest(TestCase):
         self.db.collection.update_one({}, {'$pull': {'arr': {'$in': ['a1']}}})
         self.assertEqual({'b': 0, 'arr': ['a2']}, self.db.collection.find_one({}, {'_id': 0}))
 
+    def test__update_pop(self):
+        self.db.collection.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual(['green'], res['hat'])
+
+    def test__update_pop_negative_index(self):
+        self.db.collection.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': -1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual(['tall'], res['hat'])
+
+    def test__update_pop_large_index(self):
+        self.db.collection.insert({'name': 'bob', 'hat': [['green', 'tall']]})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat.1': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual([['green', 'tall']], res['hat'])
+
+    def test__update_pop_empty(self):
+        self.db.collection.insert({'name': 'bob', 'hat': []})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual([], res['hat'])
+
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])
