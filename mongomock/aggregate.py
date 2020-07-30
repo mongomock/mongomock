@@ -109,6 +109,7 @@ string_operators = [
     '$concat',
     '$indexOfBytes',
     '$indexOfCP',
+    '$regexMatch',
     '$split',
     '$strcasecmp',
     '$strLenBytes',
