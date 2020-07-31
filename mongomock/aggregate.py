@@ -636,12 +636,12 @@ class _Parser(object):
                 )
 
             branches = values.get('branches', [])
-            if not isinstance(branches, list):
+            if not isinstance(branches, (list, tuple)):
                 raise OperationFailure(
                     "$switch expected an array for 'branches', "
                     'found: %s' % type(branches)
                 )
-            if len(branches) == 0:
+            if not branches:
                 raise OperationFailure(
                     '$switch requires at least one branch.'
                 )

@@ -3170,6 +3170,14 @@ class CollectionAPITest(TestCase):
                         'default': 'did not match',
                     }
                 },
+                'branches_is_tuple': {
+                    '$switch': {
+                        'branches': (
+                            {'case': False, 'then': 'value_f'},
+                            {'case': True, 'then': 'value_t'},
+                        ),
+                    }
+                },
                 'missing_field': {
                     '$switch': {
                         'branches': [
@@ -3186,6 +3194,7 @@ class CollectionAPITest(TestCase):
             'doc_example_1': 'less than',
             'doc_example_2': 'did not match',
             'doc_example_3': 'first case',
+            'branches_is_tuple': 'value_t',
         }
         self.assertEqual([expected], list(actual))
 
