@@ -629,8 +629,38 @@ class _Parser(object):
 
     def _handle_control_flow_operator(self, operator, values):
         if operator == '$switch':
-            branches = values['branches']
-            default = values.get('default')
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$switch requires an object as an argument, '
+                    'found: %s' % type(values)
+                )
+
+            branches = values.get('branches', [])
+            if not isinstance(branches, list):
+                raise OperationFailure(
+                    "$switch expected an array for 'branches', "
+                    'found: %s' % type(branches)
+                )
+            if len(branches) == 0:
+                raise OperationFailure(
+                    '$switch requires at least one branch.'
+                )
+
+            for branch in branches:
+                if not isinstance(branch, dict):
+                    raise OperationFailure(
+                        '$switch expected each branch to be an object, '
+                        'found: %s' % type(branch)
+                    )
+                if 'case' not in branch:
+                    raise OperationFailure(
+                        "$switch requires each branch have a 'case' expression"
+                    )
+                if 'then' not in branch:
+                    raise OperationFailure(
+                        "$switch requires each branch have a 'then' expression."
+                    )
+
             for branch in branches:
                 try:
                     case = self.parse(branch['case'])
@@ -638,12 +668,19 @@ class _Parser(object):
                     case = False
                 if case:
                     return self.parse(branch['then'])
-            return self.parse(default)
+
+            if 'default' not in values:
+                raise OperationFailure(
+                    '$switch could not find a matching branch for an input, '
+                    'and no default was specified.'
+                )
+            return self.parse(values['default'])
+
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid conditional operator for the "
+            "Although '%s' is a valid control flow operator for the "
             'aggregation pipeline, it is currently not implemented '
-            ' in Mongomock.' % operator)
+            'in Mongomock.' % operator)
 
     def _handle_set_operator(self, operator, values):
         if operator == '$in':

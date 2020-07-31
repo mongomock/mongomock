@@ -3189,6 +3189,58 @@ class CollectionAPITest(TestCase):
         }
         self.assertEqual([expected], list(actual))
 
+    def test__aggregate_switch_operation_failures(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+
+        tests_cases = [
+            (
+                {'$switch': []},
+                '$switch requires an object as an argument, found: %s' % type([]),
+            ),
+            (
+                {'$switch': {}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': {}}},
+                "$switch expected an array for 'branches', found: %s" % type({}),
+            ),
+            (
+                {'$switch': {'branches': []}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': [{}, 7]}},
+                "$switch requires each branch have a 'case' expression"
+            ),
+            (
+                {'$switch': {'branches': [{'case': True}, 7]}},
+                "$switch requires each branch have a 'then' expression."
+            ),
+            (
+                {'$switch': {'branches': [{'case': True, 'then': 3}, 7]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [7, {}]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [{'case': False, 'then': 3}]}},
+                '$switch could not find a matching branch for an input, '
+                'and no default was specified.',
+            ),
+        ]
+
+        for switch_operator, expected_exception in tests_cases:
+            pipeline = [
+                {'$match': {'_id': 1}},
+                {'$project': {'result_field': switch_operator}},
+            ]
+            with self.assertRaises(mongomock.OperationFailure) as err:
+                self.db.collection.aggregate(pipeline)
+            self.assertEqual(expected_exception, str(err.exception))
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
