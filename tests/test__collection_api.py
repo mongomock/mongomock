@@ -4073,7 +4073,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 1},
                 {'_id': 1}
             ])
-        self.assertEqual(str(cm.exception), 'batch op errors occurred')
+        self.assertTrue(str(cm.exception).startswith('batch op errors occurred'))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_many_bulk_write_error_details(self):

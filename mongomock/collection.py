@@ -352,18 +352,18 @@ class BulkOperationBuilder(object):
         self.insert(doc)
 
     def add_update(self, selector, doc, multi=False, upsert=False, collation=None,
-                   array_filters=None):
+                   array_filters=None, hint=None):
         if array_filters:
             raise NotImplementedError(
                 'Array filters are not implemented in mongomock yet.')
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.register_update_op(doc, multi)
 
-    def add_replace(self, selector, doc, upsert, collation=None):
+    def add_replace(self, selector, doc, upsert, collation=None, hint=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.replace_one(doc)
 
-    def add_delete(self, selector, just_one, collation=None):
+    def add_delete(self, selector, just_one, collation=None, hint=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=False)
         write_operation.register_remove_op(not just_one)
 
