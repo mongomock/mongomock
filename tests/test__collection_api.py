@@ -33,6 +33,7 @@ except ImportError:
     from mongomock import ObjectId
     from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
+    from tests.utils import DBRef
 
     _HAVE_PYMONGO = False
 
@@ -4324,6 +4325,7 @@ class CollectionAPITest(TestCase):
             list(actual)
         )
 
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_group_dbref_key(self):
         collection = self.db.collection
         collection.insert_many(

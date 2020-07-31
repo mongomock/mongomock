@@ -25,8 +25,8 @@ try:
     _HAVE_PYMONGO = True
     _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
 except ImportError:
-    from tests.utils import DBRef
     from mongomock.object_id import ObjectId
+    from tests.utils import DBRef
     _HAVE_PYMONGO = False
     _PYMONGO_VERSION = version.LooseVersion('0.0')
 try:
@@ -2300,7 +2300,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate(pipeline)
 
     def test__aggregate_group_by_dbref(self):
-        self.cmp.insert_many([
+        self.cmp.do.insert_many([
             {'myref': DBRef('a', '1')},
             {'myref': DBRef('a', '1')},
             {'myref': DBRef('a', '2')},
