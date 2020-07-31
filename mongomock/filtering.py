@@ -19,6 +19,7 @@ try:
     from bson import Regex, DBRef
     _RE_TYPES = (RE_TYPE, Regex)
 except ImportError:
+    DBRef = None
     _RE_TYPES = (RE_TYPE,)
 
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
@@ -293,7 +294,7 @@ def bson_compare(op, a, b, can_compare_types=True):
     if a_type != b_type:
         return can_compare_types and op(a_type, b_type)
 
-    if isinstance(a, DBRef):
+    if DBRef and isinstance(a, DBRef):
         # Compare DBRefs as dicts
         a = a.as_doc()
         b = b.as_doc()
@@ -355,7 +356,7 @@ def _get_compare_type(val):
         return 45
     if isinstance(val, _RE_TYPES):
         return 50
-    if isinstance(val, DBRef):
+    if DBRef and isinstance(val, DBRef):
         return 55
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
