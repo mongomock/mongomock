@@ -136,12 +136,15 @@ class BulkWriteOperation(object):
         assert not self.is_upsert
         return BulkWriteOperation(self.builder, self.selector, is_upsert=True)
 
-    def register_remove_op(self, multi):
+    def register_remove_op(self, multi, hint=None):
         collection = self.builder.collection
         selector = self.selector
 
         def exec_remove():
-            op_result = collection.remove(selector, multi=multi)
+            if multi:
+                op_result = collection.delete_many(selector, hint=hint).raw_result
+            else:
+                op_result = collection.delete_one(selector, hint=hint).raw_result
             if op_result.get('ok'):
                 return {'nRemoved': op_result.get('n')}
             err = op_result.get('err')
@@ -185,14 +188,14 @@ class BulkWriteOperation(object):
             return ret_val
         self.builder.executors.append(exec_update)
 
-    def update(self, document):
-        self.register_update_op(document, multi=True)
+    def update(self, document, hint=None):
+        self.register_update_op(document, multi=True, hint=hint)
 
-    def update_one(self, document):
-        self.register_update_op(document, multi=False)
+    def update_one(self, document, hint=None):
+        self.register_update_op(document, multi=False, hint=hint)
 
-    def replace_one(self, document):
-        self.register_update_op(document, multi=False, remove=True)
+    def replace_one(self, document, hint=None):
+        self.register_update_op(document, multi=False, remove=True, hint=hint)
 
 
 def _combine_projection_spec(projection_fields_spec):
@@ -352,20 +355,20 @@ class BulkOperationBuilder(object):
         self.insert(doc)
 
     def add_update(self, selector, doc, multi=False, upsert=False, collation=None,
-                   array_filters=None):
+                   array_filters=None, hint=None):
         if array_filters:
             raise NotImplementedError(
                 'Array filters are not implemented in mongomock yet.')
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.register_update_op(doc, multi)
+        write_operation.register_update_op(doc, multi, hint=hint)
 
-    def add_replace(self, selector, doc, upsert, collation=None):
+    def add_replace(self, selector, doc, upsert, collation=None, hint=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.replace_one(doc)
+        write_operation.replace_one(doc, hint=hint)
 
-    def add_delete(self, selector, just_one, collation=None):
+    def add_delete(self, selector, just_one, collation=None, hint=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=False)
-        write_operation.register_remove_op(not just_one)
+        write_operation.register_remove_op(not just_one, hint=hint)
 
 
 class Collection(object):
@@ -547,27 +550,31 @@ class Collection(object):
         return True
 
     def update_one(
-            self, filter, update, upsert=False, bypass_document_validation=False, session=None):
+            self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
+            session=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
-        return UpdateResult(self._update(filter, update, upsert=upsert, session=session),
-                            acknowledged=True)
+        return UpdateResult(
+            self._update(filter, update, upsert=upsert, hint=hint, session=session),
+            acknowledged=True)
 
     def update_many(
-            self, filter, update, upsert=False, bypass_document_validation=False, session=None):
+            self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
+            session=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
-        return UpdateResult(self._update(filter, update, upsert=upsert,
-                                         multi=True, session=session),
-                            acknowledged=True)
+        return UpdateResult(
+            self._update(filter, update, upsert=upsert, multi=True, hint=hint, session=session),
+            acknowledged=True)
 
     def replace_one(
             self, filter, replacement, upsert=False, bypass_document_validation=False,
-            session=None):
+            session=None, hint=None):
         if not bypass_document_validation:
             validate_ok_for_replace(replacement)
-        return UpdateResult(self._update(filter, replacement, upsert=upsert, session=session),
-                            acknowledged=True)
+        return UpdateResult(
+            self._update(filter, replacement, upsert=upsert, hint=hint, session=session),
+            acknowledged=True)
 
     def update(self, spec, document, upsert=False, manipulate=False,
                multi=False, check_keys=False, **kwargs):
@@ -577,9 +584,13 @@ class Collection(object):
                             check_keys, **kwargs)
 
     def _update(self, spec, document, upsert=False, manipulate=False,
-                multi=False, check_keys=False, session=None, **kwargs):
+                multi=False, check_keys=False, hint=None, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
+        if hint:
+            raise NotImplementedError(
+                'The hint argument of update is valid but has not been implemented in '
+                'mongomock yet')
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
@@ -1324,19 +1335,25 @@ class Collection(object):
         self._update({'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs)
         return to_save.get('_id', None)
 
-    def delete_one(self, filter, session=None):
+    def delete_one(self, filter, collation=None, hint=None, session=None):
         validate_is_mapping('filter', filter)
-        return DeleteResult(self._delete(filter, session=session), True)
+        return DeleteResult(
+            self._delete(filter, collation=collation, hint=hint, session=session), True)
 
-    def delete_many(self, filter, collation=None, session=None):
+    def delete_many(self, filter, collation=None, hint=None, session=None):
         validate_is_mapping('filter', filter)
+        return DeleteResult(
+            self._delete(filter, collation=collation, hint=hint, multi=True, session=session), True)
+
+    def _delete(self, filter, collation=None, hint=None, multi=False, session=None):
+        if hint:
+            raise NotImplementedError(
+                'The hint argument of delete is valid but has not been implemented in '
+                'mongomock yet')
         if collation:
             raise NotImplementedError(
-                'The collation argument of delete_many is valid but has not been '
+                'The collation argument of delete is valid but has not been '
                 'implemented in mongomock yet')
-        return DeleteResult(self._delete(filter, multi=True, session=session), True)
-
-    def _delete(self, filter, multi=False, session=None):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
         filter = helpers.patch_datetime_awareness_in_document(filter)

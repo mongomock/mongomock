@@ -837,6 +837,15 @@ class CollectionAPITest(TestCase):
                 upsert=True
             )
 
+    def test__update_one_hint(self):
+        self.db.collection.insert_one({'a': 1})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_one(
+                filter={'a': 1},
+                update={'$set': {'a': 1}},
+                hint='a',
+            )
+
     def test__update_many(self):
         self.db.collection.insert_many([
             {'a': 1, 'c': 2},
@@ -1103,6 +1112,14 @@ class CollectionAPITest(TestCase):
     def test__delete_many_collation_option(self):
         """Ensure collation delete_many's option is not rejected."""
         self.assertTrue(self.db.collection.delete_many({}, collation=None))
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.delete_many({}, collation='fr')
+
+    def test__delete_many_hint_option(self):
+        """Ensure hint delete_many's option is not rejected."""
+        self.assertTrue(self.db.collection.delete_many({}, hint=None))
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.delete_many({}, hint='_index')
 
     def test__string_matching(self):
         """Make sure strings are not treated as collections on find"""
@@ -4097,7 +4114,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 1},
                 {'_id': 1}
             ])
-        self.assertEqual(str(cm.exception), 'batch op errors occurred')
+        self.assertIn('batch op errors occurred', str(cm.exception))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_many_bulk_write_error_details(self):
