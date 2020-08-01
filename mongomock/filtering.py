@@ -294,9 +294,10 @@ def bson_compare(op, a, b, can_compare_types=True):
     if a_type != b_type:
         return can_compare_types and op(a_type, b_type)
 
-    if DBRef and isinstance(a, DBRef):
-        # Compare DBRefs as dicts
+    # Compare DBRefs as dicts
+    if type(a).__name__ == 'DBRef' and hasattr(a, 'as_doc'):
         a = a.as_doc()
+    if type(b).__name__ == 'DBRef' and hasattr(b, 'as_doc'):
         b = b.as_doc()
 
     if isinstance(a, dict):
@@ -357,7 +358,9 @@ def _get_compare_type(val):
     if isinstance(val, _RE_TYPES):
         return 50
     if DBRef and isinstance(val, DBRef):
-        return 55
+        # According to the C++ code, this should be 55 but apparently sending a DBRef through
+        # pymongo is stored as a dict.
+        return 20
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
         (val, type(val)))
