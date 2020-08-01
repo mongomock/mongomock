@@ -2887,6 +2887,30 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_switch_mongodb_to_bool(self):
+        def build_switch(case):
+            return {
+                '$switch': {
+                    'branches': [
+                        {'case': case, 'then': 't'},
+                    ],
+                    'default': 'f',
+                }
+            }
+        self.cmp.compare_ignore_order.aggregate([
+            {'$project': {
+                'undefined_value': build_switch('$not_existing_field'),
+                'false_value': build_switch(False),
+                'null_value': build_switch(None),
+                'zero_value': build_switch(0),
+                'true_value': build_switch(True),
+                'one_value': build_switch(1),
+                'empty_string': build_switch(''),
+                'empty_list': build_switch([]),
+                'empty_dict': build_switch({}),
+            }},
+        ])
+
     def test__aggregate_bug_473(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/473."""
         self.cmp.do.drop()
@@ -2906,6 +2930,23 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     '$base_value',
                     {'$arrayElemAt': ['$values_list.updated_value', -1]},
                 ]},
+            }},
+        ])
+
+    def test__aggregate_cond_mongodb_to_bool(self):
+        """Regression test for bug https://github.com/mongomock/mongomock/issues/650"""
+        self.cmp.compare_ignore_order.aggregate([
+            {'$project': {
+                # undefined aka KeyError
+                'undefined_value': {'$cond': ['$not_existing_field', 't', 'f']},
+                'false_value': {'$cond': [False, 't', 'f']},
+                'null_value': {'$cond': [None, 't', 'f']},
+                'zero_value': {'$cond': [0, 't', 'f']},
+                'true_value': {'$cond': [True, 't', 'f']},
+                'one_value': {'$cond': [1, 't', 'f']},
+                'empty_string': {'$cond': ['', 't', 'f']},
+                'empty_list': {'$cond': [[], 't', 'f']},
+                'empty_dict': {'$cond': [{}, 't', 'f']},
             }},
         ])
 

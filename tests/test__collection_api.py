@@ -3096,6 +3096,36 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 2}], list(actual))
 
+    def test__aggregate_project_cond_mongodb_to_bool(self):
+        self.db.collection.insert_one({'_id': 1})
+        actual = self.db.collection.aggregate([
+            {'$project': {
+                '_id': False,
+                # undefined aka KeyError
+                'undefined_value': {'$cond': ['$not_existing_field', 't', 'f']},
+                'false_value': {'$cond': [False, 't', 'f']},
+                'null_value': {'$cond': [None, 't', 'f']},
+                'zero_value': {'$cond': [0, 't', 'f']},
+                'true_value': {'$cond': [True, 't', 'f']},
+                'one_value': {'$cond': [1, 't', 'f']},
+                'empty_string': {'$cond': ['', 't', 'f']},
+                'empty_list': {'$cond': [[], 't', 'f']},
+                'empty_dict': {'$cond': [{}, 't', 'f']},
+            }},
+        ])
+        expected = {
+            'undefined_value': 'f',
+            'false_value': 'f',
+            'null_value': 'f',
+            'zero_value': 'f',
+            'true_value': 't',
+            'one_value': 't',
+            'empty_string': 't',
+            'empty_list': 't',
+            'empty_dict': 't',
+        }
+        self.assertEqual([expected], list(actual))
+
     def test__aggregate_project_array_size_if_null(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         self.db.collection.insert_one({'_id': 2})
@@ -3250,6 +3280,44 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure) as err:
                 self.db.collection.aggregate(pipeline)
             self.assertEqual(expected_exception, str(err.exception))
+
+    def test__aggregate_switch_mongodb_to_bool(self):
+        def build_switch(case):
+            return {
+                '$switch': {
+                    'branches': [
+                        {'case': case, 'then': 't'},
+                    ],
+                    'default': 'f',
+                }
+            }
+        self.db.collection.insert_one({'_id': 1})
+        actual = self.db.collection.aggregate([
+            {'$project': {
+                '_id': False,
+                'undefined_value': build_switch('$not_existing_field'),
+                'false_value': build_switch(False),
+                'null_value': build_switch(None),
+                'zero_value': build_switch(0),
+                'true_value': build_switch(True),
+                'one_value': build_switch(1),
+                'empty_string': build_switch(''),
+                'empty_list': build_switch([]),
+                'empty_dict': build_switch({}),
+            }},
+        ])
+        expected = {
+            'undefined_value': 'f',
+            'false_value': 'f',
+            'null_value': 'f',
+            'zero_value': 'f',
+            'true_value': 't',
+            'one_value': 't',
+            'empty_string': 't',
+            'empty_list': 't',
+            'empty_dict': 't',
+        }
+        self.assertEqual([expected], list(actual))
 
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})

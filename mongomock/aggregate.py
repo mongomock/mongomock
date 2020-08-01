@@ -250,6 +250,14 @@ class _Parser(object):
                 if self._ignore_missing_keys:
                     yield None
 
+    def _parse_to_bool(self, expression):
+        """Parse a MongoDB expression and then convert it to bool"""
+        # handles converting `undefined` (in form of KeyError) to False
+        try:
+            return helpers.mongodb_to_bool(self.parse(expression))
+        except KeyError:
+            return False
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
@@ -615,10 +623,7 @@ class _Parser(object):
                 condition = values['if']
                 true_case = values['then']
                 false_case = values['else']
-            try:
-                condition_value = self.parse(condition)
-            except KeyError:
-                condition_value = False
+            condition_value = self._parse_to_bool(condition)
             expression = true_case if condition_value else false_case
             return self.parse(expression)
         # This should never happen: it is only a safe fallback if something went wrong.
@@ -662,11 +667,7 @@ class _Parser(object):
                     )
 
             for branch in branches:
-                try:
-                    case = self.parse(branch['case'])
-                except KeyError:
-                    case = False
-                if case:
+                if self._parse_to_bool(branch['case']):
                     return self.parse(branch['then'])
 
             if 'default' not in values:
