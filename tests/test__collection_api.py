@@ -19,7 +19,7 @@ import mongomock
 try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
+    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_concern import ReadConcern
@@ -33,6 +33,7 @@ except ImportError:
     from mongomock import ObjectId
     from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
+    from tests.utils import DBRef
 
     _HAVE_PYMONGO = False
 
@@ -4437,6 +4438,27 @@ class CollectionAPITest(TestCase):
             [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
             list(actual)
         )
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_group_dbref_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '2')},
+                {'myref': DBRef('b', '1')},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$myref'}}
+        ])
+        expect = [
+            {'_id': DBRef('b', '1')},
+            {'_id': DBRef('a', '2')},
+            {'_id': DBRef('a', '1')},
+        ]
+        assertCountEqual(self, expect, list(actual))
 
     def test__aggregate_group_sum(self):
         collection = self.db.collection

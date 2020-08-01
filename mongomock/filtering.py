@@ -16,9 +16,10 @@ except ImportError:
     NoneType = type(None)
 
 try:
-    from bson import Regex
+    from bson import Regex, DBRef
     _RE_TYPES = (RE_TYPE, Regex)
 except ImportError:
+    DBRef = None
     _RE_TYPES = (RE_TYPE,)
 
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
@@ -293,6 +294,12 @@ def bson_compare(op, a, b, can_compare_types=True):
     if a_type != b_type:
         return can_compare_types and op(a_type, b_type)
 
+    # Compare DBRefs as dicts
+    if type(a).__name__ == 'DBRef' and hasattr(a, 'as_doc'):
+        a = a.as_doc()
+    if type(b).__name__ == 'DBRef' and hasattr(b, 'as_doc'):
+        b = b.as_doc()
+
     if isinstance(a, dict):
         # MongoDb server compares the type before comparing the keys
         # https://github.com/mongodb/mongo/blob/f10f214/src/mongo/bson/bsonelement.cpp#L516
@@ -350,6 +357,10 @@ def _get_compare_type(val):
         return 45
     if isinstance(val, _RE_TYPES):
         return 50
+    if DBRef and isinstance(val, DBRef):
+        # According to the C++ code, this should be 55 but apparently sending a DBRef through
+        # pymongo is stored as a dict.
+        return 20
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
         (val, type(val)))

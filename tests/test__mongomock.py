@@ -17,10 +17,8 @@ from mongomock import helpers
 from mongomock import InvalidURI
 from mongomock import OperationFailure
 
-from tests.utils import DBRef
-
 try:
-    from bson import decimal128
+    from bson import DBRef, decimal128
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
@@ -28,6 +26,7 @@ try:
     _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
 except ImportError:
     from mongomock.object_id import ObjectId
+    from tests.utils import DBRef
     _HAVE_PYMONGO = False
     _PYMONGO_VERSION = version.LooseVersion('0.0')
 try:
@@ -939,6 +938,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'type': 'string', 'a': 'a'},
             {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
             {'type': 'uuid', 'a': uuid.UUID(int=3)},
+            {'type': 'DBRef', 'a': DBRef('a', 'a', 'db_name')}
         ])
         self.cmp.compare.find({}, sort=[('a', 1), ('type', 1)])
 
@@ -2298,6 +2298,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$sort': {'_id': 1}}
         ]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_group_by_dbref(self):
+        self.cmp.do.insert_many([
+            {'myref': DBRef('a', '1')},
+            {'myref': DBRef('a', '1')},
+            {'myref': DBRef('a', '2')},
+            {'myref': DBRef('b', '1')},
+        ])
+        self.cmp.compare.aggregate([
+            {'$group': {'_id': '$myref'}}
+        ])
 
     def test__aggregate_project_include_in_inclusion(self):
         pipeline = [
