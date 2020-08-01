@@ -395,3 +395,9 @@ def delete_value_by_dot(doc, key):
     del parent[child_key]
 
     return doc
+
+
+def mongodb_to_bool(value):
+    """Converts any value to bool the way MongoDB does it"""
+
+    return value not in [False, None, 0]
