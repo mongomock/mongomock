@@ -216,6 +216,8 @@ class _Parser(object):
                 return self._handle_array_operator(k, v)
             if k in conditional_operators:
                 return self._handle_conditional_operator(k, v)
+            if k in control_flow_operators:
+                return self._handle_control_flow_operator(k, v)
             if k in set_operators:
                 return self._handle_set_operator(k, v)
             if k in string_operators:
@@ -225,7 +227,6 @@ class _Parser(object):
             if k in boolean_operators + \
                     text_search_operators + \
                     projection_operators + \
-                    control_flow_operators + \
                     object_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
@@ -625,6 +626,61 @@ class _Parser(object):
             "Although '%s' is a valid conditional operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
+
+    def _handle_control_flow_operator(self, operator, values):
+        if operator == '$switch':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$switch requires an object as an argument, '
+                    'found: %s' % type(values)
+                )
+
+            branches = values.get('branches', [])
+            if not isinstance(branches, (list, tuple)):
+                raise OperationFailure(
+                    "$switch expected an array for 'branches', "
+                    'found: %s' % type(branches)
+                )
+            if not branches:
+                raise OperationFailure(
+                    '$switch requires at least one branch.'
+                )
+
+            for branch in branches:
+                if not isinstance(branch, dict):
+                    raise OperationFailure(
+                        '$switch expected each branch to be an object, '
+                        'found: %s' % type(branch)
+                    )
+                if 'case' not in branch:
+                    raise OperationFailure(
+                        "$switch requires each branch have a 'case' expression"
+                    )
+                if 'then' not in branch:
+                    raise OperationFailure(
+                        "$switch requires each branch have a 'then' expression."
+                    )
+
+            for branch in branches:
+                try:
+                    case = self.parse(branch['case'])
+                except KeyError:
+                    case = False
+                if case:
+                    return self.parse(branch['then'])
+
+            if 'default' not in values:
+                raise OperationFailure(
+                    '$switch could not find a matching branch for an input, '
+                    'and no default was specified.'
+                )
+            return self.parse(values['default'])
+
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid control flow operator for the "
+            'aggregation pipeline, it is currently not implemented '
+            'in Mongomock.' % operator)
 
     def _handle_set_operator(self, operator, values):
         if operator == '$in':

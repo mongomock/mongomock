@@ -3136,6 +3136,120 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'full_description': 'Title 3'},
         ], list(actual))
 
+    def test__aggregate_switch(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+        # Expressions taken directly from official documentation:
+        # https://docs.mongodb.com/manual/reference/operator/aggregation/switch/
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': {
+                'doc_example_1': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                            {'case': {'$lt': ['$a', 5]}, 'then': 'less than'},
+                        ],
+                    }
+                },
+                'doc_example_2': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'doc_example_3': {
+                    '$switch': {
+                        'branches': [
+                            {'case': 'this is true', 'then': 'first case'},
+                            {'case': False, 'then': 'second case'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'branches_is_tuple': {
+                    '$switch': {
+                        'branches': (
+                            {'case': False, 'then': 'value_f'},
+                            {'case': True, 'then': 'value_t'},
+                        ),
+                    }
+                },
+                'missing_field': {
+                    '$switch': {
+                        'branches': [
+                            {'case': '$missing_field', 'then': 'first case'},
+                            {'case': True, 'then': '$missing_field'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+            }},
+        ])
+        expected = {
+            '_id': 1,
+            'doc_example_1': 'less than',
+            'doc_example_2': 'did not match',
+            'doc_example_3': 'first case',
+            'branches_is_tuple': 'value_t',
+        }
+        self.assertEqual([expected], list(actual))
+
+    def test__aggregate_switch_operation_failures(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+
+        tests_cases = [
+            (
+                {'$switch': []},
+                '$switch requires an object as an argument, found: %s' % type([]),
+            ),
+            (
+                {'$switch': {}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': {}}},
+                "$switch expected an array for 'branches', found: %s" % type({}),
+            ),
+            (
+                {'$switch': {'branches': []}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': [{}, 7]}},
+                "$switch requires each branch have a 'case' expression"
+            ),
+            (
+                {'$switch': {'branches': [{'case': True}, 7]}},
+                "$switch requires each branch have a 'then' expression."
+            ),
+            (
+                {'$switch': {'branches': [{'case': True, 'then': 3}, 7]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [7, {}]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [{'case': False, 'then': 3}]}},
+                '$switch could not find a matching branch for an input, '
+                'and no default was specified.',
+            ),
+        ]
+
+        for switch_operator, expected_exception in tests_cases:
+            pipeline = [
+                {'$match': {'_id': 1}},
+                {'$project': {'result_field': switch_operator}},
+            ]
+            with self.assertRaises(mongomock.OperationFailure) as err:
+                self.db.collection.aggregate(pipeline)
+            self.assertEqual(expected_exception, str(err.exception))
+
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([

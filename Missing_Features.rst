@@ -33,7 +33,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray, $indexOfArray, …)
-  * `$switch <https://docs.mongodb.com/manual/reference/operator/aggregation/switch/>`_
   * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
 * Operators within the query language (find):
   * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`_

@@ -2844,6 +2844,38 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_switch(self):
+        self.cmp.compare_ignore_order.aggregate([
+            {'$project': {
+                'compare_with_3': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$count', 3]}, 'then': 'equals 3'},
+                            {'case': {'$gt': ['$count', 3]}, 'then': 'greater than 3'},
+                            {'case': {'$lt': ['$count', 3]}, 'then': 'less than 3'}
+                        ],
+                    }
+                },
+                'equals_3': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$count', 3]}, 'then': 'equals 3'},
+                        ],
+                        'default': 'not equal',
+                    }
+                },
+                'missing_field': {
+                    '$switch': {
+                        'branches': [
+                            {'case': '$missing_field', 'then': 'first case'},
+                            {'case': True, 'then': '$missing_field'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+            }},
+        ])
+
     def test__aggregate_bug_473(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/473."""
         self.cmp.do.drop()
