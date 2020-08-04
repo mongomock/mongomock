@@ -28,6 +28,7 @@ try:
 
     _HAVE_PYMONGO = True
 except ImportError:
+    from mongomock import codec_options
     from mongomock.collection import ReturnDocument
     from mongomock import ObjectId
     from mongomock.read_concern import ReadConcern
@@ -1922,24 +1923,19 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.read_preference, col2.read_preference)
         self.assertEqual('nearest', col2.read_preference.mongos_mode)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
         self.db.collection.with_options(codec_options.CodecOptions())
-
-    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
-    def test__codec_options_without_pymongo(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.codec_options  # pylint: disable=pointless-statement
+        coll = self.db.collection.with_options(codec_options.CodecOptions(tz_aware=True))
+        self.assertTrue(coll.codec_options.tz_aware)
 
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
 
     def test__with_options_not_implemented(self):
-        _CodecOptions = collections.namedtuple(
-            'CodecOptions', ['document_class', 'tz_aware', 'uuid_representation'])
         with self.assertRaises(NotImplementedError):
-            self.db.collection.with_options(codec_options=_CodecOptions(None, True, 3))
+            self.db.collection.with_options(codec_options=codec_options.CodecOptions().with_options(
+                tz_aware=True, uuid_representation=6))
 
     def test__with_options_wrong_type(self):
         with self.assertRaises(TypeError):

@@ -16,11 +16,10 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON
-    from bson import codec_options as bson_codec_options
-    _DEFAULT_CODEC_OPTIONS = bson_codec_options.CodecOptions()
+    from bson.codec_options import CodecOptions
 except ImportError:
-    bson_codec_options = json_utils = SON = BSON = None
-    _DEFAULT_CODEC_OPTIONS = None
+    from mongomock.codec_options import CodecOptions
+    json_utils = SON = BSON = None
 try:
     import execjs
 except ImportError:
@@ -76,7 +75,7 @@ _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'at
 
 _WITH_OPTIONS_KWARGS = {
     'codec_options': _KwargOption(
-        'bson.codec_options.CodecOptions', _DEFAULT_CODEC_OPTIONS,
+        'bson.codec_options.CodecOptions', CodecOptions(),
         ('document_class', 'tz_aware', 'uuid_representation')),
     'read_preference': _KwargOption(
         'pymongo.read_preference.ReadPreference', _READ_PREFERENCE_PRIMARY,
@@ -382,7 +381,7 @@ class Collection(object):
         self._write_concern = write_concern or WriteConcern()
         self._read_concern = read_concern or ReadConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
-        self._codec_options = codec_options
+        self._codec_options = codec_options or CodecOptions()
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -419,10 +418,6 @@ class Collection(object):
 
     @property
     def codec_options(self):
-        if not bson_codec_options:
-            raise NotImplementedError(
-                'The codec options are not implemented in mongomock alone, you need to import '
-                'the pymongo library as well.')
         return self._codec_options
 
     def initialize_unordered_bulk_op(self, bypass_document_validation=False):
@@ -1735,11 +1730,12 @@ class Collection(object):
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if key in ('codec_options') and options.default != value:
-                # TODO(pascal): Support change of tz_aware in codec_options.
-                raise NotImplementedError(
-                    '%s is a valid parameter for with_options but it is currently not implemented '
-                    'in Mongomock' % key)
+            if key == 'codec_options':
+                opts = self.codec_options
+                if codec_options.with_options(tz_aware=opts.tz_aware) != opts:
+                    raise NotImplementedError(
+                        '%s is a valid parameter for with_options but it is currently not '
+                        'implemented in Mongomock except for a change of tz_aware' % key)
 
         if not has_changes:
             return self
@@ -1806,8 +1802,7 @@ class Cursor(object):
     def _compute_results(self, with_limit_and_skip=False):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
-            # TODO(pascal): Check collection's codec_options instead of reaching to the client.
-            if self.collection.database.client._tz_aware:
+            if self.collection.codec_options.tz_aware:
                 results = [helpers.make_datetime_timezone_aware_in_document(x)
                            for x in self._factory()]
             else:

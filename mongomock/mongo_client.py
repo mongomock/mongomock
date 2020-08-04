@@ -6,14 +6,14 @@ from mongomock import read_preferences
 import warnings
 
 try:
-    from bson import codec_options as bson_codec_options
+    from bson.codec_options import CodecOptions
     from pymongo.uri_parser import parse_uri, split_hosts
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
+    from .codec_options import CodecOptions
     from .helpers import parse_uri, split_hosts
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
-    bson_codec_options = None
 
 
 class MongoClient(object):
@@ -32,10 +32,7 @@ class MongoClient(object):
         self.port = port or self.PORT
 
         self._tz_aware = tz_aware
-        if bson_codec_options:
-            self._codec_options = bson_codec_options.CodecOptions(tz_aware=tz_aware)
-        else:
-            self._codec_options = None
+        self._codec_options = CodecOptions(tz_aware=tz_aware)
         self._database_accesses = {}
         self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
@@ -91,10 +88,6 @@ class MongoClient(object):
 
     @property
     def codec_options(self):
-        if not bson_codec_options:
-            raise NotImplementedError(
-                'The codec options are not implemented in mongomock alone, you need to import '
-                'the pymongo/bson library as well.')
         return self._codec_options
 
     def server_info(self):
@@ -140,7 +133,7 @@ class MongoClient(object):
             db_store = self._store[name]
             db = self._database_accesses[name] = Database(
                 self, name, read_preference=read_preference or self.read_preference,
-                codec_options=self._codec_options, _store=db_store)
+                codec_options=codec_options or self._codec_options, _store=db_store)
         return db
 
     def get_default_database(self):

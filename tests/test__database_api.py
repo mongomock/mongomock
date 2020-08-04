@@ -93,25 +93,19 @@ class DatabaseAPITest(TestCase):
         col = database.get_collection('col', read_preference=ReadPreference.PRIMARY)
         self.assertEqual('Primary', col.read_preference.name)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_codec_options(self):
         database = mongomock.MongoClient().somedb
         with self.assertRaises(NotImplementedError):
-            database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
+            database.get_collection('a', codec_options=codec_options.CodecOptions(
+                tz_aware=True, uuid_representation=6))
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
 
-    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
-    def test__codec_options_without_pymongo(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.codec_options  # pylint: disable=pointless-statement
-
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TypeError):
             self.database.with_options(codec_options=3)
 
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(TypeError):
             self.database.get_collection('a', codec_options=3)
 
     def test__with_options(self):
@@ -121,7 +115,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(read_concern=3)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
         other = self.database.with_options(read_preference=self.database.NEAREST)
         self.assertNotEqual(other, self.database)
@@ -133,7 +126,8 @@ class DatabaseAPITest(TestCase):
         self.database.with_options()
 
         with self.assertRaises(NotImplementedError):
-            self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
+            self.database.with_options(codec_options=codec_options.CodecOptions(
+                tz_aware=True, uuid_representation=6))
 
         tz_aware_db = mongomock.MongoClient(tz_aware=True).somedb
         self.assertIs(
