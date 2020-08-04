@@ -1227,6 +1227,14 @@ def _handle_facet_stage(in_collection, database, options):
     return [out_collection_by_pipeline]
 
 
+def _handle_match_stage(in_collection, database, options):
+    spec = helpers.patch_datetime_awareness_in_document(options)
+    return [
+        doc for doc in in_collection
+        if filtering.filter_applies(spec, helpers.patch_datetime_awareness_in_document(doc))
+    ]
+
+
 _PIPELINE_HANDLERS = {
     '$addFields': _handle_add_fields_stage,
     '$bucket': _handle_bucket_stage,
@@ -1243,7 +1251,7 @@ _PIPELINE_HANDLERS = {
     '$listLocalSessions': None,
     '$listSessions': None,
     '$lookup': _handle_lookup_stage,
-    '$match': lambda c, d, o: [doc for doc in c if filtering.filter_applies(o, doc)],
+    '$match': _handle_match_stage,
     '$merge': None,
     '$out': _handle_out_stage,
     '$planCacheStats': None,

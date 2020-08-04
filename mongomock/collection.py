@@ -1240,7 +1240,7 @@ class Collection(object):
         field_name = field_name_parts[-1]
         updater(doc, field_name, field_value)
 
-    def _iter_documents(self, filter=None):
+    def _iter_documents(self, filter):
         # Validate the filter even if no documents can be returned.
         if self._store.is_empty:
             filter_applies(filter, {})
@@ -1396,7 +1396,8 @@ class Collection(object):
             raise NotImplementedError('Mongomock does not handle sessions yet')
         if filter is None:
             return len(self._store)
-        return len(list(self._iter_documents(filter)))
+        spec = helpers.patch_datetime_awareness_in_document(filter)
+        return len(list(self._iter_documents(spec)))
 
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
@@ -1419,7 +1420,8 @@ class Collection(object):
         if unknown_kwargs:
             raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
 
-        doc_num = len(list(self._iter_documents(filter)))
+        spec = helpers.patch_datetime_awareness_in_document(filter)
+        doc_num = len(list(self._iter_documents(spec)))
         count = max(doc_num - skip, 0)
         return count if limit is None else min(count, limit)
 

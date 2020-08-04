@@ -2009,7 +2009,7 @@ class CollectionAPITest(TestCase):
             objid = db.collection.insert({'date_aware': aware, 'date_naive': naive})
 
             objs = list(db.collection.find())
-            assert objs == [{'_id': objid, 'date_aware': returned, 'date_naive': returned}]
+            self.assertEqual(objs, [{'_id': objid, 'date_aware': returned, 'date_naive': returned}])
 
             if tz_awarness:
                 self.assertEqual('UTC', returned.tzinfo.tzname(returned))
@@ -2025,17 +2025,23 @@ class CollectionAPITest(TestCase):
             )
 
             objs = list(db.collection.find())
-            assert objs == [
+            self.assertEqual(objs, [
                 {'_id': objid, 'date_aware': returned, 'date_naive': returned,
                  'new_aware': returned, 'new_naive': returned}
-            ]
+            ], msg=tz_awarness)
 
             ret = db.collection.find_one({'new_aware': naive, 'new_naive': aware})
-            assert ret == objs[0]
+            self.assertEqual(ret, objs[0], msg=tz_awarness)
 
-            db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
+            num = db.collection.count_documents({'date_naive': {'$gte': aware}})
+            self.assertEqual(1, num, msg=tz_awarness)
+
+            objs = list(db.collection.aggregate([{'$match': {'date_naive': {'$gte': aware}}}]))
+            self.assertEqual(1, len(objs), msg=tz_awarness)
+
+            db.collection.delete_one({'new_aware': naive, 'new_naive': naive})
             objs = list(db.collection.find())
-            assert not objs
+            self.assertFalse(objs, msg=tz_awarness)
 
     def test__list_of_dates(self):
         client = mongomock.MongoClient(tz_aware=True)
