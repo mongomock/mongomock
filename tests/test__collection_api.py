@@ -2,7 +2,6 @@ import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
 from distutils import version  # pylint: disable=no-name-in-module
-import math
 import platform
 import random
 import re
@@ -5156,8 +5155,10 @@ class CollectionAPITest(TestCase):
             self.assertNotEqual(
                 original_document['date'].timestamp(), stored_document['date'].timestamp())
             self.assertEqual(
-                math.floor(original_document['date'].timestamp() * 1000),
-                stored_document['date'].timestamp() * 1000)
+                datetime(2000, 1, 1, 10, 30, 30, 12000),
+                stored_document['date'],
+                msg='The stored document holds a date as timezone naive UTC and without '
+                'microseconds')
 
         # The objects are not linked: modifying the inserted document or the fetched one will
         # have no effect on future retrievals.
