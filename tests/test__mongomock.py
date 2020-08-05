@@ -1551,6 +1551,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.update_one({'name': 'bob'}, {'$pull': {'sizes': {'$in': [1, 3]}}})
         self.cmp.compare.find({'name': 'bob'})
 
+    def test__pull_in_nested_field(self):
+        self.cmp.do.remove()
+        self.cmp.do.insert_one({'name': 'bob', 'nested': {'sizes': [0, 1, 2, 3, 4, 5]}})
+        self.cmp.do.update_one({'name': 'bob'}, {'$pull': {'nested.sizes': {'$in': [1, 3]}}})
+        self.cmp.compare.find({'name': 'bob'})
+
     def test__pull_nested_dict(self):
         self.cmp.do.remove()
         self.cmp.do.insert({

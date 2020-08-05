@@ -1012,6 +1012,20 @@ class CollectionAPITest(TestCase):
         self.db.collection.update_one({}, {'$pull': {'arr': {'$in': ['a1']}}})
         self.assertEqual({'b': 0, 'arr': ['a2']}, self.db.collection.find_one({}, {'_id': 0}))
 
+    def test__update_pull_in_nested(self):
+        self.db.collection.insert_one({'food': {
+            'fruits': ['apples', 'pears', 'oranges', 'grapes', 'bananas'],
+            'vegetables': ['carrots', 'celery', 'squash', 'carrots'],
+        }})
+        self.db.collection.update_one({}, {'$pull': {
+            'food.fruits': {'$in': ['apples', 'oranges']},
+            'food.vegetables': 'carrots',
+        }})
+        self.assertEqual({'food': {
+            'fruits': ['pears', 'grapes', 'bananas'],
+            'vegetables': ['celery', 'squash'],
+        }}, self.db.collection.find_one({}, {'_id': 0}))
+
     def test__update_pop(self):
         self.db.collection.insert({'name': 'bob', 'hat': ['green', 'tall']})
         self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': 1}})
@@ -5545,3 +5559,8 @@ class CollectionAPITest(TestCase):
 
     def test_snapshot_arg(self):
         self.db.collection.find(snapshot=False)
+
+    def test_model_id(self):
+        self.db.collection.insert_one({'id': 1, 'model_id': 'aaaa'})
+        doc = self.db.collection.find_one()
+        assert doc['id'] == 1

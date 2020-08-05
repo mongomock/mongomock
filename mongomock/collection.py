@@ -745,7 +745,7 @@ class Collection(object):
                                         arr.remove(obj)
                                         continue
 
-                                    if filter_applies({field: value}, {field: obj}):
+                                    if filter_applies({'field': value}, {'field': obj}):
                                         arr.remove(obj)
                             else:
                                 for obj in arr_copy:
