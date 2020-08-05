@@ -129,3 +129,8 @@ class MongoClientApiTest(unittest.TestCase):
             client.one_db.my_collec.insert_one({})
             result = client.one_db.my_collec.find_one({})
             self.assertTrue(result)
+
+    def test_start_session(self):
+        client = mongomock.MongoClient()
+        with self.assertRaises(NotImplementedError):
+            client.start_session()

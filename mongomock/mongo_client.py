@@ -155,3 +155,7 @@ class MongoClient(object):
         In our case as we mock the actual server, we should always return True.
         """
         return True
+
+    def start_session(self, causal_consistency=True, default_transaction_options=None):
+        """Start a logical session."""
+        raise NotImplementedError('Mongomock does not support sessions yet')
