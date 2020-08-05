@@ -988,11 +988,14 @@ class Collection(object):
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
              batch_size=0, manipulate=True, collation=None, session=None,
-             max_time_ms=None):
+             max_time_ms=None, **kwargs):
         spec = filter
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
+        for kwarg, value in iteritems(kwargs):
+            if value:
+                raise OperationFailure("Unrecognized field '%s'" % kwarg)
         return Cursor(self, spec, sort, projection, skip, limit,
                       collation=collation).max_time_ms(max_time_ms)
 

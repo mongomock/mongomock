@@ -500,7 +500,7 @@ class CollectionAPITest(TestCase):
         ]
 
         for option in options:
-            with self.assertRaises(TypeError):
+            with self.assertRaises(mongomock.OperationFailure):
                 self.db.collection.find({}, **option)
 
     def test__find_and_modify_cannot_remove_and_new(self):
@@ -5542,3 +5542,6 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(mongomock.WriteError):
             collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
+
+    def test_snapshot_arg(self):
+        self.db.collection.find(snapshot=False)
