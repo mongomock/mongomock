@@ -635,6 +635,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'field': {'$elemMatch': {'a': 1}}})
         self.cmp.compare.find({'field': {'$elemMatch': {'b': {'$gt': 3}}}})
 
+    def test__find_by_elemMatchDirectQuery(self):
+        self.cmp.do.insert_many([
+            {'_id': 0, 'arr': [0, 1, 2, 3, 10]},
+            {'_id': 1, 'arr': [0, 2, 4, 6]},
+            {'_id': 2, 'arr': [1, 3, 5, 7]}
+        ])
+        self.cmp.compare_ignore_order.find({'arr': {'$elemMatch': {'$lt': 10, '$gt': 4}}})
+
     def test__find_in_array(self):
         self.cmp.do.insert({'field': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}]})
 

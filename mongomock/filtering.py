@@ -170,7 +170,14 @@ class _Filterer(object):
             return False
         if not isinstance(query, dict):
             raise OperationFailure('$elemMatch needs an Object')
-        return any(self.apply(query, item) for item in doc_val)
+        for item in doc_val:
+            try:
+                if self.apply(query, item):
+                    return True
+            except OperationFailure:
+                if self.apply({'field': query}, {'field': item}):
+                    return True
+        return False
 
     def _all_op(self, doc_val, search_val):
         if isinstance(doc_val, list) and doc_val and isinstance(doc_val[0], list):

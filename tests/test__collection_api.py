@@ -5560,7 +5560,12 @@ class CollectionAPITest(TestCase):
     def test_snapshot_arg(self):
         self.db.collection.find(snapshot=False)
 
-    def test_model_id(self):
-        self.db.collection.insert_one({'id': 1, 'model_id': 'aaaa'})
-        doc = self.db.collection.find_one()
-        assert doc['id'] == 1
+    def test_elem_match(self):
+        self.db.collection.insert_many([
+            {'_id': 0, 'arr': [0, 1, 2, 3, 10]},
+            {'_id': 1, 'arr': [0, 2, 4, 6]},
+            {'_id': 2, 'arr': [1, 3, 5, 7]}
+        ])
+        ids = set(doc['_id'] for doc in self.db.collection.find(
+            {'arr': {'$elemMatch': {'$lt': 10, '$gt': 4}}}, {'_id': 1}))
+        self.assertEqual({1, 2}, ids)
