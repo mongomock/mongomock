@@ -3293,6 +3293,11 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         for item in items:
             self.cmp.compare_exceptions.aggregate(item)
 
+    def test__create_duplicate_index(self):
+        self.cmp.do.create_index([('value', 1)])
+        self.cmp.do.create_index([('value', 1)])
+        self.cmp.compare_exceptions.create_index([('value', 1)], unique=True)
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)

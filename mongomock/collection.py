@@ -1460,10 +1460,16 @@ class Collection(object):
         index_dict = {'key': index_list}
         if is_sparse:
             index_dict['sparse'] = True
+        if is_unique:
+            index_dict['unique'] = True
+
+        existing_index = self._store.indexes.get(index_name)
+        if existing_index and index_dict != existing_index:
+            raise OperationFailure(
+                'Index with name: %s already exists with different options' % index_name)
 
         # Check that documents already verify the uniquess of this new index.
         if is_unique:
-            index_dict['unique'] = True
             indexed = set()
             indexed_list = []
             for doc in self._store.documents:

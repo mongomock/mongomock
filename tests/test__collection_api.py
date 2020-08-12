@@ -1301,6 +1301,12 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__create_index_duplicate(self):
+        self.db.collection.create_index([('value', 1)])
+        self.db.collection.create_index([('value', 1)])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.create_index([('value', 1)], unique=True)
+
     def test__create_index_wrong_type(self):
         with self.assertRaises(TypeError):
             self.db.collection.create_index({'value': 1})
