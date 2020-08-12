@@ -72,7 +72,7 @@ def create_index_list(key_or_list, direction=None):
 def gen_index_name(index_list):
     """Generate an index name based on the list of keys with directions."""
 
-    return '_'.join('_'.join([str(i) for i in ix]) for ix in index_list)
+    return u'_'.join(['%s_%s' % item for item in index_list])
 
 
 class hashdict(dict):
