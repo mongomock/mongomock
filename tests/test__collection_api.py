@@ -1313,9 +1313,17 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
-    def test__create_ttl_index(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.create_index([('value', 1)], expireAfterSeconds=3600)
+    def test__ttl_index_record_expiration(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    # def test__ttl_of_array_field_expiration
+    # def test__ttl_of_array_field_without_datetime_does_not_expire
+    # def test__ttl_applied_to_compound_key_is_ignored
+    # def test__ttl_with_non_integer_value_is_ignored
+    # def test__ttl_expiration_of_0
+    # def test__create_indexes_with_expireAfterSeconds
 
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]

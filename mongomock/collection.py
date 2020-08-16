@@ -1244,6 +1244,8 @@ class Collection(object):
         updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter):
+        self._store.remove_expired_documents()
+
         # Validate the filter even if no documents can be returned.
         if self._store.is_empty:
             filter_applies(filter, {})
@@ -1450,8 +1452,6 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
-        if 'expireAfterSeconds' in kwargs:
-            raise NotImplementedError('Mongomock does not handle TTL index yet')
         index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
@@ -1462,6 +1462,8 @@ class Collection(object):
             index_dict['sparse'] = True
         if is_unique:
             index_dict['unique'] = True
+        if 'expireAfterSeconds' in kwargs:
+            index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
 
         existing_index = self._store.indexes.get(index_name)
         if existing_index and index_dict != existing_index:
@@ -1503,6 +1505,8 @@ class Collection(object):
             if not isinstance(index, IndexModel):
                 raise TypeError(
                     '%s is not an instance of pymongo.operations.IndexModel' % index)
+
+        # TODO: expireAfterSeconds awareness(?)
         return [
             self.create_index(
                 index.document['key'].items(),

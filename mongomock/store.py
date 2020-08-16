@@ -1,4 +1,5 @@
 import collections
+import datetime
 import six
 import threading
 
@@ -104,3 +105,29 @@ class CollectionStore(object):
     def documents(self):
         for doc in six.itervalues(self._documents):
             yield doc
+
+    def remove_expired_documents(self):
+        for index in six.itervalues(self.indexes):
+            # TODO: write test - compounds are ignored
+            #if len(index['key']) > 1:
+            #    continue
+
+            # TODO: write test - check for expireAfterSeconds=0 boundary condition
+            if index.get('expireAfterSeconds'):# is not None:
+                self._expire_documents(index)
+
+    def _expire_documents(self, index):
+        # TODO: write test - pymongo/MongoDB accept but ignore non-integer expireAfterSeconds values
+        print index
+        expiry = int(index['expireAfterSeconds'])
+        indexed_field = index['key'][0][0]
+        expired_ids = set()
+
+        for doc in six.itervalues(self._documents):
+            # TODO: sanity test? - docs w/out the index fields don't expire
+            if doc.get(indexed_field):
+                if (datetime.datetime.now() - doc[indexed_field]).total_seconds() >= expiry:
+                    expired_ids.add(doc['_id'])
+
+        for exp_id in expired_ids:
+            del self[exp_id]
