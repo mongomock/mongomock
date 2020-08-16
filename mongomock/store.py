@@ -108,18 +108,18 @@ class CollectionStore(object):
 
     def remove_expired_documents(self):
         for index in six.itervalues(self.indexes):
-            # TODO: write test - compounds are ignored
-            #if len(index['key']) > 1:
-            #    continue
-
             # TODO: write test - check for expireAfterSeconds=0 boundary condition
             if index.get('expireAfterSeconds'):# is not None:
                 self._expire_documents(index)
 
     def _expire_documents(self, index):
-        # TODO: write test - pymongo/MongoDB accept but ignore non-integer expireAfterSeconds values
         print index
+        # TODO: write test - pymongo/MongoDB accept, but ignore non-integer expireAfterSeconds values
         expiry = int(index['expireAfterSeconds'])
+
+        # TODO: write test - compounds are ignored
+        #if len(index['key']) > 1:
+        #    continue
         indexed_field = index['key'][0][0]
         expired_ids = set()
 
