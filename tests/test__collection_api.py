@@ -16,6 +16,16 @@ import warnings
 import mongomock
 
 try:
+    from unittest import mock
+    _HAVE_MOCK = True
+except ImportError:
+    try:
+        import mock
+        _HAVE_MOCK = True
+    except ImportError:
+        _HAVE_MOCK = False
+
+try:
     from bson import codec_options
     from bson.errors import InvalidDocument
     from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
@@ -1369,6 +1379,17 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
         self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    @skipIf(not _HAVE_MOCK, 'mock not installed')
+    def test__ttl_expiry_with_mock(self):
+        now = datetime.utcnow()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=100)
+        self.db.collection.insert_one({'value': now + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        with mock.patch('mongomock.utcnow') as mongomock_utcnow:
+            mongomock_utcnow.return_value = now + timedelta(100)
+            self.assertEqual(self.db.collection.find({}).count(), 0)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_with_expireAfterSeconds(self):

@@ -73,7 +73,7 @@ except ImportError:
     class InvalidURI(ConfigurationError):
         pass
 
-from .helpers import ObjectId  # noqa
+from .helpers import ObjectId, utcnow  # noqa
 from mongomock.__version__ import __version__
 
 

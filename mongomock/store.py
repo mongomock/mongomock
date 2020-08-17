@@ -1,9 +1,9 @@
 import collections
 import datetime
+import mongomock
 import six
+import six.moves
 import threading
-
-from six.moves import reduce
 
 lock = threading.RLock()
 
@@ -137,7 +137,7 @@ class CollectionStore(object):
     def _value_meets_expiry(self, val, expiry):
         val_to_compare = _get_dt_from_value(val)
         try:
-            return (datetime.datetime.utcnow() - val_to_compare).total_seconds() >= expiry
+            return (mongomock.utcnow() - val_to_compare).total_seconds() >= expiry
         except TypeError:
             return False
 
@@ -146,7 +146,7 @@ def _get_dt_from_value(val):
     if not val:
         return datetime.datetime.max
     if isinstance(val, list):
-        return reduce(_min_dt, [datetime.datetime.max] + val)
+        return six.moves.reduce(_min_dt, [datetime.datetime.max] + val)
     return val
 
 
