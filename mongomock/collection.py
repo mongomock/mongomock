@@ -1462,7 +1462,7 @@ class Collection(object):
             index_dict['sparse'] = True
         if is_unique:
             index_dict['unique'] = True
-        if 'expireAfterSeconds' in kwargs:
+        if 'expireAfterSeconds' in kwargs and kwargs['expireAfterSeconds'] is not None:
             index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
 
         existing_index = self._store.indexes.get(index_name)
@@ -1506,11 +1506,11 @@ class Collection(object):
                 raise TypeError(
                     '%s is not an instance of pymongo.operations.IndexModel' % index)
 
-        # TODO: expireAfterSeconds awareness(?)
         return [
             self.create_index(
                 index.document['key'].items(),
                 session=session,
+                expireAfterSeconds=index.document.get('expireAfterSeconds'),
                 unique=index.document.get('unique', False),
                 sparse=index.document.get('sparse', False),
                 name=index.document.get('name'))

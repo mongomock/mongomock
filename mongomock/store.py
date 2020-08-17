@@ -3,6 +3,8 @@ import datetime
 import six
 import threading
 
+from six.moves import reduce
+
 lock = threading.RLock()
 
 
@@ -122,14 +124,34 @@ class CollectionStore(object):
         if len(index['key']) > 1:
             return
 
-        field = index['key'][0][0]
+        # "key" structure = list of (field name, direction) tuples
+        ttl_field_name = index['key'][0][0]
         expired_ids = {
-            doc['_id'] for doc in six.itervalues(self._documents) if self._doc_expired(doc, field, expiry)
+            doc['_id'] for doc in six.itervalues(self._documents)
+            if self._value_meets_expiry(doc.get(ttl_field_name), expiry)
         }
 
         for exp_id in expired_ids:
             del self[exp_id]
 
-    @staticmethod
-    def _doc_expired(doc, field, expiry):
-        return (datetime.datetime.now() - doc.get(field, datetime.datetime.max)).total_seconds() >= expiry
+    def _value_meets_expiry(self, val, expiry):
+        val_to_compare = _get_dt_from_value(val)
+        try:
+            return (datetime.datetime.now() - val_to_compare).total_seconds() >= expiry
+        except TypeError:
+            return False
+
+
+def _get_dt_from_value(val):
+    if not val:
+        return datetime.datetime.max
+    if isinstance(val, list):
+        return reduce(_min_dt, [datetime.datetime.max] + val)
+    return val
+
+
+def _min_dt(dt1, dt2):
+    try:
+        return dt1 if dt1 < dt2 else dt2
+    except TypeError:
+        return dt1

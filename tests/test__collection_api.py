@@ -1315,6 +1315,11 @@ class CollectionAPITest(TestCase):
 
     def test__ttl_index_record_expiration(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': datetime.now() + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        self.db.collection.drop()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
         self.assertEqual(self.db.collection.find({}).count(), 0)
 
@@ -1333,9 +1338,44 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'field1': datetime.now(), 'field2': 'val2'})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
-    # def test__ttl_of_array_field_expiration
-    # def test__ttl_of_array_field_without_datetime_does_not_expire
-    # def test__create_indexes_with_expireAfterSeconds
+    def test__ttl_of_array_field_expiration(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.now() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        self.db.collection.drop()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.now() - timedelta(seconds=5),
+                datetime.now() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_of_array_field_without_datetime_does_not_expire(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_indexes_with_expireAfterSeconds(self):
+        indexes = [
+            pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], expireAfterSeconds=5),
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(1, len(index_names))
+
+        self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
