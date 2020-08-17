@@ -1452,6 +1452,8 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
+        if 'expireAt' in kwargs:
+            raise NotImplementedError('Mongomock does not handle expireAt TTL index yet')
         index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)

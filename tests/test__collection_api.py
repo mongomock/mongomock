@@ -1313,6 +1313,10 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
+    def test__expireAt_ttl_index(self):
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.create_index([('value', 1)], expireAt=datetime.now())
+
     def test__ttl_index_record_expiration(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': datetime.now() + timedelta(seconds=100)})
