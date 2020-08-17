@@ -1315,31 +1315,31 @@ class CollectionAPITest(TestCase):
 
     def test__expireAt_ttl_index(self):
         with self.assertRaises(NotImplementedError):
-            self.db.collection.create_index([('value', 1)], expireAt=datetime.now())
+            self.db.collection.create_index([('value', 1)], expireAt=datetime.utcnow())
 
     def test__ttl_index_record_expiration(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
-        self.db.collection.insert_one({'value': datetime.now() + timedelta(seconds=100)})
+        self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
         self.db.collection.drop()
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
-        self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
         self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__ttl_expiration_of_0(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
-        self.db.collection.insert_one({'value': datetime.now()})
+        self.db.collection.insert_one({'value': datetime.utcnow()})
         self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__ttl_with_non_integer_value_is_ignored(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds='a')
-        self.db.collection.insert_one({'value': datetime.now()})
+        self.db.collection.insert_one({'value': datetime.utcnow()})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__ttl_applied_to_compound_key_is_ignored(self):
         self.db.collection.create_index([('field1', 1), ('field2', 1)], expireAfterSeconds=0)
-        self.db.collection.insert_one({'field1': datetime.now(), 'field2': 'val2'})
+        self.db.collection.insert_one({'field1': datetime.utcnow(), 'field2': 'val2'})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test__ttl_of_array_field_expiration(self):
@@ -1348,7 +1348,7 @@ class CollectionAPITest(TestCase):
             'value': [
                 'a',
                 'b',
-                datetime.now() + timedelta(seconds=100)
+                datetime.utcnow() + timedelta(seconds=100)
             ]
         })
         self.assertEqual(self.db.collection.find({}).count(), 1)
@@ -1359,8 +1359,8 @@ class CollectionAPITest(TestCase):
             'value': [
                 'a',
                 'b',
-                datetime.now() - timedelta(seconds=5),
-                datetime.now() + timedelta(seconds=100)
+                datetime.utcnow() - timedelta(seconds=5),
+                datetime.utcnow() + timedelta(seconds=100)
             ]
         })
         self.assertEqual(self.db.collection.find({}).count(), 0)
@@ -1378,7 +1378,7 @@ class CollectionAPITest(TestCase):
         index_names = self.db.collection.create_indexes(indexes)
         self.assertEqual(1, len(index_names))
 
-        self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
         self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__create_indexes_wrong_type(self):

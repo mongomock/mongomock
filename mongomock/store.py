@@ -137,7 +137,7 @@ class CollectionStore(object):
     def _value_meets_expiry(self, val, expiry):
         val_to_compare = _get_dt_from_value(val)
         try:
-            return (datetime.datetime.now() - val_to_compare).total_seconds() >= expiry
+            return (datetime.datetime.utcnow() - val_to_compare).total_seconds() >= expiry
         except TypeError:
             return False
 
