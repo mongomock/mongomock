@@ -1318,11 +1318,23 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': datetime.now() - timedelta(seconds=5)})
         self.assertEqual(self.db.collection.find({}).count(), 0)
 
+    def test__ttl_expiration_of_0(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.now()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_with_non_integer_value_is_ignored(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds='a')
+        self.db.collection.insert_one({'value': datetime.now()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_applied_to_compound_key_is_ignored(self):
+        self.db.collection.create_index([('field1', 1), ('field2', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'field1': datetime.now(), 'field2': 'val2'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
     # def test__ttl_of_array_field_expiration
     # def test__ttl_of_array_field_without_datetime_does_not_expire
-    # def test__ttl_applied_to_compound_key_is_ignored
-    # def test__ttl_with_non_integer_value_is_ignored
-    # def test__ttl_expiration_of_0
     # def test__create_indexes_with_expireAfterSeconds
 
     def test__create_indexes_wrong_type(self):

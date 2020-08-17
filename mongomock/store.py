@@ -108,26 +108,28 @@ class CollectionStore(object):
 
     def remove_expired_documents(self):
         for index in six.itervalues(self.indexes):
-            # TODO: write test - check for expireAfterSeconds=0 boundary condition
-            if index.get('expireAfterSeconds'):# is not None:
+            if index.get('expireAfterSeconds') is not None:
                 self._expire_documents(index)
 
     def _expire_documents(self, index):
-        print index
-        # TODO: write test - pymongo/MongoDB accept, but ignore non-integer expireAfterSeconds values
-        expiry = int(index['expireAfterSeconds'])
+        # Ignore non-integer values
+        try:
+            expiry = int(index['expireAfterSeconds'])
+        except ValueError:
+            return
 
-        # TODO: write test - compounds are ignored
-        #if len(index['key']) > 1:
-        #    continue
-        indexed_field = index['key'][0][0]
-        expired_ids = set()
+        # Ignore commpound keys
+        if len(index['key']) > 1:
+            return
 
-        for doc in six.itervalues(self._documents):
-            # TODO: sanity test? - docs w/out the index fields don't expire
-            if doc.get(indexed_field):
-                if (datetime.datetime.now() - doc[indexed_field]).total_seconds() >= expiry:
-                    expired_ids.add(doc['_id'])
+        field = index['key'][0][0]
+        expired_ids = {
+            doc['_id'] for doc in six.itervalues(self._documents) if self._doc_expired(doc, field, expiry)
+        }
 
         for exp_id in expired_ids:
             del self[exp_id]
+
+    @staticmethod
+    def _doc_expired(doc, field, expiry):
+        return (datetime.datetime.now() - doc.get(field, datetime.datetime.max)).total_seconds() >= expiry
