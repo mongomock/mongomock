@@ -4,7 +4,6 @@
 _IGNORED_FEATURES = {
     'collation': False,
     'session': False,
-    'expireAt TTL index': False,
 }
 
 
