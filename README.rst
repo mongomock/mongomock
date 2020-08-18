@@ -146,8 +146,9 @@ Similarly, if you'd like to run tox against a specific environment in the contai
 
  docker-compose run --rm mongomock tox -e py35-pymongo-pyexecjs
 
-NOTE: If the MongoDB image was updated, you'll want to make sure you do a `docker-compose down` before
-you run any tests, to ensure the newest image gets updated - otherwise, tests will most likley fail.
+NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
+you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
+the intended version.
 
 
 Branching model
