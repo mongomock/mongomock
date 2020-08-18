@@ -134,7 +134,7 @@ Alternatively, docker-compose can be used to simplify dependency management for 
  docker-compose build
  docker-compose run --rm mongomock
 
-If you need/want tox to recreate it's environments, you can override the container command by running:
+If you need/want tox to recreate its environments, you can override the container command by running:
 
 .. code-block:: bash
 
