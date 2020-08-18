@@ -378,7 +378,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'a': 0})
         self.cmp.compare.estimated_document_count()
         self.cmp.compare.estimated_document_count(skip=2)
-        self.cmp.compare.estimated_document_count(filter={'a': 1})
+        self.cmp.compare_exceptions.estimated_document_count(filter={'a': 1})
 
     def test__find_one(self):
         self.cmp.do.insert({'_id': 'id1', 'name': 'new'})
@@ -567,19 +567,20 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         regex = re.compile('bob|notsam')
         self.cmp.compare_ignore_order.find({'name': regex})
         self.cmp.compare_ignore_order.find({'name': {'$regex': regex}})
-        upper_regex = re.compile('Bob')
+        upper_regex = Regex('Bob')
         self.cmp.compare_ignore_order.find({'name': {'$regex': upper_regex}})
-        # TODO(pascal): Use a simple dicts once the bug
-        # https://jira.mongodb.org/browse/SERVER-38621 is fixed.
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'i')
-        ])})
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'I')
-        ])})
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'z')
-        ])})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'i',
+        }})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'I',
+        }})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'z',
+        }})
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -915,14 +916,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'a': 1, 'b': [{'c': 3, 'd': 4}, {'c': 5, 'd': 6}]})
 
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b': 1})
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b.c', 1), ('b', 1)]))
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c': 1})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c.e': 1})
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b.c.e', 0)]))
 
         # This one is not implemented in mongmock yet.
@@ -1084,7 +1085,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__projection_slice_list_select_subfield(self):
         self.cmp.do.insert({'name': 'Array', 'values': [
             {'num': 0, 'val': 1}, {'num': 1, 'val': 2}]})
-        self.cmp.compare.find({'name': 'Array'}, projection={
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
             'values.num': 1, 'values': {'$slice': 1}})
 
     def test__projection_slice_list_wrong_num_slice(self):

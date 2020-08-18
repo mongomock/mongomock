@@ -208,15 +208,20 @@ def _combine_projection_spec(projection_fields_spec):
     tmp_spec = OrderedDict()
     for f, v in iteritems(projection_fields_spec):
         if '.' not in f:
-            if isinstance(tmp_spec.get(f), dict) and not v:
-                raise NotImplementedError(
-                    'Mongomock does not support overriding excluding projection: %s' %
-                    projection_fields_spec)
+            if isinstance(tmp_spec.get(f), dict):
+                if not v:
+                    raise NotImplementedError(
+                        'Mongomock does not support overriding excluding projection: %s' %
+                        projection_fields_spec)
+                raise OperationFailure('Path collision at %s' % f)
             tmp_spec[f] = v
         else:
             split_field = f.split('.', 1)
             base_field, new_field = tuple(split_field)
             if not isinstance(tmp_spec.get(base_field), dict):
+                if base_field in tmp_spec:
+                    raise OperationFailure(
+                        'Path collision at %s remaining portion %s' % (f, new_field))
                 tmp_spec[base_field] = OrderedDict()
             tmp_spec[base_field][new_field] = v
 
@@ -1434,13 +1439,11 @@ class Collection(object):
     def estimated_document_count(self, **kwargs):
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
-        # Only some kwargs are recognized by this method, however the others
-        # are ignored silently by pymongo.
-        fwd_kwargs = {
-            k: v for k, v in iteritems(kwargs)
-            if k in {'skip', 'limit', 'maxTimeMS', 'hint'}
-        }
-        return self.count_documents({}, **fwd_kwargs)
+        unknown_kwargs = set(kwargs) - {'skip', 'limit', 'maxTimeMS', 'hint'}
+        if unknown_kwargs:
+            raise OperationFailure(
+                "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
+        return self.count_documents({}, **kwargs)
 
     def drop(self, session=None):
         if session:
@@ -1552,14 +1555,13 @@ class Collection(object):
                 information,
                 key=dict(information['key']),
                 name=name,
-                v=2,
-                ns=self.full_name)
+                v=2)
 
     def index_information(self, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return {
-            name: dict(index, v=2, ns=self.full_name)
+            name: dict(index, v=2)
             for name, index in self._list_all_indexes()
         }
 

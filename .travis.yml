@@ -4,7 +4,7 @@ os: linux
 dist: xenial
 env:
   global:
-    - MONGODB=4.1.1
+    - MONGODB=4.4.0
 jobs:
   include:
     - python: 2.7
@@ -39,15 +39,15 @@ before_install:
   - "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10"
   - "sudo apt-get update"
 before_script:
-  - mkdir ${PWD}/mongodb-linux-x86_64-${MONGODB}/data
-  - ${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-${MONGODB}/mongodb.log --fork
+  - mkdir ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data
+  - ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/mongodb.log --fork
   - "until nc -z localhost 27017; do echo Waiting for MongoDB; sleep 1; done"
 after_script:
   - pkill mongod
 install:
-  - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-${MONGODB}.tgz
-  - tar xzf mongodb-linux-x86_64-${MONGODB}.tgz
-  - ${PWD}/mongodb-linux-x86_64-${MONGODB}/bin/mongod --version
+  - wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-${MONGODB}.tgz
+  - tar xzf mongodb-linux-x86_64-ubuntu1604-${MONGODB}.tgz
+  - ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/bin/mongod --version
   - pip install tox
 deploy:
   provider: pypi
