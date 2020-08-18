@@ -56,6 +56,7 @@ from mongomock.filtering import resolve_key
 from mongomock.filtering import resolve_sort_key
 from mongomock import helpers
 from mongomock import InvalidOperation
+from mongomock.not_implemented import raise_for_feature as raise_not_implemented
 from mongomock import ObjectId
 from mongomock import OperationFailure
 from mongomock.read_concern import ReadConcern
@@ -207,15 +208,20 @@ def _combine_projection_spec(projection_fields_spec):
     tmp_spec = OrderedDict()
     for f, v in iteritems(projection_fields_spec):
         if '.' not in f:
-            if isinstance(tmp_spec.get(f), dict) and not v:
-                raise NotImplementedError(
-                    'Mongomock does not support overriding excluding projection: %s' %
-                    projection_fields_spec)
+            if isinstance(tmp_spec.get(f), dict):
+                if not v:
+                    raise NotImplementedError(
+                        'Mongomock does not support overriding excluding projection: %s' %
+                        projection_fields_spec)
+                raise OperationFailure('Path collision at %s' % f)
             tmp_spec[f] = v
         else:
             split_field = f.split('.', 1)
             base_field, new_field = tuple(split_field)
             if not isinstance(tmp_spec.get(base_field), dict):
+                if base_field in tmp_spec:
+                    raise OperationFailure(
+                        'Path collision at %s remaining portion %s' % (f, new_field))
                 tmp_spec[base_field] = OrderedDict()
             tmp_spec[base_field][new_field] = v
 
@@ -462,7 +468,7 @@ class Collection(object):
 
     def _insert(self, data, session=None, ordered=True):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if not isinstance(data, Mapping):
             results = []
             write_errors = []
@@ -586,7 +592,7 @@ class Collection(object):
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, hint=None, session=None, **kwargs):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if hint:
             raise NotImplementedError(
                 'The hint argument of update is valid but has not been implemented in '
@@ -1299,7 +1305,7 @@ class Collection(object):
                          upsert=False, sort=None,
                          return_document=ReturnDocument.BEFORE, session=None, **kwargs):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         remove = kwargs.get('remove', False)
         if kwargs.get('new', False) and remove:
             # message from mongodb
@@ -1354,11 +1360,12 @@ class Collection(object):
                 'The hint argument of delete is valid but has not been implemented in '
                 'mongomock yet')
         if collation:
-            raise NotImplementedError(
+            raise_not_implemented(
+                'collation',
                 'The collation argument of delete is valid but has not been '
                 'implemented in mongomock yet')
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
@@ -1396,7 +1403,7 @@ class Collection(object):
             '$nearSphere must be replaced by $geoWithin with $centerSphere',
             DeprecationWarning, stacklevel=2)
         if kwargs.pop('session', None):
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if filter is None:
             return len(self._store)
         spec = helpers.patch_datetime_awareness_in_document(filter)
@@ -1404,11 +1411,12 @@ class Collection(object):
 
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
-            raise NotImplementedError(
+            raise_not_implemented(
+                'collation',
                 'The collation argument of count_documents is valid but has not been '
                 'implemented in mongomock yet')
         if kwargs.pop('session', None):
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         skip = kwargs.pop('skip', 0)
         if 'limit' in kwargs:
             limit = kwargs.pop('limit')
@@ -1431,17 +1439,15 @@ class Collection(object):
     def estimated_document_count(self, **kwargs):
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
-        # Only some kwargs are recognized by this method, however the others
-        # are ignored silently by pymongo.
-        fwd_kwargs = {
-            k: v for k, v in iteritems(kwargs)
-            if k in {'skip', 'limit', 'maxTimeMS', 'hint'}
-        }
-        return self.count_documents({}, **fwd_kwargs)
+        unknown_kwargs = set(kwargs) - {'skip', 'limit', 'maxTimeMS', 'hint'}
+        if unknown_kwargs:
+            raise OperationFailure(
+                "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
+        return self.count_documents({}, **kwargs)
 
     def drop(self, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self.database.drop_collection(self.name)
 
     def ensure_index(self, key_or_list, cache_for=300, **kwargs):
@@ -1449,9 +1455,9 @@ class Collection(object):
 
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if 'expireAfterSeconds' in kwargs:
-            raise NotImplementedError('Mongomock does not handle TTL index yet')
+            raise_not_implemented('TTL index', 'Mongomock does not handle TTL index yet')
         index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
@@ -1515,7 +1521,7 @@ class Collection(object):
 
     def drop_index(self, index_or_name, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if isinstance(index_or_name, list):
             name = helpers.gen_index_name(index_or_name)
         else:
@@ -1527,12 +1533,12 @@ class Collection(object):
 
     def drop_indexes(self, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self._store.indexes = {}
 
     def reindex(self, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
 
     def _list_all_indexes(self):
         if not self._store.is_created:
@@ -1543,20 +1549,19 @@ class Collection(object):
 
     def list_indexes(self, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         for name, information in self._list_all_indexes():
             yield dict(
                 information,
                 key=dict(information['key']),
                 name=name,
-                v=2,
-                ns=self.full_name)
+                v=2)
 
     def index_information(self, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return {
-            name: dict(index, v=2, ns=self.full_name)
+            name: dict(index, v=2)
             for name, index in self._list_all_indexes()
         }
 
@@ -1568,7 +1573,7 @@ class Collection(object):
                 "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
             )
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if limit == 0:
             limit = None
         start_time = _get_perf_counter()
@@ -1665,7 +1670,7 @@ class Collection(object):
 
     def distinct(self, key, filter=None, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return self.find(filter).distinct(key)
 
     def group(self, key, condition, initial, reduce, finalize=None):
@@ -1761,7 +1766,7 @@ class Collection(object):
 
     def rename(self, new_name, session=None, **kwargs):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
@@ -1770,7 +1775,8 @@ class Collection(object):
                 'Skipping document validation is a valid MongoDB operation;'
                 ' however Mongomock does not support it yet.')
         if session:
-            raise NotImplementedError(
+            raise_not_implemented(
+                'session',
                 'Sessions are valid in MongoDB 3.6 and newer; however Mongomock'
                 ' does not support them yet.')
         bulk = BulkOperationBuilder(self, ordered=ordered)
@@ -1893,7 +1899,7 @@ class Cursor(object):
 
     def distinct(self, key, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if not isinstance(key, string_types):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()

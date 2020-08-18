@@ -9,7 +9,7 @@ import numbers
 import operator
 import re
 from sentinels import NOTHING
-from six import iteritems, iterkeys, string_types, PY3
+from six import iteritems, string_types, PY3
 try:
     from types import NoneType
 except ImportError:
@@ -431,11 +431,6 @@ def _combine_regex_options(search):
         return search_copy
 
     if isinstance(search['$regex'], _RE_TYPES):
-        keys = [k for k in iterkeys(search) if k in {'$regex', '$options'}]
-        if keys == ['$options', '$regex']:
-            raise NotImplementedError(
-                'Do not use compiled regular expressions with $options until '
-                'https://jira.mongodb.org/browse/SERVER-38621 is solved.')
         if isinstance(search['$regex'], RE_TYPE):
             search_copy['$regex'] = re.compile(
                 search['$regex'].pattern, search['$regex'].flags | options)
