@@ -31,3 +31,4 @@ ADD . mongomock
 WORKDIR mongomock
 RUN chmod u+x docker_entrypoint.sh
 ENTRYPOINT ["./docker_entrypoint.sh"]
+CMD ["tox"]
