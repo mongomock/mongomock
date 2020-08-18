@@ -16,19 +16,6 @@ RUN pyenv install 3.8.5
 RUN pyenv install pypy2.7-7.1.1
 RUN pyenv local 2.7.18 3.4.10 3.5.9 3.6.11 3.7.8 3.8.5 pypy2.7-7.1.1
 
-# Changes to MongoDB installation should be kept in sync with .travis.yml install step
-ARG MONGODB=4.1.1
-ENV MONGODB=$MONGODB
-RUN wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-$MONGODB.tgz
-RUN tar xzf mongodb-linux-x86_64-$MONGODB.tgz
-RUN mongodb-linux-x86_64-$MONGODB/bin/mongod --version
-RUN mkdir -p /data/db
-RUN ln -s /mongodb-linux-x86_64-$MONGODB/bin/mongod /usr/bin/mongod
-
 RUN pip install tox
 
-ADD . mongomock
-WORKDIR mongomock
-RUN chmod u+x docker_entrypoint.sh
-ENTRYPOINT ["./docker_entrypoint.sh"]
-CMD ["tox"]
+CMD ["python"]
