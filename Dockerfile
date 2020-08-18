@@ -16,7 +16,8 @@ RUN pyenv install 3.8.5
 RUN pyenv install pypy2.7-7.1.1
 RUN pyenv local 2.7.18 3.4.10 3.5.9 3.6.11 3.7.8 3.8.5 pypy2.7-7.1.1
 
-ENV MONGODB=4.1.1
+ARG MONGODB=4.1.1
+ENV MONGODB=$MONGODB
 RUN wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-$MONGODB.tgz
 RUN tar xzf mongodb-linux-x86_64-$MONGODB.tgz
 RUN mongodb-linux-x86_64-$MONGODB/bin/mongod --version
