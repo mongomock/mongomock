@@ -362,6 +362,18 @@ class _Parser(object):
         if operator == '$concat':
             parsed_list = list(self.parse_many(values))
             return None if None in parsed_list else ''.join([str(x) for x in parsed_list])
+        if operator == '$split':
+            if len(values) != 2:
+                raise OperationFailure('split must have 2 items')
+            string = self.parse(values[0])
+            delimiter = self.parse(values[1])
+            if string is None or delimiter is None:
+                return None
+            if not isinstance(string, six.string_types):
+                raise OperationFailure('split first argument must evaluate to string')
+            if not isinstance(delimiter, six.string_types):
+                raise OperationFailure('split second argument must evaluate to string')
+            return string.split(delimiter)
         if operator == '$substr':
             if len(values) != 3:
                 raise OperationFailure('substr must have 3 items')
