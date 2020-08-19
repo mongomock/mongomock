@@ -3636,11 +3636,11 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([{'$project': {
                 'split': {'$split': ['$a', '$b', '$c']}
             }}])
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(TypeError):
             self.db.collection.aggregate([{'$project': {
                 'split': {'$split': ['$a', 1]}
             }}])
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(TypeError):
             self.db.collection.aggregate([{'$project': {
                 'split': {'$split': [1, '$a']}
             }}])
@@ -3659,8 +3659,10 @@ class CollectionAPITest(TestCase):
             'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
-            'split_missing_string': {'$split': [None, 'l']},
-            'split_missing_delimiter': {'$split': ['$a', None]},
+            'split_string_none': {'$split': [None, 'l']},
+            'split_string_missing': {'$split': ['$missingField', 'l']},
+            'split_delimiter_none': {'$split': ['$a', None]},
+            'split_delimiter_missing': {'$split': ['$a', '$missingField']},
             'split': {'$split': ['$a', 'l']},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
@@ -3674,8 +3676,10 @@ class CollectionAPITest(TestCase):
               'sub3': 'llo',
               'lower': 'hello',
               'lower_err': '',
-              'split_missing_string': None,
-              'split_missing_delimiter': None,
+              'split_string_none': None,
+              'split_string_missing': None,
+              'split_delimiter_none': None,
+              'split_delimiter_missing': None,
               'split': ['He', '', 'o'],
               'strcasecmp': -1,
               'upper': 'HELLO',
