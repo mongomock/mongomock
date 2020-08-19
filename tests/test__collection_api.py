@@ -3686,6 +3686,21 @@ class CollectionAPITest(TestCase):
               'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_regexpmatch(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'Hello': {'$regexMatch': {'input': '$a', 'regex': 'Hel*o'}},
+            'Word': {'$regexMatch': {'input': '$b', 'regex': 'Word'}},
+            'missing-field': {'$regexMatch': {'input': '$d', 'regex': 'orl'}},
+        }}])
+        self.assertEqual(
+            [{'Hello': True, 'Word': False, 'missing-field': False}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
     def test__aggregate_add_fields(self):
         self.db.collection.insert_one({
             'a': 1.5,
