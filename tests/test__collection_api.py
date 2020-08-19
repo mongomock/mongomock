@@ -3618,6 +3618,33 @@ class CollectionAPITest(TestCase):
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_string_operation_split_exceptions(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': []}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a']}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', '$b', '$c']}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', 1]}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': [1, '$a']}
+            }}])
+
     def test__aggregate_string_operations(self):
         self.db.collection.insert_one({
             'a': 'Hello',
@@ -3632,14 +3659,31 @@ class CollectionAPITest(TestCase):
             'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
+            'split_string_none': {'$split': [None, 'l']},
+            'split_string_missing': {'$split': ['$missingField', 'l']},
+            'split_delimiter_none': {'$split': ['$a', None]},
+            'split_delimiter_missing': {'$split': ['$a', '$missingField']},
+            'split': {'$split': ['$a', 'l']},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
             'upper_err': {'$toUpper': None},
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
-              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1,
-              'upper': 'HELLO', 'upper_err': ''}],
+            [{'concat': 'Hello Dear World',
+              'concat_none': None,
+              'sub1': 'Hell',
+              'sub2': '',
+              'sub3': 'llo',
+              'lower': 'hello',
+              'lower_err': '',
+              'split_string_none': None,
+              'split_string_missing': None,
+              'split_delimiter_none': None,
+              'split_delimiter_missing': None,
+              'split': ['He', '', 'o'],
+              'strcasecmp': -1,
+              'upper': 'HELLO',
+              'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_add_fields(self):
