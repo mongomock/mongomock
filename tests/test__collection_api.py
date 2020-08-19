@@ -3618,6 +3618,33 @@ class CollectionAPITest(TestCase):
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_string_operation_split_exceptions(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': []}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a']}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', '$b', '$c']}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', 1]}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': [1, '$a']}
+            }}])
+
     def test__aggregate_string_operations(self):
         self.db.collection.insert_one({
             'a': 'Hello',
