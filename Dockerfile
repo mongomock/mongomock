@@ -1,3 +1,4 @@
+# OS+dist should be kept in sync with .travis.yml
 FROM ubuntu:xenial
 
 RUN apt-get update && apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev git netcat
@@ -17,5 +18,3 @@ RUN pyenv install pypy2.7-7.1.1
 RUN pyenv local 2.7.18 3.4.10 3.5.9 3.6.11 3.7.8 3.8.5 pypy2.7-7.1.1
 
 RUN pip install tox
-
-CMD ["python"]

@@ -17,5 +17,3 @@ services:
   mongo:
     # The image chosen here should be kept in sync with the .travis.yml mongo version
     image: mongo:4.4.0
-    ports:
-      - "27017:27017"

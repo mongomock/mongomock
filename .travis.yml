@@ -1,7 +1,7 @@
 language: python
 cache: pip
 os: linux
-dist: xenial
+dist: xenial # OS+dist should be kept in sync with Dockerfile
 env:
   global: # MongoDB version should be kept in sync with docker-compose image
     - MONGODB=4.4.0
