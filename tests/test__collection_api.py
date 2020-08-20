@@ -668,11 +668,10 @@ class CollectionAPITest(TestCase):
             self.db.collection.find_one({'a': {'$regex': 'tada', '$options': re.I}})
 
         # Bug https://jira.mongodb.org/browse/SERVER-38621
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.find_one({'a': collections.OrderedDict([
-                ('$options', 'i'),
-                ('$regex', re.compile('tada')),
-            ])})
+        self.assertTrue(self.db.collection.find_one({'a': collections.OrderedDict([
+            ('$options', 'i'),
+            ('$regex', re.compile('tada')),
+        ])}))
 
     def test__iterate_on_find_and_update(self):
         documents = [
@@ -1598,18 +1597,18 @@ class CollectionAPITest(TestCase):
 
         index_information = self.db.collection.index_information()
         self.assertEqual(
-            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)]}},
             index_information,
         )
         self.assertEqual(
-            [{'name': '_id_', 'key': {'_id': 1}, 'ns': 'somedb.collection', 'v': 2}],
+            [{'name': '_id_', 'key': {'_id': 1}, 'v': 2}],
             list(self.db.collection.list_indexes()),
         )
 
         del index_information['_id_']
 
         self.assertEqual(
-            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)]}},
             self.db.collection.index_information(),
             msg='index_information is immutable',
         )
@@ -1627,7 +1626,6 @@ class CollectionAPITest(TestCase):
         self.assertDictEqual(
             {
                 'key': [('value', 1)],
-                'ns': self.db.collection.full_name,
                 'v': 2,
             },
             self.db.collection.index_information()[index])
@@ -1649,7 +1647,6 @@ class CollectionAPITest(TestCase):
         self.assertDictEqual(
             {
                 'key': [('value', pymongo.ASCENDING)],
-                'ns': self.db.collection.full_name,
                 'unique': True,
                 'v': 2,
             },
@@ -1665,7 +1662,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.index_information()[index],
             {
                 'key': [('value', pymongo.DESCENDING)],
-                'ns': self.db.collection.full_name,
                 'unique': True,
                 'v': 2,
             })
@@ -1926,22 +1922,22 @@ class CollectionAPITest(TestCase):
         doc = {'a': 1, 'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]}
         self.db.collection.insert_one(doc)
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
-        self.assertEqual(result, doc)
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
-        self.assertEqual(result, {'a': 1, 'b': [{'c': 2}, {'c': 5}]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
-        self.assertEqual(result, {'b': [{'d': 3, 'e': 4}, {'d': 6, 'e': 7}]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
 
         # This one is tricky: the refinement 'b' overrides the previous 'b.c'
         # but it is not the equivalent of having only 'b'.
         with self.assertRaises(NotImplementedError):
-            result = self.db.collection.find_one(
+            self.db.collection.find_one(
                 {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
 
     def test__find_and_project(self):
@@ -3713,6 +3709,33 @@ class CollectionAPITest(TestCase):
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_string_operation_split_exceptions(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': []}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a']}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', '$b', '$c']}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', 1]}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': [1, '$a']}
+            }}])
+
     def test__aggregate_string_operations(self):
         self.db.collection.insert_one({
             'a': 'Hello',
@@ -3727,14 +3750,46 @@ class CollectionAPITest(TestCase):
             'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
+            'split_string_none': {'$split': [None, 'l']},
+            'split_string_missing': {'$split': ['$missingField', 'l']},
+            'split_delimiter_none': {'$split': ['$a', None]},
+            'split_delimiter_missing': {'$split': ['$a', '$missingField']},
+            'split': {'$split': ['$a', 'l']},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
             'upper_err': {'$toUpper': None},
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
-              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1,
-              'upper': 'HELLO', 'upper_err': ''}],
+            [{'concat': 'Hello Dear World',
+              'concat_none': None,
+              'sub1': 'Hell',
+              'sub2': '',
+              'sub3': 'llo',
+              'lower': 'hello',
+              'lower_err': '',
+              'split_string_none': None,
+              'split_string_missing': None,
+              'split_delimiter_none': None,
+              'split_delimiter_missing': None,
+              'split': ['He', '', 'o'],
+              'strcasecmp': -1,
+              'upper': 'HELLO',
+              'upper_err': ''}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_regexpmatch(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'Hello': {'$regexMatch': {'input': '$a', 'regex': 'Hel*o'}},
+            'Word': {'$regexMatch': {'input': '$b', 'regex': 'Word'}},
+            'missing-field': {'$regexMatch': {'input': '$d', 'regex': 'orl'}},
+        }}])
+        self.assertEqual(
+            [{'Hello': True, 'Word': False, 'missing-field': False}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_add_fields(self):

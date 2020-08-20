@@ -9,6 +9,7 @@ import itertools
 import math
 import numbers
 import random
+import re
 import warnings
 
 from sentinels import NOTHING
@@ -21,10 +22,12 @@ from mongomock import helpers
 from mongomock import OperationFailure
 
 try:
-    from bson import decimal128
+    from bson import Regex, decimal128
     decimal_support = True
+    _RE_TYPES = (helpers.RE_TYPE, Regex)
 except ImportError:
     decimal_support = False
+    _RE_TYPES = (helpers.RE_TYPE)
 
 _random = random.Random()
 
@@ -362,6 +365,22 @@ class _Parser(object):
         if operator == '$concat':
             parsed_list = list(self.parse_many(values))
             return None if None in parsed_list else ''.join([str(x) for x in parsed_list])
+        if operator == '$split':
+            if len(values) != 2:
+                raise OperationFailure('split must have 2 items')
+            try:
+                string = self.parse(values[0])
+                delimiter = self.parse(values[1])
+            except KeyError:
+                return None
+
+            if string is None or delimiter is None:
+                return None
+            if not isinstance(string, six.string_types):
+                raise TypeError('split first argument must evaluate to string')
+            if not isinstance(delimiter, six.string_types):
+                raise TypeError('split second argument must evaluate to string')
+            return string.split(delimiter)
         if operator == '$substr':
             if len(values) != 3:
                 raise OperationFailure('substr must have 3 items')
@@ -384,6 +403,66 @@ class _Parser(object):
                 raise OperationFailure('strcasecmp must have 2 items')
             a, b = str(self.parse(values[0])), str(self.parse(values[1]))
             return 0 if a == b else -1 if a < b else 1
+        if operator == '$regexMatch':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$regexMatch expects an object of named arguments but found: %s' % type(values))
+            for field in ('input', 'regex'):
+                if field not in values:
+                    raise OperationFailure("$regexMatch requires '%s' parameter" % field)
+            unknown_args = set(values) - {'input', 'regex', 'options'}
+            if unknown_args:
+                raise OperationFailure(
+                    '$regexMatch found an unknown argument: %s' % list(unknown_args)[0])
+
+            try:
+                input_value = self.parse(values['input'])
+            except KeyError:
+                return False
+            if not isinstance(input_value, six.string_types):
+                raise OperationFailure("$regexMatch needs 'input' to be of type string")
+
+            try:
+                regex_val = self.parse(values['regex'])
+            except KeyError:
+                return False
+            options = None
+            for option in values.get('options', ''):
+                if option not in 'imxs':
+                    raise OperationFailure(
+                        '$regexMatch invalid flag in regex options: %s' % option)
+                re_option = getattr(re, option.upper())
+                if options is None:
+                    options = re_option
+                else:
+                    options |= re_option
+            if isinstance(regex_val, str):
+                if options is None:
+                    regex = re.compile(regex_val)
+                else:
+                    regex = re.compile(regex_val, options)
+            elif 'options' in values and regex_val.flags:
+                raise OperationFailure(
+                    "$regexMatch: regex option(s) specified in both 'regex' and 'option' fields")
+            elif isinstance(regex_val, helpers.RE_TYPE):
+                if options and not regex_val.flags:
+                    regex = re.compile(regex_val.pattern, options)
+                elif regex_val.flags & ~(re.I | re.M | re.X | re.S):
+                    raise OperationFailure(
+                        '$regexMatch invalid flag in regex options: %s' % regex_val.flags)
+                else:
+                    regex = regex_val
+            elif isinstance(regex_val, _RE_TYPES):
+                # bson.Regex
+                if regex_val.flags & ~(re.I | re.M | re.X | re.S):
+                    raise OperationFailure(
+                        '$regexMatch invalid flag in regex options: %s' % regex_val.flags)
+                regex = re.compile(regex_val.pattern, regex_val.flags or options)
+            else:
+                raise OperationFailure("$regexMatch needs 'regex' to be of type string or regex")
+
+            return bool(regex.search(input_value))
+
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid string operator for the aggregation "

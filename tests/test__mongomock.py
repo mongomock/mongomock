@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from collections import OrderedDict
 import copy
 import datetime
@@ -268,7 +269,9 @@ class _CollectionComparisonTest(TestCase):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient(maxPoolSize=1)
+                return PymongoClient(
+                    host=os.environ.get('TEST_MONGO_HOST', 'localhost'), maxPoolSize=1
+                )
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
@@ -378,7 +381,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'a': 0})
         self.cmp.compare.estimated_document_count()
         self.cmp.compare.estimated_document_count(skip=2)
-        self.cmp.compare.estimated_document_count(filter={'a': 1})
+        self.cmp.compare_exceptions.estimated_document_count(filter={'a': 1})
 
     def test__find_one(self):
         self.cmp.do.insert({'_id': 'id1', 'name': 'new'})
@@ -567,19 +570,20 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         regex = re.compile('bob|notsam')
         self.cmp.compare_ignore_order.find({'name': regex})
         self.cmp.compare_ignore_order.find({'name': {'$regex': regex}})
-        upper_regex = re.compile('Bob')
+        upper_regex = Regex('Bob')
         self.cmp.compare_ignore_order.find({'name': {'$regex': upper_regex}})
-        # TODO(pascal): Use a simple dicts once the bug
-        # https://jira.mongodb.org/browse/SERVER-38621 is fixed.
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'i')
-        ])})
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'I')
-        ])})
-        self.cmp.compare_ignore_order.find({'name': OrderedDict([
-            ('$regex', upper_regex), ('$options', 'z')
-        ])})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'i',
+        }})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'I',
+        }})
+        self.cmp.compare_ignore_order.find({'name': {
+            '$regex': upper_regex,
+            '$options': 'z',
+        }})
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -915,14 +919,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert({'a': 1, 'b': [{'c': 3, 'd': 4}, {'c': 5, 'd': 6}]})
 
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b': 1})
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 1), ('b.c', 1), ('b', 1)]))
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c': 1})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 0, 'b.c': 0})
         self.cmp.compare.find_one({'a': 1}, {'_id': 0, 'a': 1, 'b.c.e': 1})
-        self.cmp.compare.find_one(
+        self.cmp.compare_exceptions.find_one(
             {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b.c.e', 0)]))
 
         # This one is not implemented in mongmock yet.
@@ -1084,7 +1088,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__projection_slice_list_select_subfield(self):
         self.cmp.do.insert({'name': 'Array', 'values': [
             {'num': 0, 'val': 1}, {'num': 1, 'val': 2}]})
-        self.cmp.compare.find({'name': 'Array'}, projection={
+        self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
             'values.num': 1, 'values': {'$slice': 1}})
 
     def test__projection_slice_list_wrong_num_slice(self):
@@ -2157,7 +2161,6 @@ class _GroupTest(_CollectionComparisonTest):
 
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-@skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def setUp(self):
@@ -2636,11 +2639,97 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'sub1': {'$substr': ['$a', 0, 4]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
+            'split_string_none': {'$split': [None, 'l']},
+            'split_string_missing': {'$split': ['$missingField', 'l']},
+            'split_delimiter_none': {'$split': ['$a', None]},
+            'split_delimiter_missing': {'$split': ['$a', '$missingField']},
+            'split': {'$split': ['$a', 'l']},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
             'upper_err': {'$toUpper': None},
         }}]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_regexpmatch(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'description': 'Single LINE description.'},
+            {'_id': 2, 'description': 'First lines\nsecond line'},
+            {'_id': 3, 'description': 'Many spaces before     line'},
+            {'_id': 4, 'description': 'Multiple\nline descriptions'},
+            {'_id': 5, 'description': 'anchors, links and hyperlinks'},
+            {'_id': 6, 'description': u'métier work vocation'}
+        ])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 'line'}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 'lin(e|k)'}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 'line', 'options': 'i'}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': Regex('line', 'i')}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': 'line(e|k) # matches line or link',
+                'options': 'x',
+            }},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': 'm.*line', 'options': 'si',
+            }},
+        }}])
+
+        # Missing fields
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$missing', 'regex': 'line'}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': '$missing'}},
+        }}])
+
+        # Exceptions
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': ['$description', 'line']},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'inut': '$description', 'regex': 'line'}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 'line', 'other': True}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': 42, 'regex': 'line'}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 'line', 'options': '?'}},
+        }}])
+        self.cmp.compare.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': Regex('line'), 'options': 'i'}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': re.compile('line', re.U), 'options': 'i'}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': re.compile('line', re.U)}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': Regex('line', 'i'), 'options': 'i'}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {
+                'input': '$description', 'regex': Regex('line', 'u')}},
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$addFields': {
+            'result': {'$regexMatch': {'input': '$description', 'regex': 5}},
+        }}])
 
     def test__aggregate35(self):
         self.cmp.do.drop()

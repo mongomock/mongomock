@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+
+  mongomock:
+    build:
+      context: .
+    image: mongomock:latest
+    working_dir: /project
+    command: tox
+    environment:
+      - TEST_MONGO_HOST=mongodb://mongo/mock
+    volumes:
+      - .:/project
+    depends_on:
+      - mongo
+
+  mongo:
+    # The image chosen here should be kept in sync with the .travis.yml mongo version
+    image: mongo:4.4.0

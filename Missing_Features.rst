@@ -29,7 +29,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Boolean operators ($and, $or, $not)
   * Some date operators ($isoDayOfWeek, $isoWeekYear, …)
   * Some set operators ($setIntersection, $setDifference, …)
-  * Some string operators ($indexOfBytes, $split, $regexMatch, …)
+  * Some string operators ($indexOfBytes, …)
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray, $indexOfArray, …)
