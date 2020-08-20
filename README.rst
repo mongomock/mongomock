@@ -125,6 +125,31 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
  cd mongomock
  tox
 
+Alternatively, docker-compose can be used to simplify dependency management for local development:
+
+.. code-block:: bash
+
+ git clone git@github.com:mongomock/mongomock.git
+ cd mongomock
+ docker-compose build
+ docker-compose run --rm mongomock
+
+If you need/want tox to recreate its environments, you can override the container command by running:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -r
+
+Similarly, if you'd like to run tox against a specific environment in the container:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs
+
+NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
+you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
+the intended version.
+
 
 Branching model
 ~~~~~~~~~~~~~~~
@@ -195,6 +220,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * waskew (waskew _at_ narrativescience.com)
 * jmsantorum (jmsantorum [at] gmail [dot] com)
 * lidongyong
+* `Juan Gutierrez <https://github.com/juannyg/>`_
 
 
 .. _examples in tests: https://github.com/mongomock/mongomock/blob/develop/tests/test__mongomock.py
