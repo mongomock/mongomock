@@ -1322,17 +1322,17 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
-    def test__ttl_index_record_expiration(self):
-        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+    def test__ttl_index_ignores_record_in_the_future(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
-        self.db.collection.drop()
-        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+    def test__ttl_index_ignores_records_with_non_datetime_values(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': 'not a dt'})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
-        self.db.collection.drop()
+    def test__ttl_index_record_expiry(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
         self.assertEqual(self.db.collection.find({}).count(), 0)

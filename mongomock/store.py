@@ -119,7 +119,9 @@ class CollectionStore(object):
                 self._expire_documents(index)
 
     def _expire_documents(self, index):
-        # TODO: use a caching mechanism to avoid re-expiring the documents if we just did and no document was added / updated
+        # TODO(juannyg): use a caching mechanism to avoid re-expiring the documents if
+        # we just did and no document was added / updated
+
         # Ignore non-integer values
         try:
             expiry = int(index['expireAfterSeconds'])
