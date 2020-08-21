@@ -1250,8 +1250,6 @@ class Collection(object):
         updater(doc, field_name, field_value)
 
     def _iter_documents(self, filter):
-        self._store.remove_expired_documents()
-
         # Validate the filter even if no documents can be returned.
         if self._store.is_empty:
             filter_applies(filter, {})

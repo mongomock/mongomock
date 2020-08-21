@@ -85,12 +85,15 @@ class CollectionStore(object):
 
     @property
     def is_empty(self):
+        self._remove_expired_documents()
         return not self._documents
 
     def __contains__(self, key):
+        self._remove_expired_documents()
         return key in self._documents
 
     def __getitem__(self, key):
+        self._remove_expired_documents()
         return self._documents[key]
 
     def __setitem__(self, key, val):
@@ -98,22 +101,25 @@ class CollectionStore(object):
             self._documents[key] = val
 
     def __delitem__(self, key):
-        del self._documents[key]
+        self._documents.pop(key)
 
     def __len__(self):
+        self._remove_expired_documents()
         return len(self._documents)
 
     @property
     def documents(self):
+        self._remove_expired_documents()
         for doc in six.itervalues(self._documents):
             yield doc
 
-    def remove_expired_documents(self):
+    def _remove_expired_documents(self):
         for index in six.itervalues(self.indexes):
             if index.get('expireAfterSeconds') is not None:
                 self._expire_documents(index)
 
     def _expire_documents(self, index):
+        # TODO: use a caching mechanism to avoid re-expiring the documents if we just did and no document was added / updated
         # Ignore non-integer values
         try:
             expiry = int(index['expireAfterSeconds'])
@@ -126,23 +132,24 @@ class CollectionStore(object):
 
         # "key" structure = list of (field name, direction) tuples
         ttl_field_name = index['key'][0][0]
-        expired_ids = {
+        ttl_now = mongomock.utcnow()
+        expired_ids = [
             doc['_id'] for doc in six.itervalues(self._documents)
-            if self._value_meets_expiry(doc.get(ttl_field_name), expiry)
-        }
+            if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
+        ]
 
         for exp_id in expired_ids:
             del self[exp_id]
 
-    def _value_meets_expiry(self, val, expiry):
-        val_to_compare = _get_dt_from_value(val)
+    def _value_meets_expiry(self, val, expiry, ttl_now):
+        val_to_compare = _get_min_datetime_from_value(val)
         try:
-            return (mongomock.utcnow() - val_to_compare).total_seconds() >= expiry
+            return (ttl_now - val_to_compare).total_seconds() >= expiry
         except TypeError:
             return False
 
 
-def _get_dt_from_value(val):
+def _get_min_datetime_from_value(val):
     if not val:
         return datetime.datetime.max
     if isinstance(val, list):
