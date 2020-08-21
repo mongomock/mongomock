@@ -50,6 +50,19 @@ DESCENDING = -1
 
 
 def utcnow():
+    """Simple wrapper for datetime.utcnow
+
+    This provides a centralized definition of "now" in the mongomock realm,
+    allowing users to transform the value of "now" to the future or the past,
+    based on their testing needs. For example:
+
+    ```python
+    def test_x(self):
+        with mock.patch("mongomock.utcnow") as mm_utc:
+            mm_utc = datetime.utcnow() + timedelta(hours=100)
+            # Test some things "100 hours" in the future
+    ```
+    """
     return datetime.utcnow()
 
 

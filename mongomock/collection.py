@@ -6,7 +6,6 @@ try:
 except ImportError:
     from collections import Iterable, Mapping, MutableMapping
 import copy
-from datetime import datetime
 import functools
 import itertools
 import json
@@ -48,6 +47,7 @@ from six import string_types
 from six import text_type
 
 
+import mongomock
 from mongomock import aggregate
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
@@ -1500,7 +1500,7 @@ class Collection(object):
                         raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                     indexed_list.append(index)
 
-        self._store.indexes[index_name] = index_dict
+        self._store.create_index(index_name, index_dict)
 
         return index_name
 
@@ -1529,7 +1529,7 @@ class Collection(object):
         else:
             name = index_or_name
         try:
-            del self._store.indexes[name]
+            self._store.drop_index(name)
         except KeyError:
             raise OperationFailure('index not found with name [%s]' % name)
 
@@ -2052,7 +2052,7 @@ def _current_date_updater(doc, field_name, value):
         if value == {'$type': 'timestamp'}:
             doc[field_name] = helpers.get_current_timestamp()
         else:
-            doc[field_name] = datetime.utcnow()
+            doc[field_name] = mongomock.utcnow()
 
 
 _updaters = {

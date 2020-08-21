@@ -70,6 +70,7 @@ class CollectionStore(object):
         self.indexes = {}
         self._is_force_created = False
         self.name = name
+        self._ttl_indexes = {}
 
     def create(self):
         self._is_force_created = True
@@ -81,7 +82,19 @@ class CollectionStore(object):
     def drop(self):
         self._documents = collections.OrderedDict()
         self.indexes = {}
+        self._ttl_indexes = {}
         self._is_force_created = False
+
+    def create_index(self, index_name, index_dict):
+        self.indexes[index_name] = index_dict
+        if index_dict.get('expireAfterSeconds') is not None:
+            self._ttl_indexes[index_name] = index_dict
+
+    def drop_index(self, index_name):
+        # The main index object should raise a KeyError, but the
+        # TTL indexes have no meaning to the outside.
+        del self.indexes[index_name]
+        self._ttl_indexes.pop(index_name, None)
 
     @property
     def is_empty(self):
@@ -114,9 +127,8 @@ class CollectionStore(object):
             yield doc
 
     def _remove_expired_documents(self):
-        for index in six.itervalues(self.indexes):
-            if index.get('expireAfterSeconds') is not None:
-                self._expire_documents(index)
+        for index in six.itervalues(self._ttl_indexes):
+            self._expire_documents(index)
 
     def _expire_documents(self, index):
         # TODO(juannyg): use a caching mechanism to avoid re-expiring the documents if
