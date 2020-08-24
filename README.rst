@@ -163,7 +163,7 @@ method in the following way:
    now_reference = mongomock.utcnow()
 
 This allows for a consistent way for users to mock the notion "now" in mongomock if they so choose. Please
-see `utcnow docstring for more details <mongomock/helpers.py#L52`_.
+see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
 
 Branching model
 ~~~~~~~~~~~~~~~
