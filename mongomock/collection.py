@@ -2050,6 +2050,8 @@ def _pop_from_list(list_instance, mongo_pop_value):
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
+            # TODO(juannyg): get_current_timestamp should also be using helpers utcnow,
+            # as it currently using time.time internally
             doc[field_name] = helpers.get_current_timestamp()
         else:
             doc[field_name] = mongomock.utcnow()

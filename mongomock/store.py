@@ -114,7 +114,7 @@ class CollectionStore(object):
             self._documents[key] = val
 
     def __delitem__(self, key):
-        self._documents.pop(key)
+        del self._documents[key]
 
     def __len__(self):
         self._remove_expired_documents()
