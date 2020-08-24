@@ -153,8 +153,8 @@ the intended version.
 utcnow
 ~~~~
 
-When developing features that need to make use of "now," please import and use the `helpers` module `utcnow`
-method in the following way:
+When developing features that need to make use of "now," please use the libraries :code:`utcnow` helper method
+in the following way:
 
 .. code-block:: python
 
@@ -162,7 +162,7 @@ method in the following way:
    # Awesome code!
    now_reference = mongomock.utcnow()
 
-This allows for a consistent way for users to mock the notion "now" in mongomock if they so choose. Please
+This provides users a consistent way to mock the notion of "now" in mongomock if they so choose. Please
 see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
 
 Branching model
