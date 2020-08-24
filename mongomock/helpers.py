@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
-from six import iteritems, string_types
+from six import iteritems, raise_from, string_types
 import time
 import warnings
 
@@ -230,8 +230,8 @@ def parse_uri(uri, default_port=27017, warn=False):
                 port = int(port)
                 if port < 0 or port > 65535:
                     raise ValueError()
-            except ValueError:
-                raise ValueError('Port must be an integer between 0 and 65535:', port)
+            except ValueError as err:
+                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
         else:
             port = default_port
 
@@ -272,8 +272,8 @@ def split_hosts(hosts, default_port=27017):
                 port = int(match.group(3))
                 if port < 0 or port > 65535:
                     raise ValueError()
-            except ValueError:
-                raise ValueError('Port must be an integer between 0 and 65535:', port)
+            except ValueError as err:
+                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
 
         nodelist.append((host, port))
 
@@ -341,16 +341,16 @@ def get_value_by_dot(doc, key, can_generate_array=False):
         elif isinstance(result, (list, tuple)):
             try:
                 int_key = int(key_item)
-            except ValueError:
+            except ValueError as err:
                 if not can_generate_array:
-                    raise KeyError(key_index)
+                    raise_from(KeyError(key_index), err)
                 remaining_key = '.'.join(key_items[key_index:])
                 return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
 
             try:
                 result = result[int_key]
-            except (ValueError, IndexError):
-                raise KeyError(key_index)
+            except (ValueError, IndexError) as err:
+                raise_from(KeyError(key_index), err)
 
         else:
             raise KeyError(key_index)
@@ -372,8 +372,8 @@ def set_value_by_dot(doc, key, value):
     elif isinstance(parent, (list, tuple)):
         try:
             parent[int(child_key)] = value
-        except (ValueError, IndexError):
-            raise KeyError()
+        except (ValueError, IndexError) as err:
+            raise_from(KeyError(), err)
     else:
         raise KeyError()
 
