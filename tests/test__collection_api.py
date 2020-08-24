@@ -1414,6 +1414,13 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': datetime.utcnow()})
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__ttl_index_removes_expired_documents_prior_to_removal(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+
+        self.db.collection.drop_index('value_1')
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_with_expireAfterSeconds(self):
         indexes = [

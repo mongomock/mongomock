@@ -91,6 +91,8 @@ class CollectionStore(object):
             self._ttl_indexes[index_name] = index_dict
 
     def drop_index(self, index_name):
+        self._remove_expired_documents()
+
         # The main index object should raise a KeyError, but the
         # TTL indexes have no meaning to the outside.
         del self.indexes[index_name]
