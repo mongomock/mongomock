@@ -47,7 +47,7 @@ from six import string_types
 from six import text_type
 
 
-import mongomock
+import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 from mongomock import aggregate
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies

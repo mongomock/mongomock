@@ -1,6 +1,6 @@
 import collections
 import datetime
-import mongomock
+import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 import six
 import six.moves
 import threading
