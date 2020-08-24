@@ -150,6 +150,20 @@ NOTE: If the MongoDB image was updated, or you want to try a different MongoDB v
 you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
 the intended version.
 
+utcnow
+~~~~
+
+When developing features that need to make use of "now," please import and use the `helpers` module `utcnow`
+method in the following way:
+
+.. code-block:: python
+
+   import mongomock
+   # Awesome code!
+   now_reference = mongomock.utcnow()
+
+This allows for a consistent way for users to mock the notion "now" in mongomock if they so choose. Please
+see `utcnow docstring for more details <mongomock/helpers.py#L52`_.
 
 Branching model
 ~~~~~~~~~~~~~~~
