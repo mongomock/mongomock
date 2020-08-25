@@ -43,6 +43,7 @@ except ImportError:
 from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
+from six import raise_from
 from six import string_types
 from six import text_type
 
@@ -1494,10 +1495,10 @@ class Collection(object):
                     if index in indexed:
                         raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
                     indexed.add(index)
-                except TypeError:
+                except TypeError as err:
                     # index is not hashable.
                     if index in indexed_list:
-                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+                        raise_from(DuplicateKeyError('E11000 Duplicate Key Error', 11000), err)
                     indexed_list.append(index)
 
         self._store.create_index(index_name, index_dict)
@@ -1530,8 +1531,8 @@ class Collection(object):
             name = index_or_name
         try:
             self._store.drop_index(name)
-        except KeyError:
-            raise OperationFailure('index not found with name [%s]' % name)
+        except KeyError as err:
+            raise_from(OperationFailure('index not found with name [%s]' % name), err)
 
     def drop_indexes(self, session=None):
         if session:
@@ -1853,8 +1854,8 @@ class Cursor(object):
             doc = self._compute_results(with_limit_and_skip=True)[self._emitted]
             self._emitted += 1
             return doc
-        except IndexError:
-            raise StopIteration()
+        except IndexError as err:
+            raise_from(StopIteration(), err)
 
     next = __next__
 

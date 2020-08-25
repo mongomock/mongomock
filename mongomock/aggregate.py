@@ -14,7 +14,7 @@ import warnings
 
 from sentinels import NOTHING
 import six
-from six import moves
+from six import moves, raise_from
 
 from mongomock import command_cursor
 from mongomock import filtering
@@ -647,10 +647,10 @@ class _Parser(object):
             elif isinstance(parsed, str):
                 try:
                     decimal_value = decimal128.Decimal128(parsed)
-                except decimal.InvalidOperation:
-                    raise OperationFailure(
+                except decimal.InvalidOperation as err:
+                    raise_from(OperationFailure(
                         "Failed to parse number '%s' in $convert with no onError value:"
-                        'Failed to parse string to decimal' % parsed)
+                        'Failed to parse string to decimal' % parsed), err)
             elif isinstance(parsed, datetime.datetime):
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.')[0]
@@ -1026,10 +1026,10 @@ def _handle_bucket_stage(in_collection, unused_database, options):
     def _get_default_bucket():
         try:
             return options['default']
-        except KeyError:
-            raise OperationFailure(
+        except KeyError as err:
+            raise_from(OperationFailure(
                 '$bucket could not find a matching branch for '
-                'an input, and no default was specified.')
+                'an input, and no default was specified.'), err)
 
     def _get_bucket_id(doc):
         """Get the bucket ID for a document.
@@ -1356,11 +1356,11 @@ def process_pipeline(collection, database, pipeline, session):
         for operator, options in six.iteritems(stage):
             try:
                 handler = _PIPELINE_HANDLERS[operator]
-            except KeyError:
-                raise NotImplementedError(
+            except KeyError as err:
+                raise_from(NotImplementedError(
                     '%s is not a valid operator for the aggregation pipeline. '
                     'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
-                    'for a complete list of valid operators.' % operator)
+                    'for a complete list of valid operators.' % operator), err)
             if not handler:
                 raise NotImplementedError(
                     "Although '%s' is a valid operator for the aggregation pipeline, it is "
