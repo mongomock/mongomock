@@ -3828,10 +3828,6 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_not_implemented(self):
         self.db.collection.insert_one({})
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$and': [True, False]}}}
-            ])
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
@@ -5610,6 +5606,56 @@ class CollectionAPITest(TestCase):
         for item in items:
             with self.assertRaises(mongomock.OperationFailure):
                 collection.aggregate(item)
+
+    def test_aggregate_project_with_boolean(self):
+        collection = self.db.collection
+        collection.insert_many([{
+            'items': [],
+        }])
+
+        expect = [{'items': True}]
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': True}]
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = self.db.collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
 
     def test_set_no_content(self):
         collection = self.db.collection

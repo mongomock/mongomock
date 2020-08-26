@@ -227,10 +227,9 @@ class _Parser(object):
                 return self._handle_string_operator(k, v)
             if k in type_convertion_operators:
                 return self._handle_type_convertion_operator(k, v)
-            if k in boolean_operators + \
-                    text_search_operators + \
-                    projection_operators + \
-                    object_operators:
+            if k in boolean_operators:
+                return self._handle_boolean_operator(k, v)
+            if k in text_search_operators + projection_operators + object_operators:
                 raise NotImplementedError(
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
@@ -270,6 +269,19 @@ class _Parser(object):
                 }, **self._user_vars), expression[2:])
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
+
+    def _handle_boolean_operator(self, operator, values):
+        if operator == '$and':
+            return all([self.parse(value) for value in values])
+        if operator == '$or':
+            return any(self.parse(value) for value in values)
+        if operator == '$not':
+            return not self.parse(values)
+        raise NotImplementedError(
+            "Although '%s' is a valid boolean operator for the "
+            'aggregation pipeline, it is currently not implemented'
+            ' in Mongomock.' % operator
+        )
 
     def _handle_arithmetic_operator(self, operator, values):
         if operator == '$abs':
