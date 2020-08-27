@@ -3387,6 +3387,121 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.create_index([('value', 1)])
         self.cmp.compare_exceptions.create_index([('value', 1)], unique=True)
 
+    def test_aggregate_project_with_boolean(self):
+        self.cmp.do.drop()
+
+        # Test with no items
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+
+        # Tests following are with one item
+        self.cmp.do.insert_one({
+            'items': []
+        })
+
+        # Test with 0 arguments
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+
+        # Test with one argument
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': True}}}
+        ])
+
+        # Test with two arguments
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, False]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, False]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, True]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, False]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, False]}}}
+        ])
+
+        # Following tests are with more than two items
+        self.cmp.do.insert_many([
+            {'items': []},
+            {'items': []}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+
+        # Test with something else than boolean
+        self.cmp.do.insert_one({
+            'items': ['foo']
+        })
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [{'$eq': ['$items', ['foo']]}]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [{'$eq': ['$items', ['foo']]}]}}}
+        ])
+
+        self.cmp.compare.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {'$eq': ['$items', ['foo']]}}}}
+        ])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
