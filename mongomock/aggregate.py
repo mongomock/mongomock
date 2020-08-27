@@ -272,11 +272,11 @@ class _Parser(object):
 
     def _handle_boolean_operator(self, operator, values):
         if operator == '$and':
-            return all([self.parse(value) for value in values])
+            return all([self._parse_to_bool(value) for value in values])
         if operator == '$or':
-            return any(self.parse(value) for value in values)
+            return any(self._parse_to_bool(value) for value in values)
         if operator == '$not':
-            return not self.parse(values)
+            return not self._parse_to_bool(values)
         raise NotImplementedError(
             "Although '%s' is a valid boolean operator for the "
             'aggregation pipeline, it is currently not implemented'
