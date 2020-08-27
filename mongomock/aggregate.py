@@ -277,7 +277,8 @@ class _Parser(object):
             return any(self._parse_to_bool(value) for value in values)
         if operator == '$not':
             return not self._parse_to_bool(values)
-        raise NotImplementedError(
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid boolean operator for the "
             'aggregation pipeline, it is currently not implemented'
             ' in Mongomock.' % operator
