@@ -6,7 +6,6 @@ try:
 except ImportError:
     from collections import Iterable, Mapping, MutableMapping
 import copy
-from datetime import datetime
 import functools
 import itertools
 import json
@@ -49,6 +48,7 @@ from six import string_types
 from six import text_type
 
 
+import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 from mongomock import aggregate
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
@@ -1457,8 +1457,6 @@ class Collection(object):
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        if 'expireAfterSeconds' in kwargs:
-            raise_not_implemented('TTL index', 'Mongomock does not handle TTL index yet')
         index_list = helpers.create_index_list(key_or_list)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
@@ -1469,6 +1467,8 @@ class Collection(object):
             index_dict['sparse'] = True
         if is_unique:
             index_dict['unique'] = True
+        if 'expireAfterSeconds' in kwargs and kwargs['expireAfterSeconds'] is not None:
+            index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
 
         existing_index = self._store.indexes.get(index_name)
         if existing_index and index_dict != existing_index:
@@ -1501,7 +1501,7 @@ class Collection(object):
                         raise_from(DuplicateKeyError('E11000 Duplicate Key Error', 11000), err)
                     indexed_list.append(index)
 
-        self._store.indexes[index_name] = index_dict
+        self._store.create_index(index_name, index_dict)
 
         return index_name
 
@@ -1510,10 +1510,12 @@ class Collection(object):
             if not isinstance(index, IndexModel):
                 raise TypeError(
                     '%s is not an instance of pymongo.operations.IndexModel' % index)
+
         return [
             self.create_index(
                 index.document['key'].items(),
                 session=session,
+                expireAfterSeconds=index.document.get('expireAfterSeconds'),
                 unique=index.document.get('unique', False),
                 sparse=index.document.get('sparse', False),
                 name=index.document.get('name'))
@@ -1528,7 +1530,7 @@ class Collection(object):
         else:
             name = index_or_name
         try:
-            del self._store.indexes[name]
+            self._store.drop_index(name)
         except KeyError as err:
             raise_from(OperationFailure('index not found with name [%s]' % name), err)
 
@@ -2049,9 +2051,11 @@ def _pop_from_list(list_instance, mongo_pop_value):
 def _current_date_updater(doc, field_name, value):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
+            # TODO(juannyg): get_current_timestamp should also be using helpers utcnow,
+            # as it currently using time.time internally
             doc[field_name] = helpers.get_current_timestamp()
         else:
-            doc[field_name] = datetime.utcnow()
+            doc[field_name] = mongomock.utcnow()
 
 
 _updaters = {

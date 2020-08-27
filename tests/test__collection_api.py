@@ -16,6 +16,16 @@ import warnings
 import mongomock
 
 try:
+    from unittest import mock
+    _HAVE_MOCK = True
+except ImportError:
+    try:
+        import mock
+        _HAVE_MOCK = True
+    except ImportError:
+        _HAVE_MOCK = False
+
+try:
     from bson import codec_options
     from bson.errors import InvalidDocument
     from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
@@ -1312,9 +1322,115 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
-    def test__create_ttl_index(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.create_index([('value', 1)], expireAfterSeconds=3600)
+    def test__ttl_index_ignores_record_in_the_future(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_ignores_records_with_non_datetime_values(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': 'not a dt'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_record_expiry(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_expiration_of_0(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_with_non_integer_value_is_ignored(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds='a')
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_applied_to_compound_key_is_ignored(self):
+        self.db.collection.create_index([('field1', 1), ('field2', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'field1': datetime.utcnow(), 'field2': 'val2'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_ignored_when_document_does_not_contain_indexed_field(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'other_value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_of_array_field_expiration(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.utcnow() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        self.db.collection.drop()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.utcnow() - timedelta(seconds=5),
+                datetime.utcnow() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_of_array_field_without_datetime_does_not_expire(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    @skipIf(not _HAVE_MOCK, 'mock not installed')
+    def test__ttl_expiry_with_mock(self):
+        now = datetime.utcnow()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=100)
+        self.db.collection.insert_one({'value': now + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        with mock.patch('mongomock.utcnow') as mongomock_utcnow:
+            mongomock_utcnow.return_value = now + timedelta(100)
+            self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_index_is_removed_if_collection_dropped(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+        self.db.collection.drop()
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_is_removed_when_index_is_dropped(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+        self.db.collection.drop_index('value_1')
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_removes_expired_documents_prior_to_removal(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+
+        self.db.collection.drop_index('value_1')
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_indexes_with_expireAfterSeconds(self):
+        indexes = [
+            pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], expireAfterSeconds=5),
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(1, len(index_names))
+
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
