@@ -76,6 +76,7 @@ control_flow_operators = [
 ]
 projection_operators = ['$map', '$let', '$literal']
 date_operators = [
+    '$dateFromString',
     '$dateToString',
     '$dayOfMonth',
     '$dayOfWeek',
@@ -122,6 +123,7 @@ string_operators = [
     '$substrCP',
     '$toLower',
     '$toUpper',
+    '$trim',
 ]
 comparison_operators = [
     '$cmp',

@@ -26,9 +26,9 @@ If I miss to include a feature in the below list, Please feel free to add to the
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
-  * Some date operators ($isoDayOfWeek, $isoWeekYear, …)
+  * Some date operators ($dateFromString, $isoDayOfWeek, $isoWeekYear, …)
   * Some set operators ($setIntersection, $setDifference, …)
-  * Some string operators ($indexOfBytes, …)
+  * Some string operators ($indexOfBytes, $trim, …)
   * Text search operator ($meta)
   * Projection operators ($map, $let)
   * Array operators ($concatArrays, $isArray, $indexOfArray, …)
