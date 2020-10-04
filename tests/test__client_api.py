@@ -41,20 +41,21 @@ class MongoClientApiTest(unittest.TestCase):
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
 
     @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-    def test__codec_options(self):
+    def test__codec_options_with_pymongo(self):
         client = mongomock.MongoClient()
         self.assertEqual(codec_options.CodecOptions(), client.codec_options)
+        self.assertFalse(client.codec_options.tz_aware)
+
+    def test__codec_options(self):
+        client = mongomock.MongoClient()
         self.assertFalse(client.codec_options.tz_aware)
 
         client = mongomock.MongoClient(tz_aware=True)
         self.assertTrue(client.codec_options.tz_aware)
         self.assertTrue(client.db.collection.codec_options.tz_aware)
 
-    @unittest.skipIf(_HAVE_PYMONGO, 'pymongo installed')
-    def test__codec_options_without_pymongo(self):
-        client = mongomock.MongoClient()
-        with self.assertRaises(NotImplementedError):
-            client.codec_options  # pylint: disable=pointless-statement
+        with self.assertRaises(TypeError):
+            mongomock.MongoClient(tz_aware='True')
 
     def test__parse_url(self):
         client = mongomock.MongoClient('mongodb://localhost:27017/')

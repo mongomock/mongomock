@@ -1,14 +1,33 @@
 import collections
+import datetime
+from distutils import version  # pylint: disable=no-name-in-module
 from unittest import TestCase, skipIf
 
 import mongomock
 
 try:
     from bson import codec_options
+    import pymongo
     from pymongo.read_preferences import ReadPreference
+    _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
+    _PYMONGO_VERSION = version.LooseVersion('0.0')
+
+
+class UTCPlus2(datetime.tzinfo):
+    def fromutc(self, dt):
+        return dt + self.utcoffset(dt)
+
+    def tzname(self, dt):
+        return '<dummy UTC+2>'
+
+    def utcoffset(self, dt):
+        return datetime.timedelta(hours=2)
+
+    def dst(self, dt):
+        return datetime.timedelta()
 
 
 class DatabaseAPITest(TestCase):
@@ -96,23 +115,12 @@ class DatabaseAPITest(TestCase):
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_codec_options(self):
         database = mongomock.MongoClient().somedb
-        with self.assertRaises(NotImplementedError):
-            database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
+        a = database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
+        self.assertTrue(a.codec_options.tz_aware)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
-
-    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
-    def test__codec_options_without_pymongo(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.codec_options  # pylint: disable=pointless-statement
-
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(codec_options=3)
-
-        with self.assertRaises(NotImplementedError):
-            self.database.get_collection('a', codec_options=3)
 
     def test__with_options(self):
         with self.assertRaises(NotImplementedError):
@@ -132,13 +140,51 @@ class DatabaseAPITest(TestCase):
         self.database.with_options(codec_options=codec_options.CodecOptions())
         self.database.with_options()
 
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
+        self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
 
         tz_aware_db = mongomock.MongoClient(tz_aware=True).somedb
         self.assertIs(
             tz_aware_db,
             tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)))
+
+        custom_document_class = codec_options.CodecOptions(document_class=collections.OrderedDict)
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_document_class)
+
+        custom_uuid_representation = codec_options.CodecOptions(uuid_representation=4)
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_uuid_representation)
+
+        custom_unicode_error_hander = codec_options.CodecOptions(
+            unicode_decode_error_handler='ignore')
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_unicode_error_hander)
+
+        custom_tzinfo = codec_options.CodecOptions(tz_aware=True, tzinfo=UTCPlus2())
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_tzinfo)
+
+    @skipIf(_PYMONGO_VERSION < version.LooseVersion('3.8'), 'pymongo not installed or <3.8')
+    def test__with_options_type_registry(self):
+        class _CustomTypeCodec(codec_options.TypeCodec):
+            @property
+            def python_type(self):
+                return _CustomTypeCodec
+
+            def transform_python(self, unused_value):
+                pass
+
+            @property
+            def bson_type(self):
+                return int
+
+            def transform_bson(self, unused_value):
+                pass
+
+        custom_type_registry = codec_options.CodecOptions(
+            type_registry=codec_options.TypeRegistry([_CustomTypeCodec()]))
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_type_registry)
 
     def test__collection_names(self):
         self.database.create_collection('a')
