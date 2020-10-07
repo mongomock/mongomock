@@ -2061,10 +2061,8 @@ class CollectionAPITest(TestCase):
         self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
         self.db.collection.with_options(codec_options.CodecOptions())
 
-    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
     def test__codec_options_without_pymongo(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.codec_options  # pylint: disable=pointless-statement
+        self.assertEqual(self.db.collection.codec_options, self.db.codec_options)
 
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)

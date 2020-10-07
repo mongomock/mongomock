@@ -15,11 +15,8 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON
-    from bson import codec_options as bson_codec_options
-    _DEFAULT_CODEC_OPTIONS = bson_codec_options.CodecOptions()
 except ImportError:
-    bson_codec_options = json_utils = SON = BSON = None
-    _DEFAULT_CODEC_OPTIONS = None
+    json_utils = SON = BSON = None
 try:
     import execjs
 except ImportError:
@@ -50,6 +47,7 @@ from six import text_type
 
 import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 from mongomock import aggregate
+from mongomock import codec_options as mongomock_codec_options
 from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
 from mongomock.filtering import filter_applies
 from mongomock.filtering import iter_key_candidates
@@ -77,9 +75,6 @@ else:
 _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'attrs'])
 
 _WITH_OPTIONS_KWARGS = {
-    'codec_options': _KwargOption(
-        'bson.codec_options.CodecOptions', _DEFAULT_CODEC_OPTIONS,
-        ('document_class', 'tz_aware', 'uuid_representation')),
     'read_preference': _KwargOption(
         'pymongo.read_preference.ReadPreference', _READ_PREFERENCE_PRIMARY,
         ('document', 'mode', 'mongos_mode', 'max_staleness')),
@@ -389,7 +384,7 @@ class Collection(object):
         self._write_concern = write_concern or WriteConcern()
         self._read_concern = read_concern or ReadConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
-        self._codec_options = codec_options
+        self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
 
     def __repr__(self):
         return "Collection({0}, '{1}')".format(self.database, self.name)
@@ -426,10 +421,6 @@ class Collection(object):
 
     @property
     def codec_options(self):
-        if not bson_codec_options:
-            raise NotImplementedError(
-                'The codec options are not implemented in mongomock alone, you need to import '
-                'the pymongo library as well.')
         return self._codec_options
 
     def initialize_unordered_bulk_op(self, bypass_document_validation=False):
@@ -1752,11 +1743,10 @@ class Collection(object):
                 if not hasattr(value, attr):
                     raise TypeError(
                         '{} must be an instance of {}'.format(key, options.typename))
-            if key in ('codec_options') and options.default != value:
-                # TODO(pascal): Support change of tz_aware in codec_options.
-                raise NotImplementedError(
-                    '%s is a valid parameter for with_options but it is currently not implemented '
-                    'in Mongomock' % key)
+
+        mongomock_codec_options.is_supported(codec_options)
+        if codec_options != self.codec_options:
+            has_changes = True
 
         if not has_changes:
             return self
@@ -1824,8 +1814,7 @@ class Cursor(object):
     def _compute_results(self, with_limit_and_skip=False):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
-            # TODO(pascal): Check collection's codec_options instead of reaching to the client.
-            if self.collection.database.client._tz_aware:
+            if self.collection.codec_options.tz_aware:
                 results = [helpers.make_datetime_timezone_aware_in_document(x)
                            for x in self._factory()]
             else:
