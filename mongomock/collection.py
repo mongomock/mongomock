@@ -1319,7 +1319,9 @@ class Collection(object):
         if remove:
             self.delete_one(query)
         else:
-            self._update(query, update, upsert)
+            updated = self._update(query, update, upsert)
+            if updated['upserted']:
+                query = {'_id': updated['upserted']}
 
         if return_document is ReturnDocument.AFTER or kwargs.get('new'):
             return self.find_one(query, projection)

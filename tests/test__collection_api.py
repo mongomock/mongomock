@@ -540,6 +540,15 @@ class CollectionAPITest(TestCase):
             upsert=True, return_document=ReturnDocument.BEFORE)
         self.assertEqual(ret, {'_id': 0, 'counter': 1})
 
+    def test__find_one_and_replace_return_document_after_upsert(self):
+        collection = self.db.col
+        collection.insert_one({'_id': 123, 'val': 5})
+        ret = collection.find_one_and_replace(
+            {'val': 1}, {'val': 7}, upsert=True,
+            return_document=ReturnDocument.AFTER)
+        self.assertTrue(ret)
+        self.assertEqual(7, ret['val'])
+
     def test__find_and_modify_no_projection_kwarg(self):
         with self.assertRaises(TypeError):  # unlike pymongo, we warn about this
             self.db.collection.find_and_modify({'a': 2}, {'a': 3}, projection=['a'])
