@@ -31,7 +31,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Some string operators ($indexOfBytes, $trim, …)
   * Text search operator ($meta)
   * Projection operators ($map, $let)
-  * Array operators ($concatArrays, $isArray, $indexOfArray, …)
+  * Array operators ($isArray, $indexOfArray, …)
   * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
 * Operators within the query language (find):
   * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`_

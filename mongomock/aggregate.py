@@ -542,6 +542,10 @@ class _Parser(object):
             ' in Mongomock.' % operator)
 
     def _handle_array_operator(self, operator, value):
+        if operator == '$concatArrays':
+            parsed_list = list(self.parse_many(value))
+            return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
+
         if operator == '$size':
             if isinstance(value, list):
                 if len(value) != 1:

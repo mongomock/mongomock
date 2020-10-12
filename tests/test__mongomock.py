@@ -3062,6 +3062,26 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_concatArrays(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            '_id': 1,
+            'a': [1, 2],
+            'b': ['foo', 'bar', 'baz'],
+            'c': {
+                'arr1': [123]
+            }
+        })
+        pipeline = [{
+            '$project': {
+                '_id': 0,
+                'concat': {'$concatArrays': ['$a', ['#', '*'], '$c.arr1', '$b']},
+                'concat_none': {'$concatArrays': ['$a', None, '$b']},
+                'concat_missing_field': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+            }
+        }]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_filter(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([

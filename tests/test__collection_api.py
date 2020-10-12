@@ -3972,11 +3972,6 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$concatArrays': [[0, 1], [2, 3]]}}},
-            ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
@@ -5001,6 +4996,30 @@ class CollectionAPITest(TestCase):
             'select_nested': 7,
             'select_array': [5, 15],
         }, actual[0])
+
+    def test__aggregate_concatArrays(self):
+        self.db.collection.insert_one({
+            'a': [1, 2],
+            'b': ['foo', 'bar', 'baz'],
+            'c': {
+                'arr1': [123],
+            }
+        })
+        actual = self.db.collection.aggregate([{
+            '$project': {
+                'concat': {'$concatArrays': ['$a', ['#', '*'], '$c.arr1', '$b']},
+                'concat_none': {'$concatArrays': ['$a', None, '$b']},
+                'concat_missing_field': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+            }
+        }])
+        self.assertEqual(
+            [{
+                'concat': [1, 2, '#', '*', 123, 'foo', 'bar', 'baz'],
+                'concat_none': None,
+                'concat_missing_field': None
+            }],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual]
+        )
 
     def test__aggregate_filter(self):
         collection = self.db.collection
