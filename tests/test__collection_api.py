@@ -3972,6 +3972,11 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
+                {'$project': {'a': {'$isArray': [1, 2]}}}
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
@@ -5008,18 +5013,52 @@ class CollectionAPITest(TestCase):
         actual = self.db.collection.aggregate([{
             '$project': {
                 'concat': {'$concatArrays': ['$a', ['#', '*'], '$c.arr1', '$b']},
-                'concat_none': {'$concatArrays': ['$a', None, '$b']},
-                'concat_missing_field': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+                'concat_array_expression': {'$concatArrays': '$b'},
+                'concat_tuples': {'$concatArrays': ((1, 2, 3), (1,))},
+                'concat_none': {'$concatArrays': None},
+                'concat_missing_field': {'$concatArrays': '$foo'},
+                'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
+                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
             }
         }])
         self.assertEqual(
             [{
                 'concat': [1, 2, '#', '*', 123, 'foo', 'bar', 'baz'],
+                'concat_array_expression': ['foo', 'bar', 'baz'],
+                'concat_tuples': [1, 2, 3, 1],
                 'concat_none': None,
-                'concat_missing_field': None
+                'concat_missing_field': None,
+                'concat_none_item': None,
+                'concat_missing_field_item': None
             }],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual]
         )
+
+    def test__aggregate_concatArrays_exceptions(self):
+        self.db.collection.insert_one({
+            'a': {
+                'arr1': [123]
+            }
+        })
+        pipeline_parameter_not_array = [
+            {
+                '$project': {
+                    'concat_parameter_not_array': {'$concatArrays': 42}
+                }
+            }
+        ]
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate(pipeline_parameter_not_array)
+
+        pipeline_item_not_array = [
+            {
+                '$project': {
+                    'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}
+                }
+            }
+        ]
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate(pipeline_item_not_array)
 
     def test__aggregate_filter(self):
         collection = self.db.collection

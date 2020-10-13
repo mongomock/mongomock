@@ -543,7 +543,16 @@ class _Parser(object):
 
     def _handle_array_operator(self, operator, value):
         if operator == '$concatArrays':
+            if not isinstance(value, (list, tuple)):
+                value = [value]
+
             parsed_list = list(self.parse_many(value))
+            for parsed_item in parsed_list:
+                if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
+                    raise OperationFailure(
+                        '$concatArrays only supports arrays, not {}'.format(type(parsed_item))
+                    )
+
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
 
         if operator == '$size':
