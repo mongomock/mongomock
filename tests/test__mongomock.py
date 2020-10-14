@@ -3095,29 +3095,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }
         })
 
-        pipeline_parameter_not_array = [
-            {
-                '$project': {
-                    'concat_parameter_not_array': {'$concatArrays': 42}
-                }
+        self.cmp.compare_exceptions.aggregate([{
+            '$project': {
+                'concat_parameter_not_array': {'$concatArrays': 42}
             }
-        ]
-        with self.assertRaises(OperationFailure):
-            self.mongo_collection.aggregate(pipeline_parameter_not_array)
-        with self.assertRaises(OperationFailure):
-            self.fake_collection.aggregate(pipeline_parameter_not_array)
+        }])
 
-        pipeline_item_not_array = [
-            {
-                '$project': {
-                    'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}
-                }
+        self.cmp.compare_exceptions.aggregate([{
+            '$project': {
+                'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}
             }
-        ]
-        with self.assertRaises(OperationFailure):
-            self.mongo_collection.aggregate(pipeline_item_not_array)
-        with self.assertRaises(OperationFailure):
-            self.fake_collection.aggregate(pipeline_item_not_array)
+        }])
 
     def test__aggregate_filter(self):
         self.cmp.do.drop()
