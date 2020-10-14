@@ -3062,6 +3062,51 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         ])
 
+    def test__aggregate_concatArrays(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            '_id': 1,
+            'a': [1, 2],
+            'b': ['foo', 'bar', 'baz'],
+            'c': {
+                'arr1': [123]
+            }
+        })
+        pipeline = [{
+            '$project': {
+                '_id': 0,
+                'concat': {'$concatArrays': ['$a', ['#', '*'], '$c.arr1', '$b']},
+                'concat_array_expression': {'$concatArrays': '$b'},
+                'concat_tuples': {'$concatArrays': ((1, 2, 3), (1,))},
+                'concat_none': {'$concatArrays': None},
+                'concat_missing_field': {'$concatArrays': '$foo'},
+                'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
+                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+            }
+        }]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_concatArrays_exceptions(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            '_id': 1,
+            'a': {
+                'arr1': [123]
+            }
+        })
+
+        self.cmp.compare_exceptions.aggregate([{
+            '$project': {
+                'concat_parameter_not_array': {'$concatArrays': 42}
+            }
+        }])
+
+        self.cmp.compare_exceptions.aggregate([{
+            '$project': {
+                'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}
+            }
+        }])
+
     def test__aggregate_filter(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
