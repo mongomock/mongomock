@@ -881,6 +881,24 @@ class CollectionAPITest(TestCase):
                                {'a': 1, 'c': 0},
                                {'a': 2, 'c': 4}])
 
+    def test__update_many_collation(self):
+        self.db.collection.insert_many([
+            {'a': 1, 'c': 2},
+            {'a': 1, 'c': 3},
+            {'a': 2, 'c': 4}
+        ])
+        self.db.collection.update_many(
+            filter={'a': 1},
+            update={'$set': {'c': 0}},
+            collation=None,
+        )
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_many(
+                filter={'a': 1},
+                update={'$set': {'c': 0}},
+                collation='fr',
+            )
+
     def test__update_many_upsert(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_many(

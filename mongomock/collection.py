@@ -549,20 +549,23 @@ class Collection(object):
 
     def update_one(
             self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
-            session=None):
+            session=None, collation=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
-            self._update(filter, update, upsert=upsert, hint=hint, session=session),
+            self._update(
+                filter, update, upsert=upsert, hint=hint, session=session, collation=collation),
             acknowledged=True)
 
     def update_many(
             self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
-            session=None):
+            session=None, collation=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
-            self._update(filter, update, upsert=upsert, multi=True, hint=hint, session=session),
+            self._update(
+                filter, update, upsert=upsert, multi=True, hint=hint, session=session,
+                collation=collation),
             acknowledged=True)
 
     def replace_one(
@@ -582,12 +585,18 @@ class Collection(object):
                             check_keys, **kwargs)
 
     def _update(self, spec, document, upsert=False, manipulate=False,
-                multi=False, check_keys=False, hint=None, session=None, **kwargs):
+                multi=False, check_keys=False, hint=None, session=None,
+                collation=None, **kwargs):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if hint:
             raise NotImplementedError(
                 'The hint argument of update is valid but has not been implemented in '
+                'mongomock yet')
+        if collation:
+            raise_not_implemented(
+                'collation',
+                'The collation argument of update is valid but has not been implemented in '
                 'mongomock yet')
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
