@@ -45,7 +45,7 @@ def filter_applies(search_filter, document):
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    return _Filterer().apply(search_filter, document)
+    return _filterer_inst.apply(search_filter, document)
 
 
 class _Filterer(object):
@@ -516,3 +516,6 @@ class BsonComparable(object):
 
     def __lt__(self, other):
         return bson_compare(operator.lt, self.obj, other.obj)
+
+
+_filterer_inst = _Filterer()
