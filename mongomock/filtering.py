@@ -242,10 +242,14 @@ def _iter_key_candidates_sublist(key, doc):
 
     if sub_key_int is None:
         # subkey is not an integer...
-        return [x
-                for sub_doc in doc
-                if isinstance(sub_doc, dict) and sub_key in sub_doc
-                for x in iter_key_candidates(key_remainder, sub_doc[sub_key])]
+        ret = []
+        for sub_doc in doc:
+            if isinstance(sub_doc, dict):
+                if sub_key in sub_doc:
+                    ret.extend(iter_key_candidates(key_remainder, sub_doc[sub_key]))
+                else:
+                    ret.append(NOTHING)
+        return ret
 
     # subkey is an index
     if sub_key_int >= len(doc):
