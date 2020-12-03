@@ -1,3 +1,4 @@
+import re
 import warnings
 
 from . import CollectionInvalid
@@ -63,10 +64,30 @@ class Database(object):
 
         return self.list_collection_names(session=session)
 
-    def list_collection_names(self, session=None):
+    def list_collection_names(self, filter: dict = None, session=None):
+        """
+            filter:  only name field type equal and regex operator
+            session: not supported
+        """
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
+        if filter and filter.get('name'):
+            regex = filter.get('name').get('$regex') if isinstance(filter.get('name'), dict) and filter.get('name').get('$regex') else None
+            if regex:
+                return [
+                    name for name in self._get_created_collections()
+                    if re.match(regex, name) and not name.startswith('system.')
+                ]
+            elif filter.get('name'):
+                name_filter = filter.get('name')
+                return [
+                    name for name in self._get_created_collections()
+                    if not name.startswith('system.') and name == name_filter
+                ]
+            else:
+                raise NotImplementedError('Mongomock list collection filter only support name'
+                                          ' field type equal and regex expression')
         return [
             name for name in self._get_created_collections()
             if not name.startswith('system.')
