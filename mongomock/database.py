@@ -1,6 +1,8 @@
 import re
 import warnings
 
+from mongomock.filtering import filter_applies, _regex
+
 from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
@@ -66,25 +68,40 @@ class Database(object):
 
     def list_collection_names(self, filter: dict = None, session=None):
         """
-            filter:  only name field type equal and regex operator
+            filter:  only name field type with equal or regex operator
             session: not supported
+            motice that the filter syntax is diffrent then collection syntax
         """
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
-        if filter and filter.get('name'):
-            regex = filter.get('name').get('$regex') if isinstance(filter.get('name'), dict) and filter.get('name').get('$regex') else None
-            if regex:
+
+
+        if filter:
+            if not filter.get('name'):
+                raise NotImplementedError('Mongomock list collection names support name type only')
+            cols_names = self._get_created_collections()
+            regex = filter.get('name').get('$regex') if isinstance(filter.get('name'), dict) else filter.get('name')
+            if _regex(cols_names, regex):
+
                 return [
-                    name for name in self._get_created_collections()
+                    name for name in cols_names
                     if re.match(regex, name) and not name.startswith('system.')
                 ]
-            elif filter.get('name'):
-                name_filter = filter.get('name')
-                return [
-                    name for name in self._get_created_collections()
-                    if not name.startswith('system.') and name == name_filter
-                ]
+
+
+            # regex = filter.get('name').get('$regex') if isinstance(filter.get('name'), dict) and filter.get('name').get('$regex') else None
+            # if regex:
+            #     return [
+            #         name for name in self._get_created_collections()
+            #         if re.match(regex, name) and not name.startswith('system.')
+            #     ]
+            # elif filter.get('name'):
+            #     name_filter = filter.get('name')
+            #     return [
+            #         name for name in self._get_created_collections()
+            #         if not name.startswith('system.') and name == name_filter
+            #     ]
             else:
                 raise NotImplementedError('Mongomock list collection filter only support name'
                                           ' field type equal and regex expression')
