@@ -111,6 +111,11 @@ class CollectionAPITest(TestCase):
         next(cursor)
         self.assertFalse(cursor.alive)
 
+    def test__cursor_collation(self):
+        self.db.collection.insert_one({'foo': 'bar'})
+        cursor = self.db.collection.find(collation='fr')
+        self.assertEqual('fr', cursor.collation)
+
     def test__drop_collection(self):
         self.db.create_collection('a')
         self.db.create_collection('b')

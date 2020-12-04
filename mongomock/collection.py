@@ -1962,6 +1962,10 @@ class Cursor(object):
     def alive(self):
         return self._emitted != self.count()
 
+    @property
+    def collation(self):
+        return self._collation
+
     def max_time_ms(self, max_time_ms):
         if max_time_ms is not None and not isinstance(max_time_ms, int):
             raise TypeError('max_time_ms must be an integer or None')
