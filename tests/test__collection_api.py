@@ -5988,18 +5988,18 @@ class CollectionAPITest(TestCase):
         self.db.create_collection('aggregator')
         for day in range(10):
             new_date = datetime.now() - timedelta(day)
-            self.db.create_collection(f'historical_{new_date.strftime("%Y_%m_%d")}')
+            self.db.create_collection('historical_{0}'.format(new_date.strftime("%Y_%m_%d")))
 
         # test without filter
         assert len(self.db.list_collection_names()) == 11
 
         # test regex
         assert len(self.db.list_collection_names(
-            filter={'name': {'$regex': r'historical_\d{{4}}_\d{{2}}_\d{{2}}'}}
+            filter={'name': {'$regex': r'historical_\d{4}_\d{2}_\d{2}'}}
         )) == 10
 
         new_date = datetime.now() - timedelta(1)
-        col_name = f'historical_{new_date.strftime("%Y_%m_%d")}'
+        col_name = 'historical_{0}'.format(new_date.strftime("%Y_%m_%d"))
 
         # test not equal
         assert len(self.db.list_collection_names( filter={'name': {'$ne': col_name}})) == 10
