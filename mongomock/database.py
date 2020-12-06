@@ -65,7 +65,7 @@ class Database(object):
 
         return self.list_collection_names(session=session)
 
-    def list_collection_names(self, filter: dict = None, session=None):
+    def list_collection_names(self, filter=None, session=None):
         """
             filter: only name field type with eq,ne or regex operator
             session: not supported
