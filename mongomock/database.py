@@ -79,7 +79,7 @@ class Database(object):
             for key in keys:
                 if key not in allowed_operators:
                     raise NotImplementedError(
-                        f'Mongomock list collection names filter operators are {allowed_operators}')
+                        'Mongomock list collection names filter operators are {0}'.format(allowed_operators))
 
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
@@ -95,8 +95,6 @@ class Database(object):
             return [name for name in list(self._store._collections)
                     if filter_applies(filter, {filed_name: name}) and not name.startswith('system.')]
 
-            raise NotImplementedError('Mongomock list collection filter only support name'
-                                      ' field type equal and regex expression')
         return [
             name for name in self._get_created_collections()
             if not name.startswith('system.')
