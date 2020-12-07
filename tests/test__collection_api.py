@@ -6002,7 +6002,7 @@ class CollectionAPITest(TestCase):
         col_name = 'historical_{0}'.format(new_date.strftime('%Y_%m_%d'))
 
         # test not equal
-        assert len(self.db.list_collection_names( filter={'name': {'$ne': col_name}})) == 10
+        assert len(self.db.list_collection_names(filter={'name': {'$ne': col_name}})) == 10
 
         # test equal
         assert col_name in self.db.list_collection_names(filter={'name': col_name})
