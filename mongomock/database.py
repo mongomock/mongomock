@@ -66,10 +66,10 @@ class Database(object):
         return self.list_collection_names(session=session)
 
     def list_collection_names(self, filter=None, session=None):
-        """
-            filter: only name field type with eq,ne or regex operator
-            session: not supported
-            supported operator are $eq, $ne, $regex
+        """filter: only name field type with eq,ne or regex operator
+
+        session: not supported
+        supported operator are $eq, $ne, $regex
         """
 
         allowed_operators = ['$regex', '$eq', '$ne']
@@ -79,7 +79,8 @@ class Database(object):
             for key in keys:
                 if key not in allowed_operators:
                     raise NotImplementedError(
-                        'Mongomock list collection names filter operators are {0}'.format(allowed_operators))
+                        'Mongomock list collection names filter'
+                        ' operators are {0}'.format(allowed_operators))
 
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
@@ -88,12 +89,14 @@ class Database(object):
             if not filter.get('name'):
                 raise NotImplementedError('Mongomock list collection names support name type only')
 
-            filter = {filed_name: {'$eq': filter.get(filed_name)}} if isinstance(filter.get(filed_name), str) else filter
+            filter = {filed_name: {'$eq': filter.get(filed_name)}} \
+                if isinstance(filter.get(filed_name), str) else filter
 
             verify_supported_op(filter.get(filed_name).keys())
 
             return [name for name in list(self._store._collections)
-                    if filter_applies(filter, {filed_name: name}) and not name.startswith('system.')]
+                    if filter_applies(filter, {filed_name: name}) and
+                    not name.startswith('system.')]
 
         return [
             name for name in self._get_created_collections()

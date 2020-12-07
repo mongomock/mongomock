@@ -5994,9 +5994,9 @@ class CollectionAPITest(TestCase):
         assert len(self.db.list_collection_names()) == 11
 
         # test regex
-        assert len(self.db.list_collection_names(
-            filter={'name': {'$regex': r'historical_\d{4}_\d{2}_\d{2}'}}
-        )) == 10
+        assert len(self.db.list_collection_names(filter={
+            'name': {'$regex': r'historical_\d{4}_\d{2}_\d{2}'}
+        })) == 10
 
         new_date = datetime.now() - timedelta(1)
         col_name = 'historical_{0}'.format(new_date.strftime("%Y_%m_%d"))
