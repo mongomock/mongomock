@@ -6006,3 +6006,11 @@ class CollectionAPITest(TestCase):
 
         # test equal
         assert col_name in self.db.list_collection_names(filter={'name': col_name})
+
+        # neg invalid field
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'_id': {'$ne': col_name}})
+
+        # neg invalid operator
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'name': {'$ge': col_name}})
