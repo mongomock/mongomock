@@ -18,6 +18,8 @@ try:
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
+list_collection_filter_allowed_operators = frozenset(['$regex', '$eq', '$ne'])
+
 
 class Database(object):
 
@@ -65,37 +67,35 @@ class Database(object):
 
         return self.list_collection_names(session=session)
 
+    def _verify_list_collection_supported_op(self, keys):
+        if keys - list_collection_filter_allowed_operators:
+            raise NotImplementedError(
+                'list collection names filter operator {0} is not implemented yet in mongomock '
+                'allowed operators are {1}'.format(keys, list_collection_filter_allowed_operators))
+
     def list_collection_names(self, filter=None, session=None):
         """filter: only name field type with eq,ne or regex operator
 
         session: not supported
         supported operator are $eq, $ne, $regex
         """
-
-        allowed_operators = ['$regex', '$eq', '$ne']
-        filed_name = 'name'
-
-        def verify_supported_op(keys):
-            for key in keys:
-                if key not in allowed_operators:
-                    raise NotImplementedError(
-                        'Mongomock list collection names filter'
-                        ' operators are {0}'.format(allowed_operators))
+        field_name = 'name'
 
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
         if filter:
             if not filter.get('name'):
-                raise NotImplementedError('Mongomock list collection names support name type only')
+                raise NotImplementedError(' list collection {0} might be valid but is not '
+                                          ' implemented yet in mongomock'.format(filter))
 
-            filter = {filed_name: {'$eq': filter.get(filed_name)}} \
-                if isinstance(filter.get(filed_name), str) else filter
+            filter = {field_name: {'$eq': filter.get(field_name)}} \
+                if isinstance(filter.get(field_name), str) else filter
 
-            verify_supported_op(filter.get(filed_name).keys())
+            self._verify_list_collection_supported_op(filter.get(field_name).keys())
 
             return [name for name in list(self._store._collections)
-                    if filter_applies(filter, {filed_name: name}) and
+                    if filter_applies(filter, {field_name: name}) and
                     not name.startswith('system.')]
 
         return [
