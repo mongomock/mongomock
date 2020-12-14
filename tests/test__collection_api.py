@@ -5988,3 +5988,18 @@ class CollectionAPITest(TestCase):
         ids = set(doc['_id'] for doc in self.db.collection.find(
             {'arr': {'$elemMatch': {'$lt': 10, '$gt': 4}}}, {'_id': 1}))
         self.assertEqual({1, 2}, ids)
+
+    def test__equality(self):
+        self.assertEqual(self.db.a, self.db.a)
+        self.assertNotEqual(self.db.a, self.db.b)
+        self.assertEqual(self.db.a, self.db.get_collection('a'))
+        self.assertNotEqual(self.db.a, self.client.other_db.a)
+        client = mongomock.MongoClient('localhost')
+        self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
+        self.assertNotEqual(
+            client.db.collection, mongomock.MongoClient('example.com').db.collection)
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {self.db.a, self.db.b}  # pylint: disable=pointless-statement
