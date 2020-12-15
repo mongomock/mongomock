@@ -399,6 +399,11 @@ class Collection(object):
                 (self.__class__.__name__, attr, self.name, attr, self.name, attr))
         return self.__getitem__(attr)
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.database == other.database and self.name == other.name
+        return NotImplemented
+
     @property
     def full_name(self):
         return '{0}.{1}'.format(self.database.name, self._name)
@@ -1961,6 +1966,10 @@ class Cursor(object):
     @property
     def alive(self):
         return self._emitted != self.count()
+
+    @property
+    def collation(self):
+        return self._collation
 
     def max_time_ms(self, max_time_ms):
         if max_time_ms is not None and not isinstance(max_time_ms, int):

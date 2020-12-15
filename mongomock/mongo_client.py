@@ -66,6 +66,11 @@ class MongoClient(object):
     def __repr__(self):
         return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.address == other.address
+        return NotImplemented
+
     def close(self):
         pass
 

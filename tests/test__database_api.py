@@ -1,6 +1,7 @@
 import collections
 import datetime
 from distutils import version  # pylint: disable=no-name-in-module
+import sys
 from unittest import TestCase, skipIf
 
 import mongomock
@@ -132,7 +133,7 @@ class DatabaseAPITest(TestCase):
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
         other = self.database.with_options(read_preference=self.database.NEAREST)
-        self.assertNotEqual(other, self.database)
+        self.assertFalse(other is self.database)
 
         self.database.coll.insert_one({'_id': 42})
         self.assertEqual({'_id': 42}, other.coll.find_one())
@@ -234,6 +235,19 @@ class DatabaseAPITest(TestCase):
         self.assertEqual(set(self.database.list_collection_names()), set())
         col.insert({'foo': 'bar'})
         self.assertEqual(set(self.database.list_collection_names()), set(['a']))
+
+    def test__equality(self):
+        self.assertEqual(self.database, self.database)
+        client = mongomock.MongoClient('localhost')
+        self.assertNotEqual(client.a, client.b)
+        self.assertEqual(client.a, client.get_database('a'))
+        self.assertEqual(client.a, mongomock.MongoClient('localhost').a)
+        self.assertNotEqual(client.a, mongomock.MongoClient('example.com').a)
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {self.database}  # pylint: disable=pointless-statement
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])
