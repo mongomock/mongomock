@@ -283,6 +283,20 @@ class _CollectionComparisonTest(TestCase):
         self.mongo_conn.close()
 
 
+class EqualityCollectionTest(_CollectionComparisonTest):
+
+    def test__database_equality(self):
+        self.assertEqual(self.mongo_conn[self.db_name], self.mongo_conn[self.db_name])
+        self.assertEqual(self.fake_conn[self.db_name], self.fake_conn[self.db_name])
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__database_hashable(self):
+        with self.assertRaises(TypeError):
+            {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
+        with self.assertRaises(TypeError):
+            {self.fake_conn[self.db_name]}  # pylint: disable=pointless-statement
+
+
 class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__find_is_empty(self):

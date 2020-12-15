@@ -111,6 +111,11 @@ class CollectionAPITest(TestCase):
         next(cursor)
         self.assertFalse(cursor.alive)
 
+    def test__cursor_collation(self):
+        self.db.collection.insert_one({'foo': 'bar'})
+        cursor = self.db.collection.find(collation='fr')
+        self.assertEqual('fr', cursor.collation)
+
     def test__drop_collection(self):
         self.db.create_collection('a')
         self.db.create_collection('b')
@@ -6015,3 +6020,18 @@ class CollectionAPITest(TestCase):
         # neg invalid operator
         with self.assertRaises(NotImplementedError):
             self.db.list_collection_names(filter={'name': {'$ge': col_name}})
+
+    def test__equality(self):
+        self.assertEqual(self.db.a, self.db.a)
+        self.assertNotEqual(self.db.a, self.db.b)
+        self.assertEqual(self.db.a, self.db.get_collection('a'))
+        self.assertNotEqual(self.db.a, self.client.other_db.a)
+        client = mongomock.MongoClient('localhost')
+        self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
+        self.assertNotEqual(
+            client.db.collection, mongomock.MongoClient('example.com').db.collection)
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {self.db.a, self.db.b}  # pylint: disable=pointless-statement

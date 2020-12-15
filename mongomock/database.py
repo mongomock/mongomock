@@ -45,6 +45,11 @@ class Database(object):
     def __repr__(self):
         return "Database({0}, '{1}')".format(self._client, self.name)
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self._client == other._client and self.name == other.name
+        return NotImplemented
+
     @property
     def client(self):
         return self._client

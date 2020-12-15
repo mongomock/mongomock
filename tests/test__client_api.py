@@ -1,4 +1,6 @@
+import sys
 import unittest
+from unittest import skipIf
 
 try:
     from unittest import mock
@@ -78,6 +80,22 @@ class MongoClientApiTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             mongomock.MongoClient('mongodb://localhost:mongoport/')
+
+    def test__equality(self):
+        self.assertEqual(
+            mongomock.MongoClient('mongodb://localhost:27017/'),
+            mongomock.MongoClient('mongodb://localhost:27017/'))
+        self.assertEqual(
+            mongomock.MongoClient('mongodb://localhost:27017/'),
+            mongomock.MongoClient('localhost'))
+        self.assertNotEqual(
+            mongomock.MongoClient('/var/socket/mongo.sock'),
+            mongomock.MongoClient('localhost'))
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
     def test__parse_hosts(self):
         client = mongomock.MongoClient('localhost')
