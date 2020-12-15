@@ -18,7 +18,14 @@ try:
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
-list_collection_filter_allowed_operators = frozenset(['$regex', '$eq', '$ne'])
+_LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
+
+
+def _verify_list_collection_supported_op(keys):
+    if set(keys) - _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS:
+        raise NotImplementedError(
+            'list collection names filter operator {0} is not implemented yet in mongomock '
+            'allowed operators are {1}'.format(keys, _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS))
 
 
 class Database(object):
@@ -67,17 +74,11 @@ class Database(object):
 
         return self.list_collection_names(session=session)
 
-    def _verify_list_collection_supported_op(self, keys):
-        if set(keys) - list_collection_filter_allowed_operators:
-            raise NotImplementedError(
-                'list collection names filter operator {0} is not implemented yet in mongomock '
-                'allowed operators are {1}'.format(keys, list_collection_filter_allowed_operators))
-
     def list_collection_names(self, filter=None, session=None):
         """filter: only name field type with eq,ne or regex operator
 
         session: not supported
-        supported operator are $eq, $ne, $regex
+        for supported operator please see _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS
         """
         field_name = 'name'
 
@@ -86,8 +87,8 @@ class Database(object):
 
         if filter:
             if not filter.get('name'):
-                raise NotImplementedError(' list collection {0} might be valid but is not '
-                                          ' implemented yet in mongomock'.format(filter))
+                raise NotImplementedError('list collection {0} might be valid but is not '
+                                          'implemented yet in mongomock'.format(filter))
 
             filter = {field_name: {'$eq': filter.get(field_name)}} \
                 if isinstance(filter.get(field_name), str) else filter
