@@ -68,7 +68,7 @@ class Database(object):
         return self.list_collection_names(session=session)
 
     def _verify_list_collection_supported_op(self, keys):
-        if keys - list_collection_filter_allowed_operators:
+        if set(keys) - list_collection_filter_allowed_operators:
             raise NotImplementedError(
                 'list collection names filter operator {0} is not implemented yet in mongomock '
                 'allowed operators are {1}'.format(keys, list_collection_filter_allowed_operators))
