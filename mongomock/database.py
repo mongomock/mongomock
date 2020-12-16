@@ -98,7 +98,7 @@ class Database(object):
             filter = {field_name: {'$eq': filter.get(field_name)}} \
                 if isinstance(filter.get(field_name), str) else filter
 
-            self._verify_list_collection_supported_op(filter.get(field_name).keys())
+            _verify_list_collection_supported_op(filter.get(field_name).keys())
 
             return [name for name in list(self._store._collections)
                     if filter_applies(filter, {field_name: name}) and
