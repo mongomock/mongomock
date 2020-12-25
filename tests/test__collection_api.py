@@ -5989,6 +5989,38 @@ class CollectionAPITest(TestCase):
             {'arr': {'$elemMatch': {'$lt': 10, '$gt': 4}}}, {'_id': 1}))
         self.assertEqual({1, 2}, ids)
 
+    def test_list_collection_names_filter(self):
+        now = datetime.now()
+        self.db.create_collection('aggregator')
+        for day in range(10):
+            new_date = now - timedelta(day)
+            self.db.create_collection('historical_{0}'.format(new_date.strftime('%Y_%m_%d')))
+
+        # test without filter
+        self.assertEqual(len(self.db.list_collection_names()), 11)
+
+        # test regex
+        assert len(self.db.list_collection_names(filter={
+            'name': {'$regex': r'historical_\d{4}_\d{2}_\d{2}'}
+        })) == 10
+
+        new_date = datetime.now() - timedelta(1)
+        col_name = 'historical_{0}'.format(new_date.strftime('%Y_%m_%d'))
+
+        # test not equal
+        self.assertEqual(len(self.db.list_collection_names(filter={'name': {'$ne': col_name}})), 10)
+
+        # test equal
+        assert col_name in self.db.list_collection_names(filter={'name': col_name})
+
+        # neg invalid field
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'_id': {'$ne': col_name}})
+
+        # neg invalid operator
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'name': {'$ge': col_name}})
+
     def test__equality(self):
         self.assertEqual(self.db.a, self.db.a)
         self.assertNotEqual(self.db.a, self.db.b)
