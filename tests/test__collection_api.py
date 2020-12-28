@@ -1197,6 +1197,18 @@ class CollectionAPITest(TestCase):
         self.assertTrue(isinstance(ret_val, list))
         self.assertTrue(set(ret_val) == set(['larry', 'gary']))
 
+    def test__cursor_limit(self):
+        self.db.collection.insert_many([{'a': i} for i in range(100)])
+        cursor = self.db.collection.find().limit(30)
+        first_ones = list(cursor)
+        self.assertEqual(30, len(first_ones))
+
+    def test__cursor_negative_limit(self):
+        self.db.collection.insert_many([{'a': i} for i in range(100)])
+        cursor = self.db.collection.find().limit(-30)
+        first_ones = list(cursor)
+        self.assertEqual(30, len(first_ones))
+
     def test__cursor_count_with_limit(self):
         first = {'name': 'first'}
         second = {'name': 'second'}

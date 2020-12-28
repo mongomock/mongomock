@@ -1840,7 +1840,7 @@ class Cursor(object):
         if with_limit_and_skip:
             results = self._results[self._skip:]
             if self._limit:
-                results = results[:self._limit]
+                results = results[:abs(self._limit)]
         else:
             results = self._results
         return results
