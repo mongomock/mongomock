@@ -143,9 +143,11 @@ set_operators = [
 ]
 
 type_convertion_operators = [
+    '$convert',
     '$toString',
     '$toInt',
     '$toDecimal',
+    '$toLong',
     '$arrayToObject'
 ]
 
@@ -712,6 +714,11 @@ class _Parser(object):
                 'arrays used with $arrayToObject must contain documents '
                 'with k and v fields or two-element arrays'
             )
+
+        raise NotImplementedError(
+            "Although '%s' is a valid type conversion operator for the "
+            'aggregation pipeline, it is currently not implemented '
+            'in Mongomock.' % operator)
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':

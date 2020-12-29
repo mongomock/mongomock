@@ -4025,6 +4025,11 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$mergeObjects': [{'a': 2, 'b': 3}, {'a': 5}]}}},
             ])
 
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {'$project': {'a': {'$toLong': '$scores'}}},
+            ])
+
     def test__aggregate_project_rotate(self):
         self.db.collection.insert_one({'_id': 1, 'a': 1, 'b': 2, 'c': 3})
         actual = self.db.collection.aggregate([
