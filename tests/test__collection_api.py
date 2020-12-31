@@ -3153,21 +3153,6 @@ class CollectionAPITest(TestCase):
             "Argument 'depthField' to $graphlookup must be a string",
             str(err.exception))
 
-    def test__aggregate_graph_lookup_dot_in_connect_from_field(self):
-        with self.assertRaises(NotImplementedError) as err:
-            self.db.a.aggregate([
-                {'$graphLookup': {
-                    'from': 'arr',
-                    'startWith': '$_id',
-                    'connectFromField': 'parent.id',
-                    'connectToField': '_id',
-                    'as': 'b'
-                }}
-            ])
-        self.assertIn(
-            "Although '.' is valid in the 'connectFromField' parameter",
-            str(err.exception))
-
     def test__aggregate_sample(self):
         self.db.a.insert_many([
             {'_id': i}
