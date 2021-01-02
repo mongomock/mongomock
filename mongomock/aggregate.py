@@ -1002,6 +1002,24 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 # field doesn't exist, just let go
                 pass
 
+    def _recursive_get(match, nested_fields):
+        first_field = nested_fields[0]
+        head = match.get(first_field)
+        if len(nested_fields) == 1:
+            # final/last field reached
+            yield head
+        else:
+            # more to go, get remaining from list/dict
+            remaining_fields = nested_fields[1:]
+            if type(head) == list:
+                for m in head:
+                    yield from _recursive_get(m, remaining_fields)
+            elif type(head) == dict:
+                yield from _recursive_get(head, remaining_fields)
+            else:
+                # field doesn't exist, just let go
+                pass
+
     for doc in out_doc:
         found_items = set()
         depth = 0
