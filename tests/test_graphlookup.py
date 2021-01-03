@@ -34,15 +34,16 @@ class GraphLookupAPITest(TestCase):
         self.db = self.client['somedb']
 
     def test_graphlookup_basic(self):
-        self.perform_test(*getdata(test1))
+        self.perform(test1)
 
     def test_graphlookup_nested_array(self):
-        self.perform_test(*getdata(test2))
+        self.perform(test2)
 
     def test_graphlookup_nested_dict(self):
-        self.perform_test(*getdata(test3))
+        self.perform(test3)
 
-    def perform_test(self, data_a, data_b, query, expected):
+    def perform(self, testcase):
+        data_a, data_b, query, expected = getdata(testcase)
         self.db.a.insert_many(data_a)
         self.db.b.insert_many(data_b)
         actual = self.db.b.aggregate(query)
