@@ -1015,7 +1015,9 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 for m in head:
                     yield from _recursive_get(m, remaining_fields)
             elif isinstance(head, dict):
-                yield from _recursive_get(head, remaining_fields)
+                # yield from _recursive_get(head, remaining_fields)
+                for answer in _recursive_get(head, remaining_fields):
+                    yield answer
             else:
                 # field doesn't exist, just let go
                 pass
