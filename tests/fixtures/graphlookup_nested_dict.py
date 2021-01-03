@@ -31,17 +31,17 @@ def ISODate(_x): # pylint: disable=invalid-name
 
 
 data_b = [
-    {"_id": 1, "name": "Dev"},
-    {"_id": 2, "name": "Eliot", "reportsTo": {
-        'name': "Dev", "from": ISODate("2016-01-01T00:00:00.000Z")}},
-    {"_id": 3, "name": "Ron", "reportsTo": {'name': "Eliot",
-                                            "from": ISODate("2016-01-01T00:00:00.000Z")}},
-    {"_id": 4, "name": "Andrew", "reportsTo": {
-        'name': "Eliot", "from": ISODate("2016-01-01T00:00:00.000Z")}},
-    {"_id": 5, "name": "Asya", "reportsTo": {
-        'name': "Ron", "from": ISODate("2016-01-01T00:00:00.000Z")}},
-    {"_id": 6, "name": "Dan", "reportsTo": {'name': "Andrew",
-                                            "from": ISODate("2016-01-01T00:00:00.000Z")}},
+    {'_id': 1, 'name': 'Dev'},
+    {'_id': 2, 'name': 'Eliot', 'reportsTo': {
+        'name': 'Dev', 'from': ISODate('2016-01-01T00:00:00.000Z')}},
+    {'_id': 3, 'name': 'Ron', 'reportsTo': {'name': 'Eliot',
+                                            'from': ISODate('2016-01-01T00:00:00.000Z')}},
+    {'_id': 4, 'name': 'Andrew', 'reportsTo': {
+        'name': 'Eliot', 'from': ISODate('2016-01-01T00:00:00.000Z')}},
+    {'_id': 5, 'name': 'Asya', 'reportsTo': {
+        'name': 'Ron', 'from': ISODate('2016-01-01T00:00:00.000Z')}},
+    {'_id': 6, 'name': 'Dan', 'reportsTo': {'name': 'Andrew',
+                                            'from': ISODate('2016-01-01T00:00:00.000Z')}},
 ]
 
 data_a = [{'_id':1, 'name':'x'}]
@@ -49,11 +49,11 @@ data_a = [{'_id':1, 'name':'x'}]
 query = [
     {
         '$graphLookup': {
-            'from': "b",
-            'startWith': "$name",
-            'connectFromField': "reportsTo.name",
-            'connectToField': "name",
-            'as': "reportingHierarchy"
+            'from': 'b',
+            'startWith': '$name',
+            'connectFromField': 'reportsTo.name',
+            'connectToField': 'name',
+            'as': 'reportingHierarchy'
         }
     }
 ]

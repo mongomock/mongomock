@@ -23,32 +23,32 @@
 from collections import OrderedDict
 
 data_a = [
-    {"_id": 0, "airport": "JFK", "connects": [
-        {"to": "BOS", "distance": 200}, {"to": "ORD", "distance": 800}]},
-    {"_id": 1, "airport": "BOS", "connects": [
-        {"to": "JFK", "distance": 200}, {"to": "PWM", "distance": 2000}]},
-    {"_id": 2, "airport": "ORD", "connects": [{"to": "JFK", "distance": 800}]},
-    {"_id": 3, "airport": "PWM", "connects": [
-        {"to": "BOS", "distance": 2000}, {"to": "LHR", "distance": 6000}]},
-    {"_id": 4, "airport": "LHR", "connects": [{"to": "PWM", "distance": 6000}]},
+    {'_id': 0, 'airport': 'JFK', 'connects': [
+        {'to': 'BOS', 'distance': 200}, {'to': 'ORD', 'distance': 800}]},
+    {'_id': 1, 'airport': 'BOS', 'connects': [
+        {'to': 'JFK', 'distance': 200}, {'to': 'PWM', 'distance': 2000}]},
+    {'_id': 2, 'airport': 'ORD', 'connects': [{'to': 'JFK', 'distance': 800}]},
+    {'_id': 3, 'airport': 'PWM', 'connects': [
+        {'to': 'BOS', 'distance': 2000}, {'to': 'LHR', 'distance': 6000}]},
+    {'_id': 4, 'airport': 'LHR', 'connects': [{'to': 'PWM', 'distance': 6000}]},
 ]
 
 data_b = [
-    {"_id": 1, "name": "Dev", "nearestAirport": "JFK"},
-    {"_id": 2, "name": "Eliot", "nearestAirport": "JFK"},
-    {"_id": 3, "name": "Jeff", "nearestAirport": "BOS"},
+    {'_id': 1, 'name': 'Dev', 'nearestAirport': 'JFK'},
+    {'_id': 2, 'name': 'Eliot', 'nearestAirport': 'JFK'},
+    {'_id': 3, 'name': 'Jeff', 'nearestAirport': 'BOS'},
 ]
 
 query = [
     {
         '$graphLookup': {
-            'from': "a",
-            'startWith': "$nearestAirport",
-            'connectFromField': "connects.to",
-            'connectToField': "airport",
+            'from': 'a',
+            'startWith': '$nearestAirport',
+            'connectFromField': 'connects.to',
+            'connectToField': 'airport',
             'maxDepth': 2,
-            'depthField': "numConnections",
-            'as': "destinations"
+            'depthField': 'numConnections',
+            'as': 'destinations'
         }
     }
 ]

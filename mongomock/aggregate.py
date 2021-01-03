@@ -993,10 +993,10 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         else:
             # more to go, get remaining from list/dict
             remaining_fields = nested_fields[1:]
-            if type(head) == list:
+            if isinstance(head, list):
                 for m in head:
                     yield from _recursive_get(m, remaining_fields)
-            elif type(head) == dict:
+            elif isinstance(head, dict):
                 yield from _recursive_get(head, remaining_fields)
             else:
                 # field doesn't exist, just let go
@@ -1011,10 +1011,10 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         else:
             # more to go, get remaining from list/dict
             remaining_fields = nested_fields[1:]
-            if type(head) == list:
+            if isinstance(head, list):
                 for m in head:
                     yield from _recursive_get(m, remaining_fields)
-            elif type(head) == dict:
+            elif isinstance(head, dict):
                 yield from _recursive_get(head, remaining_fields)
             else:
                 # field doesn't exist, just let go
@@ -1029,7 +1029,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
             depth += 1
             newly_discovered_matches = []
             for match in origin_matches:
-                nested_fields = connect_from_field.split(".")
+                nested_fields = connect_from_field.split('.')
                 for match_target in _recursive_get(match, nested_fields):
                     newly_discovered_matches += _find_matches_for_depth(match_target)
             doc[local_name] += newly_discovered_matches
