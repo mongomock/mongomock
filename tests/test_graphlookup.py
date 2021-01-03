@@ -9,10 +9,11 @@ The test cases are defined in the files:
      graphlookup_nested_dict.py
 
 """
-import warnings
-from unittest import TestCase
+
 import mongomock
+from unittest import TestCase
 from tests.diff import diff
+import warnings
 
 from .fixtures import graphlookup_basic_test as test1
 from .fixtures import graphlookup_nested_array as test2
@@ -20,10 +21,13 @@ from .fixtures import graphlookup_nested_dict as test3
 
 warnings.simplefilter('ignore', DeprecationWarning)
 
+
 def getdata(testcase):
     """Extract testcase elements from testcase
     """
+
     return testcase.data_a, testcase.data_b, testcase.query, testcase.expected
+
 
 class GraphLookupAPITest(TestCase):
     """Test for $graphLookup withdotted ConnectFromField
@@ -51,4 +55,4 @@ class GraphLookupAPITest(TestCase):
         actual = list(actual)
         # the diff between expected and actual should be empty
         res = diff(expected, actual)
-        self.assertEqual(res,[])
+        self.assertEqual(res, [])

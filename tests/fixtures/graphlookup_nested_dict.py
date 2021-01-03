@@ -23,10 +23,12 @@
 
 """
 
-def ISODate(_x): # pylint: disable=invalid-name
+
+def ISODate(_x):  # pylint: disable=invalid-name
     """Dummy function. Included to enable keeping the original data
-    from the link mentioned above
+      from the link mentioned above
     """
+
     return _x
 
 
@@ -44,7 +46,7 @@ data_b = [
                                             'from': ISODate('2016-01-01T00:00:00.000Z')}},
 ]
 
-data_a = [{'_id':1, 'name':'x'}]
+data_a = [{'_id': 1, 'name': 'x'}]
 
 query = [
     {
