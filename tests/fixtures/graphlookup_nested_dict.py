@@ -25,7 +25,8 @@
 
 
 def ISODate(_x):  # pylint: disable=invalid-name
-    """Dummy function. Included to enable keeping the original data
+    """
+     Dummy function. Included to enable keeping the original data
       from the link mentioned above
     """
 

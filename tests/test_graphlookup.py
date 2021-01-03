@@ -23,15 +23,13 @@ warnings.simplefilter('ignore', DeprecationWarning)
 
 
 def getdata(testcase):
-    """Extract testcase elements from testcase
-    """
+    """Extract testcase elements from testcase"""
 
     return testcase.data_a, testcase.data_b, testcase.query, testcase.expected
 
 
 class GraphLookupAPITest(TestCase):
-    """Test for $graphLookup withdotted ConnectFromField
-    """
+    """Test for $graphLookup withdotted ConnectFromField"""
 
     def setUp(self):
         super(GraphLookupAPITest, self).setUp()
