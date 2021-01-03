@@ -12,6 +12,7 @@ The test cases are defined in the files:
 import warnings
 from unittest import TestCase
 import mongomock
+from tests.diff import diff
 
 from .fixtures import graphlookup_basic_test as test1
 from .fixtures import graphlookup_nested_array as test2
@@ -48,8 +49,6 @@ class GraphLookupAPITest(TestCase):
         self.db.b.insert_many(data_b)
         actual = self.db.b.aggregate(query)
         actual = list(actual)
-
-        # If this test fails it could be because we are comparing
-        # dictionaries and lists. We need normalize the objects before
-        # comparing.
-        self.assertEqual(expected, actual)
+        # the diff between expected and actual should be empty
+        res = diff(expected, actual)
+        self.assertEqual(res,[])
