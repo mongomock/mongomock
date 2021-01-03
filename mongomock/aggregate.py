@@ -1013,7 +1013,9 @@ def _handle_graph_lookup_stage(in_collection, database, options):
             remaining_fields = nested_fields[1:]
             if isinstance(head, list):
                 for m in head:
-                    yield from _recursive_get(m, remaining_fields)
+                    # yield from _recursive_get(m, remaining_fields)
+                    for answer in _recursive_get(m, remaining_fields):
+                        yield answer
             elif isinstance(head, dict):
                 # yield from _recursive_get(head, remaining_fields)
                 for answer in _recursive_get(head, remaining_fields):
