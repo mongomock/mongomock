@@ -930,6 +930,25 @@ def _handle_lookup_stage(in_collection, database, options):
     return in_collection
 
 
+def _recursive_get(match, nested_fields):
+    head = match.get(nested_fields[0])
+    remaining_fields = nested_fields[1:]
+    if not remaining_fields:
+        # Final/last field reached.
+        yield head
+        return
+    # More fields to go, must be list, tuple, or dict.
+    if isinstance(head, (list, tuple)):
+        for m in head:
+            # Yield from _recursive_get(m, remaining_fields).
+            for answer in _recursive_get(m, remaining_fields):
+                yield answer
+    elif isinstance(head, dict):
+        # Yield from _recursive_get(head, remaining_fields).
+        for answer in _recursive_get(head, remaining_fields):
+            yield answer
+
+
 def _handle_graph_lookup_stage(in_collection, database, options):
     if not isinstance(options.get('maxDepth', 0), six.integer_types):
         raise OperationFailure(
@@ -952,8 +971,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 "Argument '%s' to $graphLookup must be string" % operator)
         if options[operator].startswith('$'):
             raise OperationFailure("FieldPath field names may not start with '$'")
-        if operator in ('as') and \
-                '.' in options[operator]:
+        if operator == 'as' and '.' in options[operator]:
             raise NotImplementedError(
                 "Although '.' is valid in the '%s' "
                 'parameter for the $graphLookup stage of the aggregation '
@@ -984,27 +1002,6 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 found_items.add(new_match['_id'])
         return new_matches
 
-    def _recursive_get(match, nested_fields):
-        first_field = nested_fields[0]
-        head = match.get(first_field)
-        if len(nested_fields) == 1:
-            # final/last field reached
-            yield head
-        else:
-            # more to go, get remaining from list/dict
-            remaining_fields = nested_fields[1:]
-            if isinstance(head, list):
-                for m in head:
-                    # yield from _recursive_get(m, remaining_fields)
-                    for answer in _recursive_get(m, remaining_fields):
-                        yield answer
-            elif isinstance(head, dict):
-                # yield from _recursive_get(head, remaining_fields)
-                for answer in _recursive_get(head, remaining_fields):
-                    yield answer
-            else:
-                # field doesn't exist, just let go
-                pass
 
     for doc in out_doc:
         found_items = set()
