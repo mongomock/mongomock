@@ -11,8 +11,8 @@ The test cases are defined in the files:
 """
 
 import mongomock
-from unittest import TestCase
 from tests.diff import diff
+from unittest import TestCase
 import warnings
 
 from .fixtures import graphlookup_basic_test as test1
