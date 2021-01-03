@@ -25,7 +25,12 @@
 
 
 def ISODate(_x):  # pylint: disable=invalid-name
-    """Dummy function; to be consistent with the link mentioned above """
+    """Dummy function; to be consistent with the link mentioned above
+
+    The original test uses ISODate. This function helps keep the test identical,
+    as does the pylint disable directive.
+    """
+
     return _x
 
 
