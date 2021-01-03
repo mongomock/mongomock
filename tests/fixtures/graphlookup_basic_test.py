@@ -1,20 +1,29 @@
-import collections
-import copy
-from datetime import datetime, tzinfo, timedelta
-import random
-from unittest import TestCase, skipIf
-import warnings
+"""
+    TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
 
-import mongomock
+* This testcase has a simple connect from field without the dot operator.
 
-warnings.simplefilter('ignore', DeprecationWarning)
+* The test case is taken from
+  https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/
 
+* The inputs and the query are copy/pasted directly from the link
+  above.
+
+* The expected output is formatted to match the pprint'ed output
+  produced by mongomock.
+
+* The elements are:
+
+     - data_a: documents for database a
+     - data_b: documents for database b
+     - query: query for database b
+     - expected: result expected from query execution
 
 """
-Example taken from https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/
 
-"""
-connections = [
+from collections import OrderedDict
+
+data_a = [
     {"_id": 0, "airport": "JFK", "connects": ["BOS", "ORD"]},
     {"_id": 1, "airport": "BOS", "connects": ["JFK", "PWM"]},
     {"_id": 2, "airport": "ORD", "connects": ["JFK"]},
@@ -22,7 +31,7 @@ connections = [
     {"_id": 4, "airport": "LHR", "connects": ["PWM"]},
 ]
 
-people = [
+data_b = [
     {"_id": 1, "name": "Dev", "nearestAirport": "JFK"},
     {"_id": 2, "name": "Eliot", "nearestAirport": "JFK"},
     {"_id": 3, "name": "Jeff", "nearestAirport": "BOS"},
@@ -41,18 +50,6 @@ query = [
         }
     }
 ]
-
-
-"""
-The expected output is a pretty-pretty printed form of actual output. It's
-manually verified to be correct, and matching the answer on mongodb website,
-mentioned above.
-
-Using OrderedDict just because the "pretty-printed" actual output shows it.
-
-"""
-
-from collections import OrderedDict
 
 expected = [{'_id': 1,
              'destinations': [OrderedDict([('_id', 0),
@@ -115,21 +112,3 @@ expected = [{'_id': 1,
                                            ('numConnections', 2)])],
              'name': 'Jeff',
              'nearestAirport': 'BOS'}]
-
-
-class CollectionAPITest(TestCase):
-
-    def setUp(self):
-        super(CollectionAPITest, self).setUp()
-        self.client = mongomock.MongoClient()
-        self.db = self.client['somedb']
-
-    def test_graph_basic(self):
-        self.db.a.insert_many(connections)
-        self.db.b.insert_many(people)
-        actual = self.db.b.aggregate(query)
-        actual = list(actual)
-        """If this test fails it could be because we are comparing dictionaries and lists
-        We need normalize the objects before comparing.
-        """
-        self.assertEqual(expected, actual)

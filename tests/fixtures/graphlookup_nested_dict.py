@@ -1,24 +1,36 @@
-import collections
-import copy
-from datetime import datetime, tzinfo, timedelta
-import random
-from unittest import TestCase, skipIf
-import warnings
-
-import mongomock
-
-warnings.simplefilter('ignore', DeprecationWarning)
-
 """
-* Following test case taken from
+    TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+
+* This test cases connectfrom x.y where x is a dictionary.
+
+* The testcase is taken from
       https://stackoverflow.com/questions/40989763/mongodb-graphlookup
 
-* The ISODate(x) helps to keep the original code intact.
+* The inputs and the query are copy/pasted directly from the link
+  above (with some cleanup)
+
+* The expected output is formatted to match the pprint'ed output
+  produced by mongomock.
+
+* The elements are:
+
+     - data_a: documents for database a
+     - data_b: documents for database b
+     - query: query for database b
+     - expected: result expected from query execution
+
+* The ISODate(x) helps to keep intact the original code from the above link.
+
 """
-def ISODate(x): return x
+
+def ISODate(_x): # pylint: disable=invalid-name
+    """Dummy function. Included to enable keeping the original data
+    from the link mentioned above
+    """
+    return _x
 
 
-documents = [
+data_b = [
     {"_id": 1, "name": "Dev"},
     {"_id": 2, "name": "Eliot", "reportsTo": {
         'name': "Dev", "from": ISODate("2016-01-01T00:00:00.000Z")}},
@@ -32,15 +44,12 @@ documents = [
                                             "from": ISODate("2016-01-01T00:00:00.000Z")}},
 ]
 
+data_a = [{'_id':1, 'name':'x'}]
 
-"""
-      Query from the original stackoverflow article, except the "startWith" is changed.
-      The stackoverflow article has "startWith" as "Elliot", which doesn't appear to be correct.
-"""
 query = [
     {
         '$graphLookup': {
-            'from': "a",
+            'from': "b",
             'startWith': "$name",
             'connectFromField': "reportsTo.name",
             'connectToField': "name",
@@ -48,12 +57,6 @@ query = [
         }
     }
 ]
-
-""" 
-This here is a cut/paste of the actual output of the system. It was verified manually to ascertain
-correctness. Incidentally, it is different from the stacck overlow article. 
-
-"""
 
 expected = [{'_id': 1,
              'name': 'Dev',
@@ -122,19 +125,3 @@ expected = [{'_id': 1,
                                                    'name': 'Dev'}},
                                     {'_id': 1, 'name': 'Dev'}],
              'reportsTo': {'from': ISODate('2016-01-01T00:00:00.000Z'), 'name': 'Andrew'}}]
-
-
-class CollectionAPITest(TestCase):
-
-    def setUp(self):
-        super(CollectionAPITest, self).setUp()
-        self.client = mongomock.MongoClient()
-        self.db = self.client['somedb']
-
-    def test_graph_nested_dict(self):
-        self.db.a.insert_many(documents)
-        actual = self.db.a.aggregate(query)
-        actual = list(actual)
-        """ if this match fails, it could be because the answer contains a list
-         They ought to be normalized before comparison."""
-        self.assertEqual(expected, actual)
