@@ -3366,7 +3366,8 @@ class CollectionAPITest(TestCase):
         self.assertEqual(res, [])
 
     def test_aggregate_graph_lookup_connect_from_nested_dict(self):
-        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+        """
+         TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
 
         * This test cases connectfrom x.y where x is a dictionary.
 

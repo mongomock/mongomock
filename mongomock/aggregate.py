@@ -1002,7 +1002,6 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 found_items.add(new_match['_id'])
         return new_matches
 
-
     for doc in out_doc:
         found_items = set()
         depth = 0
