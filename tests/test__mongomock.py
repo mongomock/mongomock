@@ -3571,6 +3571,118 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ])
 
 
+@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+class MongoClientGraphLookupTest(_CollectionComparisonTest):
+
+    def setUp(self):
+        super(MongoClientGraphLookupTest, self).setUp()
+        self.cmp_a = self._create_compare_for_collection('data_a')
+        self.cmp_b = self._create_compare_for_collection('data_b')
+
+    def test_graphlookup_basic(self):
+        data_a = [
+            {'_id': 0, 'airport': 'JFK', 'connects': ['BOS', 'ORD']},
+            {'_id': 1, 'airport': 'BOS', 'connects': ['JFK', 'PWM']},
+            {'_id': 2, 'airport': 'ORD', 'connects': ['JFK']},
+            {'_id': 3, 'airport': 'PWM', 'connects': ['BOS', 'LHR']},
+            {'_id': 4, 'airport': 'LHR', 'connects': ['PWM']},
+        ]
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev', 'nearestAirport': 'JFK'},
+            {'_id': 2, 'name': 'Eliot', 'nearestAirport': 'JFK'},
+            {'_id': 3, 'name': 'Jeff', 'nearestAirport': 'BOS'},
+        ]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'a',
+                    'startWith': '$nearestAirport',
+                    'connectFromField': 'connects',
+                    'connectToField': 'airport',
+                    'maxDepth': 2,
+                    'depthField': 'numConnections',
+                    'as': 'destinations'
+                }
+            }
+        ]
+
+        self.cmp_a.do.insert_many(data_a)
+        self.cmp_b.do.insert_many(data_b)
+        self.cmp_b.do.aggregate(query)
+
+    def test_graphlookup_nested_array(self):
+        data_a = [
+            {'_id': 0, 'airport': 'JFK', 'connects': [
+                {'to': 'BOS', 'distance': 200}, {'to': 'ORD', 'distance': 800}]},
+            {'_id': 1, 'airport': 'BOS', 'connects': [
+                {'to': 'JFK', 'distance': 200}, {'to': 'PWM', 'distance': 2000}]},
+            {'_id': 2, 'airport': 'ORD', 'connects': [{'to': 'JFK', 'distance': 800}]},
+            {'_id': 3, 'airport': 'PWM', 'connects': [
+                {'to': 'BOS', 'distance': 2000}, {'to': 'LHR', 'distance': 6000}]},
+            {'_id': 4, 'airport': 'LHR', 'connects': [{'to': 'PWM', 'distance': 6000}]},
+        ]
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev', 'nearestAirport': 'JFK'},
+            {'_id': 2, 'name': 'Eliot', 'nearestAirport': 'JFK'},
+            {'_id': 3, 'name': 'Jeff', 'nearestAirport': 'BOS'},
+        ]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'a',
+                    'startWith': '$nearestAirport',
+                    'connectFromField': 'connects.to',
+                    'connectToField': 'airport',
+                    'maxDepth': 2,
+                    'depthField': 'numConnections',
+                    'as': 'destinations'
+                }
+            }
+        ]
+
+        self.cmp_a.do.insert_many(data_a)
+        self.cmp_b.do.insert_many(data_b)
+        self.cmp_b.do.aggregate(query)
+
+    def test_graphlookup_nested_dict(self):
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev'},
+            {'_id': 2, 'name': 'Eliot', 'reportsTo': {
+                'name': 'Dev', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 3, 'name': 'Ron', 'reportsTo': {'name': 'Eliot',
+                                                    'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 4, 'name': 'Andrew', 'reportsTo': {
+                'name': 'Eliot', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 5, 'name': 'Asya', 'reportsTo': {
+                'name': 'Ron', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 6, 'name': 'Dan', 'reportsTo': {'name': 'Andrew',
+                                                    'from': '2016-01-01T00:00:00.000Z'}},
+        ]
+
+        data_a = [{'_id': 1, 'name': 'x'}]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'b',
+                    'startWith': '$name',
+                    'connectFromField': 'reportsTo.name',
+                    'connectToField': 'name',
+                    'as': 'reportingHierarchy'
+                }
+            }
+        ]
+
+        self.cmp_a.do.insert_many(data_a)
+        self.cmp_b.do.insert_many(data_b)
+        self.cmp_b.do.aggregate(query)
+
+
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
 
