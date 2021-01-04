@@ -3078,8 +3078,7 @@ class CollectionAPITest(TestCase):
                         sorted(expected_list, key=sorter) == sorted(result_list, key=sorter))
 
     def test_aggregate_graph_lookup_basic_connect_from(self):
-        """
-            TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
 
         * This testcase has a simple connect from field without the dot operator.
 
@@ -3098,7 +3097,6 @@ class CollectionAPITest(TestCase):
              - data_b: documents for database b
              - query: query for database b
              - expected: result expected from query execution
-
         """
 
         data_a = [
@@ -3201,8 +3199,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(res, [])
 
     def test_aggregate_graph_lookup_nested_array(self):
-        """
-            TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
 
         * This test cases connectfrom x.y where x is an array.
 
@@ -3220,7 +3217,6 @@ class CollectionAPITest(TestCase):
              - data_b: documents for database b
              - query: query for database b
              - expected: result expected from query execution
-
         """
 
         data_a = [
@@ -3370,8 +3366,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(res, [])
 
     def test_aggregate_graph_lookup_connect_from_nested_dict(self):
-        """
-            TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
 
         * This test cases connectfrom x.y where x is a dictionary.
 
