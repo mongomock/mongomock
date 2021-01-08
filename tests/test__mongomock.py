@@ -3610,7 +3610,7 @@ class MongoClientGraphLookupTest(_CollectionComparisonTest):
 
         self.cmp_a.do.insert_many(data_a)
         self.cmp_b.do.insert_many(data_b)
-        self.cmp_b.do.aggregate(query)
+        self.cmp_b.compare.aggregate(query)
 
     def test_graphlookup_nested_array(self):
         data_a = [
@@ -3646,7 +3646,7 @@ class MongoClientGraphLookupTest(_CollectionComparisonTest):
 
         self.cmp_a.do.insert_many(data_a)
         self.cmp_b.do.insert_many(data_b)
-        self.cmp_b.do.aggregate(query)
+        self.cmp_b.compare.aggregate(query)
 
     def test_graphlookup_nested_dict(self):
 
@@ -3680,7 +3680,7 @@ class MongoClientGraphLookupTest(_CollectionComparisonTest):
 
         self.cmp_a.do.insert_many(data_a)
         self.cmp_b.do.insert_many(data_b)
-        self.cmp_b.do.aggregate(query)
+        self.cmp_b.compare.aggregate(query)
 
 
 def _LIMIT(*args):
