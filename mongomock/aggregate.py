@@ -930,6 +930,25 @@ def _handle_lookup_stage(in_collection, database, options):
     return in_collection
 
 
+def _recursive_get(match, nested_fields):
+    head = match.get(nested_fields[0])
+    remaining_fields = nested_fields[1:]
+    if not remaining_fields:
+        # Final/last field reached.
+        yield head
+        return
+    # More fields to go, must be list, tuple, or dict.
+    if isinstance(head, (list, tuple)):
+        for m in head:
+            # Yield from _recursive_get(m, remaining_fields).
+            for answer in _recursive_get(m, remaining_fields):
+                yield answer
+    elif isinstance(head, dict):
+        # Yield from _recursive_get(head, remaining_fields).
+        for answer in _recursive_get(head, remaining_fields):
+            yield answer
+
+
 def _handle_graph_lookup_stage(in_collection, database, options):
     if not isinstance(options.get('maxDepth', 0), six.integer_types):
         raise OperationFailure(
@@ -952,8 +971,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
                 "Argument '%s' to $graphLookup must be string" % operator)
         if options[operator].startswith('$'):
             raise OperationFailure("FieldPath field names may not start with '$'")
-        if operator in ('connectFromField', 'as') and \
-                '.' in options[operator]:
+        if operator == 'as' and '.' in options[operator]:
             raise NotImplementedError(
                 "Although '.' is valid in the '%s' "
                 'parameter for the $graphLookup stage of the aggregation '
@@ -993,8 +1011,9 @@ def _handle_graph_lookup_stage(in_collection, database, options):
             depth += 1
             newly_discovered_matches = []
             for match in origin_matches:
-                match_target = match.get(connect_from_field)
-                newly_discovered_matches += _find_matches_for_depth(match_target)
+                nested_fields = connect_from_field.split('.')
+                for match_target in _recursive_get(match, nested_fields):
+                    newly_discovered_matches += _find_matches_for_depth(match_target)
             doc[local_name] += newly_discovered_matches
             origin_matches = newly_discovered_matches
     return out_doc
