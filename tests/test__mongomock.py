@@ -3570,6 +3570,58 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$project': {'_id': 0, 'items': {'$not': {'$eq': ['$items', ['foo']]}}}}
         ])
 
+    def test__aggregate_project_missing_fields(self):
+        self.cmp.do.insert_one({'_id': 1, 'arr': {'a': 2, 'b': 3}})
+        self.cmp.compare.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': OrderedDict([
+                ('_id', False),
+                ('rename_dot', '$arr.c'),
+                ('a', '$arr.a')
+            ])}
+        ])
+
+    def test__aggregate_graph_lookup_missing_field(self):
+        self.cmp.do.delete_many({})
+
+        self.cmp.do.insert_many([
+            {'_id': ObjectId(),
+             'name': 'a', 'child': 'b', 'val': 2},
+            {'_id': ObjectId(),
+             'name': 'b', 'child': 'c', 'val': 3},
+            {'_id': ObjectId(),
+             'name': 'c', 'child': None, 'val': 4},
+            {'_id': ObjectId(),
+             'name': 'd', 'child': 'a', 'val': 5}
+        ])
+        pipeline = [
+            {'$match': {'name': 'a'}},
+            {'$graphLookup': {
+                'from': self.collection_name,
+                'startWith': '$fieldThatDoesNotExist',
+                'connectFromField': 'child',
+                'connectToField': 'name',
+                'as': 'lookup'
+            }},
+            {'$unwind': '$lookup'},
+            {'$sort': {'lookup.name': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+        pipeline = [
+            {'$match': {'name': 'a'}},
+            {'$graphLookup': {
+                'from': self.collection_name,
+                'startWith': {'$concat': ['a', '$fieldThatDoesNotExist']},
+                'connectFromField': 'child',
+                'connectToField': 'name',
+                'as': 'lookup'
+            }},
+            {'$unwind': '$lookup'},
+            {'$sort': {'lookup.name': 1}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

@@ -199,6 +199,7 @@ class _Parser(object):
     def parse(self, expression):
         """Parse a MongoDB expression."""
         if not isinstance(expression, dict):
+            # May raise a KeyError despite the ignore missing key.
             return self._parse_basic_expression(expression)
 
         if len(expression) > 1 and any(key.startswith('$') for key in expression):
@@ -255,6 +256,8 @@ class _Parser(object):
             except KeyError:
                 if self._ignore_missing_keys:
                     yield None
+                else:
+                    raise
 
     def _parse_to_bool(self, expression):
         """Parse a MongoDB expression and then convert it to bool"""
@@ -1005,7 +1008,10 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     for doc in out_doc:
         found_items = set()
         depth = 0
-        result = _parse_expression(start_with, doc)
+        try:
+            result = _parse_expression(start_with, doc)
+        except KeyError:
+            continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
         while origin_matches and (max_depth is None or depth < max_depth):
             depth += 1
@@ -1290,6 +1296,7 @@ def _handle_project_stage(in_collection, unused_database, options):
             try:
                 out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
             except KeyError:
+                # Ignore missing key.
                 pass
     if (method == 'include') == (include_id is not False and include_id is not 0):
         filter_list.append('_id')

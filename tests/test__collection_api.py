@@ -3964,10 +3964,11 @@ class CollectionAPITest(TestCase):
             {'$match': {'_id': 1}},
             {'$project': collections.OrderedDict([
                 ('_id', False),
-                ('rename_dot', '$arr.c')
+                ('rename_dot', '$arr.c'),
+                ('a', '$arr.a')
             ])}
         ])
-        self.assertEqual([{}], list(actual))
+        self.assertEqual([{'a': 2}], list(actual))
 
     def test__aggregate_project_missing_nested_fields(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': {'c': 1}})
