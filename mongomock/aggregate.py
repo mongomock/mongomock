@@ -182,7 +182,7 @@ def _sum_operation(values):
 def _merge_objects_operation(values):
     merged_doc = dict()
     for v in values:
-        if if isinstance(v, dict):
+        if isinstance(v, dict):
             merged_doc.update(v)
     return merged_doc
 
