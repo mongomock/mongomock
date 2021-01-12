@@ -3275,6 +3275,38 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'nested.foo': 5,
         }}])
 
+    def test__aggregate_add_fields_with_max_min(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many([
+            {'_id': 4, 'dates': [
+                datetime.datetime(2020, 1, 10),
+                datetime.datetime(2020, 1, 5),
+                datetime.datetime(2020, 1, 7)
+            ]},
+            {'_id': 5, 'dates': []}
+        ])
+        pipeline = [
+            {'$addFields': {
+                'max_date': {'$max': '$dates'},
+                'min_date': {'$min': '$dates'}
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_add_fields_with_sum_avg(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many([
+            {'_id': 4, 'values': [10, 5, 7]},
+            {'_id': 5, 'values': []}
+        ])
+        pipeline = [
+            {'$addFields': {
+                'max_val': {'$sum': '$values'},
+                'min_val': {'$avg': '$values'}
+            }}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_to_string(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one({
