@@ -179,10 +179,18 @@ def _sum_operation(values):
     sum_value = sum(values_list)
     return decimal128.Decimal128(sum_value) if isinstance(sum_value, decimal.Decimal) else sum_value
 
+def _merge_objects_operation(values):
+    merged_doc = dict()
+    for v in values:
+        if if isinstance(v, dict):
+            merged_doc.update(v)
+    return merged_doc
+
 
 _GROUPING_OPERATOR_MAP = {
     '$sum': _sum_operation,
     '$avg': _avg_operation,
+    '$mergeObjects': _merge_objects_operation,
     '$min': lambda values: _group_operation(values, min),
     '$max': lambda values: _group_operation(values, max),
 }
