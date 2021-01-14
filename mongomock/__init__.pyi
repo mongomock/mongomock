@@ -1,12 +1,10 @@
-from typing import Any, Callable, Literal, Sequence, Union
+from typing import Any, Callable, Literal, Sequence, Tuple, Union
 from unittest import mock
 
 from bson.objectid import ObjectId as ObjectId
-from pymongo import (
-    MongoClient as MongoClient,
-    Collection as Collection,
-    Database as Database,
-)
+from pymongo import MongoClient as MongoClient
+from pymongo.collection import Collection as Collection
+from pymongo.database import Database as Database
 from pymongo.errors import (
     CollectionInvalid as CollectionInvalid,
     DuplicateKeyError as DuplicateKeyError,
@@ -16,7 +14,7 @@ from pymongo.errors import (
 
 
 def patch(
-        servers: Union[str, Sequence[str]] = ...,
+        servers: Union[str, Tuple[str, int], Sequence[Union[str, Tuple[str, int]]]] = ...,
         on_new: Literal['error', 'create', 'timeout', 'pymongo'] = ...,
         ) -> mock._patch:
     ...

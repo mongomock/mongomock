@@ -35,6 +35,8 @@ jobs:
       env: TOX_ENV=py38-pymongo-pyexecjs
     - env: TOX_ENV=pep8
     - env: TOX_ENV=pylint
+    - python: 3.8
+      env: TOX_ENV=mypy
 script:
   - tox -e $TOX_ENV
 before_install:
