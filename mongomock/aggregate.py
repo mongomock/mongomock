@@ -344,7 +344,8 @@ class _Parser(object):
 
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
-            return _GROUPING_OPERATOR_MAP[operator](self.parse_many(values))
+            values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
+            return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
             key, index = values
             array = self._parse_basic_expression(key)
