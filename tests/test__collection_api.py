@@ -4431,15 +4431,6 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$group': {'_id': '$b', 'a': {'$mergeObjects': '$a'}}},
-            ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$mergeObjects': [{'a': 2, 'b': 3}, {'a': 5}]}}},
-            ])
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
