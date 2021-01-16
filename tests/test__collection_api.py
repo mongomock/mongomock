@@ -4431,7 +4431,6 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
-
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
                 {'$project': {'a': {'$toLong': '$scores'}}},
