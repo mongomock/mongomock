@@ -3654,6 +3654,39 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate_merge_objects(self):
+        self.cmp.do.delete_many({})
+
+        self.cmp.do.insert_many([
+            {'_id': ObjectId(),
+             'a': '1', 'b': {'c': '1', 'd': 2}},
+            {'_id': ObjectId(),
+             'a': '1', 'b': {'e': 3, 'f': '4'}},
+            {'_id': ObjectId(),
+             'a': '1', 'c': '2'},
+            {'_id': ObjectId(),
+             'a': '1', 'b': None},
+            {'_id': ObjectId(),
+             'a': 2, 'b': None},
+            {'_id': ObjectId(),
+             'a': 2, 'b': {'c': None, 'd': 6}},
+            {'_id': ObjectId(),
+             'a': 2, 'b': {'c': '7', 'd': None, 'e': 9, 'f': '10'}},
+            {'_id': ObjectId(),
+             'a': 3, 'b': None},
+            {'_id': ObjectId(),
+             'a': 3, 'b': dict()},
+            {'_id': ObjectId(),
+             'a': 4, 'b': None},
+        ])
+        pipeline = [
+            {'$group': {
+                '_id': '$a',
+                'merged_b': {'$mergeObjects': '$b'},
+            }}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):
