@@ -1,10 +1,81 @@
 import collections
 import datetime
+from contextlib import contextmanager
+
 import functools
 import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 import threading
 
-lock = threading.RLock()
+
+class RWLock:
+    """Lock for enabling multiple readers but only 1 exclusive writer
+    to access a resource
+
+    Source: https://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
+    """
+
+    def __init__(self):
+        self._read_switch = _LightSwitch()
+        self._write_switch = _LightSwitch()
+        self._no_readers = threading.Lock()
+        self._no_writers = threading.Lock()
+        self._readers_queue = threading.Lock()
+
+    @contextmanager
+    def reader(self):
+        self._reader_acquire()
+        yield
+        self._reader_release()
+
+    @contextmanager
+    def writer(self):
+        self._writer_acquire()
+        yield
+        self._writer_release()
+
+    def _reader_acquire(self):
+        self._readers_queue.acquire()
+        self._no_readers.acquire()
+        self._read_switch.acquire(self._no_writers)
+        self._no_readers.release()
+        self._readers_queue.release()
+
+    def _reader_release(self):
+        self._read_switch.release(self._no_writers)
+
+    def _writer_acquire(self):
+        self._write_switch.acquire(self._no_readers)
+        self._no_writers.acquire()
+
+    def _writer_release(self):
+        self._no_writers.release()
+        self._write_switch.release(self._no_readers)
+
+
+class _LightSwitch:
+    """An auxiliary "light switch"-like object. The first thread turns on the
+    "switch", the last one turns it off (see [1, sec. 4.2.2] for details).
+
+    Source: https://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
+    """
+
+    def __init__(self):
+        self._counter = 0
+        self._mutex = threading.Lock()
+
+    def acquire(self, lock):
+        self._mutex.acquire()
+        self._counter += 1
+        if self._counter == 1:
+            lock.acquire()
+        self._mutex.release()
+
+    def release(self, lock):
+        self._mutex.acquire()
+        self._counter -= 1
+        if self._counter == 0:
+            lock.release()
+        self._mutex.release()
 
 
 class ServerStore(object):
@@ -71,6 +142,9 @@ class CollectionStore(object):
         self.name = name
         self._ttl_indexes = {}
 
+        # 694 - Lock for safely iterating and mutating OrderedDicts
+        self._rwlock = RWLock()
+
     def create(self):
         self._is_force_created = True
 
@@ -104,28 +178,33 @@ class CollectionStore(object):
 
     def __contains__(self, key):
         self._remove_expired_documents()
-        return key in self._documents
+        with self._rwlock.reader():
+            return key in self._documents
 
     def __getitem__(self, key):
         self._remove_expired_documents()
-        return self._documents[key]
+        with self._rwlock.reader():
+            return self._documents[key]
 
     def __setitem__(self, key, val):
-        with lock:
+        with self._rwlock.writer():
             self._documents[key] = val
 
     def __delitem__(self, key):
-        del self._documents[key]
+        with self._rwlock.writer():
+            del self._documents[key]
 
     def __len__(self):
         self._remove_expired_documents()
-        return len(self._documents)
+        with self._rwlock.reader():
+            return len(self._documents)
 
     @property
     def documents(self):
         self._remove_expired_documents()
-        for doc in self._documents.values():
-            yield doc
+        with self._rwlock.reader():
+            for doc in self._documents.values():
+                yield doc
 
     def _remove_expired_documents(self):
         for index in self._ttl_indexes.values():
@@ -148,10 +227,12 @@ class CollectionStore(object):
         # "key" structure = list of (field name, direction) tuples
         ttl_field_name = next(iter(index['key']))[0]
         ttl_now = mongomock.utcnow()
-        expired_ids = [
-            doc['_id'] for doc in self._documents.values()
-            if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
-        ]
+
+        with self._rwlock.reader():
+            expired_ids = [
+                doc['_id'] for doc in self._documents.values()
+                if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
+            ]
 
         for exp_id in expired_ids:
             del self[exp_id]
