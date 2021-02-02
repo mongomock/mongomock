@@ -1645,6 +1645,27 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test_unique_index_partial_filter_expression(self):
+        """
+        A unique index with `partialFilterExpression` is only unique for
+        documents matching the `partialFilterExpression` query. 
+        """
+        self.db.collection.ensure_index([('email', 1), ('org', 1)], unique=True, partialFilterExpression={'email': {'$exists': True}})
+
+        self.db.collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+        
+        # we should be able to add documents with duplicated `org` values if `email` is missing.
+        self.db.collection.insert({'org': 'beta'})
+        self.db.collection.insert({'org': 'beta'})
+        self.db.collection.insert({'org': 'gamma'})
+
+        self.assertEqual(self.db.collection.find({'email': {'$exists': False}}).count(), 3)
+        self.assertEqual(self.db.collection.find({'email': 'j.doe@example.com'}).count(), 1)
+        self.assertEqual(self.db.collection.find({'org': 'beta'}).count(), 2)
+
     def test__create_uniq_idxs_with_dupes_already_there(self):
         self.db.collection.insert({'value': 1})
         self.db.collection.insert({'value': 1})
