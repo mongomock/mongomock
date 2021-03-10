@@ -276,6 +276,12 @@ class _Parser(object):
         except KeyError:
             return False
 
+    def _parse_or_nothing(self, expression):
+        try:
+            return self.parse(expression)
+        except KeyError:
+            return NOTHING
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
@@ -576,10 +582,11 @@ class _Parser(object):
                     raise OperationFailure('Expression $size takes exactly 1 arguments. '
                                            '%d were passed in.' % len(value))
                 value = value[0]
-            array_value = self.parse(value)
-            if not isinstance(array_value, list):
-                raise OperationFailure('The argument to $size must be an array, '
-                                       'but was of type: %s' % type(array_value))
+            array_value = self._parse_or_nothing(value)
+            if not isinstance(array_value, (list, tuple)):
+                raise OperationFailure(
+                    'The argument to $size must be an array, but was of type: %s' %
+                    ('missing' if array_value is NOTHING else type(array_value)))
             return len(array_value)
 
         if operator == '$filter':
