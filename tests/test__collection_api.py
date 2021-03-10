@@ -3692,6 +3692,17 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 2}], list(actual))
 
+    def test__aggregate_project_array_size_missing(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            list(self.db.collection.aggregate([
+                {'$match': {'_id': 1}},
+                {'$project': collections.OrderedDict([
+                    ('_id', False),
+                    ('a', {'$size': '$arr'})
+                ])}
+            ]))
+
     def test__aggregate_project_cond_mongodb_to_bool(self):
         self.db.collection.insert_one({'_id': 1})
         actual = self.db.collection.aggregate([

@@ -2800,6 +2800,13 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [{'$project': {'a.b': 1, 'a.c': 1}}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate_project_array_size_missing(self):
+        self.cmp.do.insert_one({'_id': 1})
+        self.cmp.compare_exceptions.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': {'a': {'$size': '$arr'}}},
+        ])
+
     def test__aggregate_bucket(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many([
