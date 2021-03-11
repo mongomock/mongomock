@@ -51,6 +51,9 @@ def filter_applies(search_filter, document):
 class _Filterer(object):
     """An object to help applying a filter, using the MongoDB query language."""
 
+    # This is populated using register_parse_expression further down.
+    parse_expression = []
+
     def __init__(self):
         self._operator_map = dict({
             '$eq': _list_expand(operator_eq),
@@ -80,6 +83,11 @@ class _Filterer(object):
                 if not search:
                     raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
                 if not LOGICAL_OPERATOR_MAP[key](document, search, self.apply):
+                    return False
+                continue
+            if key == '$expr':
+                parse_expression = self.parse_expression[0]
+                if not parse_expression(search, document, ignore_missing_keys=True):
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
@@ -519,3 +527,12 @@ class BsonComparable(object):
 
 
 _filterer_inst = _Filterer()
+
+
+# Developer note: to avoid a cross-modules dependency (filtering requires aggregation, that requires
+# filtering), the aggregation module needs to register its parse_expression function here.
+def register_parse_expression(parse_expression):
+    """Register the parse_expression function from the aggregate module."""
+
+    del _Filterer.parse_expression[:]
+    _Filterer.parse_expression.append(parse_expression)

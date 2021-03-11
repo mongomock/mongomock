@@ -2537,11 +2537,18 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
-    def test_find_with_expr(self):
-        self.db.collection.insert_one({'_id': 1, 'a': 5})
-        with self.assertRaises(NotImplementedError) as err:
-            list(self.db.collection.find({'$expr': {'$lt': ['$a', 6]}}))
-        self.assertIn('The $expr operator', str(err.exception))
+    def test__find_with_expr(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': [5]},
+            {'_id': 2, 'a': [1, 2, 3]},
+            {'_id': 3, 'a': []},
+        ])
+        actual = list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
+        self.assertEqual([{'_id': 1, 'a': [5]}], actual)
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.insert_one({'_id': 4})
+            list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
 
     def test__find_or_and(self):
         self.db.collection.insert_many([
@@ -4273,6 +4280,17 @@ class CollectionAPITest(TestCase):
               'upper': 'HELLO',
               'upper_err': ''}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_match_expr(self):
+        self.db.collection.insert_many([
+            {'_id': 0, 'a': 2, 'b': 3},
+            {'_id': 1, 'a': 2, 'b': 2},
+            {'_id': 2, 'a': 5, 'b': 2},
+        ])
+        actual = self.db.collection.aggregate([{'$match': {
+            '$or': [{'$expr': {'$gt': ['$a', 3]}}, {'b': 3}],
+        }}])
+        self.assertEqual({0, 2}, {d['_id'] for d in actual})
 
     def test__aggregate_regexpmatch(self):
         self.db.collection.insert_one({

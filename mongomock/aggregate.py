@@ -852,6 +852,9 @@ def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
     return _Parser(doc_dict, ignore_missing_keys=ignore_missing_keys).parse(expression)
 
 
+filtering.register_parse_expression(_parse_expression)
+
+
 def _accumulate_group(output_fields, group_list):
     doc_dict = {}
     for field, value in six.iteritems(output_fields):
