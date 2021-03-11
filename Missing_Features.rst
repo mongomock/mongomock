@@ -35,7 +35,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
   * Some type conversion operators ($convert, $toLong, …)
 * Operators within the query language (find):
-  * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`_
   * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`_
   * `$text <https://docs.mongodb.com/manual/reference/operator/query/text/>`_ search
   * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`_

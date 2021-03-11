@@ -1,11 +1,10 @@
 import warnings
 
-from mongomock.filtering import filter_applies
-
 from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
+from .filtering import filter_applies
 from mongomock import codec_options as mongomock_codec_options
 from mongomock import read_preferences
 from mongomock import store

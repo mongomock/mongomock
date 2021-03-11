@@ -486,6 +486,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # test no match
         self.cmp.compare.find({'_id': id}, {'owns': {'$elemMatch': {'type': 'cap'}}})
 
+    def test__find_with_expr(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'a': [5]},
+            {'_id': 2, 'a': [1, 2, 3]},
+            {'_id': 3, 'a': []},
+        ])
+        self.cmp.compare.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}})
+
+        self.cmp.do.insert_one({'_id': 4})
+        self.cmp.compare_exceptions.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}})
+
     def test__size(self):
         id = ObjectId()
         self.cmp.do.insert_one({
