@@ -30,7 +30,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Some set operators ($setIntersection, $setDifference, …)
   * Some string operators ($indexOfBytes, $trim, …)
   * Text search operator ($meta)
-  * Projection operators ($map, $let)
+  * Projection operator $map
   * Array operators ($isArray, $indexOfArray, …)
   * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
   * Some type conversion operators ($convert, $toLong, …)

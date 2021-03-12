@@ -3806,6 +3806,49 @@ class MongoClientGraphLookupTest(_CollectionComparisonTest):
         self.cmp_b.do.insert_many(data_b)
         self.cmp_b.compare.aggregate(query)
 
+    def test__aggregate_let(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'price': 10, 'tax': 0.50, 'applyDiscount': True},
+            {'_id': 2, 'price': 10, 'tax': 0.25, 'applyDiscount': False},
+        ])
+        self.cmp.compare.aggregate([{'$project': {
+            'finalTotal': {
+                '$let': {
+                    'vars': {
+                        'total': {'$add': ['$price', '$tax']},
+                        'discounted': {'$cond': {'if': '$applyDiscount', 'then': 0.9, 'else': 1}},
+                    },
+                    'in': {'$multiply': ['$$total', '$$discounted']},
+                },
+            },
+        }}])
+
+    def test__aggregate_let_errors(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'price': 10, 'tax': 0.50, 'applyDiscount': True},
+            {'_id': 2, 'price': 10, 'tax': 0.25, 'applyDiscount': False},
+        ])
+        self.cmp.compare_exceptions.aggregate([{'$project': {
+            'finalTotal': {
+                '$let': [{'total': 3}, {'$$total'}],
+            },
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {
+            'finalTotal': {
+                '$let': {
+                    'in': {'$multiply': ['4', '3']},
+                },
+            },
+        }}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {
+            'finalTotal': {
+                '$let': {
+                    'vars': ['total', 'discounted'],
+                    'in': {'$multiply': ['$$total', '$$discounted']},
+                },
+            },
+        }}])
+
 
 def _LIMIT(*args):
     return lambda cursor: cursor.limit(*args)
