@@ -153,6 +153,29 @@ class DatabaseGettingTest(TestCase):
 
         collection.ensure_index([('value', 1)], unique=True, sparse=True)
 
+    def test_unique_index_partial_filter_expression(self):
+        db = self.client.somedb
+        collection = db.a
+        collection.ensure_index(
+            [("email", 1), ("org", 1)],
+            unique=True,
+            partialFilterExpression={"email": {"$exists": True}},
+        )
+
+        collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})
+        self.assertEqual(collection.find({}).count(), 1)
+
+        # we should be able to add documents with duplicated `org` values if `email` is missing.
+        collection.insert({'org': 'beta'})
+        collection.insert({'org': 'beta'})
+        collection.insert({'org': 'gamma'})
+
+        self.assertEqual(collection.find({'email': {'$exists': False}}).count(), 3)
+        self.assertEqual(collection.find({'email': 'j.doe@example.com'}).count(), 1)
+        self.assertEqual(collection.find({'org': 'beta'}).count(), 2)
+
     def test__alive(self):
         self.assertTrue(self.client.alive())
 
