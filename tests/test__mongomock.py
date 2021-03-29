@@ -157,9 +157,9 @@ class DatabaseGettingTest(TestCase):
         db = self.client.somedb
         collection = db.a
         collection.ensure_index(
-            [("email", 1), ("org", 1)],
+            [('email', 1), ('org', 1)],
             unique=True,
-            partialFilterExpression={"email": {"$exists": True}},
+            partialFilterExpression={'email': {'$exists': True}},
         )
 
         collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})

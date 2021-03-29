@@ -1647,9 +1647,9 @@ class CollectionAPITest(TestCase):
 
     def test_unique_index_partial_filter_expression(self):
         self.db.collection.ensure_index(
-            [("email", 1), ("org", 1)],
+            [('email', 1), ('org', 1)],
             unique=True,
-            partialFilterExpression={"email": {"$exists": True}},
+            partialFilterExpression={'email': {'$exists': True}},
         )
 
         self.db.collection.insert({'email': 'j.doe@example.com', 'org': 'alpha'})
