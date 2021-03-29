@@ -539,7 +539,7 @@ class Collection(object):
             # results using the `partialFilterExpression` query.
             if partial_filter_expression:
                 find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
-            
+
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 1:
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
@@ -1482,7 +1482,6 @@ class Collection(object):
             index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
         if 'partialFilterExpression' in kwargs:
             index_dict['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
-
 
         existing_index = self._store.indexes.get(index_name)
         if existing_index and index_dict != existing_index:
