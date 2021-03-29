@@ -1646,10 +1646,6 @@ class CollectionAPITest(TestCase):
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
     def test_unique_index_partial_filter_expression(self):
-        """A unique index with `partialFilterExpression` is only unique for
-
-        documents matching the `partialFilterExpression` query.
-        """
         self.db.collection.ensure_index(
             [("email", 1), ("org", 1)],
             unique=True,
