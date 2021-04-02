@@ -727,6 +727,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'_id': 4, 'shape': [{'size': 3}]},
             {'_id': 5},
             {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
+            {'_id': 7, 'shape': [{'color': 'red'}, {'color': None}]},
         ])
 
         self.cmp.compare_ignore_order.find({'shape.color': {'$eq': None}})
