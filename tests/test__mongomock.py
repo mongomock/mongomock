@@ -3082,16 +3082,16 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.do.insert_one({
             'index': 2,
-            'values': [0,1,5]
+            'values': [0, 1, 5]
         })
         self.cmp.compare.aggregate([
             {'$project': {
-                "values_index":{'$arrayElemAt': ["$values","$index"]}
+                'values_index': {'$arrayElemAt': ['$values', '$index']}
             }}
         ])
         self.cmp.compare.aggregate([
             {'$project': {
-                "values_index":{'$arrayElemAt': ["$values",{"$add":[1,1]}]}
+                'values_index': {'$arrayElemAt': ['$values', {'$add': [1, 1]}]}
             }}
         ])
 
