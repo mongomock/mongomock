@@ -26,17 +26,15 @@ If I miss to include a feature in the below list, Please feel free to add to the
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
-  * Boolean operators ($and, $or, $not)
-  * Some date operators ($isoDayOfWeek, $isoWeekYear, …)
+  * Some date operators ($dateFromString, $isoDayOfWeek, $isoWeekYear, …)
   * Some set operators ($setIntersection, $setDifference, …)
-  * Some string operators ($indexOfBytes, $split, …)
+  * Some string operators ($indexOfBytes, $trim, …)
   * Text search operator ($meta)
-  * Projection operators ($map, $let)
-  * Array operators ($concatArrays, $isArray, $indexOfArray, …)
-  * `$switch <https://docs.mongodb.com/manual/reference/operator/aggregation/switch/>`_
+  * Projection operator $map
+  * Array operators ($isArray, $indexOfArray, …)
   * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
+  * Some type conversion operators ($convert, $toLong, …)
 * Operators within the query language (find):
-  * `$expr <https://docs.mongodb.com/manual/reference/operator/query/expr/>`_
   * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`_
   * `$text <https://docs.mongodb.com/manual/reference/operator/query/text/>`_ search
   * `$where <https://docs.mongodb.com/manual/reference/operator/query/where/>`_

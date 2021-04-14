@@ -30,7 +30,7 @@ class BulkOperationsTest(TestCase):
     def setUp(self):
         super(BulkOperationsTest, self).setUp()
         if self.test_with_pymongo:
-            self.client = pymongo.MongoClient()
+            self.client = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         else:
             self.client = mongomock.MongoClient()
         self.db = self.client['somedb']
@@ -197,7 +197,7 @@ class CollectionComparisonTest(TestCase):
     def setUp(self):
         super(CollectionComparisonTest, self).setUp()
         self.fake_conn = mongomock.MongoClient()
-        self.mongo_conn = pymongo.MongoClient()
+        self.mongo_conn = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         self.db_name = 'mongomock___testing_db'
         self.collection_name = 'mongomock___testing_collection'
         self.mongo_conn[self.db_name][self.collection_name].remove()

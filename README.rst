@@ -40,7 +40,7 @@ since they replicate the series of calls made in the code, violating the DRY rul
      record()
      collection_mock.find().AndReturn(objects)
      for obj in objects:
-         collection_mock.update_one(document, {'$set': {'votes': document['votes']}})
+         collection_mock.update_one(obj, {'$set': {'votes': obj['votes']}})
      replay()
      increase_votes(collection_mock)
      verify()
@@ -125,6 +125,45 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
  cd mongomock
  tox
 
+Alternatively, docker-compose can be used to simplify dependency management for local development:
+
+.. code-block:: bash
+
+ git clone git@github.com:mongomock/mongomock.git
+ cd mongomock
+ docker-compose build
+ docker-compose run --rm mongomock
+
+If you need/want tox to recreate its environments, you can override the container command by running:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -r
+
+Similarly, if you'd like to run tox against a specific environment in the container:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs
+
+NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
+you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
+the intended version.
+
+utcnow
+~~~~
+
+When developing features that need to make use of "now," please use the libraries :code:`utcnow` helper method
+in the following way:
+
+.. code-block:: python
+
+   import mongomock
+   # Awesome code!
+   now_reference = mongomock.utcnow()
+
+This provides users a consistent way to mock the notion of "now" in mongomock if they so choose. Please
+see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
 
 Branching model
 ~~~~~~~~~~~~~~~
@@ -195,6 +234,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * waskew (waskew _at_ narrativescience.com)
 * jmsantorum (jmsantorum [at] gmail [dot] com)
 * lidongyong
+* `Juan Gutierrez <https://github.com/juannyg/>`_
 
 
 .. _examples in tests: https://github.com/mongomock/mongomock/blob/develop/tests/test__mongomock.py

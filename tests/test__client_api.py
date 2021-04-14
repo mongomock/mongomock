@@ -1,4 +1,6 @@
+import sys
 import unittest
+from unittest import skipIf
 
 try:
     from unittest import mock
@@ -41,20 +43,21 @@ class MongoClientApiTest(unittest.TestCase):
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
 
     @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-    def test__codec_options(self):
+    def test__codec_options_with_pymongo(self):
         client = mongomock.MongoClient()
         self.assertEqual(codec_options.CodecOptions(), client.codec_options)
+        self.assertFalse(client.codec_options.tz_aware)
+
+    def test__codec_options(self):
+        client = mongomock.MongoClient()
         self.assertFalse(client.codec_options.tz_aware)
 
         client = mongomock.MongoClient(tz_aware=True)
         self.assertTrue(client.codec_options.tz_aware)
         self.assertTrue(client.db.collection.codec_options.tz_aware)
 
-    @unittest.skipIf(_HAVE_PYMONGO, 'pymongo installed')
-    def test__codec_options_without_pymongo(self):
-        client = mongomock.MongoClient()
-        with self.assertRaises(NotImplementedError):
-            client.codec_options  # pylint: disable=pointless-statement
+        with self.assertRaises(TypeError):
+            mongomock.MongoClient(tz_aware='True')
 
     def test__parse_url(self):
         client = mongomock.MongoClient('mongodb://localhost:27017/')
@@ -77,6 +80,22 @@ class MongoClientApiTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             mongomock.MongoClient('mongodb://localhost:mongoport/')
+
+    def test__equality(self):
+        self.assertEqual(
+            mongomock.MongoClient('mongodb://localhost:27017/'),
+            mongomock.MongoClient('mongodb://localhost:27017/'))
+        self.assertEqual(
+            mongomock.MongoClient('mongodb://localhost:27017/'),
+            mongomock.MongoClient('localhost'))
+        self.assertNotEqual(
+            mongomock.MongoClient('/var/socket/mongo.sock'),
+            mongomock.MongoClient('localhost'))
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
     def test__parse_hosts(self):
         client = mongomock.MongoClient('localhost')
@@ -129,3 +148,8 @@ class MongoClientApiTest(unittest.TestCase):
             client.one_db.my_collec.insert_one({})
             result = client.one_db.my_collec.find_one({})
             self.assertTrue(result)
+
+    def test_start_session(self):
+        client = mongomock.MongoClient()
+        with self.assertRaises(NotImplementedError):
+            client.start_session()

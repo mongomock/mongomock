@@ -73,7 +73,7 @@ except ImportError:
     class InvalidURI(ConfigurationError):
         pass
 
-from .helpers import ObjectId  # noqa
+from .helpers import ObjectId, utcnow  # noqa
 from mongomock.__version__ import __version__
 
 
@@ -88,7 +88,9 @@ __all__ = [
     'ObjectId',
     'OperationFailure',
     'WriteConcern',
+    'ignore_feature',
     'patch',
+    'warn_on_feature',
 ]
 
 
@@ -97,3 +99,4 @@ from .database import Database
 from .mongo_client import MongoClient
 from .patch import patch
 from .write_concern import WriteConcern
+from .not_implemented import ignore_feature, warn_on_feature

@@ -1,5 +1,8 @@
 import collections
+import datetime
+import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 import six
+import six.moves
 import threading
 
 lock = threading.RLock()
@@ -67,6 +70,7 @@ class CollectionStore(object):
         self.indexes = {}
         self._is_force_created = False
         self.name = name
+        self._ttl_indexes = {}
 
     def create(self):
         self._is_force_created = True
@@ -78,16 +82,33 @@ class CollectionStore(object):
     def drop(self):
         self._documents = collections.OrderedDict()
         self.indexes = {}
+        self._ttl_indexes = {}
         self._is_force_created = False
+
+    def create_index(self, index_name, index_dict):
+        self.indexes[index_name] = index_dict
+        if index_dict.get('expireAfterSeconds') is not None:
+            self._ttl_indexes[index_name] = index_dict
+
+    def drop_index(self, index_name):
+        self._remove_expired_documents()
+
+        # The main index object should raise a KeyError, but the
+        # TTL indexes have no meaning to the outside.
+        del self.indexes[index_name]
+        self._ttl_indexes.pop(index_name, None)
 
     @property
     def is_empty(self):
+        self._remove_expired_documents()
         return not self._documents
 
     def __contains__(self, key):
+        self._remove_expired_documents()
         return key in self._documents
 
     def __getitem__(self, key):
+        self._remove_expired_documents()
         return self._documents[key]
 
     def __setitem__(self, key, val):
@@ -98,9 +119,62 @@ class CollectionStore(object):
         del self._documents[key]
 
     def __len__(self):
+        self._remove_expired_documents()
         return len(self._documents)
 
     @property
     def documents(self):
+        self._remove_expired_documents()
         for doc in six.itervalues(self._documents):
             yield doc
+
+    def _remove_expired_documents(self):
+        for index in six.itervalues(self._ttl_indexes):
+            self._expire_documents(index)
+
+    def _expire_documents(self, index):
+        # TODO(juannyg): use a caching mechanism to avoid re-expiring the documents if
+        # we just did and no document was added / updated
+
+        # Ignore non-integer values
+        try:
+            expiry = int(index['expireAfterSeconds'])
+        except ValueError:
+            return
+
+        # Ignore commpound keys
+        if len(index['key']) > 1:
+            return
+
+        # "key" structure = list of (field name, direction) tuples
+        ttl_field_name = index['key'][0][0]
+        ttl_now = mongomock.utcnow()
+        expired_ids = [
+            doc['_id'] for doc in six.itervalues(self._documents)
+            if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
+        ]
+
+        for exp_id in expired_ids:
+            del self[exp_id]
+
+    def _value_meets_expiry(self, val, expiry, ttl_now):
+        val_to_compare = _get_min_datetime_from_value(val)
+        try:
+            return (ttl_now - val_to_compare).total_seconds() >= expiry
+        except TypeError:
+            return False
+
+
+def _get_min_datetime_from_value(val):
+    if not val:
+        return datetime.datetime.max
+    if isinstance(val, list):
+        return six.moves.reduce(_min_dt, [datetime.datetime.max] + val)
+    return val
+
+
+def _min_dt(dt1, dt2):
+    try:
+        return dt1 if dt1 < dt2 else dt2
+    except TypeError:
+        return dt1

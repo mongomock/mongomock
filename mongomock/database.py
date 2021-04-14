@@ -4,18 +4,27 @@ from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
+from .filtering import filter_applies
+from mongomock import codec_options as mongomock_codec_options
 from mongomock import read_preferences
 from mongomock import store
 
 from six import string_types
 
 try:
-    from bson import codec_options as bson_codec_options
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
-    bson_codec_options = None
+
+_LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
+
+
+def _verify_list_collection_supported_op(keys):
+    if set(keys) - _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS:
+        raise NotImplementedError(
+            'list collection names filter operator {0} is not implemented yet in mongomock '
+            'allowed operators are {1}'.format(keys, _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS))
 
 
 class Database(object):
@@ -26,7 +35,8 @@ class Database(object):
         self._collection_accesses = {}
         self._store = _store or store.DatabaseStore()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
-        self._codec_options = codec_options
+        mongomock_codec_options.is_supported(codec_options)
+        self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -41,6 +51,11 @@ class Database(object):
     def __repr__(self):
         return "Database({0}, '{1}')".format(self._client, self.name)
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self._client == other._client and self.name == other.name
+        return NotImplemented
+
     @property
     def client(self):
         return self._client
@@ -51,10 +66,6 @@ class Database(object):
 
     @property
     def codec_options(self):
-        if not bson_codec_options:
-            raise NotImplementedError(
-                'The codec options are not implemented in mongomock alone, you need to import '
-                'the pymongo library as well.')
         return self._codec_options
 
     def _get_created_collections(self):
@@ -67,9 +78,30 @@ class Database(object):
 
         return self.list_collection_names(session=session)
 
-    def list_collection_names(self, session=None):
+    def list_collection_names(self, filter=None, session=None):
+        """filter: only name field type with eq,ne or regex operator
+
+        session: not supported
+        for supported operator please see _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS
+        """
+        field_name = 'name'
+
         if session:
             raise NotImplementedError('Mongomock does not handle sessions yet')
+
+        if filter:
+            if not filter.get('name'):
+                raise NotImplementedError('list collection {0} might be valid but is not '
+                                          'implemented yet in mongomock'.format(filter))
+
+            filter = {field_name: {'$eq': filter.get(field_name)}} \
+                if isinstance(filter.get(field_name), str) else filter
+
+            _verify_list_collection_supported_op(filter.get(field_name).keys())
+
+            return [name for name in list(self._store._collections)
+                    if filter_applies(filter, {field_name: name}) and
+                    not name.startswith('system.')]
 
         return [
             name for name in self._get_created_collections()
@@ -82,13 +114,7 @@ class Database(object):
             raise NotImplementedError('Mongomock does not handle read_concern yet')
         if read_preference is not None:
             read_preferences.ensure_read_preference_type('read_preference', read_preference)
-        if codec_options and codec_options != self._codec_options:
-            if not bson_codec_options:
-                raise NotImplementedError(
-                    'The codec options are not implemented in mongomock alone, you need to import '
-                    'the pymongo library as well.')
-            if codec_options != self._codec_options:
-                raise NotImplementedError('The codec options are not implemented yet')
+        mongomock_codec_options.is_supported(codec_options)
         try:
             return self._collection_accesses[name].with_options(
                 codec_options=codec_options or self._codec_options,
@@ -178,14 +204,7 @@ class Database(object):
     def with_options(
             self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
 
-        if codec_options:
-            if not bson_codec_options:
-                raise NotImplementedError(
-                    'The codec options are not implemented in mongomock alone, you need to import '
-                    'the pymongo library as well.')
-            if codec_options != self._codec_options:
-                # TODO(pascal): Support change of tz_aware in codec_options.
-                raise NotImplementedError('The codec options are not implemented yet')
+        mongomock_codec_options.is_supported(codec_options)
 
         if write_concern:
             raise NotImplementedError(
