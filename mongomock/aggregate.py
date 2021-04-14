@@ -4,6 +4,7 @@ import bisect
 import collections
 import copy
 import datetime
+import decimal
 import itertools
 import math
 import numbers
@@ -35,15 +36,17 @@ _random = random.Random()
 
 group_operators = [
     '$addToSet',
+    '$avg',
     '$first',
     '$last',
     '$max',
+    '$mergeObjects',
     '$min',
-    '$avg',
     '$push',
-    '$sum',
     '$stdDevPop',
-    '$stdDevSamp']
+    '$stdDevSamp',
+    '$sum',
+]
 arithmetic_operators = [
     '$abs',
     '$add',
@@ -70,19 +73,25 @@ project_operators = [
     '$stdDevSamp',
     '$arrayElemAt',
 ]
+control_flow_operators = [
+    '$switch',
+]
 projection_operators = ['$map', '$let', '$literal']
 date_operators = [
-    '$dayOfYear',
     '$dateFromString',
     '$dateToString',
     '$dayOfMonth',
     '$dayOfWeek',
-    '$year',
-    '$month',
-    '$week',
+    '$dayOfYear',
     '$hour',
+    '$isoDayOfWeek',
+    '$isoWeek',
+    '$isoWeekYear',
     '$minute',
+    '$month',
     '$second',
+    '$week',
+    '$year',
     '$millisecond',
     '$dateToString',
 ]
@@ -104,16 +113,20 @@ string_operators = [
     '$regexMatch',
     '$split',
     '$strcasecmp',
+    '$strLenBytes',
+    '$strLenCP',
     '$substr',
+    '$substrBytes',
+    '$substrCP',
     '$toLower',
     '$toUpper',
     '$trim',
 ]
 comparison_operators = [
-                           '$cmp',
-                           '$eq',
-                           '$ne',
-                       ] + list(filtering.SORTING_OPERATOR_MAP.keys())
+    '$cmp',
+    '$eq',
+    '$ne',
+] + list(filtering.SORTING_OPERATOR_MAP.keys())
 boolean_operators = ['$and', '$or', '$not']
 set_operators = [
     '$in',
@@ -173,7 +186,7 @@ def _merge_objects_operation(values):
 
 
 _GROUPING_OPERATOR_MAP = {
-    '$sum': lambda values: sum(v for v in values if isinstance(v, numbers.Number)),
+    '$sum': _sum_operation,
     '$avg': _avg_operation,
     '$mergeObjects': _merge_objects_operation,
     '$min': lambda values: _group_operation(values, min),
@@ -527,6 +540,37 @@ class _Parser(object):
             return out_value.second
         if operator == '$millisecond':
             return int(out_value.microsecond / 1000)
+        if operator == '$dateToString':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$dateToString operator must correspond a dict'
+                    'that has "format" and "date" field.'
+                )
+            if not isinstance(values, dict) or not {'format', 'date'} <= set(values):
+                raise OperationFailure(
+                    '$dateToString operator must correspond a dict'
+                    'that has "format" and "date" field.'
+                )
+            if '%L' in out_value['format']:
+                raise NotImplementedError(
+                    'Although %L is a valid date format for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'onNull' in values:
+                raise NotImplementedError(
+                    'Although onNull is a valid field for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'timezone' in values.keys():
+                raise NotImplementedError(
+                    'Although timezone is a valid field for the '
+                    '$dateToString operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            return out_value['date'].strftime(out_value['format'])
+
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '
@@ -646,7 +690,10 @@ class _Parser(object):
             return str(parsed)
 
         if operator == '$toInt':
-            parsed = self.parse(values)
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
             if decimal_support:
                 if isinstance(parsed, decimal128.Decimal128):
                     return int(parsed.to_decimal())
@@ -810,6 +857,12 @@ class _Parser(object):
                     if value not in result:
                         result.append(value)
             return result
+        if operator == '$setEquals':
+            set_values = [set(self.parse(value)) for value in values]
+            for set1, set2 in itertools.combinations(set_values, 2):
+                if set1 != set2:
+                    return False
+            return True
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
@@ -905,7 +958,7 @@ def _handle_lookup_stage(in_collection, database, options):
                 options[operator].startswith('$'):
             raise OperationFailure(
                 "FieldPath field names may not start with '$'")
-        if operator in ('localField', 'as') and \
+        if operator == 'as' and \
                 '.' in options[operator]:
             raise NotImplementedError(
                 "Although '.' is valid in the 'localField' and 'as' "
@@ -918,7 +971,10 @@ def _handle_lookup_stage(in_collection, database, options):
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
-        query = doc.get(local_field)
+        try:
+            query = helpers.get_value_by_dot(doc, local_field)
+        except KeyError:
+            query = None
         if isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
@@ -1288,7 +1344,7 @@ def _handle_project_stage(in_collection, unused_database, options):
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
             try:
-                out_doc[field] = _parse_expression(value, in_doc)
+                out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
             except KeyError:
                 # Ignore missing key.
                 pass
