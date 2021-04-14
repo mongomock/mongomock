@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
-from six import iteritems, string_types
+from six import iteritems, raise_from, string_types
 import time
 import warnings
 
@@ -49,6 +49,23 @@ ASCENDING = 1
 DESCENDING = -1
 
 
+def utcnow():
+    """Simple wrapper for datetime.utcnow
+
+    This provides a centralized definition of "now" in the mongomock realm,
+    allowing users to transform the value of "now" to the future or the past,
+    based on their testing needs. For example:
+
+    ```python
+    def test_x(self):
+        with mock.patch("mongomock.utcnow") as mm_utc:
+            mm_utc = datetime.utcnow() + timedelta(hours=100)
+            # Test some things "100 hours" in the future
+    ```
+    """
+    return datetime.utcnow()
+
+
 def print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn(
         "'%s' has been deprecated to be in line with pymongo implementation, a new parameter '%s' "
@@ -72,7 +89,7 @@ def create_index_list(key_or_list, direction=None):
 def gen_index_name(index_list):
     """Generate an index name based on the list of keys with directions."""
 
-    return '_'.join('_'.join([str(i) for i in ix]) for ix in index_list)
+    return u'_'.join(['%s_%s' % item for item in index_list])
 
 
 class hashdict(dict):
@@ -230,8 +247,8 @@ def parse_uri(uri, default_port=27017, warn=False):
                 port = int(port)
                 if port < 0 or port > 65535:
                     raise ValueError()
-            except ValueError:
-                raise ValueError('Port must be an integer between 0 and 65535:', port)
+            except ValueError as err:
+                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
         else:
             port = default_port
 
@@ -272,8 +289,8 @@ def split_hosts(hosts, default_port=27017):
                 port = int(match.group(3))
                 if port < 0 or port > 65535:
                     raise ValueError()
-            except ValueError:
-                raise ValueError('Port must be an integer between 0 and 65535:', port)
+            except ValueError as err:
+                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
 
         nodelist.append((host, port))
 
@@ -341,16 +358,16 @@ def get_value_by_dot(doc, key, can_generate_array=False):
         elif isinstance(result, (list, tuple)):
             try:
                 int_key = int(key_item)
-            except ValueError:
+            except ValueError as err:
                 if not can_generate_array:
-                    raise KeyError(key_index)
+                    raise_from(KeyError(key_index), err)
                 remaining_key = '.'.join(key_items[key_index:])
                 return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
 
             try:
                 result = result[int_key]
-            except (ValueError, IndexError):
-                raise KeyError(key_index)
+            except (ValueError, IndexError) as err:
+                raise_from(KeyError(key_index), err)
 
         else:
             raise KeyError(key_index)
@@ -372,8 +389,8 @@ def set_value_by_dot(doc, key, value):
     elif isinstance(parent, (list, tuple)):
         try:
             parent[int(child_key)] = value
-        except (ValueError, IndexError):
-            raise KeyError()
+        except (ValueError, IndexError) as err:
+            raise_from(KeyError(), err)
     else:
         raise KeyError()
 
@@ -395,3 +412,9 @@ def delete_value_by_dot(doc, key):
     del parent[child_key]
 
     return doc
+
+
+def mongodb_to_bool(value):
+    """Converts any value to bool the way MongoDB does it"""
+
+    return value not in [False, None, 0]

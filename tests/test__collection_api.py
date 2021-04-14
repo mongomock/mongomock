@@ -2,13 +2,13 @@ import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
 from distutils import version  # pylint: disable=no-name-in-module
-import math
 import platform
 import random
 import re
 import six
 from six import assertCountEqual, text_type
 import sys
+from tests.diff import diff
 import time
 from unittest import TestCase, skipIf
 import uuid
@@ -17,9 +17,19 @@ import warnings
 import mongomock
 
 try:
+    from unittest import mock
+    _HAVE_MOCK = True
+except ImportError:
+    try:
+        import mock
+        _HAVE_MOCK = True
+    except ImportError:
+        _HAVE_MOCK = False
+
+try:
     from bson import codec_options
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp
+    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
     import pymongo
     from pymongo.collation import Collation
     from pymongo.read_concern import ReadConcern
@@ -33,6 +43,7 @@ except ImportError:
     from mongomock import ObjectId
     from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
+    from tests.utils import DBRef
 
     _HAVE_PYMONGO = False
 
@@ -100,6 +111,11 @@ class CollectionAPITest(TestCase):
         self.assertTrue(cursor.alive)
         next(cursor)
         self.assertFalse(cursor.alive)
+
+    def test__cursor_collation(self):
+        self.db.collection.insert_one({'foo': 'bar'})
+        cursor = self.db.collection.find(collation='fr')
+        self.assertEqual('fr', cursor.collation)
 
     def test__drop_collection(self):
         self.db.create_collection('a')
@@ -500,7 +516,7 @@ class CollectionAPITest(TestCase):
         ]
 
         for option in options:
-            with self.assertRaises(TypeError):
+            with self.assertRaises(mongomock.OperationFailure):
                 self.db.collection.find({}, **option)
 
     def test__find_and_modify_cannot_remove_and_new(self):
@@ -529,6 +545,15 @@ class CollectionAPITest(TestCase):
             {'_id': 0}, {'$inc': {'counter': 1}},
             upsert=True, return_document=ReturnDocument.BEFORE)
         self.assertEqual(ret, {'_id': 0, 'counter': 1})
+
+    def test__find_one_and_replace_return_document_after_upsert(self):
+        collection = self.db.col
+        collection.insert_one({'_id': 123, 'val': 5})
+        ret = collection.find_one_and_replace(
+            {'val': 1}, {'val': 7}, upsert=True,
+            return_document=ReturnDocument.AFTER)
+        self.assertTrue(ret)
+        self.assertEqual(7, ret['val'])
 
     def test__find_and_modify_no_projection_kwarg(self):
         with self.assertRaises(TypeError):  # unlike pymongo, we warn about this
@@ -658,11 +683,10 @@ class CollectionAPITest(TestCase):
             self.db.collection.find_one({'a': {'$regex': 'tada', '$options': re.I}})
 
         # Bug https://jira.mongodb.org/browse/SERVER-38621
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.find_one({'a': collections.OrderedDict([
-                ('$options', 'i'),
-                ('$regex', re.compile('tada')),
-            ])})
+        self.assertTrue(self.db.collection.find_one({'a': collections.OrderedDict([
+            ('$options', 'i'),
+            ('$regex', re.compile('tada')),
+        ])}))
 
     def test__iterate_on_find_and_update(self):
         documents = [
@@ -837,6 +861,15 @@ class CollectionAPITest(TestCase):
                 upsert=True
             )
 
+    def test__update_one_hint(self):
+        self.db.collection.insert_one({'a': 1})
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_one(
+                filter={'a': 1},
+                update={'$set': {'a': 1}},
+                hint='a',
+            )
+
     def test__update_many(self):
         self.db.collection.insert_many([
             {'a': 1, 'c': 2},
@@ -853,6 +886,24 @@ class CollectionAPITest(TestCase):
         self.assert_documents([{'a': 1, 'c': 0},
                                {'a': 1, 'c': 0},
                                {'a': 2, 'c': 4}])
+
+    def test__update_many_collation(self):
+        self.db.collection.insert_many([
+            {'a': 1, 'c': 2},
+            {'a': 1, 'c': 3},
+            {'a': 2, 'c': 4}
+        ])
+        self.db.collection.update_many(
+            filter={'a': 1},
+            update={'$set': {'c': 0}},
+            collation=None,
+        )
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_many(
+                filter={'a': 1},
+                update={'$set': {'c': 0}},
+                collation='fr',
+            )
 
     def test__update_many_upsert(self):
         self.assert_document_count(0)
@@ -1003,6 +1054,44 @@ class CollectionAPITest(TestCase):
         self.db.collection.update_one({}, {'$pull': {'arr': {'$in': ['a1']}}})
         self.assertEqual({'b': 0, 'arr': ['a2']}, self.db.collection.find_one({}, {'_id': 0}))
 
+    def test__update_pull_in_nested(self):
+        self.db.collection.insert_one({'food': {
+            'fruits': ['apples', 'pears', 'oranges', 'grapes', 'bananas'],
+            'vegetables': ['carrots', 'celery', 'squash', 'carrots'],
+        }})
+        self.db.collection.update_one({}, {'$pull': {
+            'food.fruits': {'$in': ['apples', 'oranges']},
+            'food.vegetables': 'carrots',
+        }})
+        self.assertEqual({'food': {
+            'fruits': ['pears', 'grapes', 'bananas'],
+            'vegetables': ['celery', 'squash'],
+        }}, self.db.collection.find_one({}, {'_id': 0}))
+
+    def test__update_pop(self):
+        self.db.collection.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual(['green'], res['hat'])
+
+    def test__update_pop_negative_index(self):
+        self.db.collection.insert({'name': 'bob', 'hat': ['green', 'tall']})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': -1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual(['tall'], res['hat'])
+
+    def test__update_pop_large_index(self):
+        self.db.collection.insert({'name': 'bob', 'hat': [['green', 'tall']]})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat.1': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual([['green', 'tall']], res['hat'])
+
+    def test__update_pop_empty(self):
+        self.db.collection.insert({'name': 'bob', 'hat': []})
+        self.db.collection.update_one({'name': 'bob'}, {'$pop': {'hat': 1}})
+        res = self.db.collection.find_one({'name': 'bob'})
+        self.assertEqual([], res['hat'])
+
     def test__replace_one(self):
         self.db.collection.insert({'a': 1, 'b': 2})
         self.assert_documents([{'a': 1, 'b': 2}])
@@ -1079,6 +1168,14 @@ class CollectionAPITest(TestCase):
     def test__delete_many_collation_option(self):
         """Ensure collation delete_many's option is not rejected."""
         self.assertTrue(self.db.collection.delete_many({}, collation=None))
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.delete_many({}, collation='fr')
+
+    def test__delete_many_hint_option(self):
+        """Ensure hint delete_many's option is not rejected."""
+        self.assertTrue(self.db.collection.delete_many({}, hint=None))
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.delete_many({}, hint='_index')
 
     def test__string_matching(self):
         """Make sure strings are not treated as collections on find"""
@@ -1100,6 +1197,18 @@ class CollectionAPITest(TestCase):
         ret_val = self.db['coll_name'].find().distinct('name')
         self.assertTrue(isinstance(ret_val, list))
         self.assertTrue(set(ret_val) == set(['larry', 'gary']))
+
+    def test__cursor_limit(self):
+        self.db.collection.insert_many([{'a': i} for i in range(100)])
+        cursor = self.db.collection.find().limit(30)
+        first_ones = list(cursor)
+        self.assertEqual(30, len(first_ones))
+
+    def test__cursor_negative_limit(self):
+        self.db.collection.insert_many([{'a': i} for i in range(100)])
+        cursor = self.db.collection.find().limit(-30)
+        first_ones = list(cursor)
+        self.assertEqual(30, len(first_ones))
 
     def test__cursor_count_with_limit(self):
         first = {'name': 'first'}
@@ -1246,13 +1355,127 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.find({}).count(), 1)
 
+    def test__create_index_duplicate(self):
+        self.db.collection.create_index([('value', 1)])
+        self.db.collection.create_index([('value', 1)])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.create_index([('value', 1)], unique=True)
+
     def test__create_index_wrong_type(self):
         with self.assertRaises(TypeError):
             self.db.collection.create_index({'value': 1})
+        with self.assertRaises(TypeError):
+            self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
-    def test__create_ttl_index(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.create_index([('value', 1)], expireAfterSeconds=3600)
+    def test__ttl_index_ignores_record_in_the_future(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_ignores_records_with_non_datetime_values(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': 'not a dt'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_record_expiry(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_expiration_of_0(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_with_non_integer_value_is_ignored(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds='a')
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_applied_to_compound_key_is_ignored(self):
+        self.db.collection.create_index([('field1', 1), ('field2', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'field1': datetime.utcnow(), 'field2': 'val2'})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_ignored_when_document_does_not_contain_indexed_field(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'other_value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_of_array_field_expiration(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.utcnow() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        self.db.collection.drop()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({
+            'value': [
+                'a',
+                'b',
+                datetime.utcnow() - timedelta(seconds=5),
+                datetime.utcnow() + timedelta(seconds=100)
+            ]
+        })
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_of_array_field_without_datetime_does_not_expire(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    @skipIf(not _HAVE_MOCK, 'mock not installed')
+    def test__ttl_expiry_with_mock(self):
+        now = datetime.utcnow()
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=100)
+        self.db.collection.insert_one({'value': now + timedelta(seconds=100)})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+        with mock.patch('mongomock.utcnow') as mongomock_utcnow:
+            mongomock_utcnow.return_value = now + timedelta(100)
+            self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    def test__ttl_index_is_removed_if_collection_dropped(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+        self.db.collection.drop()
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_is_removed_when_index_is_dropped(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+        self.db.collection.drop_index('value_1')
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+        self.assertEqual(self.db.collection.find({}).count(), 1)
+
+    def test__ttl_index_removes_expired_documents_prior_to_removal(self):
+        self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
+        self.db.collection.insert_one({'value': datetime.utcnow()})
+
+        self.db.collection.drop_index('value_1')
+        self.assertEqual(self.db.collection.find({}).count(), 0)
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_indexes_with_expireAfterSeconds(self):
+        indexes = [
+            pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], expireAfterSeconds=5),
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(1, len(index_names))
+
+        self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
+        self.assertEqual(self.db.collection.find({}).count(), 0)
 
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
@@ -1444,18 +1667,18 @@ class CollectionAPITest(TestCase):
 
         index_information = self.db.collection.index_information()
         self.assertEqual(
-            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)]}},
             index_information,
         )
         self.assertEqual(
-            [{'name': '_id_', 'key': {'_id': 1}, 'ns': 'somedb.collection', 'v': 2}],
+            [{'name': '_id_', 'key': {'_id': 1}, 'v': 2}],
             list(self.db.collection.list_indexes()),
         )
 
         del index_information['_id_']
 
         self.assertEqual(
-            {'_id_': {'v': 2, 'key': [('_id', 1)], 'ns': self.db.collection.full_name}},
+            {'_id_': {'v': 2, 'key': [('_id', 1)]}},
             self.db.collection.index_information(),
             msg='index_information is immutable',
         )
@@ -1473,7 +1696,6 @@ class CollectionAPITest(TestCase):
         self.assertDictEqual(
             {
                 'key': [('value', 1)],
-                'ns': self.db.collection.full_name,
                 'v': 2,
             },
             self.db.collection.index_information()[index])
@@ -1495,7 +1717,6 @@ class CollectionAPITest(TestCase):
         self.assertDictEqual(
             {
                 'key': [('value', pymongo.ASCENDING)],
-                'ns': self.db.collection.full_name,
                 'unique': True,
                 'v': 2,
             },
@@ -1511,7 +1732,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.index_information()[index],
             {
                 'key': [('value', pymongo.DESCENDING)],
-                'ns': self.db.collection.full_name,
                 'unique': True,
                 'v': 2,
             })
@@ -1772,22 +1992,22 @@ class CollectionAPITest(TestCase):
         doc = {'a': 1, 'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]}
         self.db.collection.insert_one(doc)
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
-        self.assertEqual(result, doc)
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)]))
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
-        self.assertEqual(result, {'a': 1, 'b': [{'c': 2}, {'c': 5}]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)]))
 
-        result = self.db.collection.find_one(
-            {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
-        self.assertEqual(result, {'b': [{'d': 3, 'e': 4}, {'d': 6, 'e': 7}]})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one(
+                {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)]))
 
         # This one is tricky: the refinement 'b' overrides the previous 'b.c'
         # but it is not the equivalent of having only 'b'.
         with self.assertRaises(NotImplementedError):
-            result = self.db.collection.find_one(
+            self.db.collection.find_one(
                 {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b.c', 0), ('b', 0)]))
 
     def test__find_and_project(self):
@@ -1886,10 +2106,8 @@ class CollectionAPITest(TestCase):
         self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
         self.db.collection.with_options(codec_options.CodecOptions())
 
-    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
     def test__codec_options_without_pymongo(self):
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.codec_options  # pylint: disable=pointless-statement
+        self.assertEqual(self.db.collection.codec_options, self.db.codec_options)
 
     def test__with_options_wrong_kwarg(self):
         self.assertRaises(TypeError, self.db.collection.with_options, red_preference=None)
@@ -1968,7 +2186,7 @@ class CollectionAPITest(TestCase):
             objid = db.collection.insert({'date_aware': aware, 'date_naive': naive})
 
             objs = list(db.collection.find())
-            assert objs == [{'_id': objid, 'date_aware': returned, 'date_naive': returned}]
+            self.assertEqual(objs, [{'_id': objid, 'date_aware': returned, 'date_naive': returned}])
 
             if tz_awarness:
                 self.assertEqual('UTC', returned.tzinfo.tzname(returned))
@@ -1984,17 +2202,23 @@ class CollectionAPITest(TestCase):
             )
 
             objs = list(db.collection.find())
-            assert objs == [
+            self.assertEqual(objs, [
                 {'_id': objid, 'date_aware': returned, 'date_naive': returned,
                  'new_aware': returned, 'new_naive': returned}
-            ]
+            ], msg=tz_awarness)
 
             ret = db.collection.find_one({'new_aware': naive, 'new_naive': aware})
-            assert ret == objs[0]
+            self.assertEqual(ret, objs[0], msg=tz_awarness)
 
-            db.collection.delete_one({'new_aware': naive, 'new_naive': aware})
+            num = db.collection.count_documents({'date_naive': {'$gte': aware}})
+            self.assertEqual(1, num, msg=tz_awarness)
+
+            objs = list(db.collection.aggregate([{'$match': {'date_naive': {'$gte': aware}}}]))
+            self.assertEqual(1, len(objs), msg=tz_awarness)
+
+            db.collection.delete_one({'new_aware': naive, 'new_naive': naive})
             objs = list(db.collection.find())
-            assert not objs
+            self.assertFalse(objs, msg=tz_awarness)
 
     def test__list_of_dates(self):
         client = mongomock.MongoClient(tz_aware=True)
@@ -2313,11 +2537,18 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
-    def test_find_with_expr(self):
-        self.db.collection.insert_one({'_id': 1, 'a': 5})
-        with self.assertRaises(NotImplementedError) as err:
-            list(self.db.collection.find({'$expr': {'$lt': ['$a', 6]}}))
-        self.assertIn('The $expr operator', str(err.exception))
+    def test__find_with_expr(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': [5]},
+            {'_id': 2, 'a': [1, 2, 3]},
+            {'_id': 3, 'a': []},
+        ])
+        actual = list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
+        self.assertEqual([{'_id': 1, 'a': [5]}], actual)
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.insert_one({'_id': 4})
+            list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
 
     def test__find_or_and(self):
         self.db.collection.insert_many([
@@ -2407,12 +2638,9 @@ class CollectionAPITest(TestCase):
             {'_id': 2, 'first_name': 'Nancy', 'last_name': 'Walker', 'city': 'Anaheim'},
             {'_id': 3, 'first_name': 'Peter', 'last_name': 'Sumner', 'city': 'Toledo'}
         ])
-        actual = self.db.a.aggregate([
-            {'$replaceRoot':
-             {'newRoot':
-              {'full_name':
-               {'$concat': ['$first_name', ' ', '$last_name']}}}}
-        ])
+        actual = self.db.a.aggregate([{'$replaceRoot': {
+            'newRoot': {'full_name': {'$concat': ['$first_name', ' ', '$last_name']}},
+        }}])
         self.assertListEqual([
             {'full_name': 'Gary Sheffield'},
             {'full_name': 'Nancy Walker'},
@@ -2421,10 +2649,16 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_replace_root_with_array(self):
         self.db.a.insert_many([
-            {'_id': 1, 'name': 'Susan', 'phones':
-             [{'cell': '555-653-6527'}, {'home': '555-965-2454'}]},
-            {'_id': 2, 'name': 'Mark', 'phones':
-             [{'cell': '555-445-8767'}, {'home': '555-322-2774'}]}
+            {
+                '_id': 1,
+                'name': 'Susan',
+                'phones': [{'cell': '555-653-6527'}, {'home': '555-965-2454'}],
+            },
+            {
+                '_id': 2,
+                'name': 'Mark',
+                'phones': [{'cell': '555-445-8767'}, {'home': '555-322-2774'}],
+            },
         ])
         actual = self.db.a.aggregate([
             {'$unwind': '$phones'},
@@ -2853,6 +3087,420 @@ class CollectionAPITest(TestCase):
         self.assertTrue(len(expected_list) == len(result_list) and
                         sorted(expected_list, key=sorter) == sorted(result_list, key=sorter))
 
+    def test_aggregate_graph_lookup_basic_connect_from(self):
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+
+        * This testcase has a simple connect from field without the dot operator.
+
+        * The test case is taken from
+          https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/
+
+        * The inputs and the query are copy/pasted directly from the link
+          above.
+
+        * The expected output is formatted to match the pprint'ed output
+          produced by mongomock.
+
+        * The elements are:
+
+             - data_a: documents for database a
+             - data_b: documents for database b
+             - query: query for database b
+             - expected: result expected from query execution
+        """
+
+        data_a = [
+            {'_id': 0, 'airport': 'JFK', 'connects': ['BOS', 'ORD']},
+            {'_id': 1, 'airport': 'BOS', 'connects': ['JFK', 'PWM']},
+            {'_id': 2, 'airport': 'ORD', 'connects': ['JFK']},
+            {'_id': 3, 'airport': 'PWM', 'connects': ['BOS', 'LHR']},
+            {'_id': 4, 'airport': 'LHR', 'connects': ['PWM']},
+        ]
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev', 'nearestAirport': 'JFK'},
+            {'_id': 2, 'name': 'Eliot', 'nearestAirport': 'JFK'},
+            {'_id': 3, 'name': 'Jeff', 'nearestAirport': 'BOS'},
+        ]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'a',
+                    'startWith': '$nearestAirport',
+                    'connectFromField': 'connects',
+                    'connectToField': 'airport',
+                    'maxDepth': 2,
+                    'depthField': 'numConnections',
+                    'as': 'destinations'
+                }
+            }
+        ]
+
+        ordered_dict = collections.OrderedDict
+        expected = [{'_id': 1,
+                     'destinations': [ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects', ['BOS', 'ORD']),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects', ['JFK', 'PWM']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects', ['JFK']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects', ['BOS', 'LHR']),
+                                                    ('numConnections', 2)])],
+                     'name': 'Dev',
+                     'nearestAirport': 'JFK'},
+                    {'_id': 2,
+                     'destinations': [ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects', ['BOS', 'ORD']),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects', ['JFK', 'PWM']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects', ['JFK']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects', ['BOS', 'LHR']),
+                                                    ('numConnections', 2)])],
+                     'name': 'Eliot',
+                     'nearestAirport': 'JFK'},
+                    {'_id': 3,
+                     'destinations': [ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects', ['JFK', 'PWM']),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects', ['BOS', 'ORD']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects', ['BOS', 'LHR']),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects', ['JFK']),
+                                                    ('numConnections', 2)]),
+                                      ordered_dict([('_id', 4),
+                                                    ('airport', 'LHR'),
+                                                    ('connects', ['PWM']),
+                                                    ('numConnections', 2)])],
+                     'name': 'Jeff',
+                     'nearestAirport': 'BOS'}]
+
+        self.db.a.insert_many(data_a)
+        self.db.b.insert_many(data_b)
+        actual = self.db.b.aggregate(query)
+        actual = list(actual)
+        # the diff between expected and actual should be empty
+        res = diff(expected, actual)
+        self.assertEqual(res, [])
+
+    def test_aggregate_graph_lookup_nested_array(self):
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+
+        * This test cases connectfrom x.y where x is an array.
+
+        * The test case is adaptaed from
+          https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/
+
+        * The input is modified wrap a dictionary around the list of cities in
+        * And query is modified accordingly.
+        * The expected output is formatted to match the pprint'ed output
+          produced by mongomock.
+
+        * The elements are:
+
+             - data_a: documents for database a
+             - data_b: documents for database b
+             - query: query for database b
+             - expected: result expected from query execution
+        """
+
+        data_a = [
+            {'_id': 0, 'airport': 'JFK', 'connects': [
+                {'to': 'BOS', 'distance': 200}, {'to': 'ORD', 'distance': 800}]},
+            {'_id': 1, 'airport': 'BOS', 'connects': [
+                {'to': 'JFK', 'distance': 200}, {'to': 'PWM', 'distance': 2000}]},
+            {'_id': 2, 'airport': 'ORD', 'connects': [{'to': 'JFK', 'distance': 800}]},
+            {'_id': 3, 'airport': 'PWM', 'connects': [
+                {'to': 'BOS', 'distance': 2000}, {'to': 'LHR', 'distance': 6000}]},
+            {'_id': 4, 'airport': 'LHR', 'connects': [{'to': 'PWM', 'distance': 6000}]},
+        ]
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev', 'nearestAirport': 'JFK'},
+            {'_id': 2, 'name': 'Eliot', 'nearestAirport': 'JFK'},
+            {'_id': 3, 'name': 'Jeff', 'nearestAirport': 'BOS'},
+        ]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'a',
+                    'startWith': '$nearestAirport',
+                    'connectFromField': 'connects.to',
+                    'connectToField': 'airport',
+                    'maxDepth': 2,
+                    'depthField': 'numConnections',
+                    'as': 'destinations'
+                }
+            }
+        ]
+
+        ordered_dict = collections.OrderedDict
+        expected = [{'_id': 1,
+                     'destinations': [ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'BOS'},
+                                                      {'distance': 800,
+                                                       'to': 'ORD'}]),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'JFK'},
+                                                      {'distance': 2000,
+                                                       'to': 'PWM'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects',
+                                                     [{'distance': 800,
+                                                       'to': 'JFK'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects',
+                                                     [{'distance': 2000,
+                                                       'to': 'BOS'},
+                                                      {'distance': 6000,
+                                                       'to': 'LHR'}]),
+                                                    ('numConnections', 2)])],
+                     'name': 'Dev',
+                     'nearestAirport': 'JFK'},
+                    {'_id': 2,
+                     'destinations': [ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'BOS'},
+                                                      {'distance': 800,
+                                                       'to': 'ORD'}]),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'JFK'},
+                                                      {'distance': 2000,
+                                                       'to': 'PWM'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects',
+                                                     [{'distance': 800,
+                                                       'to': 'JFK'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects',
+                                                     [{'distance': 2000,
+                                                       'to': 'BOS'},
+                                                      {'distance': 6000,
+                                                       'to': 'LHR'}]),
+                                                    ('numConnections', 2)])],
+                     'name': 'Eliot',
+                     'nearestAirport': 'JFK'},
+                    {'_id': 3,
+                     'destinations': [ordered_dict([('_id', 1),
+                                                    ('airport', 'BOS'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'JFK'},
+                                                      {'distance': 2000,
+                                                       'to': 'PWM'}]),
+                                                    ('numConnections', 0)]),
+                                      ordered_dict([('_id', 0),
+                                                    ('airport', 'JFK'),
+                                                    ('connects',
+                                                     [{'distance': 200,
+                                                       'to': 'BOS'},
+                                                      {'distance': 800,
+                                                       'to': 'ORD'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 3),
+                                                    ('airport', 'PWM'),
+                                                    ('connects',
+                                                     [{'distance': 2000,
+                                                       'to': 'BOS'},
+                                                      {'distance': 6000,
+                                                       'to': 'LHR'}]),
+                                                    ('numConnections', 1)]),
+                                      ordered_dict([('_id', 2),
+                                                    ('airport', 'ORD'),
+                                                    ('connects',
+                                                     [{'distance': 800,
+                                                       'to': 'JFK'}]),
+                                                    ('numConnections', 2)]),
+                                      ordered_dict([('_id', 4),
+                                                    ('airport', 'LHR'),
+                                                    ('connects',
+                                                     [{'distance': 6000,
+                                                       'to': 'PWM'}]),
+                                                    ('numConnections', 2)])],
+                     'name': 'Jeff',
+                     'nearestAirport': 'BOS'}]
+
+        self.db.a.insert_many(data_a)
+        self.db.b.insert_many(data_b)
+        actual = self.db.b.aggregate(query)
+        actual = list(actual)
+        # the diff between expected and actual should be empty
+        res = diff(expected, actual)
+        self.assertEqual(res, [])
+
+    def test_aggregate_graph_lookup_connect_from_nested_dict(self):
+        """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
+
+        * This test cases connectfrom x.y where x is a dictionary.
+
+        * The testcase is taken from
+              https://stackoverflow.com/questions/40989763/mongodb-graphlookup
+
+        * The inputs and the query are copy/pasted directly from the link
+          above (with some cleanup)
+
+        * The expected output is formatted to match the pprint'ed output
+          produced by mongomock.
+
+        * The elements are:
+
+             - data_a: documents for database a
+             - data_b: documents for database b
+             - query: query for database b
+             - expected: result expected from query execution
+        """
+
+        data_b = [
+            {'_id': 1, 'name': 'Dev'},
+            {'_id': 2, 'name': 'Eliot', 'reportsTo': {
+                'name': 'Dev', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 3, 'name': 'Ron', 'reportsTo': {'name': 'Eliot',
+                                                    'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 4, 'name': 'Andrew', 'reportsTo': {
+                'name': 'Eliot', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 5, 'name': 'Asya', 'reportsTo': {
+                'name': 'Ron', 'from': '2016-01-01T00:00:00.000Z'}},
+            {'_id': 6, 'name': 'Dan', 'reportsTo': {'name': 'Andrew',
+                                                    'from': '2016-01-01T00:00:00.000Z'}},
+        ]
+
+        data_a = [{'_id': 1, 'name': 'x'}]
+
+        query = [
+            {
+                '$graphLookup': {
+                    'from': 'b',
+                    'startWith': '$name',
+                    'connectFromField': 'reportsTo.name',
+                    'connectToField': 'name',
+                    'as': 'reportingHierarchy'
+                }
+            }
+        ]
+
+        expected = [{'_id': 1,
+                     'name': 'Dev',
+                     'reportingHierarchy': [{'_id': 1, 'name': 'Dev'}]},
+                    {'_id': 2,
+                     'name': 'Eliot',
+                     'reportingHierarchy': [{'_id': 2,
+                                             'name': 'Eliot',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Dev'}},
+                                            {'_id': 1, 'name': 'Dev'}],
+                     'reportsTo': {'from': '2016-01-01T00:00:00.000Z', 'name': 'Dev'}},
+                    {'_id': 3,
+                     'name': 'Ron',
+                     'reportingHierarchy': [{'_id': 3,
+                                             'name': 'Ron',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Eliot'}},
+                                            {'_id': 2,
+                                             'name': 'Eliot',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Dev'}},
+                                            {'_id': 1, 'name': 'Dev'}],
+                     'reportsTo': {'from': '2016-01-01T00:00:00.000Z', 'name': 'Eliot'}},
+                    {'_id': 4,
+                     'name': 'Andrew',
+                     'reportingHierarchy': [{'_id': 4,
+                                             'name': 'Andrew',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Eliot'}},
+                                            {'_id': 2,
+                                             'name': 'Eliot',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Dev'}},
+                                            {'_id': 1, 'name': 'Dev'}],
+                     'reportsTo': {'from': '2016-01-01T00:00:00.000Z', 'name': 'Eliot'}},
+                    {'_id': 5,
+                     'name': 'Asya',
+                     'reportingHierarchy': [{'_id': 5,
+                                             'name': 'Asya',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Ron'}},
+                                            {'_id': 3,
+                                             'name': 'Ron',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Eliot'}},
+                                            {'_id': 2,
+                                             'name': 'Eliot',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Dev'}},
+                                            {'_id': 1, 'name': 'Dev'}],
+                     'reportsTo': {'from': '2016-01-01T00:00:00.000Z', 'name': 'Ron'}},
+                    {'_id': 6,
+                     'name': 'Dan',
+                     'reportingHierarchy': [{'_id': 6,
+                                             'name': 'Dan',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Andrew'}},
+                                            {'_id': 4,
+                                             'name': 'Andrew',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Eliot'}},
+                                            {'_id': 2,
+                                             'name': 'Eliot',
+                                             'reportsTo': {'from': '2016-01-01T00:00:00.000Z',
+                                                           'name': 'Dev'}},
+                                            {'_id': 1, 'name': 'Dev'}],
+                     'reportsTo': {'from': '2016-01-01T00:00:00.000Z', 'name': 'Andrew'}}]
+
+        self.db.a.insert_many(data_a)
+        self.db.b.insert_many(data_b)
+        actual = self.db.b.aggregate(query)
+        actual = list(actual)
+        # the diff between expected and actual should be empty
+        res = diff(expected, actual)
+        self.assertEqual(res, [])
+
     def test__aggregate_graph_lookup_missing_operator(self):
         with self.assertRaises(mongomock.OperationFailure) as err:
             self.db.a.aggregate([
@@ -2930,19 +3578,19 @@ class CollectionAPITest(TestCase):
             "Argument 'depthField' to $graphlookup must be a string",
             str(err.exception))
 
-    def test__aggregate_graph_lookup_dot_in_connect_from_field(self):
+    def test__aggregate_graph_lookup_dot_in_as_field(self):
         with self.assertRaises(NotImplementedError) as err:
             self.db.a.aggregate([
                 {'$graphLookup': {
                     'from': 'arr',
                     'startWith': '$_id',
-                    'connectFromField': 'parent.id',
+                    'connectFromField': 'parent',
                     'connectToField': '_id',
-                    'as': 'b'
+                    'as': 'b.id'
                 }}
             ])
         self.assertIn(
-            "Although '.' is valid in the 'connectFromField' parameter",
+            "Although '.' is valid in the 'as' parameter",
             str(err.exception))
 
     def test__aggregate_sample(self):
@@ -3054,6 +3702,47 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 2}], list(actual))
 
+    def test__aggregate_project_array_size_missing(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            list(self.db.collection.aggregate([
+                {'$match': {'_id': 1}},
+                {'$project': collections.OrderedDict([
+                    ('_id', False),
+                    ('a', {'$size': '$arr'})
+                ])}
+            ]))
+
+    def test__aggregate_project_cond_mongodb_to_bool(self):
+        self.db.collection.insert_one({'_id': 1})
+        actual = self.db.collection.aggregate([
+            {'$project': {
+                '_id': False,
+                # undefined aka KeyError
+                'undefined_value': {'$cond': ['$not_existing_field', 't', 'f']},
+                'false_value': {'$cond': [False, 't', 'f']},
+                'null_value': {'$cond': [None, 't', 'f']},
+                'zero_value': {'$cond': [0, 't', 'f']},
+                'true_value': {'$cond': [True, 't', 'f']},
+                'one_value': {'$cond': [1, 't', 'f']},
+                'empty_string': {'$cond': ['', 't', 'f']},
+                'empty_list': {'$cond': [[], 't', 'f']},
+                'empty_dict': {'$cond': [{}, 't', 'f']},
+            }},
+        ])
+        expected = {
+            'undefined_value': 'f',
+            'false_value': 'f',
+            'null_value': 'f',
+            'zero_value': 'f',
+            'true_value': 't',
+            'one_value': 't',
+            'empty_string': 't',
+            'empty_list': 't',
+            'empty_dict': 't',
+        }
+        self.assertEqual([expected], list(actual))
+
     def test__aggregate_project_array_size_if_null(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         self.db.collection.insert_one({'_id': 2})
@@ -3094,6 +3783,158 @@ class CollectionAPITest(TestCase):
             {'_id': 2, 'full_description': 'Title 2'},
             {'_id': 3, 'full_description': 'Title 3'},
         ], list(actual))
+
+    def test__aggregate_switch(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+        # Expressions taken directly from official documentation:
+        # https://docs.mongodb.com/manual/reference/operator/aggregation/switch/
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': {
+                'doc_example_1': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                            {'case': {'$lt': ['$a', 5]}, 'then': 'less than'},
+                        ],
+                    }
+                },
+                'doc_example_2': {
+                    '$switch': {
+                        'branches': [
+                            {'case': {'$eq': ['$a', 5]}, 'then': 'equals'},
+                            {'case': {'$gt': ['$a', 5]}, 'then': 'greater than'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'doc_example_3': {
+                    '$switch': {
+                        'branches': [
+                            {'case': 'this is true', 'then': 'first case'},
+                            {'case': False, 'then': 'second case'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+                'branches_is_tuple': {
+                    '$switch': {
+                        'branches': (
+                            {'case': False, 'then': 'value_f'},
+                            {'case': True, 'then': 'value_t'},
+                        ),
+                    }
+                },
+                'missing_field': {
+                    '$switch': {
+                        'branches': [
+                            {'case': '$missing_field', 'then': 'first case'},
+                            {'case': True, 'then': '$missing_field'},
+                        ],
+                        'default': 'did not match',
+                    }
+                },
+            }},
+        ])
+        expected = {
+            '_id': 1,
+            'doc_example_1': 'less than',
+            'doc_example_2': 'did not match',
+            'doc_example_3': 'first case',
+            'branches_is_tuple': 'value_t',
+        }
+        self.assertEqual([expected], list(actual))
+
+    def test__aggregate_switch_operation_failures(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 0})
+
+        tests_cases = [
+            (
+                {'$switch': []},
+                '$switch requires an object as an argument, found: %s' % type([]),
+            ),
+            (
+                {'$switch': {}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': {}}},
+                "$switch expected an array for 'branches', found: %s" % type({}),
+            ),
+            (
+                {'$switch': {'branches': []}},
+                '$switch requires at least one branch.',
+            ),
+            (
+                {'$switch': {'branches': [{}, 7]}},
+                "$switch requires each branch have a 'case' expression"
+            ),
+            (
+                {'$switch': {'branches': [{'case': True}, 7]}},
+                "$switch requires each branch have a 'then' expression."
+            ),
+            (
+                {'$switch': {'branches': [{'case': True, 'then': 3}, 7]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [7, {}]}},
+                '$switch expected each branch to be an object, found: %s' % type(0),
+            ),
+            (
+                {'$switch': {'branches': [{'case': False, 'then': 3}]}},
+                '$switch could not find a matching branch for an input, '
+                'and no default was specified.',
+            ),
+        ]
+
+        for switch_operator, expected_exception in tests_cases:
+            pipeline = [
+                {'$match': {'_id': 1}},
+                {'$project': {'result_field': switch_operator}},
+            ]
+            with self.assertRaises(mongomock.OperationFailure) as err:
+                self.db.collection.aggregate(pipeline)
+            self.assertEqual(expected_exception, str(err.exception))
+
+    def test__aggregate_switch_mongodb_to_bool(self):
+        def build_switch(case):
+            return {
+                '$switch': {
+                    'branches': [
+                        {'case': case, 'then': 't'},
+                    ],
+                    'default': 'f',
+                }
+            }
+        self.db.collection.insert_one({'_id': 1})
+        actual = self.db.collection.aggregate([
+            {'$project': {
+                '_id': False,
+                'undefined_value': build_switch('$not_existing_field'),
+                'false_value': build_switch(False),
+                'null_value': build_switch(None),
+                'zero_value': build_switch(0),
+                'true_value': build_switch(True),
+                'one_value': build_switch(1),
+                'empty_string': build_switch(''),
+                'empty_list': build_switch([]),
+                'empty_dict': build_switch({}),
+            }},
+        ])
+        expected = {
+            'undefined_value': 'f',
+            'false_value': 'f',
+            'null_value': 'f',
+            'zero_value': 'f',
+            'true_value': 't',
+            'one_value': 't',
+            'empty_string': 't',
+            'empty_list': 't',
+            'empty_dict': 't',
+        }
+        self.assertEqual([expected], list(actual))
 
     def test__aggregate_project_array_element_at(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
@@ -3144,10 +3985,11 @@ class CollectionAPITest(TestCase):
             {'$match': {'_id': 1}},
             {'$project': collections.OrderedDict([
                 ('_id', False),
-                ('rename_dot', '$arr.c')
+                ('rename_dot', '$arr.c'),
+                ('a', '$arr.a')
             ])}
         ])
-        self.assertEqual([{}], list(actual))
+        self.assertEqual([{'a': 2}], list(actual))
 
     def test__aggregate_project_missing_nested_fields(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': {'c': 1}})
@@ -3371,6 +4213,33 @@ class CollectionAPITest(TestCase):
             [{'sum': 20.5, 'prod': 30, 'trunc': 1}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
+    def test__aggregate_string_operation_split_exceptions(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': []}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a']}
+            }}])
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', '$b', '$c']}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': ['$a', 1]}
+            }}])
+        with self.assertRaises(TypeError):
+            self.db.collection.aggregate([{'$project': {
+                'split': {'$split': [1, '$a']}
+            }}])
+
     def test__aggregate_string_operations(self):
         self.db.collection.insert_one({
             'a': 'Hello',
@@ -3385,14 +4254,57 @@ class CollectionAPITest(TestCase):
             'sub3': {'$substr': ['$a', 2, -1]},
             'lower': {'$toLower': '$a'},
             'lower_err': {'$toLower': None},
+            'split_string_none': {'$split': [None, 'l']},
+            'split_string_missing': {'$split': ['$missingField', 'l']},
+            'split_delimiter_none': {'$split': ['$a', None]},
+            'split_delimiter_missing': {'$split': ['$a', '$missingField']},
+            'split': {'$split': ['$a', 'l']},
             'strcasecmp': {'$strcasecmp': ['$a', '$b']},
             'upper': {'$toUpper': '$a'},
             'upper_err': {'$toUpper': None},
         }}])
         self.assertEqual(
-            [{'concat': 'Hello Dear World', 'concat_none': None, 'sub1': 'Hell', 'sub2': '',
-              'sub3': 'llo', 'lower': 'hello', 'lower_err': '', 'strcasecmp': -1,
-              'upper': 'HELLO', 'upper_err': ''}],
+            [{'concat': 'Hello Dear World',
+              'concat_none': None,
+              'sub1': 'Hell',
+              'sub2': '',
+              'sub3': 'llo',
+              'lower': 'hello',
+              'lower_err': '',
+              'split_string_none': None,
+              'split_string_missing': None,
+              'split_delimiter_none': None,
+              'split_delimiter_missing': None,
+              'split': ['He', '', 'o'],
+              'strcasecmp': -1,
+              'upper': 'HELLO',
+              'upper_err': ''}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_match_expr(self):
+        self.db.collection.insert_many([
+            {'_id': 0, 'a': 2, 'b': 3},
+            {'_id': 1, 'a': 2, 'b': 2},
+            {'_id': 2, 'a': 5, 'b': 2},
+        ])
+        actual = self.db.collection.aggregate([{'$match': {
+            '$or': [{'$expr': {'$gt': ['$a', 3]}}, {'b': 3}],
+        }}])
+        self.assertEqual({0, 2}, {d['_id'] for d in actual})
+
+    def test__aggregate_regexpmatch(self):
+        self.db.collection.insert_one({
+            'a': 'Hello',
+            'b': 'World',
+            'c': 3
+        })
+        actual = self.db.collection.aggregate([{'$project': {
+            'Hello': {'$regexMatch': {'input': '$a', 'regex': 'Hel*o'}},
+            'Word': {'$regexMatch': {'input': '$b', 'regex': 'Word'}},
+            'missing-field': {'$regexMatch': {'input': '$d', 'regex': 'orl'}},
+        }}])
+        self.assertEqual(
+            [{'Hello': True, 'Word': False, 'missing-field': False}],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
 
     def test__aggregate_add_fields(self):
@@ -3522,23 +4434,11 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_not_implemented(self):
         self.db.collection.insert_one({})
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$and': [True, False]}}}
-            ])
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
                 {'$project': {'a': {'$stdDevPop': 'scores'}}},
             ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([{'$project': {
-                'a': {'$let': {
-                    'vars': {'a': 1},
-                    'in': {'$multiply': ['$$a', 3]},
-                }},
-            }}])
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
@@ -3547,7 +4447,7 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$concatArrays': [[0, 1], [2, 3]]}}},
+                {'$project': {'a': {'$isArray': [1, 2]}}}
             ])
 
         with self.assertRaises(NotImplementedError):
@@ -3557,13 +4457,18 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$group': {'_id': '$b', 'a': {'$mergeObjects': '$a'}}},
+                {'$project': {'a': {'$toLong': '$scores'}}},
             ])
 
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$mergeObjects': [{'a': 2, 'b': 3}, {'a': 5}]}}},
-            ])
+    def test__aggregate_project_let(self):
+        self.db.collection.insert_one({'_id': 1, 'a': 5, 'b': 2, 'c': 3})
+        actual = self.db.collection.aggregate([{'$project': {
+            'a': {'$let': {
+                'vars': {'a': 1},
+                'in': {'$multiply': ['$$a', 3]},
+            }},
+        }}])
+        self.assertEqual([{'_id': 1, 'a': 3}], list(actual))
 
     def test__aggregate_project_rotate(self):
         self.db.collection.insert_one({'_id': 1, 'a': 1, 'b': 2, 'c': 3})
@@ -4073,7 +4978,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 1},
                 {'_id': 1}
             ])
-        self.assertEqual(str(cm.exception), 'batch op errors occurred')
+        self.assertIn('batch op errors occurred', str(cm.exception))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_many_bulk_write_error_details(self):
@@ -4282,6 +5187,27 @@ class CollectionAPITest(TestCase):
             [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
             list(actual)
         )
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_group_dbref_key(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '1')},
+                {'myref': DBRef('a', '2')},
+                {'myref': DBRef('b', '1')},
+            ]
+        )
+        actual = collection.aggregate([
+            {'$group': {'_id': '$myref'}}
+        ])
+        expect = [
+            {'_id': DBRef('b', '1')},
+            {'_id': DBRef('a', '2')},
+            {'_id': DBRef('a', '1')},
+        ]
+        assertCountEqual(self, expect, list(actual))
 
     def test__aggregate_group_sum(self):
         collection = self.db.collection
@@ -4555,6 +5481,64 @@ class CollectionAPITest(TestCase):
             'select_nested': 7,
             'select_array': [5, 15],
         }, actual[0])
+
+    def test__aggregate_concatArrays(self):
+        self.db.collection.insert_one({
+            'a': [1, 2],
+            'b': ['foo', 'bar', 'baz'],
+            'c': {
+                'arr1': [123],
+            }
+        })
+        actual = self.db.collection.aggregate([{
+            '$project': {
+                'concat': {'$concatArrays': ['$a', ['#', '*'], '$c.arr1', '$b']},
+                'concat_array_expression': {'$concatArrays': '$b'},
+                'concat_tuples': {'$concatArrays': ((1, 2, 3), (1,))},
+                'concat_none': {'$concatArrays': None},
+                'concat_missing_field': {'$concatArrays': '$foo'},
+                'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
+                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+            }
+        }])
+        self.assertEqual(
+            [{
+                'concat': [1, 2, '#', '*', 123, 'foo', 'bar', 'baz'],
+                'concat_array_expression': ['foo', 'bar', 'baz'],
+                'concat_tuples': [1, 2, 3, 1],
+                'concat_none': None,
+                'concat_missing_field': None,
+                'concat_none_item': None,
+                'concat_missing_field_item': None
+            }],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual]
+        )
+
+    def test__aggregate_concatArrays_exceptions(self):
+        self.db.collection.insert_one({
+            'a': {
+                'arr1': [123]
+            }
+        })
+        pipeline_parameter_not_array = [
+            {
+                '$project': {
+                    'concat_parameter_not_array': {'$concatArrays': 42}
+                }
+            }
+        ]
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate(pipeline_parameter_not_array)
+
+        pipeline_item_not_array = [
+            {
+                '$project': {
+                    'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}
+                }
+            }
+        ]
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate(pipeline_item_not_array)
 
     def test__aggregate_filter(self):
         collection = self.db.collection
@@ -4911,8 +5895,10 @@ class CollectionAPITest(TestCase):
             self.assertNotEqual(
                 original_document['date'].timestamp(), stored_document['date'].timestamp())
             self.assertEqual(
-                math.floor(original_document['date'].timestamp() * 1000),
-                stored_document['date'].timestamp() * 1000)
+                datetime(2000, 1, 1, 10, 30, 30, 12000),
+                stored_document['date'],
+                msg='The stored document holds a date as timezone naive UTC and without '
+                'microseconds')
 
         # The objects are not linked: modifying the inserted document or the fetched one will
         # have no effect on future retrievals.
@@ -5282,6 +6268,162 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure):
                 collection.aggregate(item)
 
+    def test_aggregate_project_with_boolean(self):
+        collection = self.db.collection
+
+        # Test with no items
+        expect = []
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = []
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = []
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # Tests following are with one item
+        collection.insert_one({
+            'items': []
+        })
+
+        # Test with 0 arguments
+        expect = [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # Test with one argument
+        expect = [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': True}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # Test with two arguments
+        expect = [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [True, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [False, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, True]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [True, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [False, False]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # Following tests are with more than two items
+        collection.insert_many([
+            {'items': []},
+            {'items': []}
+        ])
+
+        expect = [{'items': True}] * 3
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}] * 3
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': []}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': False}] * 3
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {}}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # Test with something else than boolean
+        collection.insert_one({
+            'items': ['foo']
+        })
+
+        expect = [{'items': False}] * 3 + [{'items': True}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$and': [{'$eq': ['$items', ['foo']]}]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$or': [{'$eq': ['$items', ['foo']]}]}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        expect = [{'items': True}] * 3 + [{'items': False}]
+        actual = collection.aggregate([
+            {'$project': {'_id': 0, 'items': {'$not': {'$eq': ['$items', ['foo']]}}}}
+        ])
+        self.assertEqual(expect, list(actual))
+
     def test_set_no_content(self):
         collection = self.db.collection
         collection.insert_one({'a': 1})
@@ -5290,3 +6432,63 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(mongomock.WriteError):
             collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
+
+    def test_snapshot_arg(self):
+        self.db.collection.find(snapshot=False)
+
+    def test_elem_match(self):
+        self.db.collection.insert_many([
+            {'_id': 0, 'arr': [0, 1, 2, 3, 10]},
+            {'_id': 1, 'arr': [0, 2, 4, 6]},
+            {'_id': 2, 'arr': [1, 3, 5, 7]}
+        ])
+        ids = set(doc['_id'] for doc in self.db.collection.find(
+            {'arr': {'$elemMatch': {'$lt': 10, '$gt': 4}}}, {'_id': 1}))
+        self.assertEqual({1, 2}, ids)
+
+    def test_list_collection_names_filter(self):
+        now = datetime.now()
+        self.db.create_collection('aggregator')
+        for day in range(10):
+            new_date = now - timedelta(day)
+            self.db.create_collection('historical_{0}'.format(new_date.strftime('%Y_%m_%d')))
+
+        # test without filter
+        self.assertEqual(len(self.db.list_collection_names()), 11)
+
+        # test regex
+        assert len(self.db.list_collection_names(filter={
+            'name': {'$regex': r'historical_\d{4}_\d{2}_\d{2}'}
+        })) == 10
+
+        new_date = datetime.now() - timedelta(1)
+        col_name = 'historical_{0}'.format(new_date.strftime('%Y_%m_%d'))
+
+        # test not equal
+        self.assertEqual(len(self.db.list_collection_names(filter={'name': {'$ne': col_name}})), 10)
+
+        # test equal
+        assert col_name in self.db.list_collection_names(filter={'name': col_name})
+
+        # neg invalid field
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'_id': {'$ne': col_name}})
+
+        # neg invalid operator
+        with self.assertRaises(NotImplementedError):
+            self.db.list_collection_names(filter={'name': {'$ge': col_name}})
+
+    def test__equality(self):
+        self.assertEqual(self.db.a, self.db.a)
+        self.assertNotEqual(self.db.a, self.db.b)
+        self.assertEqual(self.db.a, self.db.get_collection('a'))
+        self.assertNotEqual(self.db.a, self.client.other_db.a)
+        client = mongomock.MongoClient('localhost')
+        self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
+        self.assertNotEqual(
+            client.db.collection, mongomock.MongoClient('example.com').db.collection)
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    def test__hashable(self):
+        with self.assertRaises(TypeError):
+            {self.db.a, self.db.b}  # pylint: disable=pointless-statement

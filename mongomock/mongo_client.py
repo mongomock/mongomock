@@ -1,19 +1,18 @@
 from .database import Database
 from .store import ServerStore
 import itertools
+from mongomock import codec_options as mongomock_codec_options
 from mongomock import ConfigurationError
 from mongomock import read_preferences
 import warnings
 
 try:
-    from bson import codec_options as bson_codec_options
     from pymongo.uri_parser import parse_uri, split_hosts
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     from .helpers import parse_uri, split_hosts
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
-    bson_codec_options = None
 
 
 class MongoClient(object):
@@ -32,10 +31,7 @@ class MongoClient(object):
         self.port = port or self.PORT
 
         self._tz_aware = tz_aware
-        if bson_codec_options:
-            self._codec_options = bson_codec_options.CodecOptions(tz_aware=tz_aware)
-        else:
-            self._codec_options = None
+        self._codec_options = mongomock_codec_options.CodecOptions(tz_aware=tz_aware)
         self._database_accesses = {}
         self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
@@ -70,6 +66,11 @@ class MongoClient(object):
     def __repr__(self):
         return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.address == other.address
+        return NotImplemented
+
     def close(self):
         pass
 
@@ -91,10 +92,6 @@ class MongoClient(object):
 
     @property
     def codec_options(self):
-        if not bson_codec_options:
-            raise NotImplementedError(
-                'The codec options are not implemented in mongomock alone, you need to import '
-                'the pymongo/bson library as well.')
         return self._codec_options
 
     def server_info(self):
@@ -133,14 +130,14 @@ class MongoClient(object):
     def get_database(self, name=None, codec_options=None, read_preference=None,
                      write_concern=None):
         if name is None:
-            return self.get_default_database()
-
-        db = self._database_accesses.get(name)
+            db = self.get_default_database()
+        else:
+            db = self._database_accesses.get(name)
         if db is None:
             db_store = self._store[name]
             db = self._database_accesses[name] = Database(
                 self, name, read_preference=read_preference or self.read_preference,
-                codec_options=self._codec_options, _store=db_store)
+                codec_options=codec_options or self._codec_options, _store=db_store)
         return db
 
     def get_default_database(self):
@@ -155,3 +152,7 @@ class MongoClient(object):
         In our case as we mock the actual server, we should always return True.
         """
         return True
+
+    def start_session(self, causal_consistency=True, default_transaction_options=None):
+        """Start a logical session."""
+        raise NotImplementedError('Mongomock does not support sessions yet')

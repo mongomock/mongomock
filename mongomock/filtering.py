@@ -9,16 +9,17 @@ import numbers
 import operator
 import re
 from sentinels import NOTHING
-from six import iteritems, iterkeys, string_types, PY3
+from six import iteritems, string_types, PY3
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)
 
 try:
-    from bson import Regex
+    from bson import Regex, DBRef
     _RE_TYPES = (RE_TYPE, Regex)
 except ImportError:
+    DBRef = None
     _RE_TYPES = (RE_TYPE,)
 
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
@@ -44,11 +45,14 @@ def filter_applies(search_filter, document):
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    return _Filterer().apply(search_filter, document)
+    return _filterer_inst.apply(search_filter, document)
 
 
 class _Filterer(object):
     """An object to help applying a filter, using the MongoDB query language."""
+
+    # This is populated using register_parse_expression further down.
+    parse_expression = []
 
     def __init__(self):
         self._operator_map = dict({
@@ -79,6 +83,11 @@ class _Filterer(object):
                 if not search:
                     raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
                 if not LOGICAL_OPERATOR_MAP[key](document, search, self.apply):
+                    return False
+                continue
+            if key == '$expr':
+                parse_expression = self.parse_expression[0]
+                if not parse_expression(search, document, ignore_missing_keys=True):
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
@@ -169,7 +178,14 @@ class _Filterer(object):
             return False
         if not isinstance(query, dict):
             raise OperationFailure('$elemMatch needs an Object')
-        return any(self.apply(query, item) for item in doc_val)
+        for item in doc_val:
+            try:
+                if self.apply(query, item):
+                    return True
+            except OperationFailure:
+                if self.apply({'field': query}, {'field': item}):
+                    return True
+        return False
 
     def _all_op(self, doc_val, search_val):
         if isinstance(doc_val, list) and doc_val and isinstance(doc_val[0], list):
@@ -293,6 +309,12 @@ def bson_compare(op, a, b, can_compare_types=True):
     if a_type != b_type:
         return can_compare_types and op(a_type, b_type)
 
+    # Compare DBRefs as dicts
+    if type(a).__name__ == 'DBRef' and hasattr(a, 'as_doc'):
+        a = a.as_doc()
+    if type(b).__name__ == 'DBRef' and hasattr(b, 'as_doc'):
+        b = b.as_doc()
+
     if isinstance(a, dict):
         # MongoDb server compares the type before comparing the keys
         # https://github.com/mongodb/mongo/blob/f10f214/src/mongo/bson/bsonelement.cpp#L516
@@ -350,6 +372,10 @@ def _get_compare_type(val):
         return 45
     if isinstance(val, _RE_TYPES):
         return 50
+    if DBRef and isinstance(val, DBRef):
+        # According to the C++ code, this should be 55 but apparently sending a DBRef through
+        # pymongo is stored as a dict.
+        return 20
     raise NotImplementedError(
         "Mongomock does not know how to sort '%s' of type '%s'" %
         (val, type(val)))
@@ -413,11 +439,6 @@ def _combine_regex_options(search):
         return search_copy
 
     if isinstance(search['$regex'], _RE_TYPES):
-        keys = [k for k in iterkeys(search) if k in {'$regex', '$options'}]
-        if keys == ['$options', '$regex']:
-            raise NotImplementedError(
-                'Do not use compiled regular expressions with $options until '
-                'https://jira.mongodb.org/browse/SERVER-38621 is solved.')
         if isinstance(search['$regex'], RE_TYPE):
             search_copy['$regex'] = re.compile(
                 search['$regex'].pattern, search['$regex'].flags | options)
@@ -503,3 +524,15 @@ class BsonComparable(object):
 
     def __lt__(self, other):
         return bson_compare(operator.lt, self.obj, other.obj)
+
+
+_filterer_inst = _Filterer()
+
+
+# Developer note: to avoid a cross-modules dependency (filtering requires aggregation, that requires
+# filtering), the aggregation module needs to register its parse_expression function here.
+def register_parse_expression(parse_expression):
+    """Register the parse_expression function from the aggregate module."""
+
+    del _Filterer.parse_expression[:]
+    _Filterer.parse_expression.append(parse_expression)

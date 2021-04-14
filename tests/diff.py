@@ -43,6 +43,10 @@ def diff(a, b, path=None):
         a = dict(a)
     if type(b).__name__ == 'SON':
         b = dict(b)
+    if type(a).__name__ == 'DBRef':
+        a = a.as_doc()
+    if type(b).__name__ == 'DBRef':
+        b = b.as_doc()
     if isinstance(a, dict_type) and isinstance(b, dict_type):
         return _diff_dicts(a, b, path)
     if type(a).__name__ == 'ObjectId':

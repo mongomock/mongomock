@@ -158,7 +158,9 @@ class GridFsTest(TestCase):
             if retry > 0:
                 time.sleep(0.5)
             try:
-                return PymongoClient(maxPoolSize=1)
+                return PymongoClient(
+                    host=os.environ.get('TEST_MONGO_HOST', 'localhost'), maxPoolSize=1
+                )
             except pymongo.errors.ConnectionFailure as e:
                 if retry == num_retries - 1:
                     raise
