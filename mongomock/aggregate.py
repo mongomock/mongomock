@@ -17,6 +17,7 @@ from six import moves, raise_from
 from mongomock import command_cursor
 from mongomock import filtering
 from mongomock import helpers
+from mongomock import OperationFailure
 from sentinels import NOTHING
 from six import moves
 
