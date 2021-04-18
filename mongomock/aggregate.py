@@ -366,6 +366,7 @@ class _Parser(object):
         if operator == '$arrayElemAt':
             key, index = values
             array = self._parse_basic_expression(key)
+            index = self.parse(index)
             return array[index]
         raise NotImplementedError("Although '%s' is a valid project operator for the "
                                   'aggregation pipeline, it is currently not implemented '
