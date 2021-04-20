@@ -39,13 +39,13 @@ _NOT_IMPLEMENTED_OPERATORS = {
 }
 
 
-def filter_applies(search_filter, document):
+def filter_applies(search_filter, document, user_vars=None):
     """Applies given filter
 
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    return _filterer_inst.apply(search_filter, document)
+    return _filterer_inst.apply(search_filter, document, user_vars=user_vars)
 
 
 class _Filterer(object):
@@ -71,7 +71,7 @@ class _Filterer(object):
             for key, op in iteritems(SORTING_OPERATOR_MAP)
         })
 
-    def apply(self, search_filter, document):
+    def apply(self, search_filter, document, user_vars=None):
         if not isinstance(search_filter, dict):
             raise OperationFailure('the match filter must be an expression in an object')
 
@@ -87,7 +87,8 @@ class _Filterer(object):
                 continue
             if key == '$expr':
                 parse_expression = self.parse_expression[0]
-                if not parse_expression(search, document, ignore_missing_keys=True):
+                if not parse_expression(
+                        search, document, ignore_missing_keys=True, user_vars=user_vars):
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:

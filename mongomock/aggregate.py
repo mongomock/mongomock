@@ -859,7 +859,7 @@ class _Parser(object):
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
 
-def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
+def _parse_expression(expression, doc_dict, ignore_missing_keys=False, user_vars=None):
     """Parse an expression.
 
     Args:
@@ -869,13 +869,14 @@ def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
         ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
             if it is possible.
     """
-    return _Parser(doc_dict, ignore_missing_keys=ignore_missing_keys).parse(expression)
+    return _Parser(
+        doc_dict, user_vars=user_vars, ignore_missing_keys=ignore_missing_keys).parse(expression)
 
 
 filtering.register_parse_expression(_parse_expression)
 
 
-def _accumulate_group(output_fields, group_list):
+def _accumulate_group(output_fields, group_list, user_vars):
     doc_dict = {}
     for field, value in six.iteritems(output_fields):
         if field == '_id':
@@ -884,7 +885,7 @@ def _accumulate_group(output_fields, group_list):
             values = []
             for doc in group_list:
                 try:
-                    values.append(_parse_expression(key, doc))
+                    values.append(_parse_expression(key, doc, user_vars=user_vars))
                 except KeyError:
                     continue
             if operator in _GROUPING_OPERATOR_MAP:
@@ -930,14 +931,13 @@ def _fix_sort_key(key_getter):
     return fixed_getter
 
 
-def _handle_lookup_stage(in_collection, database, options):
-    for operator in ('let', 'pipeline'):
-        if operator in options:
-            raise NotImplementedError(
-                "Although '%s' is a valid lookup operator for the "
-                'aggregation pipeline, it is currently not '
-                'implemented in Mongomock.' % operator)
-    for operator in ('from', 'localField', 'foreignField', 'as'):
+def _handle_lookup_stage(in_collection, database, options, user_vars):
+
+    required_fields = ['as', 'from']
+    if 'pipeline' not in options:
+        required_fields.extend(['localField', 'foreignField'])
+
+    for operator in required_fields:
         if operator not in options:
             raise OperationFailure(
                 "Must specify '%s' field for a $lookup" % operator)
@@ -956,18 +956,31 @@ def _handle_lookup_stage(in_collection, database, options):
                 'pipeline, it is currently not implemented in Mongomock.')
 
     foreign_name = options['from']
-    local_field = options['localField']
-    foreign_field = options['foreignField']
     local_name = options['as']
+    local_field = options.get('localField')
+    foreign_field = options.get('foreignField')
+    pipeline = options.get('pipeline')
+    let = options.get('let')
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
-        try:
-            query = helpers.get_value_by_dot(doc, local_field)
-        except KeyError:
-            query = None
-        if isinstance(query, list):
-            query = {'$in': query}
-        matches = foreign_collection.find({foreign_field: query})
+        if pipeline:
+            if let:
+                doc_user_vars = dict(user_vars or {})
+                for var, expr in six.iteritems(let):
+                    doc_user_vars[var] = _parse_expression(expr, doc, user_vars=user_vars)
+            else:
+                doc_user_vars = user_vars
+            matches = process_pipeline(
+                (doc for doc in foreign_collection.find({})),
+                database, pipeline, None, user_vars=doc_user_vars)
+        else:
+            try:
+                query = helpers.get_value_by_dot(doc, local_field)
+            except KeyError:
+                query = None
+            if isinstance(query, list):
+                query = {'$in': query}
+            matches = foreign_collection.find({foreign_field: query})
         doc[local_name] = [foreign_doc for foreign_doc in matches]
 
     return in_collection
@@ -992,7 +1005,7 @@ def _recursive_get(match, nested_fields):
             yield answer
 
 
-def _handle_graph_lookup_stage(in_collection, database, options):
+def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
     if not isinstance(options.get('maxDepth', 0), six.integer_types):
         raise OperationFailure(
             "Argument 'maxDepth' to $graphLookup must be a number")
@@ -1049,7 +1062,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         found_items = set()
         depth = 0
         try:
-            result = _parse_expression(start_with, doc)
+            result = _parse_expression(start_with, doc, user_vars=user_vars)
         except KeyError:
             continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
@@ -1065,14 +1078,14 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     return out_doc
 
 
-def _handle_group_stage(in_collection, unused_database, options):
+def _handle_group_stage(in_collection, unused_database, options, user_vars):
     grouped_collection = []
     _id = options['_id']
     if _id:
 
         def _key_getter(doc):
             try:
-                return _parse_expression(_id, doc)
+                return _parse_expression(_id, doc, user_vars=user_vars)
             except KeyError:
                 return None
 
@@ -1088,14 +1101,14 @@ def _handle_group_stage(in_collection, unused_database, options):
 
     for doc_id, group in grouped:
         group_list = ([x for x in group])
-        doc_dict = _accumulate_group(options, group_list)
+        doc_dict = _accumulate_group(options, group_list, user_vars=user_vars)
         doc_dict['_id'] = doc_id
         grouped_collection.append(doc_dict)
 
     return grouped_collection
 
 
-def _handle_bucket_stage(in_collection, unused_database, options):
+def _handle_bucket_stage(in_collection, unused_database, options, user_vars):
     unknown_options = set(options) - {'groupBy', 'boundaries', 'output', 'default'}
     if unknown_options:
         raise OperationFailure(
@@ -1139,7 +1152,7 @@ def _handle_bucket_stage(in_collection, unused_database, options):
         if it's not the same type as the boundaries.
         """
         try:
-            value = _parse_expression(group_by, doc)
+            value = _parse_expression(group_by, doc, user_vars=user_vars)
         except KeyError:
             return (is_default_last, _get_default_bucket())
         index = bisect.bisect_right(boundaries, value)
@@ -1154,13 +1167,13 @@ def _handle_bucket_stage(in_collection, unused_database, options):
     out_collection = []
     for (unused_key, doc_id), group in grouped:
         group_list = [kv[1] for kv in group]
-        doc_dict = _accumulate_group(output_fields, group_list)
+        doc_dict = _accumulate_group(output_fields, group_list, user_vars=user_vars)
         doc_dict['_id'] = doc_id
         out_collection.append(doc_dict)
     return out_collection
 
 
-def _handle_sample_stage(in_collection, unused_database, options):
+def _handle_sample_stage(in_collection, unused_database, options, unused_user_vars):
     if not isinstance(options, dict):
         raise OperationFailure('the $sample stage specification must be an object')
     size = options.pop('size', None)
@@ -1173,7 +1186,7 @@ def _handle_sample_stage(in_collection, unused_database, options):
     return shuffled[:size]
 
 
-def _handle_sort_stage(in_collection, unused_database, options):
+def _handle_sort_stage(in_collection, unused_database, options, unused_user_vars):
     sort_array = reversed([{x: y} for x, y in options.items()])
     sorted_collection = in_collection
     for sort_pair in sort_array:
@@ -1185,7 +1198,7 @@ def _handle_sort_stage(in_collection, unused_database, options):
     return sorted_collection
 
 
-def _handle_unwind_stage(in_collection, unused_database, options):
+def _handle_unwind_stage(in_collection, unused_database, options, unused_user_vars):
     if not isinstance(options, dict):
         options = {'path': options}
     path = options['path']
@@ -1289,14 +1302,15 @@ def _project_by_spec(doc, proj_spec, is_include):
     return output
 
 
-def _handle_replace_root_stage(in_collection, unused_database, options):
+def _handle_replace_root_stage(in_collection, unused_database, options, user_vars):
     if 'newRoot' not in options:
         raise OperationFailure("Parameter 'newRoot' is missing for $replaceRoot operation.")
     new_root = options['newRoot']
     out_collection = []
     for doc in in_collection:
         try:
-            new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
+            new_doc = _parse_expression(
+                new_root, doc, ignore_missing_keys=True, user_vars=user_vars)
         except KeyError:
             new_doc = NOTHING
         if not isinstance(new_doc, dict):
@@ -1307,7 +1321,7 @@ def _handle_replace_root_stage(in_collection, unused_database, options):
     return out_collection
 
 
-def _handle_project_stage(in_collection, unused_database, options):
+def _handle_project_stage(in_collection, unused_database, options, user_vars):
     filter_list = []
     method = None
     include_id = options.get('_id')
@@ -1334,7 +1348,8 @@ def _handle_project_stage(in_collection, unused_database, options):
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
             try:
-                out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
+                out_doc[field] = _parse_expression(
+                    value, in_doc, user_vars=user_vars, ignore_missing_keys=True)
             except KeyError:
                 # Ignore missing key.
                 pass
@@ -1358,7 +1373,7 @@ def _handle_project_stage(in_collection, unused_database, options):
     return out_collection
 
 
-def _handle_add_fields_stage(in_collection, unused_database, options):
+def _handle_add_fields_stage(in_collection, unused_database, options, user_vars):
     if not options:
         raise OperationFailure(
             'Invalid $addFields :: caused by :: specification must have at least one field')
@@ -1366,7 +1381,8 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     for field, value in six.iteritems(options):
         for in_doc, out_doc in zip(in_collection, out_collection):
             try:
-                out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+                out_value = _parse_expression(
+                    value, in_doc, user_vars=user_vars, ignore_missing_keys=True)
             except KeyError:
                 continue
             parts = field.split('.')
@@ -1379,7 +1395,7 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     return out_collection
 
 
-def _handle_out_stage(in_collection, database, options):
+def _handle_out_stage(in_collection, database, options, unused_user_vars):
     # TODO(MetrodataTeam): should leave the origin collection unchanged
     out_collection = database.get_collection(options)
     if out_collection.count() > 0:
@@ -1389,7 +1405,7 @@ def _handle_out_stage(in_collection, database, options):
     return in_collection
 
 
-def _handle_count_stage(in_collection, database, options):
+def _handle_count_stage(in_collection, database, options, unused_user_vars):
     if not isinstance(options, str) or options == '':
         raise OperationFailure('the count field must be a non-empty string')
     elif options.startswith('$'):
@@ -1399,19 +1415,22 @@ def _handle_count_stage(in_collection, database, options):
     return [{options: len(in_collection)}]
 
 
-def _handle_facet_stage(in_collection, database, options):
+def _handle_facet_stage(in_collection, database, options, user_vars):
     out_collection_by_pipeline = {}
     for pipeline_title, pipeline in options.items():
         out_collection_by_pipeline[pipeline_title] = list(process_pipeline(
-            in_collection, database, pipeline, None))
+            in_collection, database, pipeline, None, user_vars=user_vars))
     return [out_collection_by_pipeline]
 
 
-def _handle_match_stage(in_collection, database, options):
+def _handle_match_stage(in_collection, database, options, user_vars):
     spec = helpers.patch_datetime_awareness_in_document(options)
     return [
         doc for doc in in_collection
-        if filtering.filter_applies(spec, helpers.patch_datetime_awareness_in_document(doc))
+        if filtering.filter_applies(
+            spec, helpers.patch_datetime_awareness_in_document(doc),
+            user_vars=user_vars
+        )
     ]
 
 
@@ -1427,7 +1446,7 @@ _PIPELINE_HANDLERS = {
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
     '$indexStats': None,
-    '$limit': lambda c, d, o: c[:o],
+    '$limit': lambda c, d, o, v: c[:o],
     '$listLocalSessions': None,
     '$listSessions': None,
     '$lookup': _handle_lookup_stage,
@@ -1441,7 +1460,7 @@ _PIPELINE_HANDLERS = {
     '$replaceWith': None,
     '$sample': _handle_sample_stage,
     '$set': _handle_add_fields_stage,
-    '$skip': lambda c, d, o: c[o:],
+    '$skip': lambda c, d, o, v: c[o:],
     '$sort': _handle_sort_stage,
     '$sortByCount': None,
     '$unset': None,
@@ -1449,7 +1468,7 @@ _PIPELINE_HANDLERS = {
 }
 
 
-def process_pipeline(collection, database, pipeline, session):
+def process_pipeline(collection, database, pipeline, session, user_vars=None):
     if session:
         raise NotImplementedError('Mongomock does not handle sessions yet')
 
@@ -1466,6 +1485,6 @@ def process_pipeline(collection, database, pipeline, session):
                 raise NotImplementedError(
                     "Although '%s' is a valid operator for the aggregation pipeline, it is "
                     'currently not implemented in Mongomock.' % operator)
-            collection = handler(collection, database, options)
+            collection = handler(collection, database, options, user_vars)
 
     return command_cursor.CommandCursor(collection)
