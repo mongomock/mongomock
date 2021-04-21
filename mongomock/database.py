@@ -188,9 +188,14 @@ class Database(object):
                                                                self.name))
         return self[dbref.collection].find_one({'_id': dbref.id})
 
-    def command(self, command, **unused_kwargs):
+    def command(self, command, value=1, check=True, allowable_errors=None,
+                read_preference=None, codec_options=None, session=None,
+                **kwargs):
         if isinstance(command, string_types):
-            command = {command: 1}
+            command = {command: value}
+
+        command.update(kwargs)
+
         if 'ping' in command:
             return {'ok': 1.}
         if 'collMod' in command:

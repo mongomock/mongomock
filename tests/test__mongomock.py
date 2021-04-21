@@ -1975,21 +1975,21 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # Even setting an empty validator causes the default validation options
         # to be set.
         for db in (fake_db, real_db):
-            self.assertEqual(db.command({'collMod': 'opts1', 'validator': {}}),
+            self.assertEqual(db.command('collMod', 'opts1', validator={}),
                              {'ok': 1.0})
         cmp.compare.options()
 
         # Set a non-empty validator
         for db in (fake_db, real_db):
-            self.assertEqual(db.command({'collMod': 'opts1',
-                                         'validator': {'a': {'$type': 'int'}},
-                                         'validationLevel': 'moderate'}),
+            self.assertEqual(db.command('collMod', 'opts1',
+                                        validator={'a': {'$type': 'int'}},
+                                        validationLevel='moderate'),
                              {'ok': 1.0})
         cmp.compare.options()
 
         # Set the validator empty again
         for db in (fake_db, real_db):
-            self.assertEqual(db.command({'collMod': 'opts1', 'validator': {}}),
+            self.assertEqual(db.command('collMod', 'opts1', validator={}),
                              {'ok': 1.0})
         cmp.compare.options()
 
@@ -2029,8 +2029,8 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         fake_db = self.fake_conn[self.db_name]
         real_db = self.mongo_conn[self.db_name]
         for db in (fake_db, real_db):
-            db.command({'collMod': 'validated_collection',
-                        'validationLevel': 'moderate'})
+            db.command('collMod', 'validated_collection',
+                       validationLevel='moderate')
         cmp.do.update_one({'a': 'bcd'}, {'$set': {'a': 'def'}})
         cmp.compare.find()
 
