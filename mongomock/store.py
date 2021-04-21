@@ -47,9 +47,9 @@ class DatabaseStore(object):
     def list_created_collection_names(self):
         return [name for name, col in self._collections.items() if col.is_created]
 
-    def create_collection(self, name):
+    def create_collection(self, name, **options):
         col = self[name]
-        col.create()
+        col.create(**options)
         return col
 
     def rename(self, name, new_name):
@@ -65,15 +65,27 @@ class DatabaseStore(object):
 class CollectionStore(object):
     """Object holding the data for a collection."""
 
+    _supported_options = set(['validator', 'validationLevel',
+                              'validationAction'])
+
     def __init__(self, name):
         self._documents = collections.OrderedDict()
         self.indexes = {}
+        self.options = {}
         self._is_force_created = False
         self.name = name
         self._ttl_indexes = {}
 
-    def create(self):
+    def create(self, **options):
         self._is_force_created = True
+        for opt in options:
+            if opt not in self._supported_options:
+                raise NotImplementedError(
+                    'the {0} option is not supported; the only currently '
+                    'supported special options are {1}'.format(
+                        opt, ', '.join(sorted(self._supported_options))))
+
+        self.options.update(options)
 
     @property
     def is_created(self):
