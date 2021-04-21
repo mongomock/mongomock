@@ -1958,10 +1958,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__options(self):
         cmp = self._create_compare_for_collection(
-                'validated_collection',
-                validator={'a': {'$type': 'int'}},
-                validationLevel='strict',
-                validationAction='error')
+            'validated_collection',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='strict',
+            validationAction='error')
         cmp.compare.options()
 
     def test__validation_options_after_collmod(self):
@@ -1995,17 +1995,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__validate_on_insert(self):
         cmp = self._create_compare_for_collection(
-                'validated_collection',
-                validator={'a': {'$type': 'int'}},
-                validationLevel='strict',
-                validationAction='error')
+            'validated_collection',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='strict',
+            validationAction='error')
         cmp.do.insert_one({'a': 1})
         cmp.compare.find()
         cmp.compare_exceptions.insert_one({'a': 'abc'})
 
     def test__validate_on_update(self):
         cmp = self._create_compare_for_collection(
-                'validated_collection', validator={'a': {'$type': 'int'}})
+            'validated_collection', validator={'a': {'$type': 'int'}})
         # valid document
         cmp.do.insert_one({'a': 2})
         cmp.compare.find()

@@ -460,8 +460,9 @@ class Collection(object):
     def insert_one(self, document, bypass_document_validation=False, session=None):
         if not bypass_document_validation:
             validate_is_mutable_mapping('document', document)
-        return InsertOneResult(self._insert(document, session,
-            validate=not bypass_document_validation), acknowledged=True)
+        return InsertOneResult(
+            self._insert(document, session, validate=not bypass_document_validation),
+            acknowledged=True)
 
     def insert_many(self, documents, ordered=True, bypass_document_validation=False, session=None):
         if not isinstance(documents, Iterable) or not documents:
@@ -471,8 +472,8 @@ class Collection(object):
             for document in documents:
                 validate_is_mutable_mapping('document', document)
         return InsertManyResult(
-            self._insert(documents, session, ordered=ordered, validate=not
-                bypass_document_validation),
+            self._insert(documents, session, ordered=ordered,
+                         validate=not bypass_document_validation),
             acknowledged=True)
 
     @property
@@ -916,13 +917,14 @@ class Collection(object):
                             # new document
                             validate = False
 
-                    if validate:
-                        try:
-                            validate_against_validator(existing_document, options)
-                        except WriteError:
-                            # Rollback.
-                            self._store[original_document_snapshot['_id']] = original_document_snapshot
-                            raise
+                # Check again if validation is still required
+                if validate:
+                    try:
+                        validate_against_validator(existing_document, options)
+                    except WriteError:
+                        # Rollback.
+                        self._store[original_document_snapshot['_id']] = original_document_snapshot
+                        raise
 
                 # Make sure it still respect the unique indexes and, if not, to
                 # revert modifications
