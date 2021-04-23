@@ -693,6 +693,19 @@ class _Parser(object):
                 'You need to import the pymongo library to support decimal128 type.'
             )
 
+        if operator == '$toLong':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
+            if decimal_support:
+                if isinstance(parsed, decimal128.Decimal128):
+                    return helpers.to_long(parsed.to_decimal())
+                return helpers.to_long(parsed)
+            raise NotImplementedError(
+                'You need to import the pymongo library to support decimal128 type.'
+            )
+
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
         if operator == '$toDecimal':
             if not decimal_support:
