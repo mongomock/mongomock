@@ -15,7 +15,6 @@ parts
 bin
 develop-eggs
 .installed.cfg
-coverage.xml
 
 # Installer logs
 pip-log.txt
