@@ -110,8 +110,6 @@ class Database(object):
 
     def get_collection(self, name, codec_options=None, read_preference=None,
                        write_concern=None, read_concern=None):
-        if read_concern:
-            raise NotImplementedError('Mongomock does not handle read_concern yet')
         if read_preference is not None:
             read_preferences.ensure_read_preference_type('read_preference', read_preference)
         mongomock_codec_options.is_supported(codec_options)

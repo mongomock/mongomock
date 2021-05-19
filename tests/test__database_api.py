@@ -92,10 +92,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.database.dereference('b')
 
-    def test__get_collection(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.get_collection('a', read_concern=3)
-
     def test__read_preference(self):
         self.assertEqual('Primary', self.database.read_preference.name)
         self.assertEqual(self.database.collection.read_preference, self.database.read_preference)
