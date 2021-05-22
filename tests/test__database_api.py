@@ -123,9 +123,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(write_concern=3)
 
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(read_concern=3)
-
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
         other = self.database.with_options(read_preference=self.database.NEAREST)

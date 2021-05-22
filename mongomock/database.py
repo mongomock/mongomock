@@ -209,11 +209,6 @@ class Database(object):
                 'write_concern is a valid parameter for with_options but is not implemented yet in '
                 'mongomock')
 
-        if read_concern:
-            raise NotImplementedError(
-                'read_concern is a valid parameter for with_options but is not implemented yet in'
-                'mongomock')
-
         if read_preference is None or read_preference == self._read_preference:
             return self
 
