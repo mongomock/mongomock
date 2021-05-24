@@ -397,7 +397,7 @@ def _regex(doc_val, regex):
 def _size_op(doc_val, search_val):
     if isinstance(doc_val, (list, tuple, dict)):
         return search_val == len(doc_val)
-    return search_val == 1 if doc_val else 0
+    return search_val == 1 if doc_val and doc_val is not NOTHING else 0
 
 
 def _list_expand(f, negative=False):
