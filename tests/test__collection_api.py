@@ -6492,3 +6492,31 @@ class CollectionAPITest(TestCase):
     def test__hashable(self):
         with self.assertRaises(TypeError):
             {self.db.a, self.db.b}  # pylint: disable=pointless-statement
+
+    def test__find_one_immutable_data_projection(self):
+        # find_one data should be immutable when using projection
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'years': {'last_job': 2010}})
+
+        item = collection.find_one({'_id': 1}, projection={'years': True})
+        item['years']['last_job'] = 2021
+
+        item_2 = collection.find_one({'_id': 1})
+        self.assertEqual(item_2['years']['last_job'], 2010)
+
+    def test__find_many_immutable_data_projection(self):
+        # find data should be immutable when using projection
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': 'it', 'years': {'it': {'last_job': 2011}}})
+        collection.insert_one({'_id': 2, 'a': 'it', 'years': {'it': {'last_job': 2012}}})
+
+        items = collection.find({'a': 'it'}, projection={'years': True})
+        for item in items:
+            item['years']['it']['last_job'] = 2021
+
+        items_2 = list(collection.find({'a': 'it'}, projection={'years': True}))
+
+        self.assertEqual(items_2, [
+            {'_id': 1, 'years': {'it': {'last_job': 2011}}},
+            {'_id': 2, 'years': {'it': {'last_job': 2012}}},
+        ])
