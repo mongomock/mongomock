@@ -502,11 +502,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({
             '_id': id,
             'l_string': 1,
-            'l_tuple': ['a', 'b']
+            'l_tuple': ['a', 'b'],
+            'null_field': None
         })
         self.cmp.compare.find({'_id': id})
         self.cmp.compare.find({'_id': id, 'l_string': {'$not': {'$size': 0}}})
         self.cmp.compare.find({'_id': id, 'l_tuple': {'$size': 2}})
+        self.cmp.compare.find({'_id': id, 'missing_field': {'$size': 1}})
+        self.cmp.compare.find({'_id': id, 'null_field': {'$size': 1}})
 
     def test__all_with_other_operators(self):
         objs = [{'list': ['a']}, {'list': ['a', 123]}, {'list': ['a', 123, 'xyz']}]
