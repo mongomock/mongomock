@@ -6134,6 +6134,7 @@ class CollectionAPITest(TestCase):
         }]
         self.assertEqual(expect, list(actual))
 
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
     def test__aggregate_to_long_no_pymongo(self):
         collection = self.db.collection
         collection.drop()
