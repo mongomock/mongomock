@@ -6497,4 +6497,4 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
-            mongomock.collection.Collection(self.db, "foo", None, read_concern="bar")
+            mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')

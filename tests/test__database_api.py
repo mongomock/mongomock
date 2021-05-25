@@ -252,7 +252,7 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
-            mongomock.database.Database(client, "foo", None, read_concern="bar")
+            mongomock.database.Database(client, 'foo', None, read_concern='bar')
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])
