@@ -6121,7 +6121,6 @@ class CollectionAPITest(TestCase):
                     '$project': {
                         '_id': 0
                     }
-
                 }
             ]
         )
@@ -6134,6 +6133,28 @@ class CollectionAPITest(TestCase):
             'not_exist': None,
         }]
         self.assertEqual(expect, list(actual))
+
+    def test__aggregate_to_long_no_pymongo(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_one({
+            'double': 1.999,
+        })
+        with self.assertRaises(NotImplementedError):
+            list(collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'double': {'$toLong': '$double'},
+                        }
+                    },
+                    {
+                        '$project': {
+                            '_id': 0
+                        }
+                    }
+                ]
+            ))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_to_string(self):

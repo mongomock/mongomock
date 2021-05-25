@@ -3452,7 +3452,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 '$project': {
                     '_id': 0
                 }
-
             }
         ]
         self.cmp.compare.aggregate(pipeline)
