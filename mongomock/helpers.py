@@ -4,7 +4,6 @@ from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import PY3, iteritems, raise_from, string_types
-import sys
 import time
 import warnings
 
