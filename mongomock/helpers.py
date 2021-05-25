@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
-from six import iteritems, raise_from, string_types
+from six import PY3, iteritems, raise_from, string_types
 import time
 import warnings
 
@@ -418,3 +418,11 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
+
+
+def to_long(value):
+    """Backwards compatible `long` function. It tries to convert input to a long integer."""
+    if PY3:
+        global long  # pylint: disable=global-variable-undefined
+        long = int
+    return long(value)

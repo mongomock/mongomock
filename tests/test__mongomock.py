@@ -3431,6 +3431,34 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_to_long(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000')
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'boolean_true': {'$toLong': '$boolean_true'},
+                    'boolean_false': {'$toLong': '$boolean_false'},
+                    'integer': {'$toLong': '$integer'},
+                    'double': {'$toLong': '$double'},
+                    'decimal': {'$toLong': '$decimal'},
+                    'not_exist': {'$toLong': '$not_exist'},
+                }
+            },
+            {
+                '$project': {
+                    '_id': 0
+                }
+            }
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_date_to_string(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one({

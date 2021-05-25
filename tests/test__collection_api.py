@@ -4455,11 +4455,6 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$toLong': '$scores'}}},
-            ])
-
     def test__aggregate_project_let(self):
         self.db.collection.insert_one({'_id': 1, 'a': 5, 'b': 2, 'c': 3})
         actual = self.db.collection.aggregate([{'$project': {
@@ -6099,6 +6094,68 @@ class CollectionAPITest(TestCase):
             'not_exist': None,
         }]
         self.assertEqual(expect, list(actual))
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_to_long(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'boolean_true': True,
+            'boolean_false': False,
+            'integer': 100,
+            'double': 1.999,
+            'decimal': decimal128.Decimal128('5.5000')
+        })
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'boolean_true': {'$toLong': '$boolean_true'},
+                        'boolean_false': {'$toLong': '$boolean_false'},
+                        'integer': {'$toLong': '$integer'},
+                        'double': {'$toLong': '$double'},
+                        'decimal': {'$toLong': '$decimal'},
+                        'not_exist': {'$toLong': '$not_exist'},
+                    }
+                },
+                {
+                    '$project': {
+                        '_id': 0
+                    }
+                }
+            ]
+        )
+        expect = [{
+            'boolean_true': 1,
+            'boolean_false': 0,
+            'integer': 100,
+            'double': 1,
+            'decimal': 5,
+            'not_exist': None,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    @skipIf(_HAVE_PYMONGO, 'pymongo installed')
+    def test__aggregate_to_long_no_pymongo(self):
+        collection = self.db.collection
+        collection.drop()
+        collection.insert_one({
+            'double': 1.999,
+        })
+        with self.assertRaises(NotImplementedError):
+            list(collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'double': {'$toLong': '$double'},
+                        }
+                    },
+                    {
+                        '$project': {
+                            '_id': 0
+                        }
+                    }
+                ]
+            ))
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_to_string(self):
