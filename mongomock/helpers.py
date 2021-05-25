@@ -423,7 +423,7 @@ def mongodb_to_bool(value):
 
 def to_long(value):
     """Backwards compatible `long` function. It tries to convert input to a long integer."""
-    if sys.version_info >= (3, 0):
+    if six.PY3:
         global long  # pylint: disable=global-variable-undefined
         long = int
     return long(value)
