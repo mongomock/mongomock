@@ -5,6 +5,7 @@ import sys
 from unittest import TestCase, skipIf
 
 import mongomock
+from mongomock import read_concern
 
 try:
     from bson import codec_options
@@ -92,10 +93,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.database.dereference('b')
 
-    def test__get_collection(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.get_collection('a', read_concern=3)
-
     def test__read_preference(self):
         self.assertEqual('Primary', self.database.read_preference.name)
         self.assertEqual(self.database.collection.read_preference, self.database.read_preference)
@@ -123,12 +120,13 @@ class DatabaseAPITest(TestCase):
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
 
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__read_concern(self):
+        self.assertEqual(read_concern.ReadConcern(), self.database.read_concern)
+
     def test__with_options(self):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(write_concern=3)
-
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(read_concern=3)
 
     @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
@@ -248,6 +246,13 @@ class DatabaseAPITest(TestCase):
     def test__hashable(self):
         with self.assertRaises(TypeError):
             {self.database}  # pylint: disable=pointless-statement
+
+    def test__bad_type_as_a_read_concern_returns_type_error(self):
+        client = mongomock.MongoClient()
+        with self.assertRaises(
+            TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
+        ):
+            mongomock.database.Database(client, 'foo', None, read_concern='bar')
 
 
 _DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])

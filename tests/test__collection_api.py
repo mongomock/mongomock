@@ -6549,3 +6549,9 @@ class CollectionAPITest(TestCase):
     def test__hashable(self):
         with self.assertRaises(TypeError):
             {self.db.a, self.db.b}  # pylint: disable=pointless-statement
+
+    def test__bad_type_as_a_read_concern_returns_type_error(self):
+        with self.assertRaises(
+            TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
+        ):
+            mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')

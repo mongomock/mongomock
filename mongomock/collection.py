@@ -56,7 +56,6 @@ from mongomock import InvalidOperation
 from mongomock.not_implemented import raise_for_feature as raise_not_implemented
 from mongomock import ObjectId
 from mongomock import OperationFailure
-from mongomock.read_concern import ReadConcern
 from mongomock.results import BulkWriteResult
 from mongomock.results import DeleteResult
 from mongomock.results import InsertManyResult
@@ -64,6 +63,11 @@ from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
 from mongomock import WriteError
+
+try:
+    from pymongo.read_concern import ReadConcern
+except ImportError:
+    from mongomock.read_concern import ReadConcern
 
 if hasattr(time, 'perf_counter'):
     _get_perf_counter = time.perf_counter
@@ -79,9 +83,6 @@ _WITH_OPTIONS_KWARGS = {
     'write_concern': _KwargOption(
         'pymongo.write_concern.WriteConcern', WriteConcern(),
         ('acknowledged', 'document')),
-    'read_concern': _KwargOption(
-        'pymongo.read_concern.ReadConcern', ReadConcern(),
-        ('document', 'level', 'ok_for_legacy'))
 }
 
 
@@ -380,6 +381,8 @@ class Collection(object):
         self._name = name
         self._db_store = _db_store
         self._write_concern = write_concern or WriteConcern()
+        if read_concern and not isinstance(read_concern, ReadConcern):
+            raise TypeError('read_concern must be an instance of pymongo.read_concern.ReadConcern')
         self._read_concern = read_concern or ReadConcern()
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
         self._codec_options = codec_options or mongomock_codec_options.CodecOptions()

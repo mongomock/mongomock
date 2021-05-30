@@ -17,6 +17,11 @@ try:
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
+try:
+    from pymongo.read_concern import ReadConcern
+except ImportError:
+    from .read_concern import ReadConcern
+
 _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
 
 
@@ -29,7 +34,9 @@ def _verify_list_collection_supported_op(keys):
 
 class Database(object):
 
-    def __init__(self, client, name, _store, read_preference=None, codec_options=None):
+    def __init__(
+        self, client, name, _store, read_preference=None, codec_options=None, read_concern=None
+    ):
         self.name = name
         self._client = client
         self._collection_accesses = {}
@@ -37,6 +44,9 @@ class Database(object):
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
         mongomock_codec_options.is_supported(codec_options)
         self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
+        if read_concern and not isinstance(read_concern, ReadConcern):
+            raise TypeError('read_concern must be an instance of pymongo.read_concern.ReadConcern')
+        self._read_concern = read_concern or ReadConcern()
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -67,6 +77,10 @@ class Database(object):
     @property
     def codec_options(self):
         return self._codec_options
+
+    @property
+    def read_concern(self):
+        return self._read_concern
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
@@ -110,8 +124,6 @@ class Database(object):
 
     def get_collection(self, name, codec_options=None, read_preference=None,
                        write_concern=None, read_concern=None):
-        if read_concern:
-            raise NotImplementedError('Mongomock does not handle read_concern yet')
         if read_preference is not None:
             read_preferences.ensure_read_preference_type('read_preference', read_preference)
         mongomock_codec_options.is_supported(codec_options)
@@ -211,15 +223,12 @@ class Database(object):
                 'write_concern is a valid parameter for with_options but is not implemented yet in '
                 'mongomock')
 
-        if read_concern:
-            raise NotImplementedError(
-                'read_concern is a valid parameter for with_options but is not implemented yet in'
-                'mongomock')
-
         if read_preference is None or read_preference == self._read_preference:
             return self
 
         return Database(
             self._client, self.name, self._store,
             read_preference=read_preference or self._read_preference,
-            codec_options=codec_options or self._codec_options)
+            codec_options=codec_options or self._codec_options,
+            read_concern=read_concern or self._read_concern,
+        )
