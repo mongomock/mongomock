@@ -1998,7 +1998,7 @@ class CollectionMapReduceTest(TestCase):
 
     def _check_map_reduce(self, colc, expected_results):
         result = colc.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertIsInstance(result, mongomock.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), len(expected_results))
         for doc in result.find():
@@ -2008,7 +2008,7 @@ class CollectionMapReduceTest(TestCase):
         result = self.db.things.map_reduce(
             self.map_func, self.reduce_func,
             out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]))
-        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertIsInstance(result, mongomock.Collection)
         self.assertEqual(result.name, 'results')
         self.assertEqual(result.database.name, 'map_reduce_son_test')
         self.assertEqual(result.count(), 3)
@@ -2030,7 +2030,7 @@ class CollectionMapReduceTest(TestCase):
         result = self.db.things.map_reduce(
             self.map_func, self.reduce_func,
             'myresults', full_response=True)
-        self.assertTrue(isinstance(result, dict))
+        self.assertIsInstance(result, dict)
         self.assertEqual(result['counts'], expected_full_response['counts'])
         self.assertEqual(result['result'], expected_full_response['result'])
         for doc in getattr(self.db, result['result']).find():
@@ -2043,7 +2043,7 @@ class CollectionMapReduceTest(TestCase):
         result = self.db.things.map_reduce(
             self.map_func, self.reduce_func,
             'myresults', query={'tags': 'dog'})
-        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertIsInstance(result, mongomock.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 3)
         for doc in result.find():
@@ -2052,14 +2052,14 @@ class CollectionMapReduceTest(TestCase):
     def test__map_reduce_with_limit(self):
         result = self.db.things.map_reduce(
             self.map_func, self.reduce_func, 'myresults', limit=2)
-        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertIsInstance(result, mongomock.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 2)
 
     def test__inline_map_reduce(self):
         result = self.db.things.inline_map_reduce(
             self.map_func, self.reduce_func)
-        self.assertTrue(isinstance(result, list))
+        self.assertIsInstance(result, list)
         self.assertEqual(len(result), 3)
         for doc in result:
             self.assertIn(doc, self.expected_results)
@@ -2081,7 +2081,7 @@ class CollectionMapReduceTest(TestCase):
         }
         result = self.db.things.inline_map_reduce(
             self.map_func, self.reduce_func, full_response=True)
-        self.assertTrue(isinstance(result, dict))
+        self.assertIsInstance(result, dict)
         self.assertEqual(result['counts'], expected_full_response['counts'])
         for doc in result['result']:
             self.assertIn(doc, self.expected_results)
@@ -2097,7 +2097,7 @@ class CollectionMapReduceTest(TestCase):
                             {'_id': obj2, 'value': 1}]
         result = self.db.things_with_obj.map_reduce(
             self.map_func, self.reduce_func, 'myresults')
-        self.assertTrue(isinstance(result, mongomock.Collection))
+        self.assertIsInstance(result, mongomock.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count(), 2)
         for doc in result.find():

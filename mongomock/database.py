@@ -113,9 +113,10 @@ class Database(object):
 
             _verify_list_collection_supported_op(filter.get(field_name).keys())
 
-            return [name for name in list(self._store._collections)
-                    if filter_applies(filter, {field_name: name}) and
-                    not name.startswith('system.')]
+            return [
+                name for name in list(self._store._collections)
+                if filter_applies(filter, {field_name: name}) and not name.startswith('system.')
+            ]
 
         return [
             name for name in self._get_created_collections()

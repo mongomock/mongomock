@@ -130,10 +130,10 @@ class _Filterer(object):
                                 'yet.' % list(not_implemented_operators)[0])
                         raise OperationFailure('unknown operator: ' + list(unknown_operators)[0])
                     is_match = all(
-                        operator_string in self._operator_map and
-                        self._operator_map[operator_string](doc_val, search_val) or
-                        operator_string == '$not' and
-                        self._not_op(document, key, search_val)
+                        operator_string in self._operator_map
+                        and self._operator_map[operator_string](doc_val, search_val)
+                        or operator_string == '$not'
+                        and self._not_op(document, key, search_val)
                         for operator_string, search_val in iteritems(search)
                     ) and search
                 elif isinstance(search, _RE_TYPES) and isinstance(doc_val, (string_types, list)):

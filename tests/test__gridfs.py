@@ -105,12 +105,12 @@ class GridFsTest(TestCase):
         names = ['one', 'two', 'three', 'four']
         names_no_two = [x for x in names if x != 'two']
         for x in self.fake_gridfs.list():
-            self.assertTrue(x in names)
+            self.assertIn(x, names)
 
         self.fake_gridfs.delete(fids[1])
 
         for x in self.fake_gridfs.list():
-            self.assertTrue(x in names_no_two)
+            self.assertIn(x, names_no_two)
 
         three_file = self.get_fake_file(fids[2])
         self.assertEqual('three', three_file['filename'])

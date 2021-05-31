@@ -1209,8 +1209,7 @@ class Collection(object):
                         current_doc = current_doc[part]
 
                     subdocument = current_doc
-                    if (field_name_parts[-1] == '$' and
-                            isinstance(subdocument, list)):
+                    if field_name_parts[-1] == '$' and isinstance(subdocument, list):
                         for i, doc in enumerate(subdocument):
                             if filter_applies(subspec, doc):
                                 subdocument[i] = v

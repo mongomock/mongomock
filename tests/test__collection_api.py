@@ -140,9 +140,9 @@ class CollectionAPITest(TestCase):
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 1)
 
-        self.assertTrue(isinstance(col._store._documents, collections.OrderedDict))
+        self.assertIsInstance(col._store._documents, collections.OrderedDict)
         self.db.drop_collection(col)
-        self.assertTrue(isinstance(col._store._documents, collections.OrderedDict))
+        self.assertIsInstance(col._store._documents, collections.OrderedDict)
         qr = col.find({'_id': r})
         self.assertEqual(qr.count(), 0)
 
@@ -713,11 +713,11 @@ class CollectionAPITest(TestCase):
     def test__update_interns_lists_and_dicts(self):
         obj = {}
         obj_id = self.db.collection.save(obj)
-        d = {}
-        l = []
-        self.db.collection.update({'_id': obj_id}, {'d': d, 'l': l})
-        d['a'] = 'b'
-        l.append(1)
+        external_dict = {}
+        external_list = []
+        self.db.collection.update({'_id': obj_id}, {'d': external_dict, 'l': external_list})
+        external_dict['a'] = 'b'
+        external_list.append(1)
         self.assertEqual(
             list(self.db.collection.find()),
             [{'_id': obj_id, 'd': {}, 'l': []}])
@@ -1195,7 +1195,7 @@ class CollectionAPITest(TestCase):
         gary = {'name': 'gary'}
         self.db['coll_name'].insert([larry_bob, larry, gary])
         ret_val = self.db['coll_name'].find().distinct('name')
-        self.assertTrue(isinstance(ret_val, list))
+        self.assertIsInstance(ret_val, list)
         self.assertTrue(set(ret_val) == set(['larry', 'gary']))
 
     def test__cursor_limit(self):
@@ -3084,8 +3084,8 @@ class CollectionAPITest(TestCase):
         def sorter(doc):
             return doc['_id']
 
-        self.assertTrue(len(expected_list) == len(result_list) and
-                        sorted(expected_list, key=sorter) == sorted(result_list, key=sorter))
+        self.assertEqual(len(expected_list), len(result_list))
+        self.assertEqual(sorted(expected_list, key=sorter), sorted(result_list, key=sorter))
 
     def test_aggregate_graph_lookup_basic_connect_from(self):
         """TESTCASE FOR GRAPHLOOKUP WITH CONNECT FROM FIELD
