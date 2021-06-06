@@ -23,6 +23,7 @@ try:
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
+    from pymongo.read_preferences import ReadPreference
     _HAVE_PYMONGO = True
     _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
 except ImportError:
@@ -215,6 +216,25 @@ class DatabaseGettingTest(TestCase):
         c = client('mongodb://host1/')
         with self.assertRaises(ConfigurationError):
             c.get_default_database()
+
+    def test__getting_default_database_with_default_parameter(self):
+        c = mongomock.MongoClient('mongodb://host1/')
+        self.assertIs(c.get_default_database('foo'), c['foo'])
+        self.assertIs(c.get_default_database(default='foo'), c['foo'])
+
+    def test__getting_default_database_ignoring_default_parameter(self):
+        c = mongomock.MongoClient('mongodb://host1/bar')
+        self.assertIs(c.get_default_database('foo'), c['bar'])
+        self.assertIs(c.get_default_database(default='foo'), c['bar'])
+
+    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    def test__getting_default_database_preserves_options(self):
+        client = mongomock.MongoClient('mongodb://host1/foo')
+        db = client.get_database(read_preference=ReadPreference.NEAREST)
+
+        self.assertEqual(db.name, 'foo')
+        self.assertEqual(ReadPreference.NEAREST, db.read_preference)
+        self.assertEqual(ReadPreference.PRIMARY, client.read_preference)
 
 
 class UTCPlus2(datetime.tzinfo):
