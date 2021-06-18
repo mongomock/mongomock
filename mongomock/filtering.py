@@ -471,6 +471,7 @@ LOGICAL_OPERATOR_MAP = {
     '$or': lambda d, subq, filter_func: any(filter_func(q, d) for q in subq),
     '$and': lambda d, subq, filter_func: all(filter_func(q, d) for q in subq),
     '$nor': lambda d, subq, filter_func: all(not filter_func(q, d) for q in subq),
+    '$not': lambda d, subq, filter_func: (not filter_func(q, d) for q in subq),
 }
 
 

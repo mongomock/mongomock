@@ -542,6 +542,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'_id': 4})
         self.cmp.compare_exceptions.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}})
 
+    def test_double_negation(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'a': 'some str'},
+            {'_id': 2, 'a': 'another str'},
+            {'_id': 3, 'a': []},
+        ])
+        self.cmp.compare.find({'a': {'$not': {'$not': {'$regex': '^some'}}}})
+
     def test__size(self):
         id = ObjectId()
         self.cmp.do.insert_one({
