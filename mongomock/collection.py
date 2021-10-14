@@ -646,7 +646,7 @@ class Collection(object):
             first = True
             subdocument = None
             for k, v in iteritems(document):
-                if k in _updaters.keys():
+                if k in _updaters:
                     updater = _updaters[k]
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, updater, subdocument)
@@ -1586,7 +1586,7 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if limit == 0:
             limit = None
-        start_time = _get_perf_counter()
+        start_time = _get_perf_counter()  # pylint: disable=deprecated-method
         out_collection = None
         reduced_rows = None
         full_dict = {
@@ -1668,7 +1668,7 @@ class Collection(object):
             full_dict['result'] = reduced_rows
         else:
             raise TypeError("'out' must be an instance of string, dict or bson.SON")
-        full_dict['timeMillis'] = int(round((_get_perf_counter() - start_time) * 1000))
+        full_dict['timeMillis'] = int(round((_get_perf_counter() - start_time) * 1000))  # pylint: disable=deprecated-method
         if full_response:
             ret_val = full_dict
         return ret_val
