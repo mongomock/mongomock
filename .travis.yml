@@ -1,7 +1,7 @@
 language: python
 cache: pip
 os: linux
-dist: xenial # OS+dist should be kept in sync with Dockerfile
+dist: bionic # OS+dist should be kept in sync with Dockerfile
 env:
   global: # MongoDB version should be kept in sync with docker-compose image
     - MONGODB=4.4.0
@@ -11,10 +11,8 @@ jobs:
       env: TOX_ENV=py27
     - python: 2.7
       env: TOX_ENV=py27-mock-pymongo-pyexecjs
-    - python: pypy
-      env: TOX_ENV=pypy-mock-pymongo-pyexecjs
-    - python: 3.4
-      env: TOX_ENV=py34-pymongo-pyexecjs
+    - python: pypy2
+      env: TOX_ENV=pypy2-mock-pymongo-pyexecjs
     - python: 3.5
       env: TOX_ENV=py35-pymongo-pyexecjs
     - python: 3.6
@@ -44,6 +42,7 @@ script:
 before_install:
   - "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10"
   - "sudo apt-get update"
+  - "sudo apt-get install libcurl3 -y"
 before_script:
   - mkdir ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data
   - ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/mongodb.log --fork
