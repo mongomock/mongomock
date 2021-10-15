@@ -4995,7 +4995,7 @@ class CollectionAPITest(TestCase):
             collection.insert({'a': {'b'}})
         if version.LooseVersion(pymongo.version) < version.LooseVersion('3.8'):
             return
-        if IS_PYPY or six.PY2:
+        if six.PY2:
             expect = "cannot encode object: set(['b']), of type: <type 'set'>"
         else:
             expect = "cannot encode object: {'b'}, of type: <class 'set'>"

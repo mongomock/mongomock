@@ -21,21 +21,23 @@ jobs:
       env: TOX_ENV=py36-pymongo-pyexecjs
     - python: 3.7
       env: TOX_ENV=py37-pymongo-pyexecjs
-    - python: 3.9
-      env: TOX_ENV=py39-pymongo-pyexecjs
-    - python: 3.8
-      env: TOX_ENV=py38
-    - python: 3.8
-      env: TOX_ENV=py38-pymongo
-    - python: 3.8
-      env: TOX_ENV=py38-pyexecjs
-    - python: 3.8
-      env: TOX_ENV=py38-pymongo361-pyexecjs
     - python: 3.8
       env: TOX_ENV=py38-pymongo-pyexecjs
-    - env: TOX_ENV=pep8
-    - env: TOX_ENV=pylint
-    - python: 3.8
+    - python: 3.9
+      env: TOX_ENV=py39
+    - python: 3.9
+      env: TOX_ENV=py39-pymongo
+    - python: 3.9
+      env: TOX_ENV=py39-pyexecjs
+    - python: 3.9
+      env: TOX_ENV=py39-pymongo361-pyexecjs
+    - python: 3.9
+      env: TOX_ENV=py39-pymongo-pyexecjs
+    - python: 3.9
+      env: TOX_ENV=pep8
+    - python: 3.9
+      env: TOX_ENV=pylint
+    - python: 3.9
       env: TOX_ENV=mypy
 script:
   - tox -e $TOX_ENV
