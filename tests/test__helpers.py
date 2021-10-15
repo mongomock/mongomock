@@ -103,7 +103,7 @@ def create_uri_spec_tests():
         dirname = os.path.split(dirname[-2])[-1] + '_' + dirname[-1]
 
         for filename in filenames:
-            with open(os.path.join(dirpath, filename), encoding='utf-8') as scenario_stream:
+            with open(os.path.join(dirpath, filename)) as scenario_stream:
                 scenario_def = json.load(scenario_stream)
             # Construct test from scenario.
             new_test = create_uri_spec_test(scenario_def)

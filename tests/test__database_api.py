@@ -2,20 +2,17 @@ import collections
 import datetime
 from distutils import version  # pylint: disable=no-name-in-module
 import sys
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skipUnless
 
 import mongomock
+from mongomock import helpers
 from mongomock import read_concern
 
 try:
     from bson import codec_options
-    import pymongo
     from pymongo.read_preferences import ReadPreference
-    _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
-    _HAVE_PYMONGO = True
 except ImportError:
-    _HAVE_PYMONGO = False
-    _PYMONGO_VERSION = version.LooseVersion('0.0')
+    pass
 
 
 class UTCPlus2(datetime.tzinfo):
@@ -100,7 +97,7 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.database.get_collection('a', read_preference='nearest')
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_read_preference(self):
         database = mongomock.MongoClient()\
             .get_database('somedb', read_preference=ReadPreference.NEAREST)
@@ -110,17 +107,17 @@ class DatabaseAPITest(TestCase):
         col = database.get_collection('col', read_preference=ReadPreference.PRIMARY)
         self.assertEqual('Primary', col.read_preference.name)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_codec_options(self):
         database = mongomock.MongoClient().somedb
         a = database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
         self.assertTrue(a.codec_options.tz_aware)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__read_concern(self):
         self.assertEqual(read_concern.ReadConcern(), self.database.read_concern)
 
@@ -128,7 +125,7 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(write_concern=3)
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
         other = self.database.with_options(read_preference=self.database.NEAREST)
         self.assertFalse(other is self.database)
@@ -163,7 +160,9 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_tzinfo)
 
-    @skipIf(_PYMONGO_VERSION < version.LooseVersion('3.8'), 'pymongo not installed or <3.8')
+    @skipIf(
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
+        'pymongo not installed or <3.8')
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
             @property
@@ -243,9 +242,19 @@ class DatabaseAPITest(TestCase):
         self.assertNotEqual(client.a, mongomock.MongoClient('example.com').a)
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    def test__hashable(self):
+    @skipUnless(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__not_hashable(self):
         with self.assertRaises(TypeError):
             {self.database}  # pylint: disable=pointless-statement
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    @skipIf(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__hashable(self):
+        {self.database}  # pylint: disable=pointless-statement
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
         client = mongomock.MongoClient()

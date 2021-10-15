@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
+from distutils import version  # pylint: disable=no-name-in-module
 from mongomock import InvalidURI
 import re
 from six.moves.urllib_parse import unquote_plus
@@ -13,9 +14,14 @@ import warnings
 try:
     from bson import ObjectId  # pylint: disable=unused-import
     from bson import Timestamp
+    from pymongo import version as pymongo_version
+    PYMONGO_VERSION = version.LooseVersion(pymongo_version)
+    HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
     Timestamp = None
+    PYMONGO_VERSION = None
+    HAVE_PYMONGO = False
 
 # Cache the RegExp pattern type.
 RE_TYPE = type(re.compile(''))

@@ -1,3 +1,4 @@
+from distutils import version  # pylint: disable=no-name-in-module
 import warnings
 
 from . import CollectionInvalid
@@ -6,10 +7,11 @@ from . import OperationFailure
 from .collection import Collection
 from .filtering import filter_applies
 from mongomock import codec_options as mongomock_codec_options
+from mongomock import helpers
 from mongomock import read_preferences
 from mongomock import store
 
-from six import string_types
+from six import string_types, PY3
 
 try:
     from pymongo import ReadPreference
@@ -65,6 +67,12 @@ class Database(object):
         if isinstance(other, self.__class__):
             return self._client == other._client and self.name == other.name
         return NotImplemented
+
+    if PY3 and (
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.LooseVersion('3.12')
+    ):
+        def __hash__(self):
+            return hash((self._client, self.name))
 
     @property
     def client(self):

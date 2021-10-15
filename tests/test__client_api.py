@@ -1,6 +1,7 @@
+from distutils import version  # pylint: disable=no-name-in-module
 import sys
 import unittest
-from unittest import skipIf
+from unittest import skipIf, skipUnless
 
 try:
     from unittest import mock
@@ -13,13 +14,13 @@ except ImportError:
         _HAVE_MOCK = False
 
 import mongomock
+from mongomock import helpers
 
 try:
     from bson import codec_options
     from pymongo.read_preferences import ReadPreference
-    _HAVE_PYMONGO = True
 except ImportError:
-    _HAVE_PYMONGO = False
+    pass
 
 
 class MongoClientApiTest(unittest.TestCase):
@@ -36,13 +37,13 @@ class MongoClientApiTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             mongomock.MongoClient(read_preference=0)
 
-    @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__different_read_preference(self):
         client = mongomock.MongoClient(read_preference=ReadPreference.NEAREST)
         self.assertEqual(ReadPreference.NEAREST, client.db.read_preference)
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
 
-    @unittest.skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options_with_pymongo(self):
         client = mongomock.MongoClient()
         self.assertEqual(codec_options.CodecOptions(), client.codec_options)
@@ -93,9 +94,19 @@ class MongoClientApiTest(unittest.TestCase):
             mongomock.MongoClient('localhost'))
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    def test__hashable(self):
+    @skipUnless(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__not_hashable(self):
         with self.assertRaises(TypeError):
             {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    @skipIf(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__hashable(self):
+        {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
     def test__parse_hosts(self):
         client = mongomock.MongoClient('localhost')

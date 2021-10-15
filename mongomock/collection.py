@@ -6,6 +6,7 @@ try:
 except ImportError:
     from collections import Iterable, Mapping, MutableMapping
 import copy
+from distutils import version  # pylint: disable=no-name-in-module
 import functools
 import itertools
 import json
@@ -40,6 +41,7 @@ except ImportError:
 from sentinels import NOTHING
 from six import iteritems
 from six import iterkeys
+from six import PY3
 from six import raise_from
 from six import string_types
 from six import text_type
@@ -404,6 +406,12 @@ class Collection(object):
         if isinstance(other, self.__class__):
             return self.database == other.database and self.name == other.name
         return NotImplemented
+
+    if PY3 and (
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.LooseVersion('3.12')
+    ):
+        def __hash__(self):
+            return hash((self.database, self.name))
 
     @property
     def full_name(self):
@@ -1668,7 +1676,8 @@ class Collection(object):
             full_dict['result'] = reduced_rows
         else:
             raise TypeError("'out' must be an instance of string, dict or bson.SON")
-        full_dict['timeMillis'] = int(round((_get_perf_counter() - start_time) * 1000))  # pylint: disable=deprecated-method
+        time_millis = (_get_perf_counter() - start_time) * 1000  # pylint: disable=deprecated-method
+        full_dict['timeMillis'] = int(round(time_millis))
         if full_response:
             ret_val = full_dict
         return ret_val

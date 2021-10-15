@@ -8,7 +8,7 @@ import re
 from six import assertCountEqual
 import sys
 import time
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skipUnless
 import uuid
 
 import mongomock
@@ -24,13 +24,9 @@ try:
     import pymongo
     from pymongo import MongoClient as PymongoClient
     from pymongo.read_preferences import ReadPreference
-    _HAVE_PYMONGO = True
-    _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
 except ImportError:
     from mongomock.object_id import ObjectId
     from tests.utils import DBRef
-    _HAVE_PYMONGO = False
-    _PYMONGO_VERSION = version.LooseVersion('0.0')
 try:
     from bson.code import Code
     from bson.regex import Regex
@@ -227,7 +223,7 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(c.get_default_database('foo'), c['bar'])
         self.assertIs(c.get_default_database(default='foo'), c['bar'])
 
-    @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__getting_default_database_preserves_options(self):
         client = mongomock.MongoClient('mongodb://host1/foo')
         db = client.get_database(read_preference=ReadPreference.NEAREST)
@@ -251,7 +247,7 @@ class UTCPlus2(datetime.tzinfo):
         return datetime.timedelta()
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class _CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation
@@ -310,7 +306,18 @@ class EqualityCollectionTest(_CollectionComparisonTest):
         self.assertEqual(self.fake_conn[self.db_name], self.fake_conn[self.db_name])
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    @skipIf(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
     def test__database_hashable(self):
+        {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
+        {self.fake_conn[self.db_name]}  # pylint: disable=pointless-statement
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    @skipUnless(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__database_not_hashable(self):
         with self.assertRaises(TypeError):
             {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
         with self.assertRaises(TypeError):
@@ -396,7 +403,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count({'a': 1})
 
     @skipIf(
-        _PYMONGO_VERSION < version.LooseVersion('3.8'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
         'older version of pymongo does not have count_documents')
     def test__count_documents(self):
         self.cmp.compare.count_documents({})
@@ -413,7 +420,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.count_documents({}, limit='1')
 
     @skipIf(
-        _PYMONGO_VERSION < version.LooseVersion('3.8'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
         'older version of pymongo does not have estimated_document_count')
     def test__estimated_document_count(self):
         self.cmp.compare.estimated_document_count()
@@ -1969,7 +1976,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         }}])
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class CollectionMapReduceTest(TestCase):
 
@@ -2163,7 +2170,7 @@ class CollectionMapReduceTest(TestCase):
         self.assertEqual(result.count(), 3)
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class _GroupTest(_CollectionComparisonTest):
 
@@ -2217,7 +2224,7 @@ class _GroupTest(_CollectionComparisonTest):
             reduce=reducer)
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientAggregateTest(_CollectionComparisonTest):
 
     def setUp(self):
@@ -3775,7 +3782,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):
 
     def setUp(self):

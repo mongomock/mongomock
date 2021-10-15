@@ -10,11 +10,12 @@ from six import assertCountEqual, text_type
 import sys
 from tests.diff import diff
 import time
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skipUnless
 import uuid
 import warnings
 
 import mongomock
+from mongomock import helpers
 
 try:
     from unittest import mock
@@ -2180,7 +2181,7 @@ class CollectionAPITest(TestCase):
             naive = datetime(2000, 1, 1, 2, 0, 0)
             aware = datetime(2000, 1, 1, 4, 0, 0, tzinfo=utc2tz)
             if tz_awarness:
-                returned = datetime(2000, 1, 1, 2, 0, 0, tzinfo=mongomock.helpers.utc)
+                returned = datetime(2000, 1, 1, 2, 0, 0, tzinfo=helpers.utc)
             else:
                 returned = datetime(2000, 1, 1, 2, 0, 0)
             objid = db.collection.insert({'date_aware': aware, 'date_naive': naive})
@@ -6546,9 +6547,19 @@ class CollectionAPITest(TestCase):
             client.db.collection, mongomock.MongoClient('example.com').db.collection)
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    def test__hashable(self):
+    @skipUnless(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__not_hashable(self):
         with self.assertRaises(TypeError):
             {self.db.a, self.db.b}  # pylint: disable=pointless-statement
+
+    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
+    @skipIf(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        "older versions of pymongo didn't have proper hashing")
+    def test__hashable(self):
+        {self.db.a, self.db.b}  # pylint: disable=pointless-statement
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
         with self.assertRaises(
