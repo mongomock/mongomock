@@ -150,7 +150,8 @@ type_convertion_operators = [
     '$toInt',
     '$toDecimal',
     '$toLong',
-    '$arrayToObject'
+    '$arrayToObject',
+    '$objectToArray',
 ]
 
 
@@ -767,6 +768,23 @@ class _Parser(object):
                 'arrays used with $arrayToObject must contain documents '
                 'with k and v fields or two-element arrays'
             )
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
+        if operator == '$objectToArray':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
+
+            if parsed is None:
+                return None
+
+            if not isinstance(parsed, (dict, collections.OrderedDict)):
+                raise OperationFailure(
+                    '$objectToArray requires an object input, found: {}'.format(type(parsed))
+                )
+
+            return [{'k': k, 'v': v} for k, v in parsed.items()]
 
         raise NotImplementedError(
             "Although '%s' is a valid type conversion operator for the "
