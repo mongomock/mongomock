@@ -6326,6 +6326,100 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure):
                 collection.aggregate(item)
 
+    def test_aggregate_object_to_array(self):
+        collection = self.db.collection
+
+        collection.insert_many([
+            {'items': None},
+            {'items': {'qty': 25}},
+            {'items': {
+                'size': {'len': 25, 'w': 10, 'uom': 'cm'},
+            }},
+        ])
+
+        expect = [{
+            'items': None,
+            'not_exists': None
+        }, {
+            'items': [
+                {'k': 'qty', 'v': 25},
+            ],
+            'not_exists': None
+        }, {
+            'items': [
+                {'k': 'size', 'v': {'len': 25, 'w': 10, 'uom': 'cm'}},
+            ],
+            'not_exists': None
+        }]
+
+        actual = collection.aggregate([
+            {'$project': {
+                'items': {'$objectToArray': '$items'},
+                'not_exists': {'$objectToArray': '$nothing'},
+                '_id': 0
+            }}
+        ])
+        self.assertEqual(expect, list(actual))
+
+        # All of these items should trigger an error
+        items = [[
+            {'$addFields': {'items': ''}},
+            {'$project': {'items': {'$objectToArray': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': 100}},
+            {'$project': {'items': {'$objectToArray': '$items'}, '_id': 0}}
+        ], [
+            {'$addFields': {'items': [[]]}},
+            {'$project': {'items': {'$objectToArray': '$items'}, '_id': 0}}
+        ]]
+
+        for item in items:
+            with self.assertRaises(mongomock.OperationFailure):
+                collection.aggregate(item)
+
+    # https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/#examples
+    def test_aggregate_object_to_array_with_example(self):
+        collection = self.db.collection
+
+        collection.insert_many([
+            {'_id': 1, 'item': 'ABC1', 'dimensions': collections.OrderedDict({
+                'l': 25, 'w': 10, 'uom': 'cm',
+            })},
+            {'_id': 2, 'item': 'ABC2', 'dimensions': collections.OrderedDict({
+                'l': 50, 'w': 25, 'uom': 'cm',
+            })},
+            {'_id': 3, 'item': 'XYZ1', 'dimensions': collections.OrderedDict({
+                'l': 70, 'w': 75, 'uom': 'cm',
+            })},
+        ])
+
+        expect = [
+            {'_id': 1, 'item': 'ABC1', 'dims': [
+                {'k': 'l', 'v': 25},
+                {'k': 'w', 'v': 10},
+                {'k': 'uom', 'v': 'cm'},
+            ]},
+            {'_id': 2, 'item': 'ABC2', 'dims': [
+                {'k': 'l', 'v': 50},
+                {'k': 'w', 'v': 25},
+                {'k': 'uom', 'v': 'cm'},
+            ]},
+            {'_id': 3, 'item': 'XYZ1', 'dims': [
+                {'k': 'l', 'v': 70},
+                {'k': 'w', 'v': 75},
+                {'k': 'uom', 'v': 'cm'},
+            ]},
+        ]
+
+        actual = collection.aggregate([{
+            '$project': {
+                'item': 1,
+                'dims': {'$objectToArray': '$dimensions'},
+            },
+        }])
+
+        self.assertEqual(expect, list(actual))
+
     def test_aggregate_project_with_boolean(self):
         collection = self.db.collection
 
