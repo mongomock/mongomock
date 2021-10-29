@@ -9,13 +9,12 @@ ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 RUN eval "$(pyenv init -)" && eval "$(pyenv virtualenv-init -)"
 RUN pyenv install 2.7.18
-RUN pyenv install 3.4.10
 RUN pyenv install 3.5.9
 RUN pyenv install 3.6.11
 RUN pyenv install 3.7.8
 RUN pyenv install 3.8.5
 RUN pyenv install 3.9.0
 RUN pyenv install pypy2.7-7.1.1
-RUN pyenv local 2.7.18 3.4.10 3.5.9 3.6.11 3.7.8 3.8.5 3.9.0 pypy2.7-7.1.1
+RUN pyenv local 2.7.18 3.5.9 3.6.11 3.7.8 3.8.5 3.9.0 pypy2.7-7.1.1
 
 RUN pip install tox
