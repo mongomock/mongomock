@@ -10,6 +10,7 @@ import math
 import numbers
 import random
 import re
+import sys
 import warnings
 
 from sentinels import NOTHING
@@ -783,6 +784,11 @@ class _Parser(object):
                 raise OperationFailure(
                     '$objectToArray requires an object input, found: {}'.format(type(parsed))
                 )
+
+            if len(parsed) > 1 and sys.version_info < (3, 6):
+                raise NotImplementedError(
+                    "Although '%s' is a valid type conversion, it is not implemented for Python 2 "
+                    'and Python 3.5 in Mongomock yet.' % operator)
 
             return [{'k': k, 'v': v} for k, v in parsed.items()]
 

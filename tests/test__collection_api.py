@@ -6378,19 +6378,21 @@ class CollectionAPITest(TestCase):
                 collection.aggregate(item)
 
     # https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/#examples
+    @skipIf(
+        sys.version_info < (3, 6), "It's harder to keep dict sorted in older versions of Python")
     def test_aggregate_object_to_array_with_example(self):
         collection = self.db.collection
 
         collection.insert_many([
-            {'_id': 1, 'item': 'ABC1', 'dimensions': collections.OrderedDict({
-                'l': 25, 'w': 10, 'uom': 'cm',
-            })},
-            {'_id': 2, 'item': 'ABC2', 'dimensions': collections.OrderedDict({
-                'l': 50, 'w': 25, 'uom': 'cm',
-            })},
-            {'_id': 3, 'item': 'XYZ1', 'dimensions': collections.OrderedDict({
-                'l': 70, 'w': 75, 'uom': 'cm',
-            })},
+            {'_id': 1, 'item': 'ABC1', 'dimensions': collections.OrderedDict([
+                ('l', 25), ('w', 10), ('uom', 'cm'),
+            ])},
+            {'_id': 2, 'item': 'ABC2', 'dimensions': collections.OrderedDict([
+                ('l', 50), ('w', 25), ('uom', 'cm'),
+            ])},
+            {'_id': 3, 'item': 'XYZ1', 'dimensions': collections.OrderedDict([
+                ('l', 70), ('w', 75), ('uom', 'cm'),
+            ])},
         ])
 
         expect = [
