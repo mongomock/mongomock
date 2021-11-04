@@ -12,7 +12,6 @@ import random
 import re
 import warnings
 
-from sentinels import NOTHING
 import six
 from six import moves, raise_from
 
@@ -20,6 +19,8 @@ from mongomock import command_cursor
 from mongomock import filtering
 from mongomock import helpers
 from mongomock import OperationFailure
+from sentinels import NOTHING
+from six import moves
 
 try:
     from bson.errors import InvalidDocument
@@ -32,7 +33,6 @@ except ImportError:
     _RE_TYPES = (helpers.RE_TYPE)
 
 _random = random.Random()
-
 
 group_operators = [
     '$addToSet',
@@ -87,28 +87,23 @@ date_operators = [
     '$isoDayOfWeek',
     '$isoWeek',
     '$isoWeekYear',
-    '$millisecond',
     '$minute',
     '$month',
     '$second',
     '$week',
     '$year',
+    '$millisecond',
+    '$dateToString',
 ]
 conditional_operators = ['$cond', '$ifNull']
 array_operators = [
     '$concatArrays',
     '$filter',
-    '$indexOfArray',
     '$isArray',
-    '$range',
-    '$reduce',
-    '$reverseArray',
     '$size',
     '$slice',
-    '$zip',
-]
-object_operators = [
-    '$mergeObjects',
+    '$objectToArray',
+    '$arrayToObject',
 ]
 text_search_operators = ['$meta']
 string_operators = [
@@ -641,12 +636,12 @@ class _Parser(object):
             if not isinstance(array_value, list):
                 raise OperationFailure(
                     'First argument to $slice must be an array, but is of type: {}'
-                    .format(type(array_value)))
+                        .format(type(array_value)))
             for num, v in zip(('Second', 'Third'), value[1:]):
                 if not isinstance(v, six.integer_types):
                     raise OperationFailure(
                         '{} argument to $slice must be numeric, but is of type: {}'
-                        .format(num, type(v)))
+                            .format(num, type(v)))
             if len(value) > 2 and value[2] <= 0:
                 raise OperationFailure('Third argument to $slice must be '
                                        'positive: {}'.format(value[2]))
@@ -663,6 +658,21 @@ class _Parser(object):
                 stop = start
                 start = 0
             return array_value[start:stop]
+
+        if operator == "$objectToArray":
+            array_value = self.parse(value)
+            if isinstance(array_value, dict):
+                return [{"k": field, "v": array_value[field]} for field in array_value]
+            raise OperationFailure(
+                'Values of field {} are not object but {}'.format(field, type(array_value))
+            )
+        if operator == "$arrayToObject":
+            array_value = self.parse(value)
+            if isinstance(array_value, list):
+                return {elem["k"]: elem["v"] for elem in array_value}
+            raise OperationFailure(
+                'Values of field {} are not array but {}'.format(field, type(array_value))
+            )
 
         raise NotImplementedError(
             "Although '%s' is a valid array operator for the "
@@ -958,6 +968,7 @@ def _fix_sort_key(key_getter):
         if isinstance(key, dict):
             return [(k, v) for (k, v) in sorted(key.items())]
         return key
+
     return fixed_getter
 
 
@@ -982,7 +993,7 @@ def _handle_lookup_stage(in_collection, database, options):
         if operator == 'as' and \
                 '.' in options[operator]:
             raise NotImplementedError(
-                "Although '.' is valid in the 'as' "
+                "Although '.' is valid in the 'localField' and 'as' "
                 'parameters for the lookup stage of the aggregation '
                 'pipeline, it is currently not implemented in Mongomock.')
 
@@ -1333,7 +1344,7 @@ def _handle_replace_root_stage(in_collection, unused_database, options):
         if not isinstance(new_doc, dict):
             raise OperationFailure(
                 "'newRoot' expression must evaluate to an object, but resulting value was: {}"
-                .format(new_doc))
+                    .format(new_doc))
         out_collection.append(new_doc)
     return out_collection
 
