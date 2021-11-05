@@ -1,6 +1,6 @@
 import collections
 import datetime
-from distutils import version  # pylint: disable=no-name-in-module
+from packaging import version
 import sys
 from unittest import TestCase, skipIf, skipUnless
 
@@ -161,7 +161,7 @@ class DatabaseAPITest(TestCase):
             self.database.with_options(custom_tzinfo)
 
     @skipIf(
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('3.8'),
         'pymongo not installed or <3.8')
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
@@ -243,7 +243,7 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__not_hashable(self):
         with self.assertRaises(TypeError):
@@ -251,7 +251,7 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__hashable(self):
         {self.database}  # pylint: disable=pointless-statement

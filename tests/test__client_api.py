@@ -1,4 +1,4 @@
-from distutils import version  # pylint: disable=no-name-in-module
+from packaging import version
 import sys
 import unittest
 from unittest import skipIf, skipUnless
@@ -95,7 +95,7 @@ class MongoClientApiTest(unittest.TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__not_hashable(self):
         with self.assertRaises(TypeError):
@@ -103,7 +103,7 @@ class MongoClientApiTest(unittest.TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__hashable(self):
         {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned

@@ -1,7 +1,7 @@
 import collections
 import copy
 from datetime import datetime, tzinfo, timedelta
-from distutils import version  # pylint: disable=no-name-in-module
+from packaging import version
 import platform
 import random
 import re
@@ -4993,7 +4993,7 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert({'a': {'b'}})
-        if version.LooseVersion(pymongo.version) < version.LooseVersion('3.8'):
+        if version.parse(pymongo.version) < version.parse('3.8'):
             return
         if six.PY2:
             expect = "cannot encode object: set(['b']), of type: <type 'set'>"
@@ -6644,7 +6644,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__not_hashable(self):
         with self.assertRaises(TypeError):
@@ -6652,7 +6652,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__hashable(self):
         {self.db.a, self.db.b}  # pylint: disable=pointless-statement
