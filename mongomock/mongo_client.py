@@ -1,11 +1,11 @@
 from .database import Database
 from .store import ServerStore
-from packaging import version
 import itertools
 from mongomock import codec_options as mongomock_codec_options
 from mongomock import ConfigurationError
 from mongomock import helpers
 from mongomock import read_preferences
+from packaging import version
 from six import PY3
 import warnings
 

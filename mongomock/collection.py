@@ -6,11 +6,11 @@ try:
 except ImportError:
     from collections import Iterable, Mapping, MutableMapping
 import copy
-from packaging import version
 import functools
 import itertools
 import json
 import math
+from packaging import version
 import time
 import warnings
 

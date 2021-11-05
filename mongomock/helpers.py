@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
-from packaging import version
 from mongomock import InvalidURI
+from packaging import version
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import PY3, iteritems, raise_from, string_types

@@ -2,8 +2,8 @@
 from collections import OrderedDict
 import copy
 import datetime
-from packaging import version
 import os
+from packaging import version
 import re
 from six import assertCountEqual
 import sys
