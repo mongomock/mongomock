@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, abc
 from datetime import datetime, timedelta, tzinfo
 from distutils import version  # pylint: disable=no-name-in-module
 from mongomock import InvalidURI
@@ -86,6 +86,8 @@ def create_index_list(key_or_list, direction=None):
     """
     if isinstance(key_or_list, string_types):
         return [(key_or_list, direction or ASCENDING)]
+    if isinstance(key_or_list, abc.ItemsView):
+        return list(key_or_list)
     if not isinstance(key_or_list, (list, tuple)):
         raise TypeError('if no direction is specified, '
                         'key_or_list must be an instance of list')
