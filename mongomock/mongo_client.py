@@ -1,11 +1,11 @@
 from .database import Database
 from .store import ServerStore
-from distutils import version  # pylint: disable=no-name-in-module
 import itertools
 from mongomock import codec_options as mongomock_codec_options
 from mongomock import ConfigurationError
 from mongomock import helpers
 from mongomock import read_preferences
+from packaging import version
 from six import PY3
 import warnings
 
@@ -75,7 +75,7 @@ class MongoClient(object):
         return NotImplemented
 
     if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.LooseVersion('3.12')
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
     ):
         def __hash__(self):
             return hash(self.address)

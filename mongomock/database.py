@@ -1,4 +1,4 @@
-from distutils import version  # pylint: disable=no-name-in-module
+from packaging import version
 import warnings
 
 from . import CollectionInvalid
@@ -69,7 +69,7 @@ class Database(object):
         return NotImplemented
 
     if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.LooseVersion('3.12')
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
     ):
         def __hash__(self):
             return hash((self._client, self.name))

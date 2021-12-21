@@ -2,8 +2,8 @@
 from collections import OrderedDict
 import copy
 import datetime
-from distutils import version  # pylint: disable=no-name-in-module
 import os
+from packaging import version
 import re
 from six import assertCountEqual
 import sys
@@ -307,7 +307,7 @@ class EqualityCollectionTest(_CollectionComparisonTest):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__database_hashable(self):
         {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
@@ -315,7 +315,7 @@ class EqualityCollectionTest(_CollectionComparisonTest):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.12'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.12'),
         "older versions of pymongo didn't have proper hashing")
     def test__database_not_hashable(self):
         with self.assertRaises(TypeError):
@@ -403,7 +403,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.count({'a': 1})
 
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.8'),
         'older version of pymongo does not have count_documents')
     def test__count_documents(self):
         self.cmp.compare.count_documents({})
@@ -420,7 +420,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.count_documents({}, limit='1')
 
     @skipIf(
-        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.LooseVersion('3.8'),
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION < version.parse('3.8'),
         'older version of pymongo does not have estimated_document_count')
     def test__estimated_document_count(self):
         self.cmp.compare.estimated_document_count()

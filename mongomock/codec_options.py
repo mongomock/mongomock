@@ -1,15 +1,15 @@
 """Tools for specifying BSON codec options."""
 
 import collections
-from distutils import version  # pylint: disable=no-name-in-module
+from packaging import version
 
 try:
     from bson import codec_options
     import pymongo
-    _PYMONGO_VERSION = version.LooseVersion(pymongo.version)
+    _PYMONGO_VERSION = version.parse(pymongo.version)
 except ImportError:
     codec_options = None
-    _PYMONGO_VERSION = version.LooseVersion('0.0')
+    _PYMONGO_VERSION = version.parse('0.0')
 
 
 class TypeRegistry(object):
@@ -20,7 +20,7 @@ _FIELDS = (
     'document_class', 'tz_aware', 'uuid_representation', 'unicode_decode_error_handler', 'tzinfo',
 )
 
-if _PYMONGO_VERSION >= version.LooseVersion('3.8'):
+if _PYMONGO_VERSION >= version.parse('3.8'):
     _DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
     _FIELDS = _FIELDS + ('type_registry',)
 else:

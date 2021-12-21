@@ -6,11 +6,11 @@ try:
 except ImportError:
     from collections import Iterable, Mapping, MutableMapping
 import copy
-from distutils import version  # pylint: disable=no-name-in-module
 import functools
 import itertools
 import json
 import math
+from packaging import version
 import time
 import warnings
 
@@ -408,7 +408,7 @@ class Collection(object):
         return NotImplemented
 
     if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.LooseVersion('3.12')
+        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
     ):
         def __hash__(self):
             return hash((self.database, self.name))

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
-from distutils import version  # pylint: disable=no-name-in-module
 from mongomock import InvalidURI
+from packaging import version
 import re
 from six.moves.urllib_parse import unquote_plus
 from six import PY3, iteritems, raise_from, string_types
@@ -15,7 +15,7 @@ try:
     from bson import ObjectId  # pylint: disable=unused-import
     from bson import Timestamp
     from pymongo import version as pymongo_version
-    PYMONGO_VERSION = version.LooseVersion(pymongo_version)
+    PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
