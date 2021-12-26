@@ -269,11 +269,22 @@ class _CollectionComparisonTest(TestCase):
             'real': self.mongo_collection,
         })
 
-    def _create_compare_for_collection(self, collection_name, db_name=None):
+    def _create_compare_for_collection(self, collection_name, db_name=None,
+                                       **options):
         if not db_name:
             db_name = self.db_name
-        mongo_collection = self.mongo_conn[db_name][collection_name]
-        fake_collection = self.fake_conn[db_name][collection_name]
+        mongo_db = self.mongo_conn[db_name]
+        fake_db = self.fake_conn[db_name]
+        if collection_name in mongo_db.list_collection_names():
+            mongo_collection = mongo_db[collection_name]
+        else:
+            mongo_collection = mongo_db.create_collection(collection_name,
+                                                          **options)
+        if collection_name in fake_db.list_collection_names():
+            fake_collection = fake_db[collection_name]
+        else:
+            fake_collection = fake_db.create_collection(collection_name,
+                                                        **options)
         return MultiCollection({
             'fake': fake_collection,
             'real': mongo_collection,
@@ -1974,6 +1985,84 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             'three_equal': {'$setEquals': [['one', 'two'], ['two', 'one'], ['one', 'two']]},
             'three_not_equal': {'$setEquals': [['one', 'three'], ['two', 'one'], ['two', 'one']]},
         }}])
+
+    def test__options(self):
+        cmp = self._create_compare_for_collection(
+            'validated_collection',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='strict',
+            validationAction='error')
+        cmp.compare.options()
+
+    def test__validation_options_after_collmod(self):
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        cmp = self._create_compare_for_collection('opts1')
+        for db in (fake_db, real_db):
+            self.assertEqual(db.command({'collMod': 'opts1'}), {'ok': 1.0})
+        cmp.compare.options()
+
+        # Even setting an empty validator causes the default validation options
+        # to be set.
+        for db in (fake_db, real_db):
+            self.assertEqual(db.command('collMod', 'opts1', validator={}),
+                             {'ok': 1.0})
+        cmp.compare.options()
+
+        # Set a non-empty validator
+        for db in (fake_db, real_db):
+            self.assertEqual(db.command('collMod', 'opts1',
+                                        validator={'a': {'$type': 'int'}},
+                                        validationLevel='moderate'),
+                             {'ok': 1.0})
+        cmp.compare.options()
+
+        # Set the validator empty again
+        for db in (fake_db, real_db):
+            self.assertEqual(db.command('collMod', 'opts1', validator={}),
+                             {'ok': 1.0})
+        cmp.compare.options()
+
+    def test__validate_on_insert(self):
+        cmp = self._create_compare_for_collection(
+            'validated_collection',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='strict',
+            validationAction='error')
+        cmp.do.insert_one({'a': 1})
+        cmp.compare.find()
+        cmp.compare_exceptions.insert_one({'a': 'abc'})
+
+    def test__validate_on_update(self):
+        cmp = self._create_compare_for_collection(
+            'validated_collection', validator={'a': {'$type': 'int'}})
+        # valid document
+        cmp.do.insert_one({'a': 2})
+        cmp.compare.find()
+        cmp.do.update_one({'a': 2}, {'$set': {'a': 1}})
+        cmp.compare.find()
+        cmp.compare_exceptions.update_one({'a': 1}, {'$set': {'a': 'bcd'}})
+        # set it now to an invalid document
+        cmp.do.update_one({'a': 1}, {'$set': {'a': 'bcd'}},
+                          bypass_document_validation=True)
+        cmp.compare.find()
+        # updating a document that does not pass validation fails, unless
+        # updating it to a valid document
+        cmp.compare_exceptions.update_one({'a': 'bcd'}, {'$set': {'a': 'def'}})
+        cmp.do.update_one({'a': 'bcd'}, {'$set': {'a': 1}})
+        cmp.compare.find()
+
+        cmp.do.update_one({'a': 1}, {'$set': {'a': 'bcd'}},
+                          bypass_document_validation=True)
+        # if validationLevel is set to 'moderate', we can update documents that
+        # are already invalid, even if the update leaves it invalid
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        for db in (fake_db, real_db):
+            db.command('collMod', 'validated_collection',
+                       validationLevel='moderate')
+        cmp.do.update_one({'a': 'bcd'}, {'$set': {'a': 'def'}})
+        cmp.compare.find()
 
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')

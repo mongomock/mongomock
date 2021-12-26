@@ -124,6 +124,22 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
+def validate_against_validator(document, options):
+    validator = options.get('validator')
+    validation_level = options.get('validationLevel', 'strict')
+    validation_action = options.get('validationAction', 'error')
+
+    if (not validator or validation_level == 'off' or
+            validation_action == 'warn'):
+        # Don't bother performing validation; in the case of
+        # validation_action == 'warn' it only logs a warning in the real
+        # database
+        return
+
+    if not filter_applies(validator, document):
+        raise WriteError('Document failed validation', code=121)
+
+
 class BulkWriteOperation(object):
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
@@ -455,7 +471,9 @@ class Collection(object):
     def insert_one(self, document, bypass_document_validation=False, session=None):
         if not bypass_document_validation:
             validate_is_mutable_mapping('document', document)
-        return InsertOneResult(self._insert(document, session), acknowledged=True)
+        return InsertOneResult(
+            self._insert(document, session, validate=not bypass_document_validation),
+            acknowledged=True)
 
     def insert_many(self, documents, ordered=True, bypass_document_validation=False, session=None):
         if not isinstance(documents, Iterable) or not documents:
@@ -465,14 +483,15 @@ class Collection(object):
             for document in documents:
                 validate_is_mutable_mapping('document', document)
         return InsertManyResult(
-            self._insert(documents, session, ordered=ordered),
+            self._insert(documents, session, ordered=ordered,
+                         validate=not bypass_document_validation),
             acknowledged=True)
 
     @property
     def _store(self):
         return self._db_store[self._name]
 
-    def _insert(self, data, session=None, ordered=True):
+    def _insert(self, data, session=None, ordered=True, validate=True):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if not isinstance(data, Mapping):
@@ -481,7 +500,7 @@ class Collection(object):
             num_inserted = 0
             for index, item in enumerate(data):
                 try:
-                    results.append(self._insert(item))
+                    results.append(self._insert(item, validate=validate))
                 except WriteError as error:
                     write_errors.append({
                         'index': index,
@@ -507,6 +526,9 @@ class Collection(object):
         if BSON:
             # bson validation
             BSON.encode(data, check_keys=True)
+
+        if validate:
+            validate_against_validator(data, self.options())
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -561,6 +583,9 @@ class Collection(object):
             sub_doc = sub_doc[part]
         return True
 
+    def options(self):
+        return copy.deepcopy(self._store.options)
+
     def update_one(
             self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
             session=None, collation=None):
@@ -568,7 +593,8 @@ class Collection(object):
             validate_ok_for_update(update)
         return UpdateResult(
             self._update(
-                filter, update, upsert=upsert, hint=hint, session=session, collation=collation),
+                filter, update, upsert=upsert, hint=hint, session=session,
+                collation=collation, validate=not bypass_document_validation),
             acknowledged=True)
 
     def update_many(
@@ -579,7 +605,7 @@ class Collection(object):
         return UpdateResult(
             self._update(
                 filter, update, upsert=upsert, multi=True, hint=hint, session=session,
-                collation=collation),
+                collation=collation, validate=not bypass_document_validation),
             acknowledged=True)
 
     def replace_one(
@@ -588,7 +614,8 @@ class Collection(object):
         if not bypass_document_validation:
             validate_ok_for_replace(replacement)
         return UpdateResult(
-            self._update(filter, replacement, upsert=upsert, hint=hint, session=session),
+            self._update(filter, replacement, upsert=upsert, hint=hint,
+                         session=session, validate=not bypass_document_validation),
             acknowledged=True)
 
     def update(self, spec, document, upsert=False, manipulate=False,
@@ -600,7 +627,7 @@ class Collection(object):
 
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, hint=None, session=None,
-                collation=None, **kwargs):
+                collation=None, validate=True, **kwargs):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if hint:
@@ -866,6 +893,7 @@ class Collection(object):
                         raise ValueError(
                             'Invalid modifier specified: {}'.format(k))
                 first = False
+
             # if empty document comes
             if not document:
                 _id = spec.get('_id', existing_document.get('_id'))
@@ -874,7 +902,7 @@ class Collection(object):
                     existing_document['_id'] = _id
 
             if was_insert:
-                upserted_id = self._insert(existing_document)
+                upserted_id = self._insert(existing_document, validate=validate)
                 num_updated += 1
             elif existing_document != original_document_snapshot:
                 # Document has been modified in-place.
@@ -886,6 +914,28 @@ class Collection(object):
                     raise WriteError(
                         "After applying the update, the (immutable) field '_id' was found to have "
                         'been altered to _id: {}'.format(existing_document.get('_id')))
+
+                if validate:
+                    options = self.options()
+                    validation_level = options.get('validationLevel', 'strict')
+                    if validation_level == 'moderate':
+                        try:
+                            validate_against_validator(original_document_snapshot,
+                                                       options)
+                        except WriteError:
+                            # if validationLevel is 'moderate' and the existing
+                            # document is not valid, we don't have to validate the
+                            # new document
+                            validate = False
+
+                # Check again if validation is still required
+                if validate:
+                    try:
+                        validate_against_validator(existing_document, options)
+                    except WriteError:
+                        # Rollback.
+                        self._store[original_document_snapshot['_id']] = original_document_snapshot
+                        raise
 
                 # Make sure it still respect the unique indexes and, if not, to
                 # revert modifications
