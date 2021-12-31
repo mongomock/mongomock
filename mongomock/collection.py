@@ -88,6 +88,13 @@ _WITH_OPTIONS_KWARGS = {
 }
 
 
+def validate_list_or_mapping(option, value):
+    if not isinstance(value, (Mapping, list)):
+        raise TypeError('%s must either be a list or an instance of dict, '
+                        'bson.son.SON, or any other type that inherits from '
+                        'collections.Mapping' % (option,))
+
+
 def validate_is_mapping(option, value):
     if not isinstance(value, Mapping):
         raise TypeError('%s must be an instance of dict, bson.son.SON, or '
@@ -111,11 +118,13 @@ def validate_ok_for_replace(replacement):
 
 
 def validate_ok_for_update(update):
-    validate_is_mapping('update', update)
+    validate_list_or_mapping('update', update)
     if not update:
-        raise ValueError('update only works with $ operators')
+        raise ValueError('update cannot be empty')
+
+    is_document = not isinstance(update, list)
     first = next(iter(update))
-    if not first.startswith('$'):
+    if is_document and not first.startswith('$'):
         raise ValueError('update only works with $ operators')
 
 
@@ -615,13 +624,20 @@ class Collection(object):
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
-        validate_is_mapping('document', document)
-        for operator in _updaters:
-            if not document.get(operator, True):
-                raise WriteError(
-                    "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
-                    % (operator, operator),
-                )
+        validate_list_or_mapping('document', document)
+
+        if isinstance(document, list):
+            raise NotImplementedError(
+                'Using aggregation pipeline for update is valid in MongoDB, but it is not '
+                'yet supported by mongomock'
+            )
+        else:
+            for operator in _updaters:
+                if not document.get(operator, True):
+                    raise WriteError(
+                        "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
+                        % (operator, operator),
+                    )
 
         updated_existing = False
         upserted_id = None
