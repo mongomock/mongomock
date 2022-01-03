@@ -78,7 +78,10 @@ project_operators = [
 control_flow_operators = [
     '$switch',
 ]
-projection_operators = ['$map', '$let', '$literal']
+projection_operators = [
+    '$let',
+    '$literal',
+]
 date_operators = [
     '$dateFromString',
     '$dateToString',
@@ -102,6 +105,7 @@ array_operators = [
     '$filter',
     '$indexOfArray',
     '$isArray',
+    '$map',
     '$range',
     '$reduce',
     '$reverseArray',
