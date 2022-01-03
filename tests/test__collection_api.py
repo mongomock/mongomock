@@ -3948,6 +3948,28 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': 3}], list(actual))
 
+    def test__aggregate_project_first(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': collections.OrderedDict([
+                ('_id', False),
+                ('a', {'$first': '$arr'})
+            ])}
+        ])
+        self.assertEqual([{'a': 2}], list(actual))
+
+    def test__aggregate_project_last(self):
+        self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
+        actual = self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': collections.OrderedDict([
+                ('_id', False),
+                ('a', {'$last': '$arr'})
+            ])}
+        ])
+        self.assertEqual([{'a': 3}], list(actual))
+
     def test__aggregate_project_rename__id(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
         actual = self.db.collection.aggregate([
