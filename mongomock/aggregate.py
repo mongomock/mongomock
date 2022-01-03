@@ -676,6 +676,66 @@ class _Parser(object):
                 for item in input_array
             ]
 
+        if operator == '$indexOfArray':
+            if not isinstance(value, (list, tuple)):
+                value = [value]
+            if len(value) < 2 or len(value) > 4:
+                raise OperationFailure(
+                    'Expression $indexOfArray takes at least 2 arguments, and '
+                    'at most 4, but %i were passed in.' % len(value)
+                )
+            array_value = self._parse_array_or_nothing(value[0])
+            search_value = self.parse(value[1])
+            start, end = 0, None
+            if len(value) > 2:
+                start = self.parse(value[2])
+            if len(value) > 3:
+                end = self.parse(value[3])
+
+            # Validate arguments
+            if array_value is NOTHING or array_value is None:
+                return None
+            if not isinstance(array_value, list):
+                raise OperationFailure(
+                    '$indexOfArray requires an array as a first argument, '
+                    'found: %s' % type(type(array_value))
+                )
+            if len(value) > 2:
+                if isinstance(start, int):
+                    if start < 0:
+                        raise OperationFailure(
+                            '$indexOfArray requires a nonnegative starting '
+                            'index, found: %r' % start
+                        )
+                else:
+                    raise OperationFailure(
+                        '$indexOfArrayrequires an integral starting index, '
+                        'found a value of type: %s, with value: "%r"' % (
+                            type(start), start
+                        )
+                    )
+            if len(value) > 3:
+                if isinstance(end, int):
+                    if end < 0:
+                        raise OperationFailure(
+                            '$indexOfArray requires a nonnegative ending '
+                            'index, found: %r' % end
+                        )
+                else:
+                    raise OperationFailure(
+                        '$indexOfArrayrequires an integral ending index, '
+                        'found a value of type: %s, with value: "%r"' % (
+                            type(end), end
+                        )
+                    )
+            if end is None:
+                end = len(array_value)
+
+            try:
+                return array_value.index(search_value, start, end)
+            except ValueError:
+                return -1
+
         if operator == '$size':
             if isinstance(value, list):
                 if len(value) != 1:
