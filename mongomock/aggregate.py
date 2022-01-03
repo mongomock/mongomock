@@ -606,6 +606,43 @@ class _Parser(object):
 
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
 
+        if operator == '$map':
+            if not isinstance(value, dict):
+                raise OperationFailure('$map only supports an object as its argument')
+
+            # NOTE: while the two validations below could be achieved with
+            # one-liner set operations (e.g. set(value) - {'input', 'as',
+            # 'in'}), we prefer the iteration-based approaches in order to
+            # mimic MongoDB's behavior regarding the order of evaluation. For
+            # example, MongoDB complains about 'input' parameter missing before
+            # 'in'.
+            for k in ('input', 'in'):
+                if k not in value:
+                    raise OperationFailure("Missing '%s' parameter to $map" % k)
+
+            for k in value:
+                if k not in {'input', 'as', 'in'}:
+                    raise OperationFailure('Unrecognized parameter to $map: %s' % k)
+
+            input_array = self._parse_or_nothing(value['input'])
+
+            if input_array is None or input_array is NOTHING:
+                return None
+
+            if not isinstance(input_array, list):
+                raise OperationFailure('input to $map must be an array not %s' % type(input_array))
+
+            fieldname = value.get('as', 'this')
+            in_expr = value['in']
+            return [
+                _Parser(
+                    self._doc_dict,
+                    dict(self._user_vars, **{fieldname: item}),
+                    ignore_missing_keys=self._ignore_missing_keys,
+                ).parse(in_expr)
+                for item in input_array
+            ]
+
         if operator == '$size':
             if isinstance(value, list):
                 if len(value) != 1:

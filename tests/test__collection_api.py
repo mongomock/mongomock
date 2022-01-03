@@ -5645,6 +5645,77 @@ class CollectionAPITest(TestCase):
                 self.db.collection.aggregate(
                     [{'$project': {'filtered_items': {'$filter': option}}}])
 
+    def test__aggregate_map(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'array': [1, 2, 3, 4],
+        })
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$map': {
+                'input': '$array',
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'custom_variable': {'$map': {
+                'input': '$array',
+                'as': 'self',
+                'in': {'$multiply': ['$$self', '$$self']},
+            }},
+            'empty': {'$map': {
+                'input': [],
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'null': {'$map': {
+                'input': None,
+                'in': '$$this',
+            }},
+            'missing': {'$map': {
+                'input': '$missing.key',
+                'in': '$$this',
+            }},
+        }}])
+        expect = [{
+            'array': [1, 4, 9, 16],
+            'custom_variable': [1, 4, 9, 16],
+            'empty': [],
+            'null': None,
+            'missing': None,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_map_errors(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        data = (
+            (
+                {},
+                "Missing 'input' parameter to $map",
+            ),
+            (
+                # Check that the following message is raised before the error
+                # on the type of input
+                {'input': 'foo'},
+                "Missing 'in' parameter to $map",
+            ),
+            (
+                # NOTE: actual type is omitted in the expected message because
+                # of difference in string representations for types between
+                # Python 2 and Python 3.
+                # TODO(guludo): We should output the type name that is output
+                # by the real mongodb.
+                {'input': 'foo', 'in': '$$this'},
+                'input to $map must be an array not',
+            ),
+            (
+                {'input': [], 'in': '$$this', 'foo': 1},
+                'Unrecognized parameter to $map: foo',
+            ),
+        )
+        for op, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {'x': {'$map': op}}}])
+            self.assertIn(msg, str(cm.exception))
+
     def test__aggregate_slice(self):
         self.db.collection.drop()
         collection = self.db.collection
