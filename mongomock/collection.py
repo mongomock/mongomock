@@ -627,10 +627,13 @@ class Collection(object):
         validate_list_or_mapping('document', document)
 
         if isinstance(document, list):
-            raise NotImplementedError(
-                'Using aggregation pipeline for update is valid in MongoDB, but it is not '
-                'yet supported by mongomock'
-            )
+            for stage in document:
+                for stage_name in iterkeys(stage):
+                    aggregate.validate_stage_name(stage_name)
+                    if stage_name not in _valid_update_pipeline_stages:
+                        raise WriteError(
+                            '%s is not allowed to be used within an update' % stage_name
+                        )
         else:
             for operator in _updaters:
                 if not document.get(operator, True):
@@ -654,7 +657,7 @@ class Collection(object):
                 # update it like a regular one, then finally insert it
                 if spec.get('_id') is not None:
                     _id = spec['_id']
-                elif document.get('_id') is not None:
+                elif not isinstance(document, list) and document.get('_id') is not None:
                     _id = document['_id']
                 else:
                     _id = ObjectId()
@@ -668,7 +671,10 @@ class Collection(object):
                 updated_existing = True
             num_matched += 1
 
-            self._apply_update_document(existing_document, spec, document, was_insert)
+            if isinstance(document, list):
+                self._apply_update_pipeline(existing_document, document, session)
+            else:
+                self._apply_update_document(existing_document, spec, document, was_insert)
 
             if was_insert:
                 upserted_id = self._insert(existing_document)
@@ -706,6 +712,16 @@ class Collection(object):
             text_type('upserted'): upserted_id,
             text_type('updatedExisting'): updated_existing,
         }
+
+    def _apply_update_pipeline(self, existing_document, pipeline, session):
+        """Apply the aggregation pipeline to a single document.
+
+        This method updates existing_document in-place.
+        """
+        [new_document] = aggregate.process_pipeline(
+            [existing_document], self.database, pipeline, session)
+        existing_document.clear()
+        existing_document.update(new_document)
 
     def _apply_update_document(self, existing_document, spec, document, was_insert):
         """Apply document, which is an update document, to existing_document.
@@ -2107,4 +2123,14 @@ _updaters = {
     '$max': _max_updater,
     '$min': _min_updater,
     '$pop': _pop_updater
+}
+
+
+_valid_update_pipeline_stages = {
+    '$addFields',
+    '$set',
+    '$project',
+    '$unset',
+    '$replaceRoot',
+    '$replaceWith',
 }

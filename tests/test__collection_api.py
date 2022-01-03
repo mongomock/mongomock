@@ -871,6 +871,89 @@ class CollectionAPITest(TestCase):
                 hint='a',
             )
 
+    def test__update_pipeline(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 1, 'b': 2},
+            {'_id': 3, 'a': 1, 'b': 2},
+            {'_id': 4, 'a': 1, 'b': 2},
+        ])
+        # TODO(guludo): add test cases for other stages when they become
+        # supported in Mongomock:
+        # - $unset: https://github.com/mongomock/mongomock/issues/740
+        # - $replaceWith: https://github.com/mongomock/mongomock/issues/741
+        data = (
+            (
+                1,
+                [{'$set': {'c': {'$add': ['$a', '$b']}}}],
+                {'_id': 1, 'a': 1, 'b': 2, 'c': 3},
+            ),
+            (
+                2,
+                [{'$addFields': {'c': {'$add': ['$a', '$b']}}}],
+                {'_id': 2, 'a': 1, 'b': 2, 'c': 3},
+            ),
+            (
+                3,
+                [{'$project': {'a': 0}}],
+                {'_id': 3, 'b': 2},
+            ),
+            (
+                4,
+                [{'$replaceRoot': {'newRoot': {
+                    '_id': '$_id',
+                    'x': {'$add': ['$a', '$b']}
+                }}}],
+                {'_id': 4, 'x': 3},
+            ),
+        )
+        for doc_id, update, expected in data:
+            update_result = collection.update_one(
+                filter={'_id': doc_id},
+                update=update,
+            )
+            self.assertEqual(update_result.modified_count, 1)
+            self.assertEqual(update_result.matched_count, 1)
+            self.assert_document_stored(doc_id, expected)
+
+    def test__update_pipeline_upsert(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': 1, 'b': 2})
+
+        update_result = collection.update_one(
+            filter={'a': 99, 'b': 100},
+            update=[{'$set': {'a': {'$add': ['$a', 10]}}}],
+            upsert=True,
+        )
+        expected = {
+            '_id': update_result.upserted_id,
+            'a': 109,
+            'b': 100,
+        }
+        self.assertEqual(update_result.matched_count, 0)
+        self.assert_document_stored(update_result.upserted_id, expected)
+
+    def test__update_pipeline_invalid_stages(self):
+        collection = self.db.collection
+        data = (
+            (
+                [{'$unwind': '$a'}],
+                '$unwind is not allowed to be used within an update',
+            ),
+            (
+                [{'$count': 'foo'}],
+                '$count is not allowed to be used within an update',
+            ),
+        )
+        for pipeline, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.update_one(
+                    filter={},
+                    update=pipeline,
+                )
+            self.assertIn(msg, str(cm.exception))
+
     def test__update_many(self):
         self.db.collection.insert_many([
             {'a': 1, 'c': 2},
