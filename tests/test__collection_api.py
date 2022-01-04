@@ -53,6 +53,33 @@ warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
 
 
+def set_op_results(iterable):
+    """Convert results of set operations to a value usable in asserts.
+
+    This is a utility function to convert a result (or expected result) of a
+    set operation test into a value that can be compared with equality check.
+
+    It is expected that the iterable yields dictionaries with strings as keys
+    and lists (or Nones) as values. The returned value is a list containing
+    each dictionary from the iterable, but with the internal lists converted to
+    sets of values returned from to_hashables() or None if the original value
+    was None.
+
+    The order of elements resulting from set operations in MongoDB is
+    unspecified, so using this function provides a more robust way to compare
+    the results instead of just comparting the list objects.
+    """
+    results = []
+    for d in iterable:
+        results.append({})
+        for k in d:
+            if d[k] is None:
+                results[-1][k] = None
+                continue
+            results[-1][k] = {helpers.to_hashable(v) for v in d[k]}
+    return results
+
+
 class UTCPlus2(tzinfo):
     def fromutc(self, dt):
         return dt + self.utcoffset(dt)
@@ -5815,7 +5842,7 @@ class CollectionAPITest(TestCase):
             'nested': ['one', 'two', ['one', 'two']],
             'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
         }]
-        self.assertEqual(expect, list(actual))
+        self.assertEqual(set_op_results(expect), set_op_results(actual))
 
     def test__set_intersection(self):
         collection = self.db.collection
@@ -5841,7 +5868,7 @@ class CollectionAPITest(TestCase):
             'missing': None,
             'null': None,
         }]
-        self.assertEqual(expect, list(actual))
+        self.assertEqual(set_op_results(expect), set_op_results(actual))
 
     @skipIf(sys.version_info < (3, 7), 'dictionaries maintain key order only for Python>=3.7')
     def test__set_intersection_key_order(self):
