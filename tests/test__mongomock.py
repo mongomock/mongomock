@@ -3125,6 +3125,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }}
         ])
 
+    def test__aggregate_first_last_in_array(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'values': [0, 1, 5]
+        })
+        self.cmp.compare.aggregate([
+            {'$project': {
+                'first': {'$first': '$values'},
+                'last': {'$last': '$values'},
+            }}
+        ])
+
     def test__aggregate_cond_mongodb_to_bool(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/650"""
         self.cmp.compare_ignore_order.aggregate([
