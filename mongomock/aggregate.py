@@ -79,7 +79,10 @@ project_operators = [
 control_flow_operators = [
     '$switch',
 ]
-projection_operators = ['$map', '$let', '$literal']
+projection_operators = [
+    '$let',
+    '$literal',
+]
 date_operators = [
     '$dateFromString',
     '$dateToString',
@@ -103,6 +106,7 @@ array_operators = [
     '$filter',
     '$indexOfArray',
     '$isArray',
+    '$map',
     '$range',
     '$reduce',
     '$reverseArray',
@@ -290,6 +294,39 @@ class _Parser(object):
         except KeyError:
             return NOTHING
 
+    def _parse_or_none(self, expression):
+        """Modified version of _parse_or_nothing that returns None instead of NOTHING."""
+        value = self._parse_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
+    # TODO(guludo): alter callers of _parse_array_or_* to take appropriate
+    # actions when the returned value is not a list. Some of them already do.
+    def _parse_array_or_nothing(self, expression):
+        """Parse expression expected to return an array (which is a list in Python).
+
+        This if the expression is an array literal (list or tuple in Python),
+        then a list with every element parsed is returned. Otherwise, the
+        expression is parsed with _parse_or_nothing().
+
+        Note that is is still possible that the returned value is not a list,
+        so callers must act appropriately for such scenario.
+
+        This is useful for parsing arguments of expressions that are expected
+        to resolve to an array.
+        """
+        if isinstance(expression, (list, tuple)):
+            return [self._parse_or_none(v) for v in expression]
+        return self._parse_or_nothing(expression)
+
+    def _parse_array_or_none(self, expression):
+        """Modified version of _parse_array_or_nothing that returns None instead of NOTHING"""
+        value = self._parse_array_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
@@ -371,7 +408,7 @@ class _Parser(object):
             return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
             key, index = values
-            array = self._parse_basic_expression(key)
+            array = self._parse_array_or_nothing(key)
             index = self.parse(index)
             return array[index]
         raise NotImplementedError("Although '%s' is a valid project operator for the "
@@ -593,7 +630,7 @@ class _Parser(object):
             if not isinstance(value, (list, tuple)):
                 value = [value]
 
-            parsed_list = list(self.parse_many(value))
+            parsed_list = [self._parse_array_or_none(v) for v in value]
             for parsed_item in parsed_list:
                 if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
@@ -601,6 +638,103 @@ class _Parser(object):
                     )
 
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
+
+        if operator == '$map':
+            if not isinstance(value, dict):
+                raise OperationFailure('$map only supports an object as its argument')
+
+            # NOTE: while the two validations below could be achieved with
+            # one-liner set operations (e.g. set(value) - {'input', 'as',
+            # 'in'}), we prefer the iteration-based approaches in order to
+            # mimic MongoDB's behavior regarding the order of evaluation. For
+            # example, MongoDB complains about 'input' parameter missing before
+            # 'in'.
+            for k in ('input', 'in'):
+                if k not in value:
+                    raise OperationFailure("Missing '%s' parameter to $map" % k)
+
+            for k in value:
+                if k not in {'input', 'as', 'in'}:
+                    raise OperationFailure('Unrecognized parameter to $map: %s' % k)
+
+            input_array = self._parse_array_or_nothing(value['input'])
+
+            if input_array is None or input_array is NOTHING:
+                return None
+
+            if not isinstance(input_array, list):
+                raise OperationFailure('input to $map must be an array not %s' % type(input_array))
+
+            fieldname = value.get('as', 'this')
+            in_expr = value['in']
+            return [
+                _Parser(
+                    self._doc_dict,
+                    dict(self._user_vars, **{fieldname: item}),
+                    ignore_missing_keys=self._ignore_missing_keys,
+                ).parse(in_expr)
+                for item in input_array
+            ]
+
+        if operator == '$indexOfArray':
+            if not isinstance(value, (list, tuple)):
+                value = [value]
+            if len(value) < 2 or len(value) > 4:
+                raise OperationFailure(
+                    'Expression $indexOfArray takes at least 2 arguments, and '
+                    'at most 4, but %i were passed in.' % len(value)
+                )
+            array_value = self._parse_array_or_nothing(value[0])
+            search_value = self.parse(value[1])
+            start, end = 0, None
+            if len(value) > 2:
+                start = self.parse(value[2])
+            if len(value) > 3:
+                end = self.parse(value[3])
+
+            # Validate arguments
+            if array_value is NOTHING or array_value is None:
+                return None
+            if not isinstance(array_value, list):
+                raise OperationFailure(
+                    '$indexOfArray requires an array as a first argument, '
+                    'found: %s' % type(type(array_value))
+                )
+            if len(value) > 2:
+                if isinstance(start, int):
+                    if start < 0:
+                        raise OperationFailure(
+                            '$indexOfArray requires a nonnegative starting '
+                            'index, found: %r' % start
+                        )
+                else:
+                    raise OperationFailure(
+                        '$indexOfArrayrequires an integral starting index, '
+                        'found a value of type: %s, with value: "%r"' % (
+                            type(start), start
+                        )
+                    )
+            if len(value) > 3:
+                if isinstance(end, int):
+                    if end < 0:
+                        raise OperationFailure(
+                            '$indexOfArray requires a nonnegative ending '
+                            'index, found: %r' % end
+                        )
+                else:
+                    raise OperationFailure(
+                        '$indexOfArrayrequires an integral ending index, '
+                        'found a value of type: %s, with value: "%r"' % (
+                            type(end), end
+                        )
+                    )
+            if end is None:
+                end = len(array_value)
+
+            try:
+                return array_value.index(search_value, start, end)
+            except ValueError:
+                return -1
 
         if operator == '$size':
             if isinstance(value, list):
@@ -625,7 +759,7 @@ class _Parser(object):
             if missing_params:
                 raise OperationFailure("Missing '%s' parameter to $filter" % missing_params.pop())
 
-            input_array = self.parse(value['input'])
+            input_array = self._parse_array_or_nothing(value['input'])
             fieldname = value.get('as', 'this')
             cond = value['cond']
             return [
@@ -642,7 +776,7 @@ class _Parser(object):
             if len(value) < 2 or len(value) > 3:
                 raise OperationFailure('Expression $slice takes at least 2 arguments, and at most '
                                        '3, but {} were passed in'.format(len(value)))
-            array_value = self.parse(value[0])
+            array_value = self._parse_array_or_nothing(value[0])
             if not isinstance(array_value, list):
                 raise OperationFailure(
                     'First argument to $slice must be an array, but is of type: {}'
@@ -750,10 +884,7 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
         if operator == '$arrayToObject':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
+            parsed = self._parse_array_or_none(values)
 
             if parsed is None:
                 return None
@@ -882,13 +1013,69 @@ class _Parser(object):
         if operator == '$in':
             expression, array = values
             return self.parse(expression) in self.parse(array)
-        if operator == '$setUnion':
-            result = []
-            for set_value in values:
-                for value in self.parse(set_value):
-                    if value not in result:
-                        result.append(value)
+
+        min_args = {
+            '$setEquals': 2,
+        }
+        accepted_special_values = {
+            '$setUnion': (None, NOTHING),
+            '$setIntersection': (None, NOTHING),
+        }
+        default_result = {
+            '$setEquals': True,
+        }
+        if operator in ('$setUnion', '$setIntersection', '$setEquals'):
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+
+            if len(values) < min_args.get(operator, 0):
+                raise OperationFailure(
+                    '%s needs at least two arguments had: %r' % (operator, len(values))
+                )
+
+            values = [self._parse_array_or_nothing(v) for v in values]
+            for v in values:
+                if not isinstance(v, list):
+                    if v not in accepted_special_values.get(operator, []):
+                        type_ = 'missing' if v is NOTHING else type(v)
+                        raise OperationFailure(
+                            'All operands of %s must be arrays. '
+                            'One argument is of type: %s' % (operator, type_)
+                        )
+            input_sets = []
+            for v in values:
+                if v is None or v is NOTHING:
+                    input_sets.append(None)
+                else:
+                    input_sets.append({helpers.to_hashable(elem) for elem in v})
+
+            result = default_result.get(operator, set())
+            prev_set = None
+            for i, s in enumerate(input_sets):
+                if s is None:
+                    result = None
+                    break
+                if operator == '$setUnion':
+                    if i == 0:
+                        result = s
+                    else:
+                        result |= s
+                elif operator == '$setIntersection':
+                    if i == 0:
+                        result = s
+                    else:
+                        result &= s
+                elif operator == '$setEquals':
+                    if i > 0 and s != prev_set:
+                        result = False
+                        break
+                else:
+                    raise RuntimeError('unhandled operator %s - this is a bug' % operator)
+                prev_set = s
+            if isinstance(result, set):
+                result = [v.original for v in result]
             return result
+
         if operator == '$setEquals':
             set_values = [set(self.parse(value)) for value in values]
             for set1, set2 in itertools.combinations(set_values, 2):
@@ -1375,7 +1562,7 @@ def _handle_project_stage(in_collection, unused_database, options):
             except KeyError:
                 # Ignore missing key.
                 pass
-    if (method == 'include') == (include_id != False and include_id != 0):
+    if (method == 'include') == (include_id is not False and include_id != 0):
         filter_list.append('_id')
 
     if not filter_list:

@@ -53,6 +53,33 @@ warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
 
 
+def set_op_results(iterable):
+    """Convert results of set operations to a value usable in asserts.
+
+    This is a utility function to convert a result (or expected result) of a
+    set operation test into a value that can be compared with equality check.
+
+    It is expected that the iterable yields dictionaries with strings as keys
+    and lists (or Nones) as values. The returned value is a list containing
+    each dictionary from the iterable, but with the internal lists converted to
+    sets of values returned from to_hashables() or None if the original value
+    was None.
+
+    The order of elements resulting from set operations in MongoDB is
+    unspecified, so using this function provides a more robust way to compare
+    the results instead of just comparting the list objects.
+    """
+    results = []
+    for d in iterable:
+        results.append({})
+        for k in d:
+            if d[k] is None:
+                results[-1][k] = None
+                continue
+            results[-1][k] = {helpers.to_hashable(v) for v in d[k]}
+    return results
+
+
 class UTCPlus2(tzinfo):
     def fromutc(self, dt):
         return dt + self.utcoffset(dt)
@@ -4473,11 +4500,6 @@ class CollectionAPITest(TestCase):
                 {'$project': {'a': {'$isArray': [1, 2]}}}
             ])
 
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
-                {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
-            ])
-
     def test__aggregate_project_let(self):
         self.db.collection.insert_one({'_id': 1, 'a': 5, 'b': 2, 'c': 3})
         actual = self.db.collection.aggregate([{'$project': {
@@ -5516,7 +5538,8 @@ class CollectionAPITest(TestCase):
                 'concat_none': {'$concatArrays': None},
                 'concat_missing_field': {'$concatArrays': '$foo'},
                 'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
-                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']},
+                'concat_with_variable_inside': {'$concatArrays': ['$a', ['$a']]},
             }
         }])
         self.assertEqual(
@@ -5527,7 +5550,8 @@ class CollectionAPITest(TestCase):
                 'concat_none': None,
                 'concat_missing_field': None,
                 'concat_none_item': None,
-                'concat_missing_field_item': None
+                'concat_missing_field_item': None,
+                'concat_with_variable_inside': [1, 2, [1, 2]],
             }],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual]
         )
@@ -5622,6 +5646,173 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure, msg=option):
                 self.db.collection.aggregate(
                     [{'$project': {'filtered_items': {'$filter': option}}}])
+
+    def test__aggregate_map(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'array': [1, 2, 3, 4],
+        })
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$map': {
+                'input': '$array',
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'custom_variable': {'$map': {
+                'input': '$array',
+                'as': 'self',
+                'in': {'$multiply': ['$$self', '$$self']},
+            }},
+            'empty': {'$map': {
+                'input': [],
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'null': {'$map': {
+                'input': None,
+                'in': '$$this',
+            }},
+            'missing': {'$map': {
+                'input': '$missing.key',
+                'in': '$$this',
+            }},
+            'element_is_missing_type': {'$map': {
+                'input': ['$missing.key', 1],
+                'in': '$$this',
+            }}
+        }}])
+        expect = [{
+            'array': [1, 4, 9, 16],
+            'custom_variable': [1, 4, 9, 16],
+            'empty': [],
+            'null': None,
+            'missing': None,
+            'element_is_missing_type': [None, 1],
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_map_errors(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        data = (
+            (
+                {},
+                "Missing 'input' parameter to $map",
+            ),
+            (
+                # Check that the following message is raised before the error
+                # on the type of input
+                {'input': 'foo'},
+                "Missing 'in' parameter to $map",
+            ),
+            (
+                # NOTE: actual type is omitted in the expected message because
+                # of difference in string representations for types between
+                # Python 2 and Python 3.
+                # TODO(guludo): We should output the type name that is output
+                # by the real mongodb.
+                {'input': 'foo', 'in': '$$this'},
+                'input to $map must be an array not',
+            ),
+            (
+                {'input': [], 'in': '$$this', 'foo': 1},
+                'Unrecognized parameter to $map: foo',
+            ),
+        )
+        for op, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {'x': {'$map': op}}}])
+            self.assertIn(msg, str(cm.exception))
+
+    def test__aggregate_index_of_array(self):
+        collection = self.db.collection
+        collection.insert_one({'array': ['one', 'two', 'three', 'four']})
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'two': {'$indexOfArray': ['$array', 'two']},
+            'trhee': {'$indexOfArray': ['$array', 'three']},
+            'repeated_value': {'$indexOfArray': [[0, 3, 2, 1, 2], 2]},
+            'repeated_value_from_3': {'$indexOfArray': [[0, 3, 2, 1, 2], 2, 3]},
+            'not_found': {'$indexOfArray': ['$array', 'foo']},
+            'two_from_1': {'$indexOfArray': ['$array', 'two', 1]},
+            'two_from_2': {'$indexOfArray': ['$array', 'two', 2]},
+            'two_from_0_to_1': {'$indexOfArray': ['$array', 'two', 0, 1]},
+            'two_from_0_to_2': {'$indexOfArray': ['$array', 'two', 0, 2]},
+            'two_from_10': {'$indexOfArray': ['$array', 'two', 10]},
+            'two_from_0_to_10': {'$indexOfArray': ['$array', 'two', 0, 10]},
+            'array_literal': {'$indexOfArray': [[1, 2, 3], 3]},
+            'missing': {'$indexOfArray': ['$missing.key', 'foo']},
+            'null': {'$indexOfArray': [None, 'foo']},
+            'element_is_missing_type': {'$indexOfArray': [['$missing.key'], None]},
+        }}])
+        expect = [{
+            'two': 1,
+            'trhee': 2,
+            'repeated_value': 2,
+            'repeated_value_from_3': 4,
+            'not_found': -1,
+            'two_from_1': 1,
+            'two_from_2': -1,
+            'two_from_0_to_1': -1,
+            'two_from_0_to_2': 1,
+            'two_from_10': -1,
+            'two_from_0_to_10': 1,
+            'array_literal': 2,
+            'missing': None,
+            'null': None,
+            'element_is_missing_type': 0,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_index_of_array_errors(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        data = (
+            (
+                [],
+                ('Expression $indexOfArray takes at least 2 arguments, '
+                 'and at most 4, but 0 were passed in.'),
+            ),
+            (
+                # MongoDB behaves as if ['foo'] was passed in.
+                'foo',
+                ('Expression $indexOfArray takes at least 2 arguments, '
+                 'and at most 4, but 1 were passed in.'),
+            ),
+            (
+                # Check that error regarding number of arguments is raised
+                # before error regarding the type.
+                [1],
+                ('Expression $indexOfArray takes at least 2 arguments, '
+                 'and at most 4, but 1 were passed in.'),
+            ),
+            # NOTE: actual types are omitted in the expected message because of
+            # difference in string representations for types between Python 2
+            # and Python 3.
+            # TODO(guludo): We should output the type name that is output by
+            # the real mongodb.
+            (
+                ['foo', 'bar'],
+                '$indexOfArray requires an array as a first argument, found:',
+            ),
+            (
+                [[], 'foo', 'bar'],
+                '$indexOfArrayrequires an integral starting index, found a value of type: ',
+            ),
+            (
+                [[], 'foo', -2],
+                '$indexOfArray requires a nonnegative starting index, found: -2',
+            ),
+            (
+                [[], 'foo', 1, -4],
+                '$indexOfArray requires a nonnegative ending index, found: -4',
+            ),
+        )
+        for op, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {
+                    'foo': {'$indexOfArray': op},
+                }}])
+            self.assertIn(msg, str(cm.exception))
 
     def test__aggregate_slice(self):
         self.db.collection.drop()
@@ -5820,7 +6011,123 @@ class CollectionAPITest(TestCase):
             'nested': ['one', 'two', ['one', 'two']],
             'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
         }]
+        self.assertEqual(set_op_results(expect), set_op_results(actual))
+
+    @skipIf(sys.version_info < (3, 7), 'dictionaries maintain key order only for Python>=3.7')
+    def test__set_union_key_order(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}]},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'same_order': {'$setUnion': ['$array', [{'a': 1, 'b': 2}]]},
+            'different_order': {'$setUnion': ['$array', [{'b': 2, 'a': 1}]]},
+        }}])
+        expect = [{
+            'same_order': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}],
+            'different_order': [{'a': 1, 'b': 2}, {'b': 2, 'a': 1}, {'c': 3, 'd': 4}],
+        }]
+        self.assertEqual(set_op_results(expect), set_op_results(actual))
+
+    def test__set_union_errors(self):
+        collection = self.db.collection
+        collection.insert_many([{}])
+
+        # NOTE: actual types are omitted in the expected message because of
+        # difference in string representations for types between Python 2 and
+        # Python 3.
+        # TODO(guludo): We should output the type name that is output by the
+        # real mongodb.
+        data = (
+            (
+                ['foo'],
+                ('All operands of $setUnion must be arrays. '
+                 'One argument is of type: ')
+            ),
+            (
+                [98],
+                ('All operands of $setUnion must be arrays. '
+                 'One argument is of type: ')
+            ),
+        )
+        for operands, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {
+                    'foo': {'$setUnion': operands},
+                }}])
+            self.assertIn(msg, str(cm.exception))
+
+    def test__set_intersection(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': ['one', 'three']},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$setIntersection': [['one', 'two'], '$array']},
+            'distinct': {'$setIntersection': [['one', 'two'], ['three'], ['four']]},
+            'nested': {'$setIntersection': [['one', 'two'], [['one', 'two']]]},
+            'objects': {'$setIntersection': [[{'a': 1}, {'b': 2}], [{'a': 1}, {'c': 3}]]},
+            'empty': {'$setIntersection': []},
+            'missing': {'$setIntersection': [[1], '$missing.key']},
+            'null': {'$setIntersection': [[1], None]},
+        }}])
+        expect = [{
+            'array': ['one'],
+            'distinct': [],
+            'nested': [],
+            'objects': [{'a': 1}],
+            'empty': [],
+            'missing': None,
+            'null': None,
+        }]
+        self.assertEqual(set_op_results(expect), set_op_results(actual))
+
+    @skipIf(sys.version_info < (3, 7), 'dictionaries maintain key order only for Python>=3.7')
+    def test__set_intersection_key_order(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': [{'a': 1, 'b': 2}, {'c': 3, 'd': 4}]},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'same_order': {'$setIntersection': ['$array', [{'a': 1, 'b': 2}]]},
+            'different_order': {'$setIntersection': ['$array', [{'b': 2, 'a': 1}]]},
+        }}])
+        expect = [{
+            'same_order': [{'a': 1, 'b': 2}],
+            'different_order': [],
+        }]
         self.assertEqual(expect, list(actual))
+
+    def test__set_intersection_errors(self):
+        collection = self.db.collection
+        collection.insert_many([{}])
+
+        # NOTE: actual types are omitted in the expected message because of
+        # difference in string representations for types between Python 2 and
+        # Python 3.
+        # TODO(guludo): We should output the type name that is output by the
+        # real mongodb.
+        data = (
+            (
+                ['foo'],
+                ('All operands of $setIntersection must be arrays. '
+                 'One argument is of type: ')
+            ),
+            (
+                [98],
+                ('All operands of $setIntersection must be arrays. '
+                 'One argument is of type: ')
+            ),
+        )
+        for operands, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {
+                    'foo': {'$setIntersection': operands},
+                }}])
+            self.assertIn(msg, str(cm.exception))
 
     def test__set_equals(self):
         collection = self.db.collection
@@ -5847,6 +6154,69 @@ class CollectionAPITest(TestCase):
             'three_not_equal': False,
         }]
         self.assertEqual(expect, list(actual))
+
+    @skipIf(sys.version_info < (3, 7), 'dictionaries maintain key order only for Python>=3.7')
+    def test__set_equals_key_order(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': [{'a': 1, 'b': 2}]},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'same_order': {'$setEquals': ['$array', [{'a': 1, 'b': 2}]]},
+            'different_order': {'$setEquals': ['$array', [{'b': 2, 'a': 1}]]},
+        }}])
+        expect = [{
+            'same_order': True,
+            'different_order': False,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__set_equals_errors(self):
+        collection = self.db.collection
+        collection.insert_many([{}])
+        data = (
+            (
+                [],
+                '$setEquals needs at least two arguments had: 0'
+            ),
+            (
+                [[1]],
+                '$setEquals needs at least two arguments had: 1'
+            ),
+            (
+                # Check that errors related to number of arguments are raised
+                # before errors regarding types
+                [1],
+                '$setEquals needs at least two arguments had: 1'
+            ),
+            # NOTE: actual types (except for "missing") are omitted in the
+            # expected message because of difference in string representations
+            # for types between Python 2 and Python 3.
+            # TODO(guludo): We should output the type name that is output by
+            # the real mongodb.
+            (
+                [[1], 'foo'],
+                ('All operands of $setEquals must be arrays. '
+                 'One argument is of type: ')
+            ),
+            (
+                [[1], '$missing.key'],
+                ('All operands of $setEquals must be arrays. '
+                 'One argument is of type: missing')
+            ),
+            (
+                [[1], None],
+                ('All operands of $setEquals must be arrays. '
+                 'One argument is of type: ')
+            ),
+        )
+        for operands, msg in data:
+            with self.assertRaises(mongomock.OperationFailure) as cm:
+                collection.aggregate([{'$project': {
+                    'foo': {'$setEquals': operands},
+                }}])
+            self.assertIn(msg, str(cm.exception))
 
     def test__add_to_set_missing_value(self):
         collection = self.db.collection
