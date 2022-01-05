@@ -294,6 +294,37 @@ class _Parser(object):
         except KeyError:
             return NOTHING
 
+    def _parse_or_none(self, expression):
+        """Modified version of _parse_or_nothing that returns None instead of NOTHING."""
+        value = self._parse_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
+    def _parse_array_or_nothing(self, expression):
+        """Parse expression expected to return an array (which is a list in Python).
+
+        This if the expression is an array literal (list or tuple in Python),
+        then a list with every element parsed is returned. Otherwise, the
+        expression is parsed with _parse_or_nothing().
+
+        Note that is is still possible that the returned value is not a list,
+        so callers must act appropriately for such scenario.
+
+        This is useful for parsing arguments of expressions that are expected
+        to resolve to an array.
+        """
+        if isinstance(expression, (list, tuple)):
+            return [self._parse_or_none(v) for v in expression]
+        return self._parse_or_nothing(expression)
+
+    def _parse_array_or_none(self, expression):
+        """Modified version of _parse_array_or_nothing that returns None instead of NOTHING"""
+        value = self._parse_array_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, six.string_types) and expression.startswith('$'):
             if expression.startswith('$$'):
