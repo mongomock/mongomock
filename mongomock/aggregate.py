@@ -301,6 +301,8 @@ class _Parser(object):
             return None
         return value
 
+    # TODO(guludo): alter callers of _parse_array_or_* to take appropriate
+    # actions when the returned value is not a list. Some of them already do.
     def _parse_array_or_nothing(self, expression):
         """Parse expression expected to return an array (which is a list in Python).
 
@@ -406,7 +408,7 @@ class _Parser(object):
             return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
             key, index = values
-            array = self._parse_basic_expression(key)
+            array = self._parse_array_or_nothing(key)
             index = self.parse(index)
             return array[index]
         raise NotImplementedError("Although '%s' is a valid project operator for the "
@@ -628,7 +630,7 @@ class _Parser(object):
             if not isinstance(value, (list, tuple)):
                 value = [value]
 
-            parsed_list = list(self.parse_many(value))
+            parsed_list = [self._parse_array_or_none(v) for v in value]
             for parsed_item in parsed_list:
                 if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
@@ -655,7 +657,7 @@ class _Parser(object):
                 if k not in {'input', 'as', 'in'}:
                     raise OperationFailure('Unrecognized parameter to $map: %s' % k)
 
-            input_array = self._parse_or_nothing(value['input'])
+            input_array = self._parse_array_or_nothing(value['input'])
 
             if input_array is None or input_array is NOTHING:
                 return None
@@ -697,7 +699,7 @@ class _Parser(object):
             if missing_params:
                 raise OperationFailure("Missing '%s' parameter to $filter" % missing_params.pop())
 
-            input_array = self.parse(value['input'])
+            input_array = self._parse_array_or_nothing(value['input'])
             fieldname = value.get('as', 'this')
             cond = value['cond']
             return [
@@ -714,7 +716,7 @@ class _Parser(object):
             if len(value) < 2 or len(value) > 3:
                 raise OperationFailure('Expression $slice takes at least 2 arguments, and at most '
                                        '3, but {} were passed in'.format(len(value)))
-            array_value = self.parse(value[0])
+            array_value = self._parse_array_or_nothing(value[0])
             if not isinstance(array_value, list):
                 raise OperationFailure(
                     'First argument to $slice must be an array, but is of type: {}'
@@ -822,10 +824,7 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
         if operator == '$arrayToObject':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
+            parsed = self._parse_array_or_none(values)
 
             if parsed is None:
                 return None
@@ -974,7 +973,7 @@ class _Parser(object):
                     '%s needs at least two arguments had: %r' % (operator, len(values))
                 )
 
-            values = [self._parse_or_nothing(v) for v in values]
+            values = [self._parse_array_or_nothing(v) for v in values]
             for v in values:
                 if not isinstance(v, list):
                     if v not in accepted_special_values.get(operator, []):

@@ -5538,7 +5538,8 @@ class CollectionAPITest(TestCase):
                 'concat_none': {'$concatArrays': None},
                 'concat_missing_field': {'$concatArrays': '$foo'},
                 'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
-                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']}
+                'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']},
+                'concat_with_variable_inside': {'$concatArrays': ['$a', ['$a']]},
             }
         }])
         self.assertEqual(
@@ -5549,7 +5550,8 @@ class CollectionAPITest(TestCase):
                 'concat_none': None,
                 'concat_missing_field': None,
                 'concat_none_item': None,
-                'concat_missing_field_item': None
+                'concat_missing_field_item': None,
+                'concat_with_variable_inside': [1, 2, [1, 2]],
             }],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual]
         )
@@ -5673,6 +5675,10 @@ class CollectionAPITest(TestCase):
                 'input': '$missing.key',
                 'in': '$$this',
             }},
+            'element_is_missing_type': {'$map': {
+                'input': ['$missing.key', 1],
+                'in': '$$this',
+            }}
         }}])
         expect = [{
             'array': [1, 4, 9, 16],
@@ -5680,6 +5686,7 @@ class CollectionAPITest(TestCase):
             'empty': [],
             'null': None,
             'missing': None,
+            'element_is_missing_type': [None, 1],
         }]
         self.assertEqual(expect, list(actual))
 
