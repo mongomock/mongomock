@@ -1,4 +1,4 @@
-from collections import OrderedDict, abc
+from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
 from distutils import version  # pylint: disable=no-name-in-module
 from mongomock import InvalidURI
@@ -7,6 +7,12 @@ from six.moves.urllib_parse import unquote_plus
 from six import PY3, iteritems, raise_from, string_types
 import time
 import warnings
+
+import sys
+if sys.version_info.major > 2:
+    from collections.abc import ItemsView
+else:
+    from collections import ItemsView
 
 
 # Get ObjectId from bson if available or import a crafted one. This is not used
@@ -86,7 +92,7 @@ def create_index_list(key_or_list, direction=None):
     """
     if isinstance(key_or_list, string_types):
         return [(key_or_list, direction or ASCENDING)]
-    if isinstance(key_or_list, abc.ItemsView):
+    if isinstance(key_or_list, ItemsView):
         return list(key_or_list)
     if not isinstance(key_or_list, (list, tuple)):
         raise TypeError('if no direction is specified, '
