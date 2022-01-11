@@ -492,6 +492,7 @@ TYPE_MAP = {
     'timestamp': None,
     'long': (float,),
     'decimal': (float,),
+    'number': (int, float),
     'minKey': None,
     'maxKey': None,
 }

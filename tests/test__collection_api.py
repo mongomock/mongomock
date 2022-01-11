@@ -4538,6 +4538,21 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test__find_type_number(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': 'str'},
+            {'_id': 2, 'a': 1},
+            {'_id': 3, 'a': {'b': 1}},
+            {'_id': 4, 'a': 1.2},
+            {'_id': 5, 'a': None},
+        ])
+        actual = self.db.collection.find({'a': {'$type': 'number'}})
+        expect = [
+            {'_id': 2, 'a': 1},
+            {'_id': 4, 'a': 1.2},
+        ]
+        self.assertEqual(expect, list(actual))
+
     def test__find_unknown_type(self):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_one({'arr': {'$type': 'unknown-type'}})
