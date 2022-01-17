@@ -166,14 +166,14 @@ class DatabaseAPITest(TestCase):
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
             @property
-            def python_type(self):
+            def python_type(self):  # pylint: disable=invalid-overridden-method
                 return _CustomTypeCodec
 
             def transform_python(self, unused_value):
                 pass
 
             @property
-            def bson_type(self):
+            def bson_type(self):  # pylint: disable=invalid-overridden-method
                 return int
 
             def transform_bson(self, unused_value):
