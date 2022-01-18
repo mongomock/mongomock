@@ -26,6 +26,13 @@ if _PYMONGO_VERSION >= version.parse('3.8'):
 else:
     _DEFAULT_TYPE_REGISTRY = TypeRegistry()
 
+# New default in Pymongo v4:
+# https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
+if _PYMONGO_VERSION >= version.parse('4.0'):
+    _DEFAULT_UUID_REPRESENTATION = 0
+else:
+    _DEFAULT_UUID_REPRESENTATION = 3
+
 
 class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
 
@@ -43,8 +50,8 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
             raise TypeError('tz_aware must be True or False')
 
         if uuid_representation is None:
-            uuid_representation = 3
-        if uuid_representation != 3:
+            uuid_representation = _DEFAULT_UUID_REPRESENTATION
+        if uuid_representation != _DEFAULT_UUID_REPRESENTATION:
             raise NotImplementedError('Mongomock does not handle custom uuid_representation yet')
 
         if unicode_decode_error_handler not in ('strict', None):

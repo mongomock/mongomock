@@ -147,7 +147,7 @@ class CollectionStore(object):
             return
 
         # "key" structure = list of (field name, direction) tuples
-        ttl_field_name = index['key'][0][0]
+        ttl_field_name = next(iter(index['key']))[0]
         ttl_now = mongomock.utcnow()
         expired_ids = [
             doc['_id'] for doc in six.itervalues(self._documents)

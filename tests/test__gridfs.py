@@ -5,6 +5,7 @@ from unittest import TestCase, skipIf
 
 import mongomock
 import mongomock.gridfs
+from packaging import version
 from six import text_type
 
 try:
@@ -21,9 +22,11 @@ try:
 
     import pymongo
     from pymongo import MongoClient as PymongoClient
+    _PYMONGO_VERSION = version.parse(pymongo.version)
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
+    _PYMONGO_VERSION = version.parse('0.0')
 
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
@@ -139,7 +142,10 @@ class GridFsTest(TestCase):
             self.fake_gridfs.put(GenFile(2, 3), _id='12345')
 
     def assertSameFile(self, real, fake, max_delta_seconds=1):
-        self.assertEqual(real['md5'], fake['md5'])
+        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#disable-md5-parameter-is-removed
+        if _PYMONGO_VERSION < version.parse('4.0'):
+            self.assertEqual(real['md5'], fake['md5'])
+
         self.assertEqual(real['length'], fake['length'])
         self.assertEqual(real['chunkSize'], fake['chunkSize'])
         self.assertLessEqual(

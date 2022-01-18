@@ -230,7 +230,7 @@ class DatabaseAPITest(TestCase):
     def test__lazy_create_collection(self):
         col = self.database.a
         self.assertEqual(set(self.database.list_collection_names()), set())
-        col.insert({'foo': 'bar'})
+        col.insert_one({'foo': 'bar'})
         self.assertEqual(set(self.database.list_collection_names()), set(['a']))
 
     def test__equality(self):

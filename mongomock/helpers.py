@@ -1,3 +1,4 @@
+from collections import abc
 from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
@@ -86,7 +87,7 @@ def create_index_list(key_or_list, direction=None):
     """
     if isinstance(key_or_list, string_types):
         return [(key_or_list, direction or ASCENDING)]
-    if not isinstance(key_or_list, (list, tuple)):
+    if not isinstance(key_or_list, (list, tuple, abc.Iterable)):
         raise TypeError('if no direction is specified, '
                         'key_or_list must be an instance of list')
     return key_or_list
