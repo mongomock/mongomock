@@ -1039,6 +1039,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         ])
         self.cmp.compare.find({}, sort=[('timestamp', 1), ('_id', 1)])
 
+    @skipIf(
+        _PYMONGO_VERSION < version.parse('4.0'),
+        'old version of pymongo accepts to encode uuid')
+    def test__fail_at_uuid_encoding(self):
+        self.cmp.compare_exceptions.insert_one({'_id': uuid.UUID(int=2)})
+
     def test__find_all(self):
         self.cmp.do.insert_many([
             {
