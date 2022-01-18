@@ -1137,6 +1137,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
 
+    @skipIf(
+        _PYMONGO_VERSION < version.parse('4.0'),
+        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
+        'In pymongo v4 or above, the behavior changed')
+    def test__default_fields_to_all_if_empty(self):
+        self.cmp.do.insert_one({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
+        self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
+
     def test__projection_slice_int_first(self):
         self.cmp.do.insert_one({'name': 'Array', 'values': [0, 1, 2, 3, 4, 5, 6, 7]})
         self.cmp.compare.find({'name': 'Array'}, projection={'name': 1, 'values': {'$slice': 1}})

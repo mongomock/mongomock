@@ -1132,7 +1132,8 @@ class Collection(object):
     def _copy_only_fields(self, doc, fields, container):
         """Copy only the specified fields."""
 
-        if fields is None:
+        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
+        if fields is None or not fields and helpers.PYMONGO_VERSION >= version.parse('4.0'):
             return self._copy_field(doc, container)
 
         if not fields:
