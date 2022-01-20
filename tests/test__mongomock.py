@@ -348,8 +348,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 'Returned object ids not unique!')
         self.cmp.compare_ignore_order.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__insert(self):
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.insert({'a': 1})
+            return
         self.cmp.do.insert({'a': 1})
         self.cmp.compare.find()
 
@@ -361,10 +363,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
         self.cmp.compare.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__save(self):
         # add an item with a non ObjectId _id first.
         self.cmp.do.insert_one({'_id': 'b'})
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.save({'_id': ObjectId(), 'someProp': 1})
+            return
         self.cmp.do.save({'_id': ObjectId(), 'someProp': 1})
         self.cmp.compare_ignore_order.find()
 
@@ -398,8 +402,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
             self.cmp.do.delete_one({'_id': doc_id})
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__count(self):
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.count()
+            return
         self.cmp.compare.count()
         self.cmp.do.insert_one({'a': 1})
         self.cmp.compare.count()
@@ -902,9 +908,12 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$ne': 3}})
         self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$nin': [1, 3]}})
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__find_and_modify_remove(self):
         self.cmp.do.insert_many([{'a': x, 'junk': True} for x in range(10)])
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.find_and_modify(
+                {'a': 2}, remove=True, fields={'_id': False, 'a': True})
+            return
         self.cmp.compare.find_and_modify({'a': 2}, remove=True, fields={'_id': False, 'a': True})
         self.cmp.compare_ignore_order.find()
 
@@ -1135,19 +1144,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find(
             {'name': 'Chucky'}, projection={'properties.type': 0, 'properties.model': 0})
 
-    @skipIf(
-        _PYMONGO_VERSION >= version.parse('4.0'),
-        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        'In pymongo v4 or above, the behavior changed')
-    def test__default_fields_to_id_if_empty(self):
-        self.cmp.do.insert_one({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
-        self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
-
-    @skipIf(
-        _PYMONGO_VERSION < version.parse('4.0'),
-        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        'In pymongo v4 or above, the behavior changed')
-    def test__default_fields_to_all_if_empty(self):
+    def test__default_fields_if_projection_empty(self):
         self.cmp.do.insert_one({'name': 'Chucky', 'type': 'doll', 'model': 'v6'})
         self.cmp.compare_ignore_order.find({'name': 'Chucky'}, projection=[])
 
@@ -1205,11 +1202,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.find({'name': 'Array'}, projection={
             'name': 1, 'values': {'$slice': 1}})
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__remove(self):
         """Test the remove method."""
         self.cmp.do.insert_one({'value': 1})
         self.cmp.compare_ignore_order.find()
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.remove()
+            return
         self.cmp.do.remove()
         self.cmp.compare.find()
         self.cmp.do.insert_many([
@@ -1238,15 +1237,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.delete_many({'a': {'$gt': 5}})
         self.cmp.compare.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__update(self):
         doc = {'a': 1}
         self.cmp.do.insert_one(doc)
         new_document = {'new_attr': 2}
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.update({'a': 1}, new_document)
+            return
         self.cmp.do.update({'a': 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
+    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above dropped update')
     def test__update_upsert_with_id(self):
         self.cmp.do.update(
             {'a': 1}, {'_id': ObjectId('52d669dcad547f059424f783'), 'a': 1}, upsert=True)
@@ -1954,8 +1955,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.compare.find({})
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
     def test__ensure_index(self):
+        if _PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.ensure_index('name')
+            return
         self.cmp.compare.ensure_index('name')
         self.cmp.compare.ensure_index('hat', cache_for=100)
         self.cmp.compare.ensure_index([('name', 1), ('hat', -1)])
@@ -2019,6 +2022,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
+@skipIf(
+    helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION >= version.parse('4.0'),
+    'pymongo v4 dropped map reduce')
 class CollectionMapReduceTest(TestCase):
 
     def setUp(self):
@@ -4135,6 +4141,9 @@ class InsertedDocumentTest(TestCase):
         [object] = self.collection.find({'_id': self.object_id})
         self.assertEqual(object, self.data)
 
+    @skipIf(
+        helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION >= version.parse('4.0'),
+        'remove was removed in pymongo v4')
     def test__remove_by_id(self):
         self.collection.remove(self.object_id)
         self.assertEqual(0, self.collection.find({}).count())

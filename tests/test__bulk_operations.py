@@ -26,6 +26,8 @@ from tests.multicollection import MultiCollection
 from unittest import TestCase, skipIf
 
 
+# https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
+@skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
 class BulkOperationsTest(TestCase):
 
     test_with_pymongo = False
@@ -189,8 +191,6 @@ class BulkOperationsTest(TestCase):
 
 @skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
-# https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
 class BulkOperationsWithPymongoTest(BulkOperationsTest):
     test_with_pymongo = True
 

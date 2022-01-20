@@ -402,6 +402,12 @@ class Collection(object):
                 (self.__class__.__name__, attr, self.name, attr, self.name, attr))
         return self.__getitem__(attr)
 
+    def __call__(self, *args, **kwargs):
+        name = self._name if '.' not in self._name else self._name.split('.')[-1]
+        raise TypeError(
+            "'Collection' object is not callable. If you meant to call the '%s' method on a "
+            "'Collection' object it is failing because no such method exists." % name)
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.database == other.database and self.name == other.name
@@ -445,12 +451,13 @@ class Collection(object):
         return BulkOperationBuilder(
             self, ordered=True, bypass_document_validation=bypass_document_validation)
 
-    def insert(self, data, manipulate=True, check_keys=True,
-               continue_on_error=False, **kwargs):
-        warnings.warn('insert is deprecated. Use insert_one or insert_many '
-                      'instead.', DeprecationWarning, stacklevel=2)
-        validate_write_concern_params(**kwargs)
-        return self._insert(data)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def insert(self, data, manipulate=True, check_keys=True,
+                   continue_on_error=False, **kwargs):
+            warnings.warn('insert is deprecated. Use insert_one or insert_many '
+                          'instead.', DeprecationWarning, stacklevel=2)
+            validate_write_concern_params(**kwargs)
+            return self._insert(data)
 
     def insert_one(self, document, bypass_document_validation=False, session=None):
         if not bypass_document_validation:
@@ -591,12 +598,13 @@ class Collection(object):
             self._update(filter, replacement, upsert=upsert, hint=hint, session=session),
             acknowledged=True)
 
-    def update(self, spec, document, upsert=False, manipulate=False,
-               multi=False, check_keys=False, **kwargs):
-        warnings.warn('update is deprecated. Use replace_one, update_one or '
-                      'update_many instead.', DeprecationWarning, stacklevel=2)
-        return self._update(spec, document, upsert, manipulate, multi,
-                            check_keys, **kwargs)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def update(self, spec, document, upsert=False, manipulate=False,
+                   multi=False, check_keys=False, **kwargs):
+            warnings.warn('update is deprecated. Use replace_one, update_one or '
+                          'update_many instead.', DeprecationWarning, stacklevel=2)
+            return self._update(spec, document, upsert, manipulate, multi,
+                                check_keys, **kwargs)
 
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, hint=None, session=None,
@@ -1133,7 +1141,8 @@ class Collection(object):
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or not fields and helpers.PYMONGO_VERSION >= version.parse('4.0'):
+        if fields is None or not fields and (
+                helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION >= version.parse('4.0')):
             return self._copy_field(doc, container)
 
         if not fields:
@@ -1306,15 +1315,16 @@ class Collection(object):
         return self._find_and_modify(filter, projection, update, upsert,
                                      sort, return_document, **kwargs)
 
-    def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
-                        full_response=False, manipulate=False, fields=None, **kwargs):
-        warnings.warn('find_and_modify is deprecated, use find_one_and_delete'
-                      ', find_one_and_replace, or find_one_and_update instead',
-                      DeprecationWarning, stacklevel=2)
-        if 'projection' in kwargs:
-            raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
-        return self._find_and_modify(query, update=update, upsert=upsert,
-                                     sort=sort, projection=fields, **kwargs)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
+                            full_response=False, manipulate=False, fields=None, **kwargs):
+            warnings.warn('find_and_modify is deprecated, use find_one_and_delete'
+                          ', find_one_and_replace, or find_one_and_update instead',
+                          DeprecationWarning, stacklevel=2)
+            if 'projection' in kwargs:
+                raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
+            return self._find_and_modify(query, update=update, upsert=upsert,
+                                         sort=sort, projection=fields, **kwargs)
 
     def _find_and_modify(self, query, projection=None, update=None,
                          upsert=False, sort=None,
@@ -1350,16 +1360,18 @@ class Collection(object):
             return self.find_one(query, projection)
         return old
 
-    def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
-        warnings.warn('save is deprecated. Use insert_one or replace_one '
-                      'instead', DeprecationWarning, stacklevel=2)
-        validate_is_mutable_mapping('to_save', to_save)
-        validate_write_concern_params(**kwargs)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
+            warnings.warn('save is deprecated. Use insert_one or replace_one '
+                          'instead', DeprecationWarning, stacklevel=2)
+            validate_is_mutable_mapping('to_save', to_save)
+            validate_write_concern_params(**kwargs)
 
-        if '_id' not in to_save:
-            return self.insert(to_save)
-        self._update({'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs)
-        return to_save.get('_id', None)
+            if '_id' not in to_save:
+                return self.insert(to_save)
+            self._update(
+                {'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs)
+            return to_save.get('_id', None)
 
     def delete_one(self, filter, collation=None, hint=None, session=None):
         validate_is_mapping('filter', filter)
@@ -1406,25 +1418,26 @@ class Collection(object):
             'err': None,
         }
 
-    def remove(self, spec_or_id=None, multi=True, **kwargs):
-        warnings.warn('remove is deprecated. Use delete_one or delete_many '
-                      'instead.', DeprecationWarning, stacklevel=2)
-        validate_write_concern_params(**kwargs)
-        return self._delete(spec_or_id, multi=multi)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def remove(self, spec_or_id=None, multi=True, **kwargs):
+            warnings.warn('remove is deprecated. Use delete_one or delete_many '
+                          'instead.', DeprecationWarning, stacklevel=2)
+            validate_write_concern_params(**kwargs)
+            return self._delete(spec_or_id, multi=multi)
 
-    def count(self, filter=None, **kwargs):
-        warnings.warn(
-            'count is deprecated. Use estimated_document_count or '
-            'count_documents instead. Please note that $where must be replaced '
-            'by $expr, $near must be replaced by $geoWithin with $center, and '
-            '$nearSphere must be replaced by $geoWithin with $centerSphere',
-            DeprecationWarning, stacklevel=2)
-        if kwargs.pop('session', None):
-            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        if filter is None:
-            return len(self._store)
-        spec = helpers.patch_datetime_awareness_in_document(filter)
-        return len(list(self._iter_documents(spec)))
+        def count(self, filter=None, **kwargs):
+            warnings.warn(
+                'count is deprecated. Use estimated_document_count or '
+                'count_documents instead. Please note that $where must be replaced '
+                'by $expr, $near must be replaced by $geoWithin with $center, and '
+                '$nearSphere must be replaced by $geoWithin with $centerSphere',
+                DeprecationWarning, stacklevel=2)
+            if kwargs.pop('session', None):
+                raise_not_implemented('session', 'Mongomock does not handle sessions yet')
+            if filter is None:
+                return len(self._store)
+            spec = helpers.patch_datetime_awareness_in_document(filter)
+            return len(list(self._iter_documents(spec)))
 
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
@@ -1467,8 +1480,9 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self.database.drop_collection(self.name)
 
-    def ensure_index(self, key_or_list, cache_for=300, **kwargs):
-        return self.create_index(key_or_list, cache_for, **kwargs)
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def ensure_index(self, key_or_list, cache_for=300, **kwargs):
+            return self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
         if session:
@@ -1584,109 +1598,111 @@ class Collection(object):
             for name, index in self._list_all_indexes()
         }
 
-    def map_reduce(self, map_func, reduce_func, out, full_response=False,
-                   query=None, limit=0, session=None):
-        if execjs is None:
-            raise NotImplementedError(
-                'PyExecJS is required in order to run Map-Reduce. '
-                "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
-            )
-        if session:
-            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        if limit == 0:
-            limit = None
-        start_time = _get_perf_counter()  # pylint: disable=deprecated-method
-        out_collection = None
-        reduced_rows = None
-        full_dict = {
-            'counts': {
-                'input': 0,
-                'reduce': 0,
-                'emit': 0,
-                'output': 0},
-            'timeMillis': 0,
-            'ok': 1.0,
-            'result': None}
-        map_ctx = execjs.compile('''
-            function doMap(fnc, docList) {
-                var mappedDict = {};
-                function emit(key, val) {
-                    if (key['$oid']) {
-                        mapped_key = '$oid' + key['$oid'];
+    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def map_reduce(self, map_func, reduce_func, out, full_response=False,
+                       query=None, limit=0, session=None):
+            if execjs is None:
+                raise NotImplementedError(
+                    'PyExecJS is required in order to run Map-Reduce. '
+                    "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
+                )
+            if session:
+                raise_not_implemented('session', 'Mongomock does not handle sessions yet')
+            if limit == 0:
+                limit = None
+            start_time = _get_perf_counter()  # pylint: disable=deprecated-method
+            out_collection = None
+            reduced_rows = None
+            full_dict = {
+                'counts': {
+                    'input': 0,
+                    'reduce': 0,
+                    'emit': 0,
+                    'output': 0},
+                'timeMillis': 0,
+                'ok': 1.0,
+                'result': None}
+            map_ctx = execjs.compile('''
+                function doMap(fnc, docList) {
+                    var mappedDict = {};
+                    function emit(key, val) {
+                        if (key['$oid']) {
+                            mapped_key = '$oid' + key['$oid'];
+                        }
+                        else {
+                            mapped_key = key;
+                        }
+                        if(!mappedDict[mapped_key]) {
+                            mappedDict[mapped_key] = [];
+                        }
+                        mappedDict[mapped_key].push(val);
                     }
-                    else {
-                        mapped_key = key;
+                    mapper = eval('('+fnc+')');
+                    var mappedList = new Array();
+                    for(var i=0; i<docList.length; i++) {
+                        var thisDoc = eval('('+docList[i]+')');
+                        var mappedVal = (mapper).call(thisDoc);
                     }
-                    if(!mappedDict[mapped_key]) {
-                        mappedDict[mapped_key] = [];
+                    return mappedDict;
+                }
+            ''')
+            reduce_ctx = execjs.compile('''
+                function doReduce(fnc, docList) {
+                    var reducedList = new Array();
+                    reducer = eval('('+fnc+')');
+                    for(var key in docList) {
+                        var reducedVal = {'_id': key,
+                                'value': reducer(key, docList[key])};
+                        reducedList.push(reducedVal);
                     }
-                    mappedDict[mapped_key].push(val);
+                    return reducedList;
                 }
-                mapper = eval('('+fnc+')');
-                var mappedList = new Array();
-                for(var i=0; i<docList.length; i++) {
-                    var thisDoc = eval('('+docList[i]+')');
-                    var mappedVal = (mapper).call(thisDoc);
-                }
-                return mappedDict;
-            }
-        ''')
-        reduce_ctx = execjs.compile('''
-            function doReduce(fnc, docList) {
-                var reducedList = new Array();
-                reducer = eval('('+fnc+')');
-                for(var key in docList) {
-                    var reducedVal = {'_id': key,
-                            'value': reducer(key, docList[key])};
-                    reducedList.push(reducedVal);
-                }
-                return reducedList;
-            }
-        ''')
-        doc_list = [json.dumps(doc, default=json_util.default)
-                    for doc in self.find(query)]
-        mapped_rows = map_ctx.call('doMap', map_func, doc_list)
-        reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
-        for reduced_row in reduced_rows:
-            if reduced_row['_id'].startswith('$oid'):
-                reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])
-        reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
-        if full_response:
-            full_dict['counts']['input'] = len(doc_list)
-            for key in mapped_rows.keys():
-                emit_count = len(mapped_rows[key])
-                full_dict['counts']['emit'] += emit_count
-                if emit_count > 1:
-                    full_dict['counts']['reduce'] += 1
-            full_dict['counts']['output'] = len(reduced_rows)
-        if isinstance(out, (string_types, bytes)):
-            out_collection = getattr(self.database, out)
-            out_collection.drop()
-            out_collection.insert(reduced_rows)
-            ret_val = out_collection
-            full_dict['result'] = out
-        elif isinstance(out, SON) and out.get('replace') and out.get('db'):
-            # Must be of the format SON([('replace','results'),('db','outdb')])
-            out_db = getattr(self.database._client, out['db'])
-            out_collection = getattr(out_db, out['replace'])
-            out_collection.insert(reduced_rows)
-            ret_val = out_collection
-            full_dict['result'] = {'db': out['db'], 'collection': out['replace']}
-        elif isinstance(out, dict) and out.get('inline'):
-            ret_val = reduced_rows
-            full_dict['result'] = reduced_rows
-        else:
-            raise TypeError("'out' must be an instance of string, dict or bson.SON")
-        time_millis = (_get_perf_counter() - start_time) * 1000  # pylint: disable=deprecated-method
-        full_dict['timeMillis'] = int(round(time_millis))
-        if full_response:
-            ret_val = full_dict
-        return ret_val
+            ''')
+            doc_list = [json.dumps(doc, default=json_util.default)
+                        for doc in self.find(query)]
+            mapped_rows = map_ctx.call('doMap', map_func, doc_list)
+            reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
+            for reduced_row in reduced_rows:
+                if reduced_row['_id'].startswith('$oid'):
+                    reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])
+            reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
+            if full_response:
+                full_dict['counts']['input'] = len(doc_list)
+                for key in mapped_rows.keys():
+                    emit_count = len(mapped_rows[key])
+                    full_dict['counts']['emit'] += emit_count
+                    if emit_count > 1:
+                        full_dict['counts']['reduce'] += 1
+                full_dict['counts']['output'] = len(reduced_rows)
+            if isinstance(out, (string_types, bytes)):
+                out_collection = getattr(self.database, out)
+                out_collection.drop()
+                out_collection.insert(reduced_rows)
+                ret_val = out_collection
+                full_dict['result'] = out
+            elif isinstance(out, SON) and out.get('replace') and out.get('db'):
+                # Must be of the format SON([('replace','results'),('db','outdb')])
+                out_db = getattr(self.database._client, out['db'])
+                out_collection = getattr(out_db, out['replace'])
+                out_collection.insert(reduced_rows)
+                ret_val = out_collection
+                full_dict['result'] = {'db': out['db'], 'collection': out['replace']}
+            elif isinstance(out, dict) and out.get('inline'):
+                ret_val = reduced_rows
+                full_dict['result'] = reduced_rows
+            else:
+                raise TypeError("'out' must be an instance of string, dict or bson.SON")
+            time_millis = (
+                _get_perf_counter() - start_time) * 1000  # pylint: disable=deprecated-method
+            full_dict['timeMillis'] = int(round(time_millis))
+            if full_response:
+                ret_val = full_dict
+            return ret_val
 
-    def inline_map_reduce(self, map_func, reduce_func, full_response=False,
-                          query=None, limit=0, session=None):
-        return self.map_reduce(
-            map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session)
+        def inline_map_reduce(self, map_func, reduce_func, full_response=False,
+                              query=None, limit=0, session=None):
+            return self.map_reduce(
+                map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session)
 
     def distinct(self, key, filter=None, session=None):
         if session:
