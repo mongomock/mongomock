@@ -1,10 +1,11 @@
 import os
 import time
 import unittest
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skipUnless
 
 import mongomock
 import mongomock.gridfs
+from mongomock import helpers
 from packaging import version
 from six import text_type
 
@@ -22,15 +23,12 @@ try:
 
     import pymongo
     from pymongo import MongoClient as PymongoClient
-    _PYMONGO_VERSION = version.parse(pymongo.version)
-    _HAVE_PYMONGO = True
 except ImportError:
-    _HAVE_PYMONGO = False
-    _PYMONGO_VERSION = version.parse('0.0')
+    ...
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
-@skipIf(not _HAVE_GRIDFS, 'gridfs not installed')
+@skipUnless(helpers.HAVE_PYMONGO, 'pymongo not installed')
+@skipUnless(_HAVE_GRIDFS, 'gridfs not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class GridFsTest(TestCase):
 
@@ -143,7 +141,7 @@ class GridFsTest(TestCase):
 
     def assertSameFile(self, real, fake, max_delta_seconds=1):
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#disable-md5-parameter-is-removed
-        if _PYMONGO_VERSION < version.parse('4.0'):
+        if helpers.PYMONGO_VERSION < version.parse('4.0'):
             self.assertEqual(real['md5'], fake['md5'])
 
         self.assertEqual(real['length'], fake['length'])

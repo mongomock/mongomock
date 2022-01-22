@@ -413,9 +413,7 @@ class Collection(object):
             return self.database == other.database and self.name == other.name
         return NotImplemented
 
-    if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
-    ):
+    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash((self.database, self.name))
 
@@ -451,7 +449,7 @@ class Collection(object):
         return BulkOperationBuilder(
             self, ordered=True, bypass_document_validation=bypass_document_validation)
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def insert(self, data, manipulate=True, check_keys=True,
                    continue_on_error=False, **kwargs):
             warnings.warn('insert is deprecated. Use insert_one or insert_many '
@@ -598,7 +596,7 @@ class Collection(object):
             self._update(filter, replacement, upsert=upsert, hint=hint, session=session),
             acknowledged=True)
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def update(self, spec, document, upsert=False, manipulate=False,
                    multi=False, check_keys=False, **kwargs):
             warnings.warn('update is deprecated. Use replace_one, update_one or '
@@ -1141,8 +1139,7 @@ class Collection(object):
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or not fields and (
-                helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION >= version.parse('4.0')):
+        if fields is None or not fields and helpers.PYMONGO_VERSION >= version.parse('4.0'):
             return self._copy_field(doc, container)
 
         if not fields:
@@ -1315,7 +1312,7 @@ class Collection(object):
         return self._find_and_modify(filter, projection, update, upsert,
                                      sort, return_document, **kwargs)
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
                             full_response=False, manipulate=False, fields=None, **kwargs):
             warnings.warn('find_and_modify is deprecated, use find_one_and_delete'
@@ -1360,7 +1357,7 @@ class Collection(object):
             return self.find_one(query, projection)
         return old
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
             warnings.warn('save is deprecated. Use insert_one or replace_one '
                           'instead', DeprecationWarning, stacklevel=2)
@@ -1418,7 +1415,7 @@ class Collection(object):
             'err': None,
         }
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def remove(self, spec_or_id=None, multi=True, **kwargs):
             warnings.warn('remove is deprecated. Use delete_one or delete_many '
                           'instead.', DeprecationWarning, stacklevel=2)
@@ -1480,7 +1477,7 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self.database.drop_collection(self.name)
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def ensure_index(self, key_or_list, cache_for=300, **kwargs):
             return self.create_index(key_or_list, cache_for, **kwargs)
 
@@ -1598,7 +1595,7 @@ class Collection(object):
             for name, index in self._list_all_indexes()
         }
 
-    if not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def map_reduce(self, map_func, reduce_func, out, full_response=False,
                        query=None, limit=0, session=None):
             if execjs is None:

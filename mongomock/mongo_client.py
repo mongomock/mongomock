@@ -74,9 +74,7 @@ class MongoClient(object):
             return self.address == other.address
         return NotImplemented
 
-    if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
-    ):
+    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash(self.address)
 

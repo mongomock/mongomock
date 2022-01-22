@@ -1,6 +1,7 @@
 import os
 
 import mongomock
+from mongomock import helpers
 from packaging import version
 
 try:
@@ -15,19 +16,15 @@ except ImportError:
 
 try:
     import pymongo
-    _HAVE_PYMONGO = True
-    _PYMONGO_VERSION = version.parse(pymongo.version)
 except ImportError:
-    _HAVE_PYMONGO = False
-    _PYMONGO_VERSION = version.parse('0.0')
-
+    pymongo = None
 
 from tests.multicollection import MultiCollection
 from unittest import TestCase, skipIf
 
 
 # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
+@skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
 class BulkOperationsTest(TestCase):
 
     test_with_pymongo = False
@@ -189,16 +186,16 @@ class BulkOperationsTest(TestCase):
         self.__check_number_of_elements(2)
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class BulkOperationsWithPymongoTest(BulkOperationsTest):
     test_with_pymongo = True
 
 
-@skipIf(not _HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
+@skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
 class CollectionComparisonTest(TestCase):
 
     def setUp(self):

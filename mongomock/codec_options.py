@@ -3,13 +3,12 @@
 import collections
 from packaging import version
 
+from mongomock import helpers
+
 try:
     from bson import codec_options
-    import pymongo
-    _PYMONGO_VERSION = version.parse(pymongo.version)
 except ImportError:
     codec_options = None
-    _PYMONGO_VERSION = version.parse('0.0')
 
 
 class TypeRegistry(object):
@@ -20,7 +19,7 @@ _FIELDS = (
     'document_class', 'tz_aware', 'uuid_representation', 'unicode_decode_error_handler', 'tzinfo',
 )
 
-if _PYMONGO_VERSION >= version.parse('3.8'):
+if codec_options and helpers.PYMONGO_VERSION >= version.parse('3.8'):
     _DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
     _FIELDS = _FIELDS + ('type_registry',)
 else:
@@ -28,7 +27,7 @@ else:
 
 # New default in Pymongo v4:
 # https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
-if _PYMONGO_VERSION >= version.parse('4.0'):
+if helpers.PYMONGO_VERSION >= version.parse('4.0'):
     _DEFAULT_UUID_REPRESENTATION = 0
 else:
     _DEFAULT_UUID_REPRESENTATION = 3

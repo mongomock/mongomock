@@ -68,9 +68,7 @@ class Database(object):
             return self._client == other._client and self.name == other.name
         return NotImplemented
 
-    if PY3 and (
-        not helpers.PYMONGO_VERSION or helpers.PYMONGO_VERSION >= version.parse('3.12')
-    ):
+    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash((self._client, self.name))
 

@@ -21,7 +21,8 @@ try:
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
     Timestamp = None
-    PYMONGO_VERSION = None
+    # Default Pymongo version if not present.
+    PYMONGO_VERSION = version.parse('4.0')
     HAVE_PYMONGO = False
 
 # Cache the RegExp pattern type.

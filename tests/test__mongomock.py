@@ -24,11 +24,9 @@ try:
     import pymongo
     from pymongo import MongoClient as PymongoClient
     from pymongo.read_preferences import ReadPreference
-    _PYMONGO_VERSION = version.parse(pymongo.version)
 except ImportError:
     from mongomock.object_id import ObjectId
     from tests.utils import DBRef
-    _PYMONGO_VERSION = version.parse('0.0')
 try:
     from bson.code import Code
     from bson.regex import Regex
@@ -349,7 +347,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find()
 
     def test__insert(self):
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.insert({'a': 1})
             return
         self.cmp.do.insert({'a': 1})
@@ -366,7 +364,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__save(self):
         # add an item with a non ObjectId _id first.
         self.cmp.do.insert_one({'_id': 'b'})
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.save({'_id': ObjectId(), 'someProp': 1})
             return
         self.cmp.do.save({'_id': ObjectId(), 'someProp': 1})
@@ -403,7 +401,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             self.cmp.do.delete_one({'_id': doc_id})
 
     def test__count(self):
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.count()
             return
         self.cmp.compare.count()
@@ -910,7 +908,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__find_and_modify_remove(self):
         self.cmp.do.insert_many([{'a': x, 'junk': True} for x in range(10)])
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.find_and_modify(
                 {'a': 2}, remove=True, fields={'_id': False, 'a': True})
             return
@@ -1014,7 +1012,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     @skipIf(sys.version_info < (3, 7), 'Older versions of Python cannot copy regex partterns')
     @skipIf(
-        _PYMONGO_VERSION >= version.parse('4.0'),
+        helpers.PYMONGO_VERSION >= version.parse('4.0'),
         'pymongo v4 or above do not specify uuid encoding')
     def test__sort_mixed_types(self):
         self.cmp.do.insert_many([
@@ -1037,7 +1035,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({}, sort=[('a', 1), ('type', 1)])
 
     @skipIf(
-        _PYMONGO_VERSION >= version.parse('4.0'),
+        helpers.PYMONGO_VERSION >= version.parse('4.0'),
         'pymongo v4 or above do not specify uuid encoding')
     def test__find_sort_uuid(self):
         self.cmp.do.delete_many({})
@@ -1049,7 +1047,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({}, sort=[('timestamp', 1), ('_id', 1)])
 
     @skipIf(
-        _PYMONGO_VERSION < version.parse('4.0'),
+        helpers.PYMONGO_VERSION < version.parse('4.0'),
         'old version of pymongo accepts to encode uuid')
     def test__fail_at_uuid_encoding(self):
         self.cmp.compare_exceptions.insert_one({'_id': uuid.UUID(int=2)})
@@ -1206,7 +1204,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         """Test the remove method."""
         self.cmp.do.insert_one({'value': 1})
         self.cmp.compare_ignore_order.find()
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.remove()
             return
         self.cmp.do.remove()
@@ -1241,13 +1239,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         doc = {'a': 1}
         self.cmp.do.insert_one(doc)
         new_document = {'new_attr': 2}
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.update({'a': 1}, new_document)
             return
         self.cmp.do.update({'a': 1}, new_document)
         self.cmp.compare_ignore_order.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above dropped update')
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above dropped update')
     def test__update_upsert_with_id(self):
         self.cmp.do.update(
             {'a': 1}, {'_id': ObjectId('52d669dcad547f059424f783'), 'a': 1}, upsert=True)
@@ -1277,7 +1275,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'$set': {'a': 1}}, upsert=True)
         self.cmp.compare.find()
 
-    @skipIf(_PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above dropped update')
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above dropped update')
     def test__update_with_empty_document_comes(self):
         """Tests calling update_one with just '{}' for replacing whole document"""
         self.cmp.do.insert_one({'name': 'bob', 'hat': 'wide'})
@@ -1956,7 +1954,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({})
 
     def test__ensure_index(self):
-        if _PYMONGO_VERSION >= version.parse('4.0'):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
             self.cmp.compare_exceptions.ensure_index('name')
             return
         self.cmp.compare.ensure_index('name')
