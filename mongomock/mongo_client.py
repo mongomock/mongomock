@@ -112,9 +112,10 @@ class MongoClient(object):
             'ok': 1
         }
 
-    def database_names(self):
-        warnings.warn('database_names is deprecated. Use list_database_names instead.')
-        return self.list_database_names()
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def database_names(self):
+            warnings.warn('database_names is deprecated. Use list_database_names instead.')
+            return self.list_database_names()
 
     def list_database_names(self):
         return self._store.list_created_database_names()

@@ -105,23 +105,19 @@ class DatabaseGettingTest(TestCase):
         db = self.client.a
         collection = db.a
         doc_id = collection.insert_one({'aa': 'bb'}).inserted_id
-        result = collection.find({'_id': doc_id})
-        self.assertEqual(result.count(), 1)
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 1)
 
         self.client.drop_database('a')
-        result = collection.find({'_id': doc_id})
-        self.assertEqual(result.count(), 0)
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
 
         db = self.client.a
         collection = db.a
 
         doc_id = collection.insert_one({'aa': 'bb'}).inserted_id
-        result = collection.find({'_id': doc_id})
-        self.assertEqual(result.count(), 1)
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 1)
 
         self.client.drop_database(db)
-        result = collection.find({'_id': doc_id})
-        self.assertEqual(result.count(), 0)
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
 
     def test__drop_database_indexes(self):
         db = self.client.somedb
@@ -136,8 +132,7 @@ class DatabaseGettingTest(TestCase):
         collection.insert_one({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
         collection.insert_one({'value': 'not_unique_but_ok'})
         collection.insert_one({'sparsed': 'not_unique_but_ok'})
-        result = collection.find({})
-        self.assertEqual(result.count(), 3)
+        self.assertEqual(collection.count_documents({}), 3)
 
     def test__sparse_unique_index(self):
         db = self.client.somedb
@@ -4002,6 +3997,19 @@ def _SORT(*args):
     return lambda cursor: cursor.sort(*args)
 
 
+def _COUNT(cursor):
+    return cursor.count()
+
+
+def _COUNT_EXCEPTION_TYPE(cursor):
+    try:
+        cursor.count()
+    except Exception as error:
+        return str(type(error))
+
+    assert False, 'Count should have failed'
+
+
 def _DISTINCT(*args):
     return lambda cursor: sorted(
         helpers.hashdict(v) if isinstance(v, dict) else v
@@ -4033,6 +4041,18 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
 
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT('index', 1), _SKIP(10), _LIMIT(10)).find()
+
+    @skipIf(
+        helpers.PYMONGO_VERSION >= version.parse('4.0'),
+        'Cursor.count was removed in pymongo 4')
+    def test__count(self):
+        self.cmp.compare(_COUNT).find()
+
+    @skipUnless(
+        helpers.PYMONGO_VERSION >= version.parse('4.0'),
+        'Cursor.count was removed in pymongo 4')
+    def test__count_fail(self):
+        self.cmp.compare(_COUNT_EXCEPTION_TYPE).find()
 
     def test__sort_name(self):
         self.cmp.do.delete_many({})
@@ -4144,7 +4164,7 @@ class InsertedDocumentTest(TestCase):
         'remove was removed in pymongo v4')
     def test__remove_by_id(self):
         self.collection.remove(self.object_id)
-        self.assertEqual(0, self.collection.find({}).count())
+        self.assertEqual(0, self.collection.count_documents({}))
 
     def test__inserting_changes_argument(self):
         # Like pymongo, we should fill the _id in the inserted dict
@@ -4177,15 +4197,40 @@ class ObjectIdTest(TestCase):
         self.assertEqual(obj1, obj2)
 
 
-class DatabasesNamesTest(TestCase):
+class MongoClientTest(_CollectionComparisonTest):
+    """Compares a fake connection with the real mongo connection implementation
+
+       This is done via cross-comparison of the results.
+    """
 
     def setUp(self):
-        super(DatabasesNamesTest, self).setUp()
-        self.client = mongomock.MongoClient()
+        super(MongoClientTest, self).setUp()
+        self.cmp = MultiCollection({'fake': self.fake_conn, 'real': self.mongo_conn})
 
     def test__database_names(self):
-        self.client.unit.tests.insert_one({'foo': 'bar'})
-        self.client.foo.bar.insert_one({'unit': 'test'})
-        names = self.client.database_names()
-        self.assertIsInstance(names, list)
-        self.assertEqual(sorted(['foo', 'unit']), sorted(names))
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.database_names()
+            return
+
+        self.cmp.do.database_names()
+
+
+class DatabaseTest(_CollectionComparisonTest):
+    """Compares a fake database with the real mongo database implementation
+
+       This is done via cross-comparison of the results.
+    """
+
+    def setUp(self):
+        super(DatabaseTest, self).setUp()
+        self.cmp = MultiCollection({
+            'fake': self.fake_conn[self.db_name],
+            'real': self.mongo_conn[self.db_name],
+        })
+
+    def test__database_names(self):
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.collection_names()
+            return
+
+        self.cmp.do.collection_names()

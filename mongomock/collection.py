@@ -1899,12 +1899,13 @@ class Cursor(object):
             self.collection._get_dataset, self._spec, self._sort, self._projection, dict)
         return self
 
-    def count(self, with_limit_and_skip=False):
-        warnings.warn(
-            'count is deprecated. Use Collection.count_documents instead.',
-            DeprecationWarning, stacklevel=2)
-        results = self._compute_results(with_limit_and_skip)
-        return len(results)
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def count(self, with_limit_and_skip=False):
+            warnings.warn(
+                'count is deprecated. Use Collection.count_documents instead.',
+                DeprecationWarning, stacklevel=2)
+            results = self._compute_results(with_limit_and_skip)
+            return len(results)
 
     def skip(self, count):
         self._skip = count
@@ -1988,7 +1989,7 @@ class Cursor(object):
 
     @property
     def alive(self):
-        return self._emitted != self.count()
+        return self._emitted != len(self._compute_results(with_limit_and_skip=False))
 
     @property
     def collation(self):

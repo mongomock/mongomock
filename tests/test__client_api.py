@@ -135,13 +135,19 @@ class MongoClientApiTest(unittest.TestCase):
 
     @unittest.skipIf(not _HAVE_MOCK, 'mock not installed')
     def test_database_names(self):
+        client = mongomock.MongoClient()
+        client.one_db.my_collec.insert_one({})
+
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+            with self.assertRaises(TypeError):
+                client.database_names()
+            return
+
         with mock.patch('warnings.warn') as mock_warn:
-            client = mongomock.MongoClient()
-            client.one_db.my_collec.insert_one({})
-            mock_warn.assert_not_called()
             self.assertEqual(['one_db'], client.database_names())
-            self.assertEqual(1, mock_warn.call_count)
-            self.assertIn('deprecated', mock_warn.call_args[0][0])
+
+        self.assertEqual(1, mock_warn.call_count)
+        self.assertIn('deprecated', mock_warn.call_args[0][0])
 
     def test_list_database_names(self):
         client = mongomock.MongoClient()

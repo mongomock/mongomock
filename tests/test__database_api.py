@@ -187,6 +187,12 @@ class DatabaseAPITest(TestCase):
     def test__collection_names(self):
         self.database.create_collection('a')
         self.database.create_collection('b')
+
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+            with self.assertRaises(TypeError):
+                self.database.collection_names()
+            return
+
         self.assertEqual(set(self.database.collection_names()), set(['a', 'b']))
 
         self.database.c.drop()

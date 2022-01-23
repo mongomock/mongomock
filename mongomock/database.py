@@ -91,12 +91,12 @@ class Database(object):
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
 
-    def collection_names(self, include_system_collections=True, session=None):
-        warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
-        if include_system_collections:
-            return list(self._get_created_collections())
-
-        return self.list_collection_names(session=session)
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def collection_names(self, include_system_collections=True, session=None):
+            warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
+            if include_system_collections:
+                return list(self._get_created_collections())
+            return self.list_collection_names(session=session)
 
     def list_collection_names(self, filter=None, session=None):
         """filter: only name field type with eq,ne or regex operator

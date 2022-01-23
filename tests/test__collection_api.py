@@ -125,23 +125,19 @@ class CollectionAPITest(TestCase):
 
         col = self.db.a
         r = col.insert_one({'aa': 'bb'}).inserted_id
-        qr = col.find({'_id': r})
-        self.assertEqual(qr.count(), 1)
+        self.assertEqual(col.count_documents({'_id': r}), 1)
 
         self.db.drop_collection('a')
-        qr = col.find({'_id': r})
-        self.assertEqual(qr.count(), 0)
+        self.assertEqual(col.count_documents({'_id': r}), 0)
 
         col = self.db.a
         r = col.insert_one({'aa': 'bb'}).inserted_id
-        qr = col.find({'_id': r})
-        self.assertEqual(qr.count(), 1)
+        self.assertEqual(col.count_documents({'_id': r}), 1)
 
         self.assertIsInstance(col._store._documents, collections.OrderedDict)
         self.db.drop_collection(col)
         self.assertIsInstance(col._store._documents, collections.OrderedDict)
-        qr = col.find({'_id': r})
-        self.assertEqual(qr.count(), 0)
+        self.assertEqual(col.count_documents({'_id': r}), 0)
 
     def test__drop_collection_indexes(self):
         col = self.db.a
@@ -155,26 +151,25 @@ class CollectionAPITest(TestCase):
         col.insert_one({'value': 'not_unique_but_ok', 'sparsed': 'not_unique_but_ok'})
         col.insert_one({'value': 'not_unique_but_ok'})
         col.insert_one({'sparsed': 'not_unique_but_ok'})
-        result = col.find({})
-        self.assertEqual(result.count(), 3)
+        self.assertEqual(col.count_documents({}), 3)
 
     def test__drop_n_recreate_collection(self):
         col_a = self.db.create_collection('a')
         col_a2 = self.db.a
         col_a.insert_one({'foo': 'bar'})
-        self.assertEqual(col_a.find().count(), 1)
-        self.assertEqual(col_a2.find().count(), 1)
-        self.assertEqual(self.db.a.find().count(), 1)
+        self.assertEqual(col_a.count_documents({}), 1)
+        self.assertEqual(col_a2.count_documents({}), 1)
+        self.assertEqual(self.db.a.count_documents({}), 1)
 
         self.db.drop_collection('a')
-        self.assertEqual(col_a.find().count(), 0)
-        self.assertEqual(col_a2.find().count(), 0)
-        self.assertEqual(self.db.a.find().count(), 0)
+        self.assertEqual(col_a.count_documents({}), 0)
+        self.assertEqual(col_a2.count_documents({}), 0)
+        self.assertEqual(self.db.a.count_documents({}), 0)
 
         col_a2.insert_one({'foo2': 'bar2'})
-        self.assertEqual(col_a.find().count(), 1)
-        self.assertEqual(col_a2.find().count(), 1)
-        self.assertEqual(self.db.a.find().count(), 1)
+        self.assertEqual(col_a.count_documents({}), 1)
+        self.assertEqual(col_a2.count_documents({}), 1)
+        self.assertEqual(self.db.a.count_documents({}), 1)
 
     def test__cursor_hint(self):
         self.db.collection.insert_one({'f1': {'f2': 'v'}})
@@ -713,17 +708,14 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_many(documents)
         self.assert_documents(documents, ignore_ids=False)
 
-        cursor = self.db.collection.find({'x': 1})
-        self.assertEqual(cursor.count(), 4)
+        self.assertEqual(self.db.collection.count_documents({'x': 1}), 4)
 
         # Update the field used by the cursor's filter should not upset the iteration
-        for doc in cursor:
+        for doc in self.db.collection.find({'x': 1}):
             self.db.collection.update_one({'_id': doc['_id']}, {'$set': {'x': 2}})
 
-        cursor = self.db.collection.find({'x': 1})
-        self.assertEqual(cursor.count(), 0)
-        cursor = self.db.collection.find({'x': 2})
-        self.assertEqual(cursor.count(), 4)
+        self.assertEqual(self.db.collection.count_documents({'x': 1}), 0)
+        self.assertEqual(self.db.collection.count_documents({'x': 2}), 4)
 
     def test__update_interns_lists_and_dicts(self):
         obj = {}
@@ -1201,7 +1193,6 @@ class CollectionAPITest(TestCase):
 
     def test__collection_is_indexable(self):
         self.db['def'].insert_one({'name': 'test1'})
-        self.assertTrue(self.db['def'].find({'name': 'test1'}).count() > 0)
         self.assertEqual(self.db['def'].find({'name': 'test1'})[0]['name'], 'test1')
 
     def test__cursor_distinct(self):
@@ -1225,6 +1216,7 @@ class CollectionAPITest(TestCase):
         first_ones = list(cursor)
         self.assertEqual(30, len(first_ones))
 
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'count was removed in pymongo v4')
     def test__cursor_count_with_limit(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
@@ -1237,6 +1229,7 @@ class CollectionAPITest(TestCase):
             0).count(with_limit_and_skip=True)
         self.assertEqual(count, 3)
 
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'count was removed in pymongo v4')
     def test__cursor_count_with_skip(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
@@ -1246,6 +1239,7 @@ class CollectionAPITest(TestCase):
             1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'count was removed in pymongo v4')
     def test__cursor_count_with_skip_init(self):
         first = {'name': 'first'}
         second = {'name': 'second'}
@@ -1254,6 +1248,7 @@ class CollectionAPITest(TestCase):
         count = self.db['coll_name'].find(skip=1).count(with_limit_and_skip=True)
         self.assertEqual(count, 2)
 
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'count was removed in pymongo v4')
     def test__cursor_count_when_db_changes(self):
         self.db['coll_name'].insert_one({})
         cursor = self.db['coll_name'].find()
@@ -1284,9 +1279,7 @@ class CollectionAPITest(TestCase):
         cursor = self.db['coll_name'].find()
         ret = cursor[1:4]
         self.assertIs(ret, cursor)
-        count = cursor.count()
-        self.assertEqual(count, 3)
-        count = cursor.count(with_limit_and_skip=True)
+        count = sum(1 for d in cursor)
         self.assertEqual(count, 2)
 
     def test__cursor_getitem_negative_index(self):
@@ -1313,10 +1306,8 @@ class CollectionAPITest(TestCase):
         u1 = {'name': 'first'}
         u2 = {'name': 'second'}
         self.db['users'].insert_many([u1, u2])
-        self.assertEqual(
-            self.db['users'].find(
-                sort=[
-                    ('name', 1)], skip=1).count(with_limit_and_skip=True), 1)
+        count = sum(1 for d in self.db['users'].find(sort=[('name', 1)], skip=1))
+        self.assertEqual(1, count)
         self.assertEqual(
             self.db['users'].find(
                 sort=[
@@ -1349,7 +1340,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_uniq_idxs_with_descending_ordering(self):
@@ -1359,7 +1350,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__create_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -1368,7 +1359,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__create_index_duplicate(self):
         self.db.collection.create_index([('value', 1)])
@@ -1385,37 +1376,37 @@ class CollectionAPITest(TestCase):
     def test__ttl_index_ignores_record_in_the_future(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_index_ignores_records_with_non_datetime_values(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': 'not a dt'})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_index_record_expiry(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__ttl_expiration_of_0(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__ttl_with_non_integer_value_is_ignored(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds='a')
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_applied_to_compound_key_is_ignored(self):
         self.db.collection.create_index([('field1', 1), ('field2', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'field1': datetime.utcnow(), 'field2': 'val2'})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_ignored_when_document_does_not_contain_indexed_field(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'other_value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_of_array_field_expiration(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
@@ -1426,7 +1417,7 @@ class CollectionAPITest(TestCase):
                 datetime.utcnow() + timedelta(seconds=100)
             ]
         })
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
         self.db.collection.drop()
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
@@ -1438,48 +1429,48 @@ class CollectionAPITest(TestCase):
                 datetime.utcnow() + timedelta(seconds=100)
             ]
         })
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__ttl_of_array_field_without_datetime_does_not_expire(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=5)
         self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     @skipIf(not _HAVE_MOCK, 'mock not installed')
     def test__ttl_expiry_with_mock(self):
         now = datetime.utcnow()
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=100)
         self.db.collection.insert_one({'value': now + timedelta(seconds=100)})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
         with mock.patch('mongomock.utcnow') as mongomock_utcnow:
             mongomock_utcnow.return_value = now + timedelta(100)
-            self.assertEqual(self.db.collection.find({}).count(), 0)
+            self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__ttl_index_is_removed_if_collection_dropped(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
         self.db.collection.drop()
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_index_is_removed_when_index_is_dropped(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
         self.db.collection.drop_index('value_1')
         self.db.collection.insert_one({'value': datetime.utcnow()})
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ttl_index_removes_expired_documents_prior_to_removal(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow()})
 
         self.db.collection.drop_index('value_1')
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_with_expireAfterSeconds(self):
@@ -1490,7 +1481,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(1, len(index_names))
 
         self.db.collection.insert_one({'value': datetime.utcnow() - timedelta(seconds=5)})
-        self.assertEqual(self.db.collection.find({}).count(), 0)
+        self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
@@ -1513,7 +1504,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 0, 'name': 'bob'})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_names(self):
@@ -1532,7 +1523,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__ensure_uniq_idxs_with_descending_ordering(self):
@@ -1542,7 +1533,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__ensure_uniq_idxs_on_nested_field(self):
         self.db.collection.create_index([('a.b', 1)], unique=True)
@@ -1552,7 +1543,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'a': {'b': 1}})
 
-        self.assertEqual(self.db.collection.find({}).count(), 2)
+        self.assertEqual(self.db.collection.count_documents({}), 2)
 
     def test__ensure_sparse_uniq_idxs_on_nested_field(self):
         self.db.collection.create_index([('a.b', 1)], unique=True, sparse=True)
@@ -1568,7 +1559,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'c': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 5)
+        self.assertEqual(self.db.collection.count_documents({}), 5)
 
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -1577,7 +1568,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__insert_empty_doc_uniq_idx(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -1585,7 +1576,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': 1})
         self.db.collection.insert_one({})
 
-        self.assertEqual(self.db.collection.find({}).count(), 2)
+        self.assertEqual(self.db.collection.count_documents({}), 2)
 
     def test__insert_empty_doc_twice_uniq_idx(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -1594,7 +1585,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test_sparse_unique_index(self):
         self.db.collection.create_index([('value', 1)], unique=True, sparse=True)
@@ -1604,7 +1595,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': None})
         self.db.collection.insert_one({'value': None})
 
-        self.assertEqual(self.db.collection.find({}).count(), 4)
+        self.assertEqual(self.db.collection.count_documents({}), 4)
 
     def test_unique_index_with_upsert_insertion(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -1658,7 +1649,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'value': 'a'})
 
-        self.assertEqual(self.db.collection.find({}).count(), 1)
+        self.assertEqual(self.db.collection.count_documents({}), 1)
 
     def test__create_uniq_idxs_with_dupes_already_there(self):
         self.db.collection.insert_one({'value': 1})
@@ -1668,7 +1659,7 @@ class CollectionAPITest(TestCase):
             self.db.collection.create_index([('value', 1)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        self.assertEqual(self.db.collection.find({}).count(), 3)
+        self.assertEqual(self.db.collection.count_documents({}), 3)
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_index_with_name(self):
@@ -1850,7 +1841,7 @@ class CollectionAPITest(TestCase):
             sort=[('time_check', pymongo.ASCENDING)])
 
         expected = list(filter(lambda x: 'checked' in x, list(self.db.collection.find())))
-        self.assertEqual(self.db.collection.find().count(), len(expected))
+        self.assertEqual(self.db.collection.count_documents({}), len(expected))
         self.assertEqual(
             list(self.db.collection.find({'checked': True})), list(self.db.collection.find()))
 

@@ -33,7 +33,7 @@ class PatchTest(unittest.TestCase):
         client1.db.coll.insert_one({'name': 'Pascal'})
 
         client2 = pymongo.MongoClient()
-        self.assertEqual(['db'], client2.database_names())
+        self.assertEqual(['db'], client2.list_database_names())
         self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
         client2.db.coll.drop()
 

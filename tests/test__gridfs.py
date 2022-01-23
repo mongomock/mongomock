@@ -82,7 +82,7 @@ class GridFsTest(TestCase):
         self.assertFalse(self.fake_gridfs.exists(fid))
         self.assertFalse(self.get_fake_file(fid) is not None)
         # All the chunks got removed
-        self.assertEqual(0, self.fake_conn[self.db_name].fs.chunks.find({}).count())
+        self.assertEqual(0, self.fake_conn[self.db_name].fs.chunks.count_documents({}))
 
     def test__delete_exists_big(self):
         fid = self.fake_gridfs.put(GenFile(500000))
@@ -92,7 +92,7 @@ class GridFsTest(TestCase):
         self.assertFalse(self.fake_gridfs.exists(fid))
         self.assertFalse(self.get_fake_file(fid) is not None)
         # All the chunks got removed
-        self.assertEqual(0, self.fake_conn[self.db_name].fs.chunks.find({}).count())
+        self.assertEqual(0, self.fake_conn[self.db_name].fs.chunks.count_documents({}))
 
     def test__delete_no_file(self):
         # Just making sure we don't crash
@@ -129,7 +129,7 @@ class GridFsTest(TestCase):
         c = self.fake_gridfs.find({'filename': 'a'}).sort('uploadDate', -1)
         should_be_fid3 = c.next()
         should_be_fid0 = c.next()
-        self.assertEqual(2, c.count())
+        self.assertFalse(c.alive)
 
         self.assertEqual(fids[3], should_be_fid3._id)
         self.assertEqual(fids[0], should_be_fid0._id)
