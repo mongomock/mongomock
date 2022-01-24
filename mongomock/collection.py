@@ -1566,9 +1566,10 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self._store.indexes = {}
 
-    def reindex(self, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock does not handle sessions yet')
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def reindex(self, session=None):
+            if session:
+                raise_not_implemented('session', 'Mongomock does not handle sessions yet')
 
     def _list_all_indexes(self):
         if not self._store.is_created:

@@ -435,6 +435,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.estimated_document_count(skip=2)
         self.cmp.compare_exceptions.estimated_document_count(filter={'a': 1})
 
+    def test__reindex(self):
+        self.cmp.compare.create_index('a')
+        self.cmp.do.insert_one({'a': 1})
+        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+            self.cmp.compare_exceptions.reindex()
+            return
+        self.cmp.do.reindex()
+
     def test__find_one(self):
         self.cmp.do.insert_one({'_id': 'id1', 'name': 'new'})
         self.cmp.compare.find_one({'_id': 'id1'})
