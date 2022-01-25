@@ -1013,6 +1013,26 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         # self.cmp.compare.find_one(
         #     {'a': 1}, OrderedDict([('_id', 0), ('a', 0), ('b.c.e', 0), ('b.c', 0)]))
 
+    def test__find_type(self):
+        self.cmp.do.insert_many([
+            {'a': 1.2},  # double
+            {'a': 1},  # int
+            {'a': 1 << 32},  # long
+            {'a': decimal128.Decimal128('1.1')},  # decimal
+            {'a': 'a string value'},  # string
+            {'a': {'b': 1}},  # object
+            {'a': [1, 2, 3]},  # array or int
+            {'a': b'hello'},  # binData
+            {'a': ObjectId()},  # objectId
+            {'a': True},  # bool
+            {'a': datetime.datetime.now()},  # date
+        ])
+        for type_name, spec in mongomock.filtering.TYPE_MAP.items():
+            # Skip unsupported types
+            if spec is None:
+                continue
+            self.cmp.compare.find({'a': {'$type': type_name}})
+
     @skipIf(sys.version_info < (3, 7), 'Older versions of Python cannot copy regex partterns')
     @skipIf(
         helpers.PYMONGO_VERSION >= version.parse('4.0'),
