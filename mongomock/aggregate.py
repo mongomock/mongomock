@@ -882,13 +882,69 @@ class _Parser(object):
         if operator == '$in':
             expression, array = values
             return self.parse(expression) in self.parse(array)
-        if operator == '$setUnion':
-            result = []
-            for set_value in values:
-                for value in self.parse(set_value):
-                    if value not in result:
-                        result.append(value)
+
+        min_args = {
+            '$setEquals': 2,
+        }
+        accepted_special_values = {
+            '$setUnion': (None, NOTHING),
+            '$setIntersection': (None, NOTHING),
+        }
+        default_result = {
+            '$setEquals': True,
+        }
+        if operator in ('$setUnion', '$setIntersection', '$setEquals'):
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+
+            if len(values) < min_args.get(operator, 0):
+                raise OperationFailure(
+                    '%s needs at least two arguments had: %r' % (operator, len(values))
+                )
+
+            values = [self._parse_or_nothing(v) for v in values]
+            for v in values:
+                if not isinstance(v, list):
+                    if v not in accepted_special_values.get(operator, []):
+                        type_ = 'missing' if v is NOTHING else type(v)
+                        raise OperationFailure(
+                            'All operands of %s must be arrays. '
+                            'One argument is of type: %s' % (operator, type_)
+                        )
+            input_sets = []
+            for v in values:
+                if v is None or v is NOTHING:
+                    input_sets.append(None)
+                else:
+                    input_sets.append({helpers.to_hashable(elem) for elem in v})
+
+            result = default_result.get(operator, set())
+            prev_set = None
+            for i, s in enumerate(input_sets):
+                if s is None:
+                    result = None
+                    break
+                if operator == '$setUnion':
+                    if i == 0:
+                        result = s
+                    else:
+                        result |= s
+                elif operator == '$setIntersection':
+                    if i == 0:
+                        result = s
+                    else:
+                        result &= s
+                elif operator == '$setEquals':
+                    if i > 0 and s != prev_set:
+                        result = False
+                        break
+                else:
+                    raise RuntimeError('unhandled operator %s - this is a bug' % operator)
+                prev_set = s
+            if isinstance(result, set):
+                result = [v.original for v in result]
             return result
+
         if operator == '$setEquals':
             set_values = [set(self.parse(value)) for value in values]
             for set1, set2 in itertools.combinations(set_values, 2):
