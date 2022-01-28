@@ -4598,11 +4598,6 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$isArray': [1, 2]}}}
-            ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
@@ -6690,6 +6685,68 @@ class CollectionAPITest(TestCase):
             '$project': {
                 'item': 1,
                 'dims': {'$objectToArray': '$dimensions'},
+            },
+        }])
+
+        self.assertEqual(expect, list(actual))
+
+    def test_aggregate_is_number(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {'_id': 1, 'int': 3, 'big_int': 3 ** 10, 'negative': -3,
+             'str': 'not_a_number', 'str_numeric': '3', 'float': 3.3,
+             'negative_float': -3.3, 'bool': True,
+             'none': None}
+        )
+
+        expect = [
+            {'int': True, 'big_int': True, 'negative': True,
+             'str': False, 'str_numeric': False, 'float': True, 'negative_float': True,
+             'bool': False, 'none': False},
+        ]
+
+        actual = collection.aggregate([{
+            '$project': {
+                '_id': False,
+                'int': {'$isNumber': '$int'},
+                'big_int': {'$isNumber': '$big_int'},
+                'negative': {'$isNumber': '$negative'},
+                'str': {'$isNumber': '$str'},
+                'str_numeric': {'$isNumber': '$str_numeric'},
+                'float': {'$isNumber': '$float'},
+                'negative_float': {'$isNumber': '$negative_float'},
+                'bool': {'$isNumber': '$bool'},
+                'none': {'$isNumber': '$none'},
+            },
+        }])
+
+        self.assertEqual(expect, list(actual))
+
+    def test_aggregate_is_array(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {'_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3),
+             'empty_list': [], 'empty_tuple': (),
+             'int': 3, 'str': '123', 'bool': True, 'none': None}
+        )
+
+        expect = [
+            {'list': True, 'tuple': True,
+             'empty_list': True, 'empty_tuple': True,
+             'int': False, 'str': False, 'bool': False, 'none': False},
+        ]
+
+        actual = collection.aggregate([{
+            '$project': {
+                '_id': False,
+                'list': {'$isArray': '$list'}, 'tuple': {'$isArray': '$tuple'},
+                'empty_list': {'$isArray': '$empty_list'},
+                'empty_tuple': {'$isArray': '$empty_tuple'},
+                'int': {'$isArray': '$int'}, 'str': {'$isArray': '$str'},
+                'bool': {'$isArray': '$bool'},
+                'none': {'$isArray': '$none'},
             },
         }])
 

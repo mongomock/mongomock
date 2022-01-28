@@ -110,7 +110,6 @@ array_operators = [
     '$concatArrays',
     '$filter',
     '$indexOfArray',
-    '$isArray',
     '$map',
     '$range',
     '$reduce',
@@ -164,6 +163,10 @@ type_convertion_operators = [
     '$toLong',
     '$arrayToObject',
     '$objectToArray',
+]
+type_operators = [
+    '$isNumber',
+    '$isArray',
 ]
 
 
@@ -258,6 +261,8 @@ class _Parser(object):
                 return self._handle_string_operator(k, v)
             if k in type_convertion_operators:
                 return self._handle_type_convertion_operator(k, v)
+            if k in type_operators:
+                return self._handle_type_operator(k, v)
             if k in boolean_operators:
                 return self._handle_boolean_operator(k, v)
             if k in text_search_operators + projection_operators + object_operators:
@@ -877,6 +882,27 @@ class _Parser(object):
             "Although '%s' is a valid type conversion operator for the "
             'aggregation pipeline, it is currently not implemented '
             'in Mongomock.' % operator)
+
+    def _handle_type_operator(self, operator, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
+        if operator == '$isNumber':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return False
+            return False if isinstance(parsed, bool) else isinstance(parsed, numbers.Number)
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isArray/
+        if operator == '$isArray':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return False
+            return isinstance(parsed, (tuple, list))
+
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid type operator for the aggregation pipeline, it is currently "
+            'not implemented in Mongomock.' % operator)
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
