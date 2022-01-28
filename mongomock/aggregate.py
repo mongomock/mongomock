@@ -9,6 +9,7 @@ import functools
 import itertools
 import math
 import numbers
+from packaging import version
 import random
 import re
 import sys
@@ -16,6 +17,7 @@ import warnings
 
 from sentinels import NOTHING
 
+import mongomock
 from mongomock import command_cursor
 from mongomock import filtering
 from mongomock import helpers
@@ -878,13 +880,20 @@ class _Parser(object):
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
-            field, fallback = values
-            try:
-                out_value = self.parse(field)
-                if out_value is not None:
-                    return out_value
-            except KeyError:
-                pass
+            fields = values[:-1]
+            if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
+                raise OperationFailure(
+                    '$ifNull supports only one input expression '
+                    ' in MongoDB v4.4 and lower'
+                )
+            fallback = values[-1]
+            for field in fields:
+                try:
+                    out_value = self.parse(field)
+                    if out_value is not None:
+                        return out_value
+                except KeyError:
+                    pass
             return self.parse(fallback)
         if operator == '$cond':
             if isinstance(values, list):

@@ -3102,6 +3102,34 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$count': 'my_count'}
         ])
 
+    def test__aggregate_if_null(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        self.cmp.compare.aggregate([
+            {
+                '$project': {
+                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
+                    'b': {'$ifNull': ['$elem_b', '<missing_b>']},
+                }
+            }
+        ])
+
+    def test__aggregate_if_null_multi_field(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        # Multiple input expressions in $ifNull are not supported in MongoDB v4.4 and earlier.
+        if SERVER_VERSION > version.parse('4.4'):
+            compare = self.cmp.compare
+        else:
+            compare = self.cmp.compare_exceptions
+        compare.aggregate([
+            {
+                '$project': {
+                    'a_and_b': {'$ifNull': ['$elem_a', '$elem_b', '<missing_both>']},
+                    'b_and_a': {'$ifNull': ['$elem_b', '$elem_a', '<missing_both>']},
+                    'b_and_c': {'$ifNull': ['$elem_b', '$elem_c', '<missing_both>']},
+                }
+            }
+        ])
+
     def test__aggregate_facet(self):
         self.cmp.do.insert_many([
             {'_id': i} for i in range(5)
