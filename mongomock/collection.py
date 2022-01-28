@@ -1707,65 +1707,68 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return self.find(filter).distinct(key)
 
-    def group(self, key, condition, initial, reduce, finalize=None):
-        if execjs is None:
-            raise NotImplementedError(
-                'PyExecJS is required in order to use group. '
-                "Use 'pip install pyexecjs pymongo' to support group mock."
-            )
-        reduce_ctx = execjs.compile('''
-            function doReduce(fnc, docList) {
-                reducer = eval('('+fnc+')');
-                for(var i=0, l=docList.length; i<l; i++) {
-                    try {
-                        reducedVal = reducer(docList[i-1], docList[i]);
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+        def group(self, key, condition, initial, reduce, finalize=None):
+            if helpers.PYMONGO_VERSION >= version.parse('3.6'):
+                raise OperationFailure("no such command: 'group'")
+            if execjs is None:
+                raise NotImplementedError(
+                    'PyExecJS is required in order to use group. '
+                    "Use 'pip install pyexecjs pymongo' to support group mock."
+                )
+            reduce_ctx = execjs.compile('''
+                function doReduce(fnc, docList) {
+                    reducer = eval('('+fnc+')');
+                    for(var i=0, l=docList.length; i<l; i++) {
+                        try {
+                            reducedVal = reducer(docList[i-1], docList[i]);
+                        }
+                        catch (err) {
+                            continue;
+                        }
                     }
-                    catch (err) {
-                        continue;
-                    }
+                return docList[docList.length - 1];
                 }
-            return docList[docList.length - 1];
-            }
-        ''')
+            ''')
 
-        ret_array = []
-        doc_list_copy = []
-        ret_array_copy = []
-        reduced_val = {}
-        doc_list = [doc for doc in self.find(condition)]
-        for doc in doc_list:
-            doc_copy = copy.deepcopy(doc)
-            for doc_key in doc:
-                if isinstance(doc[doc_key], ObjectId):
-                    doc_copy[doc_key] = str(doc[doc_key])
-                if doc_key not in key and doc_key not in reduce:
-                    del doc_copy[doc_key]
-            for initial_key in initial:
-                if initial_key in doc.keys():
-                    pass
-                else:
-                    doc_copy[initial_key] = initial[initial_key]
-            doc_list_copy.append(doc_copy)
-        doc_list = doc_list_copy
-        for k1 in key:
-            doc_list = sorted(doc_list, key=lambda x: filtering.resolve_key(k1, x))
-        for k2 in key:
-            if not isinstance(k2, string_types):
-                raise TypeError(
-                    'Keys must be a list of key names, '
-                    'each an instance of %s' % string_types[0].__name__)
-            for _, group in itertools.groupby(doc_list, lambda item: item[k2]):
-                group_list = ([x for x in group])
-                reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
-                ret_array.append(reduced_val)
-        for doc in ret_array:
-            doc_copy = copy.deepcopy(doc)
-            for k in doc:
-                if k not in key and k not in initial.keys():
-                    del doc_copy[k]
-            ret_array_copy.append(doc_copy)
-        ret_array = ret_array_copy
-        return ret_array
+            ret_array = []
+            doc_list_copy = []
+            ret_array_copy = []
+            reduced_val = {}
+            doc_list = [doc for doc in self.find(condition)]
+            for doc in doc_list:
+                doc_copy = copy.deepcopy(doc)
+                for doc_key in doc:
+                    if isinstance(doc[doc_key], ObjectId):
+                        doc_copy[doc_key] = str(doc[doc_key])
+                    if doc_key not in key and doc_key not in reduce:
+                        del doc_copy[doc_key]
+                for initial_key in initial:
+                    if initial_key in doc.keys():
+                        pass
+                    else:
+                        doc_copy[initial_key] = initial[initial_key]
+                doc_list_copy.append(doc_copy)
+            doc_list = doc_list_copy
+            for k1 in key:
+                doc_list = sorted(doc_list, key=lambda x: filtering.resolve_key(k1, x))
+            for k2 in key:
+                if not isinstance(k2, string_types):
+                    raise TypeError(
+                        'Keys must be a list of key names, '
+                        'each an instance of %s' % string_types[0].__name__)
+                for _, group in itertools.groupby(doc_list, lambda item: item[k2]):
+                    group_list = ([x for x in group])
+                    reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
+                    ret_array.append(reduced_val)
+            for doc in ret_array:
+                doc_copy = copy.deepcopy(doc)
+                for k in doc:
+                    if k not in key and k not in initial.keys():
+                        del doc_copy[k]
+                ret_array_copy.append(doc_copy)
+            ret_array = ret_array_copy
+            return ret_array
 
     def aggregate(self, pipeline, session=None, **unused_kwargs):
         in_collection = [doc for doc in self.find()]

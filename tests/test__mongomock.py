@@ -35,6 +35,7 @@ try:
     _HAVE_MAP_REDUCE = any(r.is_available() for r in execjs.runtimes().values())
 except ImportError:
     _HAVE_MAP_REDUCE = False
+    Code = str
 from tests.multicollection import MultiCollection
 
 
@@ -2020,12 +2021,26 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             'three_not_equal': {'$setEquals': [['one', 'three'], ['two', 'one'], ['two', 'one']]},
         }}])
 
+    @skipIf(
+        helpers.PYMONGO_VERSION < version.parse('4.0'), 'pymongo v4 dropped map reduce methods')
+    def test__map_reduce_fails(self):
+        self.cmp.compare_exceptions.map_reduce(Code(''), Code(''), 'myresults')
+        self.cmp.compare_exceptions.inline_map_reduce(Code(''), Code(''))
+        self.cmp.compare_exceptions.group(['a'], {'a': {'$lt': 3}}, {'count': 0}, Code('''
+            function(cur, result) { result.count += cur.count }
+        '''))
+
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 dropped group method')
+    @skipIf(helpers.PYMONGO_VERSION < version.parse('3.6'), 'pymongo v3.6 broke group method')
+    def test__group_fails(self):
+        self.cmp.compare_exceptions.group(['a'], {'a': {'$lt': 3}}, {'count': 0}, Code('''
+            function(cur, result) { result.count += cur.count }
+        '''))
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
-@skipIf(
-    helpers.PYMONGO_VERSION and helpers.PYMONGO_VERSION >= version.parse('4.0'),
-    'pymongo v4 dropped map reduce')
+@skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 dropped map reduce')
 class CollectionMapReduceTest(TestCase):
 
     def setUp(self):
@@ -2220,7 +2235,8 @@ class CollectionMapReduceTest(TestCase):
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
-class _GroupTest(_CollectionComparisonTest):
+@skipIf(helpers.PYMONGO_VERSION >= version.parse('3.6'), 'pymongo v3.6 broke group')
+class GroupTest(_CollectionComparisonTest):
 
     def setUp(self):
         _CollectionComparisonTest.setUp(self)
@@ -2238,8 +2254,7 @@ class _GroupTest(_CollectionComparisonTest):
             {'b': 1, 'foo': 2},
             {'b': 1, 'foo': self._id1},
         ]
-        for item in self.data:
-            self.cmp.do.insert_one(item)
+        self.cmp.do.insert_many(self.data)
 
     def test__group1(self):
         key = ['a']
