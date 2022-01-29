@@ -106,6 +106,17 @@ used to validate production code, it is unacceptable to behave differently than 
 implementation. In such cases it is better to throw `NotImplementedError` than implement a modified
 version of the original behavior.
 
+Upgrading to Pymongo v4
+-----------------------
+
+The major version 4 of Pymongo changed the API quite a bit. The Mongomock library has evolved to
+help you ease the migration:
+
+1. Upgrade to Mongomock v4 or above: if your tests are running with Pymongo installed, Mongomock
+   will adapt its own API to the version of Pymongo installed.
+2. Upgrade to Pymongo v4 or above: your tests using Mongomock will fail exactly where your code
+   would fail in production, so that you can fix it before releasing.
+
 Contributing
 ------------
 
