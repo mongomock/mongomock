@@ -1,4 +1,7 @@
-|travis| |pypi_version| |pypi_license| |pypi_wheel|
+.. image:: https://app.travis-ci.com/mongomock/mongomock.svg?branch=develop
+  :target: https://app.travis-ci.com/mongomock/mongomock
+
+|pypi_version| |pypi_license| |pypi_wheel|
 
 .. image:: https://codecov.io/gh/mongomock/mongomock/branch/develop/graph/badge.svg
   :target: https://codecov.io/gh/mongomock/mongomock
