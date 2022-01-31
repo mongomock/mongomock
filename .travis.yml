@@ -3,7 +3,7 @@ cache: pip
 os: linux
 dist: bionic # OS+dist should be kept in sync with Dockerfile
 env:
-  global: # MongoDB version should be kept in sync with docker-compose image
+  global: # MongoDB version should be kept in sync with docker-compose image and mongo_client.py
     - MONGODB=4.4.0
 jobs:
   include:

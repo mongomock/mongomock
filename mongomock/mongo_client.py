@@ -102,10 +102,11 @@ class MongoClient(object):
         return self._codec_options
 
     def server_info(self):
+        # Keep the version in sync with docker-compose.yml and travis.yml.
         return {
-            'version': '3.0.0',
+            'version': '4.4.0',
             'sysInfo': 'Mock',
-            'versionArray': [3, 0, 0, 0],
+            'versionArray': [4, 4, 0, 0],
             'bits': 64,
             'debug': False,
             'maxBsonObjectSize': 16777216,
