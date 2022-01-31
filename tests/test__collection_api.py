@@ -207,6 +207,14 @@ class CollectionAPITest(TestCase):
         cursor = self.db.collection.find()
         self.assertEqual(cursor.distinct('f1'), [{'f2': 'v2', 'f3': 'v3'}])
 
+    def test__distinct_array_field_with_dicts(self):
+        self.db.collection.insert_many([
+            {'f1': [{'f2': 'v2'}, {'f3': 'v3'}]},
+            {'f1': [{'f3': 'v3'}, {'f4': 'v4'}]},
+        ])
+        cursor = self.db.collection.find()
+        self.assertCountEqual(cursor.distinct('f1'), [{'f2': 'v2'}, {'f3': 'v3'}, {'f4': 'v4'}])
+
     def test__distinct_filter_field(self):
         self.db.collection.insert_many(
             [{'f1': 'v1', 'k1': 'v1'}, {'f1': 'v2', 'k1': 'v1'},
