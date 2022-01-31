@@ -1506,3 +1506,8 @@ def process_pipeline(collection, database, pipeline, session):
             collection = handler(collection, database, options)
 
     return command_cursor.CommandCursor(collection)
+
+
+def validate_stage_name(name):
+    if name not in _PIPELINE_HANDLERS:
+        raise OperationFailure("Unrecognized pipeline stage name: '%s'" % name)
