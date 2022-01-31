@@ -1,3 +1,5 @@
+import os
+
 try:
     from pymongo.errors import PyMongoError
 except ImportError:
@@ -91,8 +93,8 @@ __all__ = [
     'ignore_feature',
     'patch',
     'warn_on_feature',
+    'SERVER_VERSION',
 ]
-
 
 from .collection import Collection
 from .database import Database
@@ -100,3 +102,8 @@ from .mongo_client import MongoClient
 from .patch import patch
 from .write_concern import WriteConcern
 from .not_implemented import ignore_feature, warn_on_feature
+
+# The version of the server faked by mongomock. Callers may patch it before creating connections to
+# update the behavior of mongomock.
+# Keep the default version in sync with docker-compose.yml and travis.yml.
+SERVER_VERSION = os.getenv('MONGODB', '4.4.0')

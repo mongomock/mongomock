@@ -29,3 +29,6 @@ def ignore_feature(feature: _FeatureName) -> None:
 
 def warn_on_feature(feature: _FeatureName) -> None:
     ...
+
+
+SERVER_VERSION: str = ...

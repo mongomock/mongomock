@@ -16,5 +16,5 @@ services:
 
   mongo:
     # The image chosen here should be kept in sync with the .travis.yml mongo version and with
-    # the value in mongo_client.py
+    # the value in mongomock/__init__.py
     image: mongo:4.4.0

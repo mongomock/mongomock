@@ -1,9 +1,12 @@
 language: python
 cache: pip
 os: linux
-dist: bionic # OS+dist should be kept in sync with Dockerfile
+dist: bionic # OS+dist should be kept in sync with Dockerfile and UBUNTU_VERSION below.
 env:
-  global: # MongoDB version should be kept in sync with docker-compose image and mongo_client.py
+  global:
+    # Ubuntu version, keep in sync with os + dist above.
+    - UBUNTU_VERSION=1804
+    # MongoDB version should be kept in sync with docker-compose image and mongomock/__init__.py
     - MONGODB=4.4.0
 jobs:
   include:
@@ -36,17 +39,17 @@ script:
 before_install:
   - "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10"
   - "sudo apt-get update"
-  - "sudo apt-get install libcurl3 -y"
+  - "sudo apt-get install libcurl4 -y"
 before_script:
-  - mkdir ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data
-  - ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/mongodb.log --fork
+  - mkdir ${PWD}/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}/data
+  - ${PWD}/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}/bin/mongod --dbpath ${PWD}/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}/data --logpath ${PWD}/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}/mongodb.log --fork
   - "until nc -z localhost 27017; do echo Waiting for MongoDB; sleep 1; done"
 after_script:
   - pkill mongod
 install:
-  - wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-${MONGODB}.tgz
-  - tar xzf mongodb-linux-x86_64-ubuntu1604-${MONGODB}.tgz
-  - ${PWD}/mongodb-linux-x86_64-ubuntu1604-${MONGODB}/bin/mongod --version
+  - wget https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}.tgz
+  - tar xzf mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}.tgz
+  - ${PWD}/mongodb-linux-x86_64-ubuntu${UBUNTU_VERSION}-${MONGODB}/bin/mongod --version
   - pip install tox
 deploy:
   provider: pypi

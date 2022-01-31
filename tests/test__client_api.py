@@ -170,3 +170,10 @@ class MongoClientApiTest(unittest.TestCase):
         client = mongomock.MongoClient()
         with self.assertRaises(NotImplementedError):
             client.start_session()
+
+    @mock.patch('mongomock.SERVER_VERSION', '3.6')
+    def test_server_version(self):
+        client = mongomock.MongoClient()
+        server_info = client.server_info()
+        self.assertEqual('3.6', server_info['version'])
+        self.assertEqual([3, 6, 0, 0], server_info['versionArray'])

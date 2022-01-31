@@ -1,6 +1,7 @@
 from .database import Database
 from .store import ServerStore
 import itertools
+import mongomock
 from mongomock import codec_options as mongomock_codec_options
 from mongomock import ConfigurationError
 from mongomock import helpers
@@ -16,6 +17,11 @@ try:
 except ImportError:
     from .helpers import parse_uri, split_hosts
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
+
+
+def _convert_version_to_list(version_str):
+    pieces = [int(part) for part in version_str.split('.')]
+    return pieces + [0] * (4 - len(pieces))
 
 
 class MongoClient(object):
@@ -102,11 +108,10 @@ class MongoClient(object):
         return self._codec_options
 
     def server_info(self):
-        # Keep the version in sync with docker-compose.yml and travis.yml.
         return {
-            'version': '4.4.0',
+            'version': mongomock.SERVER_VERSION,
             'sysInfo': 'Mock',
-            'versionArray': [4, 4, 0, 0],
+            'versionArray': _convert_version_to_list(mongomock.SERVER_VERSION),
             'bits': 64,
             'debug': False,
             'maxBsonObjectSize': 16777216,
