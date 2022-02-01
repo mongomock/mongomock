@@ -98,6 +98,11 @@ class Database(object):
                 return list(self._get_created_collections())
             return self.list_collection_names(session=session)
 
+    def list_collections(self, filter=None, session=None, nameOnly=False):
+        raise NotImplementedError(
+            'list_collections is a valid method of Database but has not been implemented in '
+            'mongomock yet.')
+
     def list_collection_names(self, filter=None, session=None):
         """filter: only name field type with eq,ne or regex operator
 

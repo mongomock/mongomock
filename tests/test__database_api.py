@@ -206,6 +206,12 @@ class DatabaseAPITest(TestCase):
         self.database.c.drop()
         self.assertEqual(set(self.database.list_collection_names()), set(['a', 'b']))
 
+    def test__list_collections(self):
+        self.database.create_collection('a')
+
+        with self.assertRaises(NotImplementedError):
+            self.database.list_collections()
+
     def test__create_collection(self):
         coll = self.database.create_collection('c')
         self.assertIs(self.database.c, coll)
