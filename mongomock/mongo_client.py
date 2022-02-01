@@ -60,6 +60,8 @@ class MongoClient(object):
 
         self.__default_database_name = dbase
 
+        self._server_version = mongomock.SERVER_VERSION
+
     def __getitem__(self, db_name):
         return self.get_database(db_name)
 
@@ -109,9 +111,9 @@ class MongoClient(object):
 
     def server_info(self):
         return {
-            'version': mongomock.SERVER_VERSION,
+            'version': self._server_version,
             'sysInfo': 'Mock',
-            'versionArray': _convert_version_to_list(mongomock.SERVER_VERSION),
+            'versionArray': _convert_version_to_list(self._server_version),
             'bits': 64,
             'debug': False,
             'maxBsonObjectSize': 16777216,

@@ -177,3 +177,9 @@ class MongoClientApiTest(unittest.TestCase):
         server_info = client.server_info()
         self.assertEqual('3.6', server_info['version'])
         self.assertEqual([3, 6, 0, 0], server_info['versionArray'])
+
+    def test_consistent_server_version(self):
+        client = mongomock.MongoClient()
+        server_info = client.server_info()
+        with mock.patch('mongomock.SERVER_VERSION', '3.6'):
+            self.assertEqual(server_info, client.server_info())
