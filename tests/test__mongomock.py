@@ -39,6 +39,9 @@ except ImportError:
 from tests.multicollection import MultiCollection
 
 
+SERVER_VERSION = version.parse(mongomock.SERVER_VERSION)
+
+
 class InterfaceTest(TestCase):
 
     def test__can_create_db_without_path(self):
@@ -433,7 +436,10 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.estimated_document_count()
         self.cmp.do.insert_one({'a': 0})
         self.cmp.compare.estimated_document_count()
-        self.cmp.compare.estimated_document_count(skip=2)
+        if SERVER_VERSION < version.parse('5'):
+            self.cmp.compare.estimated_document_count(skip=2)
+        else:
+            self.cmp.compare_exceptions.estimated_document_count(skip=2)
         self.cmp.compare_exceptions.estimated_document_count(filter={'a': 1})
 
     def test__reindex(self):

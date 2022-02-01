@@ -622,12 +622,14 @@ class Collection(object):
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
         validate_is_mapping('document', document)
-        for operator in _updaters:
-            if not document.get(operator, True):
-                raise WriteError(
-                    "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
-                    % (operator, operator),
-                )
+
+        if self.database.client.server_info()['versionArray'] < [5]:
+            for operator in _updaters:
+                if not document.get(operator, True):
+                    raise WriteError(
+                        "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
+                        % (operator, operator),
+                    )
 
         updated_existing = False
         upserted_id = None
@@ -1466,7 +1468,9 @@ class Collection(object):
     def estimated_document_count(self, **kwargs):
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
-        unknown_kwargs = set(kwargs) - {'skip', 'limit', 'maxTimeMS', 'hint'}
+        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
+        if self.database.client.server_info()['versionArray'] < [5]:
+            unknown_kwargs.discard('skip')
         if unknown_kwargs:
             raise OperationFailure(
                 "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])

@@ -106,4 +106,4 @@ from .not_implemented import ignore_feature, warn_on_feature
 # The version of the server faked by mongomock. Callers may patch it before creating connections to
 # update the behavior of mongomock.
 # Keep the default version in sync with docker-compose.yml and travis.yml.
-SERVER_VERSION = os.getenv('MONGODB', '4.4.0')
+SERVER_VERSION = os.getenv('MONGODB', '5.0.5')

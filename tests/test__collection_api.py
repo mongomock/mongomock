@@ -6657,6 +6657,12 @@ class CollectionAPITest(TestCase):
     def test_set_no_content(self):
         collection = self.db.collection
         collection.insert_one({'a': 1})
+
+        if version.parse(mongomock.SERVER_VERSION) >= version.parse('5.0'):
+            collection.update_one({}, {'$set': {}})
+            collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
+            return
+
         with self.assertRaises(mongomock.WriteError):
             collection.update_one({}, {'$set': {}})
 

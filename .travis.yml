@@ -7,7 +7,7 @@ env:
     # Ubuntu version, keep in sync with os + dist above.
     - UBUNTU_VERSION=1804
     # MongoDB version should be kept in sync with docker-compose image and mongomock/__init__.py
-    - MONGODB=4.4.0
+    - MONGODB=5.0.5
 jobs:
   include:
     - python: pypy3
@@ -34,6 +34,8 @@ jobs:
       env: TOX_ENV=pylint
     - python: 3.9
       env: TOX_ENV=mypy
+    - python: 3.9
+      env: TOX_ENV=py39-pymongo-pyexecjs-mongodb4 MONGODB=4.4.0
 script:
   - tox -e $TOX_ENV
 before_install:
