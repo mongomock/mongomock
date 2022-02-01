@@ -360,8 +360,8 @@ class BulkOperationBuilder(object):
     def add_update(self, selector, doc, multi=False, upsert=False, collation=None,
                    array_filters=None, hint=None):
         if array_filters:
-            raise NotImplementedError(
-                'Array filters are not implemented in mongomock yet.')
+            raise_not_implemented(
+                'array_filters', 'Array filters are not implemented in mongomock yet.')
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
         write_operation.register_update_op(doc, multi, hint=hint)
 
@@ -567,24 +567,26 @@ class Collection(object):
         return True
 
     def update_one(
-            self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
-            session=None, collation=None):
+            self, filter, update, upsert=False, bypass_document_validation=False, collation=None,
+            array_filters=None, hint=None, session=None, let=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
             self._update(
-                filter, update, upsert=upsert, hint=hint, session=session, collation=collation),
+                filter, update, upsert=upsert, hint=hint, session=session, collation=collation,
+                array_filters=array_filters, let=let),
             acknowledged=True)
 
     def update_many(
-            self, filter, update, upsert=False, bypass_document_validation=False, hint=None,
-            session=None, collation=None):
+            self, filter, update, upsert=False, array_filters=None,
+            bypass_document_validation=False, collation=None, hint=None,
+            session=None, let=None):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
             self._update(
                 filter, update, upsert=upsert, multi=True, hint=hint, session=session,
-                collation=collation),
+                collation=collation, array_filters=array_filters, let=let),
             acknowledged=True)
 
     def replace_one(
@@ -606,7 +608,7 @@ class Collection(object):
 
     def _update(self, spec, document, upsert=False, manipulate=False,
                 multi=False, check_keys=False, hint=None, session=None,
-                collation=None, **kwargs):
+                collation=None, let=None, array_filters=None, **kwargs):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if hint:
@@ -618,6 +620,14 @@ class Collection(object):
                 'collation',
                 'The collation argument of update is valid but has not been implemented in '
                 'mongomock yet')
+        if array_filters:
+            raise_not_implemented(
+                'array_filters', 'Array filters are not implemented in mongomock yet.')
+        if let:
+            raise_not_implemented(
+                'let',
+                'The let argument of update is valid but has not been implemented in mongomock '
+                'yet')
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)

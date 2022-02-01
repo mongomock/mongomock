@@ -912,6 +912,42 @@ class CollectionAPITest(TestCase):
                 collation='fr',
             )
 
+    def test__update_many_array_filters(self):
+        self.db.collection.insert_many([
+            {'a': 1, 'c': [2, 5, 6]},
+            {'a': 1, 'c': [3, 4, 5]},
+            {'a': 2, 'c': [12, 15]}
+        ])
+        self.db.collection.update_many(
+            filter={'a': 1},
+            update={'$set': {'a': 0}},
+            array_filters=None,
+        )
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_many(
+                filter={'a': 1},
+                update={'$set': {'c.$[e]': 0}},
+                array_filters=[{'e': {'$lt': 5}}],
+            )
+
+    def test__update_many_let(self):
+        self.db.collection.insert_many([
+            {'a': 1, 'c': 2},
+            {'a': 1, 'c': 3},
+            {'a': 2, 'c': 4}
+        ])
+        self.db.collection.update_many(
+            filter={'a': 1},
+            update={'$set': {'c': '$$newValue'}},
+            let=None,
+        )
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.update_many(
+                filter={'a': 1},
+                update={'$set': {'c': '$$newValue'}},
+                let={'newValue': 0},
+            )
+
     def test__update_many_upsert(self):
         self.assert_document_count(0)
         update_result = self.db.collection.update_many(
