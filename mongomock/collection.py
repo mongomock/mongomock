@@ -1175,7 +1175,8 @@ class Collection(object):
                 doc_copy = self._copy_field(doc, container)
         else:
             doc_copy = _project_by_spec(
-                doc, _combine_projection_spec(fields),
+                self._copy_field(doc, container),
+                _combine_projection_spec(fields),
                 is_include=list(fields.values())[0],
                 container=container)
 

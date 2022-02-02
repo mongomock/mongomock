@@ -260,6 +260,14 @@ class CollectionAPITest(TestCase):
         refetched_obj = self.db.collection.find_one({'a': 1})
         self.assertNotEqual(fetched_obj, refetched_obj)
 
+    def test_cursor_with_projection_returns_value_copies(self):
+        self.db.collection.insert_one({'a': ['b']})
+        fetched_list = self.db.collection.find_one(projection=['a'])['a']
+        self.assertEqual(fetched_list, ['b'])
+        fetched_list.append('c')
+        refetched_list = self.db.collection.find_one(projection=['a'])['a']
+        self.assertEqual(refetched_list, ['b'])
+
     @skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'update was removed in pymongo v4')
     def test__update_retval(self):
         self.db.col.insert_one({'a': 1})
