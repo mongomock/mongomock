@@ -4040,10 +4040,12 @@ def _COUNT_EXCEPTION_TYPE(cursor):
 
 
 def _DISTINCT(*args):
-    return lambda cursor: sorted(
-        helpers.hashdict(v) if isinstance(v, dict) else v
-        for v in cursor.distinct(*args)
-    )
+    def sortkey(value):
+        if isinstance(value, dict):
+            return [(k, sortkey(v)) for k, v in sorted(value.items())]
+        return value
+
+    return lambda cursor: sorted(cursor.distinct(*args), key=sortkey)
 
 
 def _SKIP(*args):
@@ -4169,6 +4171,13 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__distinct_array_nested_field(self):
         self.cmp.do.insert_one({'f1': [{'f2': 'v'}, {'f2': 'w'}]})
         self.cmp.compare(_DISTINCT('f1.f2')).find()
+
+    def test__distinct_array_field_with_dicts(self):
+        self.cmp.do.insert_many([
+            {'f1': [{'f2': 'v2'}, {'f3': 'v3'}]},
+            {'f1': [{'f3': 'v3'}, {'f4': 'v4'}]},
+        ])
+        self.cmp.compare(_DISTINCT('f1')).find()
 
 
 class InsertedDocumentTest(TestCase):

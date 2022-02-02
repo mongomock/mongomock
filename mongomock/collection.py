@@ -1953,20 +1953,18 @@ class Cursor(object):
         if not isinstance(key, string_types):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
-        unique_dict_vals = []
         for x in self._compute_results():
-            for value in filtering.iter_key_candidates(key, x):
-                if value == NOTHING:
+            for values in filtering.iter_key_candidates(key, x):
+                if values == NOTHING:
                     continue
-                if isinstance(value, dict):
-                    if any(dict_val == value for dict_val in unique_dict_vals):
-                        continue
-                    unique_dict_vals.append(value)
-                else:
-                    unique.update(
-                        value if isinstance(
-                            value, (tuple, list)) else [value])
-        return list(unique) + unique_dict_vals
+                if not isinstance(values, (tuple, list)):
+                    values = [values]
+                for value in values:
+                    if isinstance(value, dict):
+                        unique.add(helpers.hashdict(value))
+                    else:
+                        unique.add(value)
+        return [dict(v) if isinstance(v, helpers.hashdict) else v for v in unique]
 
     def __getitem__(self, index):
         if isinstance(index, slice):
