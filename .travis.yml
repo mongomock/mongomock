@@ -1,11 +1,11 @@
 language: python
 cache: pip
 os: linux
-dist: bionic # OS+dist should be kept in sync with Dockerfile and UBUNTU_VERSION below.
+dist: focal # OS+dist should be kept in sync with Dockerfile and UBUNTU_VERSION below.
 env:
   global:
     # Ubuntu version, keep in sync with os + dist above.
-    - UBUNTU_VERSION=1804
+    - UBUNTU_VERSION=2004
     # MongoDB version should be kept in sync with docker-compose image and mongomock/__init__.py
     - MONGODB=5.0.5
 jobs:
