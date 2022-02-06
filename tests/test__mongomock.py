@@ -2007,7 +2007,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.sort_by(lambda i: i['name']).list_indexes()
 
     def test__empty_logical_operators(self):
-        for operator in mongomock.filtering.LOGICAL_OPERATOR_MAP:
+        for operator in ('$or', '$and', '$nor'):
             self.cmp.compare_exceptions.find({operator: []})
 
     def test__rename(self):
