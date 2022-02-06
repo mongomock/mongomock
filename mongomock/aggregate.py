@@ -5,6 +5,7 @@ import collections
 import copy
 import datetime
 import decimal
+import functools
 import itertools
 import math
 import numbers
@@ -14,8 +15,6 @@ import sys
 import warnings
 
 from sentinels import NOTHING
-import six
-from six import moves, raise_from
 
 from mongomock import command_cursor
 from mongomock import filtering
@@ -226,7 +225,7 @@ class _Parser(object):
                 % (len(expression), expression))
 
         value_dict = {}
-        for k, v in six.iteritems(expression):
+        for k, v in expression.items():
             if k in arithmetic_operators:
                 return self._handle_arithmetic_operator(k, v)
             if k in project_operators:
@@ -291,7 +290,7 @@ class _Parser(object):
             return NOTHING
 
     def _parse_basic_expression(self, expression):
-        if isinstance(expression, six.string_types) and expression.startswith('$'):
+        if isinstance(expression, str) and expression.startswith('$'):
             if expression.startswith('$$'):
                 return helpers.get_value_by_dot(dict({
                     'ROOT': self._doc_dict,
@@ -339,7 +338,7 @@ class _Parser(object):
             assert len(values) == 2, 'mod must have only 2 items'
             return math.fmod(self.parse(values[0]), self.parse(values[1]))
         if operator == '$multiply':
-            return moves.reduce(
+            return functools.reduce(
                 lambda x, y: x * y,
                 (self.parse(value) for value in values))
         if operator == '$pow':
@@ -352,7 +351,7 @@ class _Parser(object):
             value_0 = self.parse(values[0])
             value_1 = self.parse(values[1])
             if isinstance(value_0, datetime.datetime) and \
-                    isinstance(value_1, (six.integer_types, float)):
+                    isinstance(value_1, (int, float)):
                 value_1 = datetime.timedelta(milliseconds=value_1)
             res = value_0 - value_1
             if isinstance(res, datetime.timedelta):
@@ -391,7 +390,7 @@ class _Parser(object):
                 raise OperationFailure('invalid parameter: expected an object (vars)')
             user_vars = {
                 var_key: self.parse(var_value)
-                for var_key, var_value in six.iteritems(value['vars'])
+                for var_key, var_value in value['vars'].items()
             }
             return _Parser(
                 self._doc_dict,
@@ -438,9 +437,9 @@ class _Parser(object):
 
             if string is None or delimiter is None:
                 return None
-            if not isinstance(string, six.string_types):
+            if not isinstance(string, str):
                 raise TypeError('split first argument must evaluate to string')
-            if not isinstance(delimiter, six.string_types):
+            if not isinstance(delimiter, str):
                 raise TypeError('split second argument must evaluate to string')
             return string.split(delimiter)
         if operator == '$substr':
@@ -481,7 +480,7 @@ class _Parser(object):
                 input_value = self.parse(values['input'])
             except KeyError:
                 return False
-            if not isinstance(input_value, six.string_types):
+            if not isinstance(input_value, str):
                 raise OperationFailure("$regexMatch needs 'input' to be of type string")
 
             try:
@@ -648,7 +647,7 @@ class _Parser(object):
                     'First argument to $slice must be an array, but is of type: {}'
                     .format(type(array_value)))
             for num, v in zip(('Second', 'Third'), value[1:]):
-                if not isinstance(v, six.integer_types):
+                if not isinstance(v, int):
                     raise OperationFailure(
                         '{} argument to $slice must be numeric, but is of type: {}'
                         .format(num, type(v)))
@@ -706,8 +705,8 @@ class _Parser(object):
                 return None
             if decimal_support:
                 if isinstance(parsed, decimal128.Decimal128):
-                    return helpers.to_long(parsed.to_decimal())
-                return helpers.to_long(parsed)
+                    return int(parsed.to_decimal())
+                return int(parsed)
             raise NotImplementedError(
                 'You need to import the pymongo library to support decimal128 type.'
             )
@@ -737,9 +736,9 @@ class _Parser(object):
                 try:
                     decimal_value = decimal128.Decimal128(parsed)
                 except decimal.InvalidOperation as err:
-                    raise_from(OperationFailure(
+                    raise OperationFailure(
                         "Failed to parse number '%s' in $convert with no onError value:"
-                        'Failed to parse string to decimal' % parsed), err)
+                        'Failed to parse string to decimal' % parsed) from err
             elif isinstance(parsed, datetime.datetime):
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
@@ -918,10 +917,10 @@ filtering.register_parse_expression(_parse_expression)
 
 def _accumulate_group(output_fields, group_list):
     doc_dict = {}
-    for field, value in six.iteritems(output_fields):
+    for field, value in output_fields.items():
         if field == '_id':
             continue
-        for operator, key in six.iteritems(value):
+        for operator, key in value.items():
             values = []
             for doc in group_list:
                 try:
@@ -978,7 +977,7 @@ def _handle_lookup_stage(in_collection, database, options):
         if operator not in options:
             raise OperationFailure(
                 "Must specify '%s' field for a $lookup" % operator)
-        if not isinstance(options[operator], six.string_types):
+        if not isinstance(options[operator], str):
             raise OperationFailure(
                 'Arguments to $lookup must be strings')
         if operator in ('as', 'localField', 'foreignField') and \
@@ -1030,13 +1029,13 @@ def _recursive_get(match, nested_fields):
 
 
 def _handle_graph_lookup_stage(in_collection, database, options):
-    if not isinstance(options.get('maxDepth', 0), six.integer_types):
+    if not isinstance(options.get('maxDepth', 0), int):
         raise OperationFailure(
             "Argument 'maxDepth' to $graphLookup must be a number")
     if not isinstance(options.get('restrictSearchWithMatch', {}), dict):
         raise OperationFailure(
             "Argument 'restrictSearchWithMatch' to $graphLookup must be a Dictionary")
-    if not isinstance(options.get('depthField', ''), six.string_types):
+    if not isinstance(options.get('depthField', ''), str):
         raise OperationFailure(
             "Argument 'depthField' to $graphlookup must be a string")
     if 'startWith' not in options:
@@ -1046,7 +1045,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         if operator not in options:
             raise OperationFailure(
                 "Must specify '%s' field for a $graphLookup" % operator)
-        if not isinstance(options[operator], six.string_types):
+        if not isinstance(options[operator], str):
             raise OperationFailure(
                 "Argument '%s' to $graphLookup must be string" % operator)
         if options[operator].startswith('$'):
@@ -1164,9 +1163,9 @@ def _handle_bucket_stage(in_collection, unused_database, options):
         try:
             return options['default']
         except KeyError as err:
-            raise_from(OperationFailure(
+            raise OperationFailure(
                 '$bucket could not find a matching branch for '
-                'an input, and no default was specified.'), err)
+                'an input, and no default was specified.') from err
 
     def _get_bucket_id(doc):
         """Get the bucket ID for a document.
@@ -1226,7 +1225,7 @@ def _handle_unwind_stage(in_collection, unused_database, options):
     if not isinstance(options, dict):
         options = {'path': options}
     path = options['path']
-    if not isinstance(path, six.string_types) or path[0] != '$':
+    if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
             '$unwind failed: exception: field path references must be prefixed '
             "with a '$' '%s'" % path)
@@ -1298,13 +1297,13 @@ def _combine_projection_spec(filter_list, original_filter, prefix=''):
 
     return collections.OrderedDict(
         (k, _combine_projection_spec(v, original_filter, prefix='%s%s.' % (prefix, k)))
-        for k, v in six.iteritems(filter_dict)
+        for k, v in filter_dict.items()
     )
 
 
 def _project_by_spec(doc, proj_spec, is_include):
     output = {}
-    for key, value in six.iteritems(doc):
+    for key, value in doc.items():
         if key not in proj_spec:
             if not is_include:
                 output[key] = value
@@ -1351,7 +1350,7 @@ def _handle_project_stage(in_collection, unused_database, options):
     # Compute new values for each field, except inclusion/exclusions that are
     # handled in one final step.
     new_fields_collection = None
-    for field, value in six.iteritems(options):
+    for field, value in options.items():
         if method is None and (field != '_id' or value):
             method = 'include' if value else 'exclude'
         elif method == 'include' and not value and field != '_id':
@@ -1400,7 +1399,7 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
         raise OperationFailure(
             'Invalid $addFields :: caused by :: specification must have at least one field')
     out_collection = [dict(doc) for doc in in_collection]
-    for field, value in six.iteritems(options):
+    for field, value in options.items():
         for in_doc, out_doc in zip(in_collection, out_collection):
             try:
                 out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
@@ -1491,14 +1490,14 @@ def process_pipeline(collection, database, pipeline, session):
         raise NotImplementedError('Mongomock does not handle sessions yet')
 
     for stage in pipeline:
-        for operator, options in six.iteritems(stage):
+        for operator, options in stage.items():
             try:
                 handler = _PIPELINE_HANDLERS[operator]
             except KeyError as err:
-                raise_from(NotImplementedError(
+                raise NotImplementedError(
                     '%s is not a valid operator for the aggregation pipeline. '
                     'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
-                    'for a complete list of valid operators.' % operator), err)
+                    'for a complete list of valid operators.' % operator) from err
             if not handler:
                 raise NotImplementedError(
                     "Although '%s' is a valid operator for the aggregation pipeline, it is "

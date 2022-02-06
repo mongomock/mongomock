@@ -4,9 +4,8 @@ from datetime import datetime, timedelta, tzinfo
 from mongomock import InvalidURI
 from packaging import version
 import re
-from six.moves.urllib_parse import unquote_plus
-from six import PY3, iteritems, raise_from, string_types
 import time
+from urllib.parse import unquote_plus
 import warnings
 
 
@@ -86,7 +85,7 @@ def create_index_list(key_or_list, direction=None):
 
        It takes such a list, or a single key, or a single key and direction.
     """
-    if isinstance(key_or_list, string_types):
+    if isinstance(key_or_list, str):
         return [(key_or_list, direction or ASCENDING)]
     if not isinstance(key_or_list, (list, tuple, abc.Iterable)):
         raise TypeError('if no direction is specified, '
@@ -124,7 +123,7 @@ class hashdict(dict):
                           hashdict(v) if isinstance(v, dict) else
                           tuple(v) if isinstance(v, list) else
                           v)
-                         for k, v in iteritems(self))
+                         for k, v in self.items())
 
     def __repr__(self):
         return '{0}({1})'.format(
@@ -179,9 +178,8 @@ def fields_list_to_dict(fields):
     """
     as_dict = {}
     for field in fields:
-        if not isinstance(field, string_types):
-            raise TypeError('fields must be a list of key names, '
-                            'each an instance of %s' % (string_types[0].__name__,))
+        if not isinstance(field, str):
+            raise TypeError('fields must be a list of key names, each an instance of str')
         as_dict[field] = 1
     return as_dict
 
@@ -256,7 +254,7 @@ def parse_uri(uri, default_port=27017, warn=False):
                 if port < 0 or port > 65535:
                     raise ValueError()
             except ValueError as err:
-                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
+                raise ValueError('Port must be an integer between 0 and 65535:', port) from err
         else:
             port = default_port
 
@@ -298,7 +296,7 @@ def split_hosts(hosts, default_port=27017):
                 if port < 0 or port > 65535:
                     raise ValueError()
             except ValueError as err:
-                raise_from(ValueError('Port must be an integer between 0 and 65535:', port), err)
+                raise ValueError('Port must be an integer between 0 and 65535:', port) from err
 
         nodelist.append((host, port))
 
@@ -368,14 +366,14 @@ def get_value_by_dot(doc, key, can_generate_array=False):
                 int_key = int(key_item)
             except ValueError as err:
                 if not can_generate_array:
-                    raise_from(KeyError(key_index), err)
+                    raise KeyError(key_index) from err
                 remaining_key = '.'.join(key_items[key_index:])
                 return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
 
             try:
                 result = result[int_key]
             except (ValueError, IndexError) as err:
-                raise_from(KeyError(key_index), err)
+                raise KeyError(key_index) from err
 
         else:
             raise KeyError(key_index)
@@ -398,7 +396,7 @@ def set_value_by_dot(doc, key, value):
         try:
             parent[int(child_key)] = value
         except (ValueError, IndexError) as err:
-            raise_from(KeyError(), err)
+            raise KeyError() from err
     else:
         raise KeyError()
 
@@ -426,11 +424,3 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
-
-
-def to_long(value):
-    """Backwards compatible `long` function. It tries to convert input to a long integer."""
-    if PY3:
-        global long  # pylint: disable=global-variable-undefined
-        long = int
-    return long(value)

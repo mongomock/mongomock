@@ -7,7 +7,6 @@ import mongomock
 import mongomock.gridfs
 from mongomock import helpers
 from packaging import version
-from six import text_type
 
 try:
     import gridfs
@@ -183,7 +182,7 @@ class GenFile(object):
             yield value
 
     def _maybe_encode(self, s):
-        if self.do_encode and isinstance(s, text_type):
+        if self.do_encode and isinstance(s, str):
             return s.encode('UTF-8')
         return s
 

@@ -39,12 +39,6 @@ except ImportError:
     from mongomock.read_preferences import PRIMARY as _READ_PREFERENCE_PRIMARY
 
 from sentinels import NOTHING
-from six import iteritems
-from six import iterkeys
-from six import PY3
-from six import raise_from
-from six import string_types
-from six import text_type
 
 
 import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
@@ -203,7 +197,7 @@ def _combine_projection_spec(projection_fields_spec):
     """
 
     tmp_spec = OrderedDict()
-    for f, v in iteritems(projection_fields_spec):
+    for f, v in projection_fields_spec.items():
         if '.' not in f:
             if isinstance(tmp_spec.get(f), dict):
                 if not v:
@@ -223,7 +217,7 @@ def _combine_projection_spec(projection_fields_spec):
             tmp_spec[base_field][new_field] = v
 
     combined_spec = OrderedDict()
-    for f, v in iteritems(tmp_spec):
+    for f, v in tmp_spec.items():
         if isinstance(v, dict):
             combined_spec[f] = _combine_projection_spec(v)
         else:
@@ -236,10 +230,10 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
     doc_copy = container()
 
     if not is_include:
-        for key, val in iteritems(doc):
+        for key, val in doc.items():
             doc_copy[key] = val
 
-    for key, spec in iteritems(combined_projection_spec):
+    for key, spec in combined_projection_spec.items():
         if key == '$':
             if is_include:
                 raise NotImplementedError('Positional projection is not implemented in mongomock')
@@ -413,7 +407,7 @@ class Collection(object):
             return self.database == other.database and self.name == other.name
         return NotImplemented
 
-    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
+    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash((self.database, self.name))
 
@@ -506,7 +500,7 @@ class Collection(object):
                 })
             return results
 
-        if not all(isinstance(k, string_types) for k in data):
+        if not all(isinstance(k, str) for k in data):
             raise ValueError('Document keys must be strings')
 
         if BSON:
@@ -555,7 +549,7 @@ class Collection(object):
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
     def _internalize_dict(self, d):
-        return {k: copy.deepcopy(v) for k, v in iteritems(d)}
+        return {k: copy.deepcopy(v) for k, v in d.items()}
 
     def _has_key(self, doc, key):
         key_parts = key.split('.')
@@ -671,14 +665,14 @@ class Collection(object):
             num_matched += 1
             first = True
             subdocument = None
-            for k, v in iteritems(document):
+            for k, v in document.items():
                 if k in _updaters:
                     updater = _updaters[k]
                     subdocument = self._update_document_fields_with_positional_awareness(
                         existing_document, v, spec, updater, subdocument)
 
                 elif k == '$rename':
-                    for src, dst in iteritems(v):
+                    for src, dst in v.items():
                         if '.' in src or '.' in dst:
                             raise NotImplementedError(
                                 'Using the $rename operator with dots is a valid MongoDB '
@@ -698,7 +692,7 @@ class Collection(object):
                         existing_document, v, spec, _current_date_updater, subdocument)
 
                 elif k == '$addToSet':
-                    for field, value in iteritems(v):
+                    for field, value in v.items():
                         nested_field_list = field.rsplit('.')
                         if len(nested_field_list) == 1:
                             if field not in existing_document:
@@ -740,7 +734,7 @@ class Collection(object):
 
                             subdocument[nested_field_list[-1]] = push_results
                 elif k == '$pull':
-                    for field, value in iteritems(v):
+                    for field, value in v.items():
                         nested_field_list = field.rsplit('.')
                         # nested fields includes a positional element
                         # need to find that element
@@ -754,7 +748,7 @@ class Collection(object):
                             # and the last subdoc should be an array
                             for obj in subdocument[nested_field_list[-1]]:
                                 if isinstance(obj, dict):
-                                    for pull_key, pull_value in iteritems(value):
+                                    for pull_key, pull_value in value.items():
                                         if obj[pull_key] != pull_value:
                                             pull_results.append(obj)
                                     continue
@@ -791,7 +785,7 @@ class Collection(object):
                                     if value == obj:
                                         arr.remove(obj)
                 elif k == '$pullAll':
-                    for field, value in iteritems(v):
+                    for field, value in v.items():
                         nested_field_list = field.rsplit('.')
                         if len(nested_field_list) == 1:
                             if field in existing_document:
@@ -811,7 +805,7 @@ class Collection(object):
                                 subdocument[nested_field_list[-1]] = [
                                     obj for obj in arr if obj not in value]
                 elif k == '$push':
-                    for field, value in iteritems(v):
+                    for field, value in v.items():
                         # Find the place where to push.
                         nested_field_list = field.rsplit('.')
                         subdocument, field = self._get_subdocument(
@@ -919,13 +913,13 @@ class Collection(object):
                 break
 
         return {
-            text_type('connectionId'): self.database.client._id,
-            text_type('err'): None,
-            text_type('n'): num_matched,
-            text_type('nModified'): num_updated if updated_existing else 0,
-            text_type('ok'): 1,
-            text_type('upserted'): upserted_id,
-            text_type('updatedExisting'): updated_existing,
+            'connectionId': self.database.client._id,
+            'err': None,
+            'n': num_matched,
+            'nModified': num_updated if updated_existing else 0,
+            'ok': 1,
+            'upserted': upserted_id,
+            'updatedExisting': updated_existing,
         }
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
@@ -984,7 +978,7 @@ class Collection(object):
     def _expand_dots(self, doc):
         expanded = {}
         paths = {}
-        for k, v in iteritems(doc):
+        for k, v in doc.items():
 
             def _raise_incompatible(subkey):
                 raise WriteError(
@@ -1013,7 +1007,7 @@ class Collection(object):
         if not doc or not isinstance(doc, dict):
             return doc, False
         new_doc = OrderedDict()
-        for k, v in iteritems(doc):
+        for k, v in doc.items():
             if k == '$eq':
                 return v, False
             if k.startswith('$'):
@@ -1032,7 +1026,7 @@ class Collection(object):
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
-        for kwarg, value in iteritems(kwargs):
+        for kwarg, value in kwargs.items():
             if value:
                 raise OperationFailure("Unrecognized field '%s'" % kwarg)
         return Cursor(self, spec, sort, projection, skip, limit,
@@ -1072,7 +1066,7 @@ class Collection(object):
         """Removes and returns fields with projection operators."""
         result = {}
         allowed_projection_operators = {'$elemMatch', '$slice'}
-        for key, value in iteritems(fields):
+        for key, value in fields.items():
             if isinstance(value, dict):
                 for op in value:
                     if op not in allowed_projection_operators:
@@ -1086,7 +1080,7 @@ class Collection(object):
 
     def _apply_projection_operators(self, ops, doc, doc_copy):
         """Applies projection operators to copied document."""
-        for field, op in iteritems(ops):
+        for field, op in ops.items():
             if field not in doc_copy:
                 if field in doc:
                     # field was not copied yet (since we are in include mode)
@@ -1196,19 +1190,19 @@ class Collection(object):
 
         # time to apply the projection operators and put back their fields
         self._apply_projection_operators(projection_operators, doc, doc_copy)
-        for field, op in iteritems(projection_operators):
+        for field, op in projection_operators.items():
             fields[field] = op
         return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
         """Implements the $set behavior on an existing document"""
-        for k, v in iteritems(fields):
+        for k, v in fields.items():
             self._update_document_single_field(doc, k, v, updater)
 
     def _update_document_fields_positional(self, doc, fields, spec, updater,
                                            subdocument=None):
         """Implements the $set behavior on an existing document"""
-        for k, v in iteritems(fields):
+        for k, v in fields.items():
             if '$' in k:
 
                 field_name_parts = k.split('.')
@@ -1252,7 +1246,7 @@ class Collection(object):
 
     def _update_document_fields_with_positional_awareness(self, existing_document, v, spec,
                                                           updater, subdocument):
-        positional = any('$' in key for key in iterkeys(v))
+        positional = any('$' in key for key in v.keys())
 
         if positional:
             return self._update_document_fields_positional(
@@ -1539,7 +1533,7 @@ class Collection(object):
                 except TypeError as err:
                     # index is not hashable.
                     if index in indexed_list:
-                        raise_from(DuplicateKeyError('E11000 Duplicate Key Error', 11000), err)
+                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000) from err
                     indexed_list.append(index)
 
         self._store.create_index(index_name, index_dict)
@@ -1573,7 +1567,7 @@ class Collection(object):
         try:
             self._store.drop_index(name)
         except KeyError as err:
-            raise_from(OperationFailure('index not found with name [%s]' % name), err)
+            raise OperationFailure('index not found with name [%s]' % name) from err
 
     def drop_indexes(self, session=None):
         if session:
@@ -1686,7 +1680,7 @@ class Collection(object):
                     if emit_count > 1:
                         full_dict['counts']['reduce'] += 1
                 full_dict['counts']['output'] = len(reduced_rows)
-            if isinstance(out, (string_types, bytes)):
+            if isinstance(out, (str, bytes)):
                 out_collection = getattr(self.database, out)
                 out_collection.drop()
                 out_collection.insert(reduced_rows)
@@ -1767,10 +1761,8 @@ class Collection(object):
             for k1 in key:
                 doc_list = sorted(doc_list, key=lambda x: filtering.resolve_key(k1, x))
             for k2 in key:
-                if not isinstance(k2, string_types):
-                    raise TypeError(
-                        'Keys must be a list of key names, '
-                        'each an instance of %s' % string_types[0].__name__)
+                if not isinstance(k2, str):
+                    raise TypeError('Keys must be a list of key names, each an instance of str')
                 for _, group in itertools.groupby(doc_list, lambda item: item[k2]):
                     group_list = ([x for x in group])
                     reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
@@ -1791,7 +1783,7 @@ class Collection(object):
     def with_options(
             self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
         has_changes = False
-        for key, options in iteritems(_WITH_OPTIONS_KWARGS):
+        for key, options in _WITH_OPTIONS_KWARGS.items():
             value = locals()[key]
             if value is None or value == getattr(self, '_' + key):
                 continue
@@ -1901,7 +1893,7 @@ class Cursor(object):
             self._emitted += 1
             return doc
         except IndexError as err:
-            raise_from(StopIteration(), err)
+            raise StopIteration() from err
 
     next = __next__
 
@@ -1950,7 +1942,7 @@ class Cursor(object):
     def distinct(self, key, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        if not isinstance(key, string_types):
+        if not isinstance(key, str):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()
         for x in self._compute_results():

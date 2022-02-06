@@ -4,8 +4,6 @@ from platform import python_version
 import re
 import uuid
 
-from six import integer_types, string_types, text_type
-
 try:
     from bson import decimal128, Regex
     _HAVE_PYMONGO = True
@@ -20,8 +18,9 @@ class _NO_VALUE(object):
 # we don't use NOTHING because it might be returned from various APIs
 NO_VALUE = _NO_VALUE()
 
-_SUPPORTED_BASE_TYPES = (float, bool, str, datetime.datetime, type(None), uuid.UUID) + \
-    string_types + integer_types + (text_type, bytes, type, type(re.compile('')),)
+_SUPPORTED_BASE_TYPES = (
+    float, bool, str, datetime.datetime, type(None), uuid.UUID, int, bytes, type,
+    type(re.compile('')),)
 
 if _HAVE_PYMONGO:
     _SUPPORTED_TYPES = _SUPPORTED_BASE_TYPES + (decimal.Decimal, decimal128.Decimal128)

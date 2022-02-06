@@ -5,7 +5,6 @@ import datetime
 import os
 from packaging import version
 import re
-from six import assertCountEqual
 import sys
 import time
 from unittest import TestCase, skipIf, skipUnless
@@ -2669,10 +2668,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         result = list(aggregations['fake'])
         self.assertEqual(len(result), len(expected))
         for expected_elt, result_elt in zip(expected, result):
-            assertCountEqual(self, expected_elt.keys(), result_elt.keys())
+            self.assertCountEqual(expected_elt.keys(), result_elt.keys())
             for key in result_elt:
                 if isinstance(result_elt[key], list):
-                    assertCountEqual(self, result_elt[key], expected_elt[key], msg=key)
+                    self.assertCountEqual(result_elt[key], expected_elt[key], msg=key)
                 else:
                     self.assertEqual(result_elt[key], expected_elt[key], msg=key)
 

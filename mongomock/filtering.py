@@ -9,7 +9,6 @@ import numbers
 import operator
 import re
 from sentinels import NOTHING
-from six import iteritems, string_types, PY3
 try:
     from types import NoneType
 except ImportError:
@@ -68,14 +67,14 @@ class _Filterer(object):
             '$type': _type_op
         }, **{
             key: _not_nothing_and(_list_expand(_compare_objects(op)))
-            for key, op in iteritems(SORTING_OPERATOR_MAP)
+            for key, op in SORTING_OPERATOR_MAP.items()
         })
 
     def apply(self, search_filter, document):
         if not isinstance(search_filter, dict):
             raise OperationFailure('the match filter must be an expression in an object')
 
-        for key, search in iteritems(search_filter):
+        for key, search in search_filter.items():
             # Top level operators.
             if key == '$comment':
                 continue
@@ -134,9 +133,9 @@ class _Filterer(object):
                         and self._operator_map[operator_string](doc_val, search_val)
                         or operator_string == '$not'
                         and self._not_op(document, key, search_val)
-                        for operator_string, search_val in iteritems(search)
+                        for operator_string, search_val in search.items()
                     ) and search
-                elif isinstance(search, _RE_TYPES) and isinstance(doc_val, (string_types, list)):
+                elif isinstance(search, _RE_TYPES) and isinstance(doc_val, (str, list)):
                     is_match = _regex(doc_val, search)
                 elif key in LOGICAL_OPERATOR_MAP:
                     if not search:
@@ -319,8 +318,8 @@ def bson_compare(op, a, b, can_compare_types=True):
         # MongoDb server compares the type before comparing the keys
         # https://github.com/mongodb/mongo/blob/f10f214/src/mongo/bson/bsonelement.cpp#L516
         # even though the documentation does not say anything about that.
-        a = [(_get_compare_type(v), k, v) for k, v in iteritems(a)]
-        b = [(_get_compare_type(v), k, v) for k, v in iteritems(b)]
+        a = [(_get_compare_type(v), k, v) for k, v in a.items()]
+        b = [(_get_compare_type(v), k, v) for k, v in b.items()]
 
     if isinstance(a, (tuple, list)):
         for item_a, item_b in zip(a, b):
@@ -333,7 +332,7 @@ def bson_compare(op, a, b, can_compare_types=True):
 
     # bson handles bytes as binary in python3+:
     # https://api.mongodb.com/python/current/api/bson/index.html
-    if PY3 and isinstance(a, bytes):
+    if isinstance(a, bytes):
         # Performs the same operation as described by:
         # https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#bindata
         if len(a) != len(b):
@@ -355,7 +354,7 @@ def _get_compare_type(val):
         return 40
     if isinstance(val, numbers.Number):
         return 10
-    if isinstance(val, string_types):
+    if isinstance(val, str):
         return 15
     if isinstance(val, dict):
         return 20
@@ -364,7 +363,6 @@ def _get_compare_type(val):
     if isinstance(val, uuid.UUID):
         return 30
     if isinstance(val, bytes):
-        assert PY3
         return 30
     if isinstance(val, ObjectId):
         return 35
@@ -382,16 +380,16 @@ def _get_compare_type(val):
 
 
 def _regex(doc_val, regex):
-    if not (isinstance(doc_val, (string_types, list)) or isinstance(doc_val, RE_TYPE)):
+    if not (isinstance(doc_val, (str, list)) or isinstance(doc_val, RE_TYPE)):
         return False
-    if isinstance(regex, string_types):
+    if isinstance(regex, str):
         regex = re.compile(regex)
     if not isinstance(regex, RE_TYPE):
         # bson.Regex
         regex = regex.try_compile()
     return any(
         regex.search(item) for item in _force_list(doc_val)
-        if isinstance(item, string_types))
+        if isinstance(item, str))
 
 
 def _size_op(doc_val, search_val):
@@ -419,7 +417,7 @@ def _type_op(doc_val, search_val):
 
 
 def _combine_regex_options(search):
-    if not isinstance(search['$options'], string_types):
+    if not isinstance(search['$options'], str):
         raise OperationFailure('$options has to be a string')
 
     options = None

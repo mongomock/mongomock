@@ -1,8 +1,7 @@
 import collections
 import datetime
+import functools
 import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
-import six
-import six.moves
 import threading
 
 lock = threading.RLock()
@@ -125,11 +124,11 @@ class CollectionStore(object):
     @property
     def documents(self):
         self._remove_expired_documents()
-        for doc in six.itervalues(self._documents):
+        for doc in self._documents.values():
             yield doc
 
     def _remove_expired_documents(self):
-        for index in six.itervalues(self._ttl_indexes):
+        for index in self._ttl_indexes.values():
             self._expire_documents(index)
 
     def _expire_documents(self, index):
@@ -150,7 +149,7 @@ class CollectionStore(object):
         ttl_field_name = next(iter(index['key']))[0]
         ttl_now = mongomock.utcnow()
         expired_ids = [
-            doc['_id'] for doc in six.itervalues(self._documents)
+            doc['_id'] for doc in self._documents.values()
             if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
         ]
 
@@ -169,7 +168,7 @@ def _get_min_datetime_from_value(val):
     if not val:
         return datetime.datetime.max
     if isinstance(val, list):
-        return six.moves.reduce(_min_dt, [datetime.datetime.max] + val)
+        return functools.reduce(_min_dt, [datetime.datetime.max] + val)
     return val
 
 

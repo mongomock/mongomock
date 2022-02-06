@@ -7,7 +7,6 @@ from mongomock import ConfigurationError
 from mongomock import helpers
 from mongomock import read_preferences
 from packaging import version
-from six import PY3
 import warnings
 
 try:
@@ -82,7 +81,7 @@ class MongoClient(object):
             return self.address == other.address
         return NotImplemented
 
-    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
+    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash(self.address)
 

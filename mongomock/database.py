@@ -11,8 +11,6 @@ from mongomock import helpers
 from mongomock import read_preferences
 from mongomock import store
 
-from six import string_types, PY3
-
 try:
     from pymongo import ReadPreference
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
@@ -68,7 +66,7 @@ class Database(object):
             return self._client == other._client and self.name == other.name
         return NotImplemented
 
-    if PY3 and helpers.PYMONGO_VERSION >= version.parse('3.12'):
+    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash((self._client, self.name))
 
@@ -162,8 +160,8 @@ class Database(object):
 
     def _ensure_valid_collection_name(self, name):
         # These are the same checks that are done in pymongo.
-        if not isinstance(name, string_types):
-            raise TypeError('name must be an instance of basestring')
+        if not isinstance(name, str):
+            raise TypeError('name must be an instance of str')
         if not name or '..' in name:
             raise InvalidName('collection names cannot be empty')
         if name[0] == '.' or name[-1] == '.':
@@ -216,7 +214,7 @@ class Database(object):
         return self[dbref.collection].find_one({'_id': dbref.id})
 
     def command(self, command, **unused_kwargs):
-        if isinstance(command, string_types):
+        if isinstance(command, str):
             command = {command: 1}
         if 'ping' in command:
             return {'ok': 1.}

@@ -5,8 +5,6 @@ from packaging import version
 import platform
 import random
 import re
-import six
-from six import assertCountEqual, text_type
 import sys
 from tests.diff import diff
 import time
@@ -267,10 +265,10 @@ class CollectionAPITest(TestCase):
         self.db.col.insert_one({'a': 1})
         retval = self.db.col.update({'a': 1}, {'b': 2})
         self.assertIsInstance(retval, dict)
-        self.assertIsInstance(retval[text_type('connectionId')], int)
-        self.assertIsNone(retval[text_type('err')])
-        self.assertEqual(retval[text_type('n')], 1)
-        self.assertTrue(retval[text_type('updatedExisting')])
+        self.assertIsInstance(retval['connectionId'], int)
+        self.assertIsNone(retval['err'])
+        self.assertEqual(retval['n'], 1)
+        self.assertTrue(retval['updatedExisting'])
         self.assertEqual(retval['ok'], 1.0)
 
         self.assertEqual(self.db.col.update({'bla': 1}, {'bla': 2})['n'], 0)
@@ -280,10 +278,10 @@ class CollectionAPITest(TestCase):
         self.db.col.insert_one({'a': 1})
         retval = self.db.col.remove({'a': 1})
         self.assertIsInstance(retval, dict)
-        self.assertIsInstance(retval[text_type('connectionId')], int)
-        self.assertIsNone(retval[text_type('err')])
-        self.assertEqual(retval[text_type('n')], 1)
-        self.assertEqual(retval[text_type('ok')], 1.0)
+        self.assertIsInstance(retval['connectionId'], int)
+        self.assertIsNone(retval['err'])
+        self.assertEqual(retval['n'], 1)
+        self.assertEqual(retval['ok'], 1.0)
 
         self.assertEqual(self.db.col.remove({'bla': 1})['n'], 0)
 
@@ -5080,11 +5078,7 @@ class CollectionAPITest(TestCase):
             collection.insert_one({'a': {'b'}})
         if version.parse(pymongo.version) < version.parse('3.8'):
             return
-        if six.PY2:
-            expect = "cannot encode object: set(['b']), of type: <type 'set'>"
-        else:
-            expect = "cannot encode object: {'b'}, of type: <class 'set'>"
-        self.assertEqual(str(cm.exception), expect)
+        self.assertEqual(str(cm.exception), "cannot encode object: {'b'}, of type: <class 'set'>")
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_bson_invalid_encode_type(self):
@@ -5222,7 +5216,7 @@ class CollectionAPITest(TestCase):
         actual = collection.aggregate([
             {'$group': {'_id': '$a'}},
         ])
-        assertCountEqual(self, [{'_id': 1}, {'_id': 2}], list(actual))
+        self.assertCountEqual([{'_id': 1}, {'_id': 2}], list(actual))
 
     @skipIf(
         helpers.PYMONGO_VERSION >= version.parse('4.0'),
@@ -5252,7 +5246,7 @@ class CollectionAPITest(TestCase):
         actual = collection.aggregate([
             {'$group': {'_id': '$a'}},
         ])
-        assertCountEqual(self, [{'_id': 1}, {'_id': None}], list(actual))
+        self.assertCountEqual([{'_id': 1}, {'_id': None}], list(actual))
 
     def test__aggregate_group_dict_key(self):
         collection = self.db.collection
@@ -5266,8 +5260,7 @@ class CollectionAPITest(TestCase):
         actual = collection.aggregate([
             {'$group': {'_id': {'a': '$a', 'b': '$b'}}},
         ])
-        assertCountEqual(
-            self,
+        self.assertCountEqual(
             [{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}],
             list(actual)
         )
@@ -5291,7 +5284,7 @@ class CollectionAPITest(TestCase):
             {'_id': DBRef('a', '2')},
             {'_id': DBRef('a', '1')},
         ]
-        assertCountEqual(self, expect, list(actual))
+        self.assertCountEqual(expect, list(actual))
 
     def test__aggregate_group_sum(self):
         collection = self.db.collection
@@ -5851,7 +5844,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.BulkWriteError) as err_context:
             bulk.execute()
 
-        assertCountEqual(self, [1, 2, 3], [d['_id'] for d in self.db.collection.find()])
+        self.assertCountEqual([1, 2, 3], [d['_id'] for d in self.db.collection.find()])
         self.assertEqual(3, err_context.exception.details['nInserted'])
         self.assertEqual([2, 4], [e['index'] for e in err_context.exception.details['writeErrors']])
 
@@ -5866,7 +5859,7 @@ class CollectionAPITest(TestCase):
                 pymongo.InsertOne({'_id': 1}),
             ], ordered=False)
 
-        assertCountEqual(self, [1, 2, 3], [d['_id'] for d in self.db.collection.find()])
+        self.assertCountEqual([1, 2, 3], [d['_id'] for d in self.db.collection.find()])
         self.assertEqual(3, err_context.exception.details['nInserted'])
         self.assertEqual([2, 4], [e['index'] for e in err_context.exception.details['writeErrors']])
 
@@ -5881,7 +5874,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.BulkWriteError) as err_context:
             bulk.execute()
 
-        assertCountEqual(self, [1, 2], [d['_id'] for d in self.db.collection.find()])
+        self.assertCountEqual([1, 2], [d['_id'] for d in self.db.collection.find()])
         self.assertEqual(2, err_context.exception.details['nInserted'])
         self.assertEqual([2], [e['index'] for e in err_context.exception.details['writeErrors']])
 
@@ -5896,7 +5889,7 @@ class CollectionAPITest(TestCase):
                 pymongo.InsertOne({'_id': 1}),
             ])
 
-        assertCountEqual(self, [1, 2], [d['_id'] for d in self.db.collection.find()])
+        self.assertCountEqual([1, 2], [d['_id'] for d in self.db.collection.find()])
         self.assertEqual(2, err_context.exception.details['nInserted'])
         self.assertEqual([2], [e['index'] for e in err_context.exception.details['writeErrors']])
 
@@ -6000,21 +5993,17 @@ class CollectionAPITest(TestCase):
         del stored_document['_id']
         self.assertEqual(
             dict(original_document, date=None), dict(stored_document, date=None))
-        if six.PY2:
-            with self.assertRaises(TypeError):
-                self.assertNotEqual(original_document, stored_document)
-        else:
-            self.assertNotEqual(
-                original_document, stored_document,
-                msg='The document is not the same because the date TZ has been stripped of and the '
-                'microseconds truncated.')
-            self.assertNotEqual(
-                original_document['date'].timestamp(), stored_document['date'].timestamp())
-            self.assertEqual(
-                datetime(2000, 1, 1, 10, 30, 30, 12000),
-                stored_document['date'],
-                msg='The stored document holds a date as timezone naive UTC and without '
-                'microseconds')
+        self.assertNotEqual(
+            original_document, stored_document,
+            msg='The document is not the same because the date TZ has been stripped of and the '
+            'microseconds truncated.')
+        self.assertNotEqual(
+            original_document['date'].timestamp(), stored_document['date'].timestamp())
+        self.assertEqual(
+            datetime(2000, 1, 1, 10, 30, 30, 12000),
+            stored_document['date'],
+            msg='The stored document holds a date as timezone naive UTC and without '
+            'microseconds')
 
         # The objects are not linked: modifying the inserted document or the fetched one will
         # have no effect on future retrievals.
