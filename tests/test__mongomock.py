@@ -744,6 +744,20 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find(
             {'field.0.a': {'$exists': True}, 'field.1.a': {'$exists': False}})
 
+    def test__find_in_array_equal_null(self):
+        self.cmp.do.insert_many([
+            {'_id': 1, 'shape': [{'color': 'red'}]},
+            {'_id': 2, 'shape': [{'color': 'yellow'}]},
+            {'_id': 3, 'shape': [{'color': 'red'}, {'color': 'yellow'}]},
+            {'_id': 4, 'shape': [{'size': 3}]},
+            {'_id': 5},
+            {'_id': 6, 'shape': {'color': ['red', 'yellow']}},
+            {'_id': 7, 'shape': [{'color': 'red'}, {'color': None}]},
+        ])
+
+        self.cmp.compare_ignore_order.find({'shape.color': {'$eq': None}})
+        self.cmp.compare_ignore_order.find({'shape.color': None})
+
     def test__find_notequal(self):
         """Test searching with operators other than equality."""
         bob = {'_id': 1, 'name': 'bob'}

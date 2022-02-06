@@ -4895,6 +4895,13 @@ class CollectionAPITest(TestCase):
         results = self.db.collection.find({'shape.color': {'$eq': 'red'}})
         self.assertEqual([1, 3, 6], [doc['_id'] for doc in results])
 
+        # testing eq operation with null as value
+        results = self.db.collection.find({'shape.color': {'$eq': None}})
+        self.assertEqual([4, 5], [doc['_id'] for doc in results])
+
+        results = self.db.collection.find({'shape.color': None})
+        self.assertEqual([4, 5], [doc['_id'] for doc in results])
+
     def test__filter_ne_on_array(self):
         """$ne and $nin on array only matches if no element of the array matches."""
         collection = self.db.collection
