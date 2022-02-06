@@ -417,12 +417,16 @@ def _list_expand(f, negative=False):
     return func
 
 
-def _type_op(doc_val, search_val):
+def _type_op(doc_val, search_val, in_array=False):
     if search_val not in TYPE_MAP:
         raise OperationFailure('%r is not a valid $type' % search_val)
     elif TYPE_MAP[search_val] is None:
         raise NotImplementedError('%s is a valid $type but not implemented' % search_val)
-    return TYPE_MAP[search_val](doc_val)
+    if TYPE_MAP[search_val](doc_val):
+        return True
+    if isinstance(doc_val, (list, tuple)) and not in_array:
+        return any(_type_op(val, search_val, in_array=True) for val in doc_val)
+    return False
 
 
 def _combine_regex_options(search):

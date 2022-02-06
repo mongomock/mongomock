@@ -1046,6 +1046,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             'double',
             'string',
             'object',
+            'array',
             'binData',
             'objectId',
             'bool',
@@ -1058,6 +1059,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'a': 1.2},  # double
             {'a': 'a string value'},  # string
             {'a': {'b': 1}},  # object
+            {'a': [1, 2, 3]},  # array or int
             {'a': b'hello'},  # binData
             {'a': ObjectId()},  # objectId
             {'a': True},  # bool
