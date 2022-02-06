@@ -204,11 +204,11 @@ def iter_key_candidates(key, doc):
 
     Returns the appropriate nested value if the key includes dot notation.
     """
-    if doc is None:
-        return ()
-
     if not key:
         return [doc]
+
+    if doc is None:
+        return ()
 
     if isinstance(doc, list):
         return _iter_key_candidates_sublist(key, doc)
