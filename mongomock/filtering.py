@@ -508,6 +508,11 @@ TYPE_MAP = {
         isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32
     ),
     'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,
+    'number': lambda v: (
+        # pylint: disable-next=isinstance-second-argument-not-valid-type
+        isinstance(v, (int, float) + ((Decimal128,) if Decimal128 else ()))
+        and not isinstance(v, bool)
+    ),
     'minKey': None,
     'maxKey': None,
 }

@@ -1054,6 +1054,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             'int',
             'long',
             'decimal',
+            'number',
         )
         self.cmp.do.insert_many([
             {'a': 1.2},  # double
