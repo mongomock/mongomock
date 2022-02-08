@@ -3332,6 +3332,35 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             'cond': {'$lt': ['$$this.price', 100]},
         }}}}])
 
+    def test__aggregate_map(self):
+        self.cmp.do.insert_one({
+            'array': [1, 2, 3, 4],
+        })
+        self.cmp.compare.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$map': {
+                'input': '$array',
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'custom_variable': {'$map': {
+                'input': '$array',
+                'as': 'self',
+                'in': {'$multiply': ['$$self', '$$self']},
+            }},
+            'empty': {'$map': {
+                'input': [],
+                'in': {'$multiply': ['$$this', '$$this']},
+            }},
+            'null': {'$map': {
+                'input': None,
+                'in': '$$this',
+            }},
+            'missing': {'$map': {
+                'input': '$missing.key',
+                'in': '$$this',
+            }},
+        }}])
+
     def test__aggregate_slice(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
