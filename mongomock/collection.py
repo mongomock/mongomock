@@ -227,32 +227,23 @@ def _combine_projection_spec(projection_fields_spec):
 
 
 def _project_by_spec(doc, combined_projection_spec, is_include, container):
+    if '$' in combined_projection_spec:
+        if is_include:
+            raise NotImplementedError('Positional projection is not implemented in mongomock')
+        raise OperationFailure('Cannot exclude array elements with the positional operator')
+
     doc_copy = container()
 
-    if not is_include:
-        for key, val in doc.items():
-            doc_copy[key] = val
-
-    for key, spec in combined_projection_spec.items():
-        if key == '$':
-            if is_include:
-                raise NotImplementedError('Positional projection is not implemented in mongomock')
-            raise OperationFailure('Cannot exclude array elements with the positional operator')
-        if key not in doc:
-            continue
-
+    for key, val in doc.items():
+        spec = combined_projection_spec.get(key, NOTHING)
         if isinstance(spec, dict):
-            sub = doc[key]
-            if isinstance(sub, (list, tuple)):
+            if isinstance(val, (list, tuple)):
                 doc_copy[key] = [_project_by_spec(sub_doc, spec, is_include, container)
-                                 for sub_doc in sub]
-            elif isinstance(sub, dict):
-                doc_copy[key] = _project_by_spec(sub, spec, is_include, container)
-        else:
-            if is_include:
-                doc_copy[key] = doc[key]
-            else:
-                doc_copy.pop(key, None)
+                                 for sub_doc in val]
+            elif isinstance(val, dict):
+                doc_copy[key] = _project_by_spec(val, spec, is_include, container)
+        elif (is_include and spec is not NOTHING) or (not is_include and spec is NOTHING):
+            doc_copy[key] = copy.deepcopy(val)
 
     return doc_copy
 
@@ -1175,8 +1166,7 @@ class Collection(object):
                 doc_copy = self._copy_field(doc, container)
         else:
             doc_copy = _project_by_spec(
-                self._copy_field(doc, container),
-                _combine_projection_spec(fields),
+                doc, _combine_projection_spec(fields),
                 is_include=list(fields.values())[0],
                 container=container)
 
