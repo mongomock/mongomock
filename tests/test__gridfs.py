@@ -12,7 +12,6 @@ try:
     import gridfs
     from gridfs import errors
     _HAVE_GRIDFS = True
-    mongomock.gridfs.enable_gridfs_integration()
 except ImportError:
     _HAVE_GRIDFS = False
 
@@ -27,9 +26,13 @@ except ImportError:
 
 
 @skipUnless(helpers.HAVE_PYMONGO, 'pymongo not installed')
-@skipUnless(_HAVE_GRIDFS, 'gridfs not installed')
+@skipUnless(_HAVE_GRIDFS and hasattr(gridfs.__builtins__, 'copy'), 'gridfs not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class GridFsTest(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        mongomock.gridfs.enable_gridfs_integration()
 
     def setUp(self):
         super(GridFsTest, self).setUp()
