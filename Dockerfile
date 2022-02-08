@@ -8,11 +8,12 @@ ENV PYENV_ROOT /root/.pyenv
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 RUN eval "$(pyenv init -)" && eval "$(pyenv virtualenv-init -)"
-RUN pyenv install 3.6.11
-RUN pyenv install 3.7.8
-RUN pyenv install 3.8.5
-RUN pyenv install 3.9.0
+RUN pyenv install 3.6.15
+RUN pyenv install 3.7.9
+RUN pyenv install 3.8.12
+RUN pyenv install 3.9.10
 RUN pyenv install pypy3.8-7.3.7
-RUN pyenv local 3.6.11 3.7.8 3.8.5 3.9.0 pypy3.8-7.3.7
+RUN pyenv install 3.10.2
+RUN pyenv local 3.6.15 3.7.9 3.8.12 3.9.10 3.10.2 pypy3.8-7.3.7
 
 RUN pip install tox

@@ -19,23 +19,25 @@ jobs:
     - python: 3.8
       env: TOX_ENV=py38-pymongo-pyexecjs
     - python: 3.9
-      env: TOX_ENV=py39
-    - python: 3.9
-      env: TOX_ENV=py39-pymongo
-    - python: 3.9
-      env: TOX_ENV=py39-pyexecjs
-    - python: 3.9
       env: TOX_ENV=py39-pymongo361-pyexecjs
     - python: 3.9
       env: TOX_ENV=py39-pymongo-pyexecjs
-    - python: 3.9
+    - python: "3.10"
+      env: TOX_ENV=py310
+    - python: "3.10"
+      env: TOX_ENV=py310-pymongo
+    - python: "3.10"
+      env: TOX_ENV=py310-pyexecjs
+    - python: "3.10"
+      env: TOX_ENV=py310-pymongo-pyexecjs
+    - python: "3.10"
       env: TOX_ENV=pep8
-    - python: 3.9
+    - python: "3.10"
       env: TOX_ENV=pylint
-    - python: 3.9
+    - python: "3.10"
       env: TOX_ENV=mypy
-    - python: 3.9
-      env: TOX_ENV=py39-pymongo-pyexecjs-mongodb4 MONGODB=4.4.0
+    - python: "3.10"
+      env: TOX_ENV=py310-pymongo-pyexecjs-mongodb4 MONGODB=4.4.0
 script:
   - tox -e $TOX_ENV
 before_install:
