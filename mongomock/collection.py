@@ -1,10 +1,7 @@
 from __future__ import division
 import collections
 from collections import OrderedDict
-try:
-    from collections.abc import Iterable, Mapping, MutableMapping
-except ImportError:
-    from collections import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 import copy
 import functools
 import itertools
@@ -64,11 +61,6 @@ try:
     from pymongo.read_concern import ReadConcern
 except ImportError:
     from mongomock.read_concern import ReadConcern
-
-if hasattr(time, 'perf_counter'):
-    _get_perf_counter = time.perf_counter
-else:
-    _get_perf_counter = time.clock
 
 _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'attrs'])
 
@@ -1616,7 +1608,7 @@ class Collection(object):
                 raise_not_implemented('session', 'Mongomock does not handle sessions yet')
             if limit == 0:
                 limit = None
-            start_time = _get_perf_counter()  # pylint: disable=deprecated-method
+            start_time = time.perf_counter()
             out_collection = None
             reduced_rows = None
             full_dict = {
@@ -1698,8 +1690,7 @@ class Collection(object):
                 full_dict['result'] = reduced_rows
             else:
                 raise TypeError("'out' must be an instance of string, dict or bson.SON")
-            time_millis = (
-                _get_perf_counter() - start_time) * 1000  # pylint: disable=deprecated-method
+            time_millis = (time.perf_counter() - start_time) * 1000
             full_dict['timeMillis'] = int(round(time_millis))
             if full_response:
                 ret_val = full_dict
