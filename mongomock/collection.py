@@ -219,34 +219,39 @@ def _combine_projection_spec(projection_fields_spec):
 
 
 def _project_by_spec(doc, combined_projection_spec, is_include, container):
+    if '$' in combined_projection_spec:
+        if is_include:
+            raise NotImplementedError('Positional projection is not implemented in mongomock')
+        raise OperationFailure('Cannot exclude array elements with the positional operator')
+
     doc_copy = container()
 
-    if not is_include:
-        for key, val in doc.items():
-            doc_copy[key] = val
-
-    for key, spec in combined_projection_spec.items():
-        if key == '$':
-            if is_include:
-                raise NotImplementedError('Positional projection is not implemented in mongomock')
-            raise OperationFailure('Cannot exclude array elements with the positional operator')
-        if key not in doc:
-            continue
-
+    for key, val in doc.items():
+        spec = combined_projection_spec.get(key, NOTHING)
         if isinstance(spec, dict):
-            sub = doc[key]
-            if isinstance(sub, (list, tuple)):
+            if isinstance(val, (list, tuple)):
                 doc_copy[key] = [_project_by_spec(sub_doc, spec, is_include, container)
-                                 for sub_doc in sub]
-            elif isinstance(sub, dict):
-                doc_copy[key] = _project_by_spec(sub, spec, is_include, container)
-        else:
-            if is_include:
-                doc_copy[key] = doc[key]
-            else:
-                doc_copy.pop(key, None)
+                                 for sub_doc in val]
+            elif isinstance(val, dict):
+                doc_copy[key] = _project_by_spec(val, spec, is_include, container)
+        elif (is_include and spec is not NOTHING) or (not is_include and spec is NOTHING):
+            doc_copy[key] = _copy_field(val, container)
 
     return doc_copy
+
+
+def _copy_field(obj, container):
+    if isinstance(obj, list):
+        new = []
+        for item in obj:
+            new.append(_copy_field(item, container))
+        return new
+    if isinstance(obj, dict):
+        new = container()
+        for key, value in obj.items():
+            new[key] = _copy_field(value, container)
+        return new
+    return copy.copy(obj)
 
 
 class BulkOperationBuilder(object):
@@ -1041,19 +1046,6 @@ class Collection(object):
         for document in dataset:
             yield self._copy_only_fields(document, fields, as_class)
 
-    def _copy_field(self, obj, container):
-        if isinstance(obj, list):
-            new = []
-            for item in obj:
-                new.append(self._copy_field(item, container))
-            return new
-        if isinstance(obj, dict):
-            new = container()
-            for key, value in obj.items():
-                new[key] = self._copy_field(value, container)
-            return new
-        return copy.copy(obj)
-
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
         result = {}
@@ -1138,7 +1130,7 @@ class Collection(object):
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
         if fields is None or not fields and helpers.PYMONGO_VERSION >= version.parse('4.0'):
-            return self._copy_field(doc, container)
+            return _copy_field(doc, container)
 
         if not fields:
             fields = {'_id': 1}
@@ -1164,7 +1156,7 @@ class Collection(object):
             if id_value == 1:
                 doc_copy = container()
             else:
-                doc_copy = self._copy_field(doc, container)
+                doc_copy = _copy_field(doc, container)
         else:
             doc_copy = _project_by_spec(
                 doc, _combine_projection_spec(fields),
