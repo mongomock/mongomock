@@ -21,6 +21,11 @@ except ImportError:
     DBRef = None
     _RE_TYPES = (RE_TYPE,)
 
+try:
+    from bson.decimal128 import Decimal128
+except ImportError:
+    Decimal128 = None
+
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
 
 
@@ -417,7 +422,7 @@ def _type_op(doc_val, search_val):
         raise OperationFailure('%r is not a valid $type' % search_val)
     elif TYPE_MAP[search_val] is None:
         raise NotImplementedError('%s is a valid $type but not implemented' % search_val)
-    return isinstance(doc_val, TYPE_MAP[search_val])
+    return TYPE_MAP[search_val](doc_val)
 
 
 def _combine_regex_options(search):
@@ -476,25 +481,29 @@ LOGICAL_OPERATOR_MAP = {
 
 
 TYPE_MAP = {
-    'double': (float,),
-    'string': (str,),
-    'object': (dict,),
-    'array': (list,),
-    'binData': (bytes,),
+    'double': lambda v: isinstance(v, float),
+    'string': lambda v: isinstance(v, str),
+    'object': lambda v: isinstance(v, dict),
+    'array': lambda v: isinstance(v, list),
+    'binData': lambda v: isinstance(v, bytes),
     'undefined': None,
-    'objectId': (ObjectId,),
-    'bool': (bool,),
-    'date': (datetime,),
+    'objectId': lambda v: isinstance(v, ObjectId),
+    'bool': lambda v: isinstance(v, bool),
+    'date': lambda v: isinstance(v, datetime),
     'null': None,
     'regex': None,
     'dbPointer': None,
     'javascript': None,
     'symbol': None,
     'javascriptWithScope': None,
-    'int': (int,),
+    'int': lambda v: (
+        isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32
+    ),
     'timestamp': None,
-    'long': (float,),
-    'decimal': (float,),
+    'long': lambda v: (
+        isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32
+    ),
+    'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,
     'minKey': None,
     'maxKey': None,
 }
