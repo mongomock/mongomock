@@ -1,6 +1,6 @@
 import collections
 import datetime
-
+import functools
 
 import mongomock
 from mongomock.thread import RWLock
