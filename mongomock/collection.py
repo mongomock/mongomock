@@ -1498,7 +1498,8 @@ class Collection(object):
         if is_unique:
             indexed = set()
             indexed_list = []
-            for doc in self._store.documents:
+            documents_gen = self._store.documents
+            for doc in documents_gen:
                 index = []
                 for key, unused_order in index_list:
                     try:
@@ -1512,12 +1513,13 @@ class Collection(object):
                 index = tuple(index)
                 try:
                     if index in indexed:
-                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+                        # Need to throw this inside the generator so it can clean the locks
+                        documents_gen.throw(DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None)
                     indexed.add(index)
                 except TypeError as err:
                     # index is not hashable.
                     if index in indexed_list:
-                        raise DuplicateKeyError('E11000 Duplicate Key Error', 11000) from err
+                        documents_gen.throw(DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err)
                     indexed_list.append(index)
 
         self._store.create_index(index_name, index_dict)
