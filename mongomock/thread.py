@@ -1,10 +1,10 @@
-import threading
 from contextlib import contextmanager
+
+import threading
 
 
 class RWLock:
-    """Lock for enabling multiple readers but only 1 exclusive writer
-    to access a resource
+    """Lock enabling multiple readers but only 1 exclusive writer
 
     Source: https://cutt.ly/Ij70qaq
     """
@@ -48,7 +48,9 @@ class RWLock:
         self._read_switch.release(self._no_writers)
 
     def _writer_acquire(self):
-        """Only the first writer will lock the readtry and then
+        """Acquire the writer lock.
+
+        Only the first writer will lock the readtry and then
         all subsequent writers can simply use the resource as
         it gets freed by the previous writer. The very last writer must
         release the readtry semaphore, thus opening the gate for readers
@@ -56,7 +58,6 @@ class RWLock:
 
         No reader can engage in the entry section if the readtry semaphore
         has been set by a writer previously
-
         """
         self._write_switch.acquire(self._no_readers)
         self._no_writers.acquire()
@@ -67,8 +68,10 @@ class RWLock:
 
 
 class _LightSwitch:
-    """An auxiliary "light switch"-like object. The first thread turns on the
-    "switch", the last one turns it off (see [1, sec. 4.2.2] for details).
+
+    """An auxiliary "light switch"-like object
+
+    The first thread turns on the "switch", the last one turns it off.
 
     Source: https://cutt.ly/Ij70qaq
     """
