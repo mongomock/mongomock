@@ -1514,12 +1514,14 @@ class Collection(object):
                 try:
                     if index in indexed:
                         # Need to throw this inside the generator so it can clean the locks
-                        documents_gen.throw(DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None)
+                        documents_gen.throw(
+                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None)
                     indexed.add(index)
                 except TypeError as err:
                     # index is not hashable.
                     if index in indexed_list:
-                        documents_gen.throw(DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err)
+                        documents_gen.throw(
+                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err)
                     indexed_list.append(index)
 
         self._store.create_index(index_name, index_dict)

@@ -21,7 +21,7 @@ class RWLock:
         self._reader_acquire()
         try:
             yield
-        except Exception:
+        except Exception:  # pylint: disable=W0706
             raise
         finally:
             self._reader_release()
@@ -31,7 +31,7 @@ class RWLock:
         self._writer_acquire()
         try:
             yield
-        except Exception:
+        except Exception:  # pylint: disable=W0706
             raise
         finally:
             self._writer_release()
