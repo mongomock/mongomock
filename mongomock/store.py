@@ -1,10 +1,9 @@
 import collections
 import datetime
 import functools
-import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
-import threading
 
-lock = threading.RLock()
+import mongomock
+from mongomock.thread import RWLock
 
 
 class ServerStore(object):
@@ -71,6 +70,9 @@ class CollectionStore(object):
         self.name = name
         self._ttl_indexes = {}
 
+        # 694 - Lock for safely iterating and mutating OrderedDicts
+        self._rwlock = RWLock()
+
     def create(self):
         self._is_force_created = True
 
@@ -104,28 +106,33 @@ class CollectionStore(object):
 
     def __contains__(self, key):
         self._remove_expired_documents()
-        return key in self._documents
+        with self._rwlock.reader():
+            return key in self._documents
 
     def __getitem__(self, key):
         self._remove_expired_documents()
-        return self._documents[key]
+        with self._rwlock.reader():
+            return self._documents[key]
 
     def __setitem__(self, key, val):
-        with lock:
+        with self._rwlock.writer():
             self._documents[key] = val
 
     def __delitem__(self, key):
-        del self._documents[key]
+        with self._rwlock.writer():
+            del self._documents[key]
 
     def __len__(self):
         self._remove_expired_documents()
-        return len(self._documents)
+        with self._rwlock.reader():
+            return len(self._documents)
 
     @property
     def documents(self):
         self._remove_expired_documents()
-        for doc in self._documents.values():
-            yield doc
+        with self._rwlock.reader():
+            for doc in self._documents.values():
+                yield doc
 
     def _remove_expired_documents(self):
         for index in self._ttl_indexes.values():
@@ -148,10 +155,12 @@ class CollectionStore(object):
         # "key" structure = list of (field name, direction) tuples
         ttl_field_name = next(iter(index['key']))[0]
         ttl_now = mongomock.utcnow()
-        expired_ids = [
-            doc['_id'] for doc in self._documents.values()
-            if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
-        ]
+
+        with self._rwlock.reader():
+            expired_ids = [
+                doc['_id'] for doc in self._documents.values()
+                if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
+            ]
 
         for exp_id in expired_ids:
             del self[exp_id]
