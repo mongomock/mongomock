@@ -542,6 +542,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'_id': 4})
         self.cmp.compare_exceptions.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}})
 
+        self.cmp.compare.find({'$expr': {'$eq': [{'$last': '$a'}, 3]}})
+
+        self.cmp.do.insert_one({'_id': 6, 'array': [{'a': 0}, {'a': 1, 'b': 3}]})
+        self.cmp.compare.find({'$expr': {'$not': {'$gt': [{'$last': '$array.b'}, 2]}}})
+
     def test_double_negation(self):
         self.cmp.do.insert_many([
             {'_id': 1, 'a': 'some str'},
@@ -2564,6 +2569,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ])
         pipeline = [
             {'$project': {'_id': False, 'e': '$a.b.c'}}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test_aggregate_project_array_with_missing_subfields(self):
+        # $last with a subfield should pick the last subdoc with
+        # the subfield defined, not necessarily the last in the array
+        self.cmp.do.insert_many([
+            {'a': [{'b': 1}, {'b': 2, 'c': 2}, {}]},
+        ])
+        pipeline = [
+            {'$project': {'_id': False, 'e': {'$last': '$a.c'}}}
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 

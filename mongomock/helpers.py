@@ -8,6 +8,7 @@ import time
 from urllib.parse import unquote_plus
 import warnings
 
+from sentinels import NOTHING
 
 # Get ObjectId from bson if available or import a crafted one. This is not used
 # in this module but is made available for callers of this module.
@@ -353,12 +354,14 @@ def make_datetime_timezone_aware_in_document(value):
     return value
 
 
-def get_value_by_dot(doc, key, can_generate_array=False):
+def get_value_by_dot(doc, key, can_generate_array=False, ignore_missing_keys=False):
     """Get dictionary value using dotted key"""
     result = doc
     key_items = key.split('.')
     for key_index, key_item in enumerate(key_items):
         if isinstance(result, dict):
+            if ignore_missing_keys and key_item not in result:
+                return NOTHING
             result = result[key_item]
 
         elif isinstance(result, (list, tuple)):
@@ -368,12 +371,16 @@ def get_value_by_dot(doc, key, can_generate_array=False):
                 if not can_generate_array:
                     raise KeyError(key_index) from err
                 remaining_key = '.'.join(key_items[key_index:])
-                return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
+                values = [get_value_by_dot(subdoc, remaining_key, ignore_missing_keys=ignore_missing_keys) for subdoc in result]
+                return [v for v in values if v is not NOTHING]
 
             try:
                 result = result[int_key]
             except (ValueError, IndexError) as err:
                 raise KeyError(key_index) from err
+
+        elif ignore_missing_keys:
+            return NOTHING
 
         else:
             raise KeyError(key_index)
@@ -423,4 +430,4 @@ def delete_value_by_dot(doc, key):
 def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
-    return value not in [False, None, 0]
+    return value not in [False, None, NOTHING, 0]

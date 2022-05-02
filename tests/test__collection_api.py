@@ -2620,6 +2620,14 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_one({'_id': 4})
             list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
 
+        self.db.collection.insert_one({'_id': 5, 'a': None})
+        actual = list(self.db.collection.find({'$expr': {'$eq': [{'$last': '$a'}, 3]}}, None))
+        self.assertEqual([{'_id': 2, 'a': [1, 2, 3]}], actual)
+
+        self.db.collection.insert_one({'_id': 6, 'array': [{'a': 0}, {'a': 1, 'b': 3}]})
+        actual = list(self.db.collection.find({'$expr': {'$not': {'$gt': [{'$last': '$array.b'}, 2]}}}, {'_id': 1}))
+        self.assertEqual([{'_id': i} for i in range(1,6)], actual)
+
     def test__find_or_and(self):
         self.db.collection.insert_many([
             {'x': 1, 'y': 1},

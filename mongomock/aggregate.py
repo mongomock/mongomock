@@ -197,6 +197,10 @@ def _merge_objects_operation(values):
     return merged_doc
 
 
+def _is_nullish(value):
+    return value is None or value is NOTHING
+
+
 _GROUPING_OPERATOR_MAP = {
     '$sum': _sum_operation,
     '$avg': _avg_operation,
@@ -259,13 +263,9 @@ class _Parser(object):
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
                 raise OperationFailure("Unrecognized expression '%s'" % k)
-            try:
-                value = self.parse(v)
-            except KeyError:
-                if self._ignore_missing_keys:
-                    continue
-                raise
-            value_dict[k] = value
+            value = self.parse(v)
+            if value is not NOTHING:
+                value_dict[k] = value
 
         return value_dict
 
@@ -300,7 +300,7 @@ class _Parser(object):
                     'ROOT': self._doc_dict,
                     'CURRENT': self._doc_dict,
                 }, **self._user_vars), expression[2:])
-            return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
+            return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True, ignore_missing_keys=self._ignore_missing_keys)
         return expression
 
     def _handle_boolean_operator(self, operator, values):
@@ -371,7 +371,7 @@ class _Parser(object):
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
             values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
-            return _GROUPING_OPERATOR_MAP[operator](values)
+            return _GROUPING_OPERATOR_MAP[operator](values) if values is not NOTHING else None
         if operator == '$arrayElemAt':
             key, value = values
             array = self._parse_basic_expression(key)
@@ -379,7 +379,7 @@ class _Parser(object):
             try:
                 return array[index]
             except IndexError as error:
-                raise KeyError('Array have length less than index value') from error
+                return NOTHING
 
         raise NotImplementedError("Although '%s' is a valid project operator for the "
                                   'aggregation pipeline, it is currently not implemented '
@@ -443,7 +443,7 @@ class _Parser(object):
             except KeyError:
                 return None
 
-            if string is None or delimiter is None:
+            if _is_nullish(string) or _is_nullish(delimiter):
                 return None
             if not isinstance(string, str):
                 raise TypeError('split first argument must evaluate to string')
@@ -484,16 +484,14 @@ class _Parser(object):
                 raise OperationFailure(
                     '$regexMatch found an unknown argument: %s' % list(unknown_args)[0])
 
-            try:
-                input_value = self.parse(values['input'])
-            except KeyError:
+            input_value = self._parse_or_nothing(values['input'])
+            if input_value is NOTHING:
                 return False
             if not isinstance(input_value, str):
                 raise OperationFailure("$regexMatch needs 'input' to be of type string")
 
-            try:
-                regex_val = self.parse(values['regex'])
-            except KeyError:
+            regex_val = self._parse_or_nothing(values['regex'])
+            if regex_val is NOTHING:
                 return False
             options = None
             for option in values.get('options', ''):
@@ -602,12 +600,12 @@ class _Parser(object):
 
             parsed_list = list(self.parse_many(value))
             for parsed_item in parsed_list:
-                if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
+                if parsed_item is not None and parsed_item is not NOTHING and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
                         '$concatArrays only supports arrays, not {}'.format(type(parsed_item))
                     )
 
-            return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
+            return None if (None in parsed_list or NOTHING in parsed_list) else list(itertools.chain.from_iterable(parsed_list))
 
         if operator == '$map':
             if not isinstance(value, dict):
@@ -720,9 +718,8 @@ class _Parser(object):
 
     def _handle_type_convertion_operator(self, operator, values):
         if operator == '$toString':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self._parse_or_nothing(values)
+            if parsed is NOTHING:
                 return None
             if isinstance(parsed, bool):
                 return str(parsed).lower()
@@ -731,9 +728,8 @@ class _Parser(object):
             return str(parsed)
 
         if operator == '$toInt':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self._parse_or_nothing(values)
+            if parsed is NOTHING:
                 return None
             if decimal_support:
                 if isinstance(parsed, decimal128.Decimal128):
@@ -744,9 +740,8 @@ class _Parser(object):
             )
 
         if operator == '$toLong':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self._parse_or_nothing(values)
+            if parsed is NOTHING:
                 return None
             if decimal_support:
                 if isinstance(parsed, decimal128.Decimal128):
@@ -762,9 +757,8 @@ class _Parser(object):
                 raise NotImplementedError(
                     'You need to import the pymongo library to support decimal128 type.'
                 )
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self._parse_or_nothing(values)
+            if parsed is NOTHING:
                 return None
             if isinstance(parsed, bool):
                 parsed = '1' if parsed is True else '0'
@@ -794,12 +788,8 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
         if operator == '$arrayToObject':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
+            parsed = self._parse_or_nothing(values)
+            if _is_nullish(parsed):
                 return None
 
             if not isinstance(parsed, (list, tuple)):
@@ -820,12 +810,8 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
         if operator == '$objectToArray':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
+            parsed = self._parse_or_nothing(values)
+            if _is_nullish(parsed):
                 return None
 
             if not isinstance(parsed, (dict, collections.OrderedDict)):
@@ -848,12 +834,9 @@ class _Parser(object):
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
             field, fallback = values
-            try:
-                out_value = self.parse(field)
-                if out_value is not None:
-                    return out_value
-            except KeyError:
-                pass
+            out_value = self._parse_or_nothing(field)
+            if not _is_nullish(out_value):
+                return out_value
             return self.parse(fallback)
         if operator == '$cond':
             if isinstance(values, list):
@@ -1414,11 +1397,10 @@ def _handle_project_stage(in_collection, unused_database, options):
             new_fields_collection = [{} for unused_doc in in_collection]
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
-            try:
-                out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
-            except KeyError:
-                # Ignore missing key.
-                pass
+            out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+            if out_value is not NOTHING:
+                out_doc[field] = out_value
+
     if (method == 'include') == (include_id is not False and include_id != 0):
         filter_list.append('_id')
 
@@ -1446,9 +1428,8 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     out_collection = [dict(doc) for doc in in_collection]
     for field, value in options.items():
         for in_doc, out_doc in zip(in_collection, out_collection):
-            try:
-                out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
-            except KeyError:
+            out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+            if out_value is NOTHING:
                 continue
             parts = field.split('.')
             for subfield in parts[:-1]:
