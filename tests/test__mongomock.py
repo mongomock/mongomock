@@ -3262,7 +3262,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.do.insert_one({})
         self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
-        self.cmp.do.insert_one({'a': [1,2,3]})
+        self.cmp.do.insert_one({'a': [1, 2, 3]})
         self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
         self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', '$index']}}}])
 

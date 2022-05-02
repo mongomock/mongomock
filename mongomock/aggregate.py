@@ -300,7 +300,11 @@ class _Parser(object):
                     'ROOT': self._doc_dict,
                     'CURRENT': self._doc_dict,
                 }, **self._user_vars), expression[2:])
-            return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True, ignore_missing_keys=self._ignore_missing_keys)
+            return helpers.get_value_by_dot(
+                self._doc_dict, expression[1:],
+                can_generate_array=True,
+                ignore_missing_keys=self._ignore_missing_keys,
+            )
         return expression
 
     def _handle_boolean_operator(self, operator, values):
@@ -380,7 +384,7 @@ class _Parser(object):
                 return None
             try:
                 return array[index]
-            except IndexError as error:
+            except IndexError:
                 return NOTHING
 
         raise NotImplementedError("Although '%s' is a valid project operator for the "
@@ -602,12 +606,16 @@ class _Parser(object):
 
             parsed_list = list(self.parse_many(value))
             for parsed_item in parsed_list:
-                if parsed_item is not None and parsed_item is not NOTHING and not isinstance(parsed_item, (list, tuple)):
+                if not _is_nullish(parsed_item) and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
                         '$concatArrays only supports arrays, not {}'.format(type(parsed_item))
                     )
 
-            return None if (None in parsed_list or NOTHING in parsed_list) else list(itertools.chain.from_iterable(parsed_list))
+            return (
+                None
+                if (None in parsed_list or NOTHING in parsed_list)
+                else list(itertools.chain.from_iterable(parsed_list))
+            )
 
         if operator == '$map':
             if not isinstance(value, dict):

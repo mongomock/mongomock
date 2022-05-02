@@ -371,7 +371,10 @@ def get_value_by_dot(doc, key, can_generate_array=False, ignore_missing_keys=Fal
                 if not can_generate_array:
                     raise KeyError(key_index) from err
                 remaining_key = '.'.join(key_items[key_index:])
-                values = [get_value_by_dot(subdoc, remaining_key, ignore_missing_keys=ignore_missing_keys) for subdoc in result]
+                values = [
+                    get_value_by_dot(subdoc, remaining_key, ignore_missing_keys=ignore_missing_keys)
+                    for subdoc in result
+                ]
                 return [v for v in values if v is not NOTHING]
 
             try:
