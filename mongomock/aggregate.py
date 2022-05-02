@@ -443,12 +443,8 @@ class _Parser(object):
         if operator == '$split':
             if len(values) != 2:
                 raise OperationFailure('split must have 2 items')
-            try:
-                string = self.parse(values[0])
-                delimiter = self.parse(values[1])
-            except KeyError:
-                return None
-
+            string = self.parse(values[0])
+            delimiter = self.parse(values[1])
             if _is_nullish(string) or _is_nullish(delimiter):
                 return None
             if not isinstance(string, str):
@@ -1369,10 +1365,7 @@ def _handle_replace_root_stage(in_collection, unused_database, options):
     new_root = options['newRoot']
     out_collection = []
     for doc in in_collection:
-        try:
-            new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
-        except KeyError:
-            new_doc = NOTHING
+        new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
         if not isinstance(new_doc, dict):
             raise OperationFailure(
                 "'newRoot' expression must evaluate to an object, but resulting value was: {}"
