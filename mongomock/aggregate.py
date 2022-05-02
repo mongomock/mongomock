@@ -376,6 +376,8 @@ class _Parser(object):
             key, value = values
             array = self._parse_basic_expression(key)
             index = self.parse(value)
+            if array is NOTHING or index is NOTHING:
+                return None
             try:
                 return array[index]
             except IndexError as error:

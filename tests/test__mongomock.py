@@ -3257,6 +3257,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             },
         }])
 
+    def test_aggregate_bug_503(self):
+        """Regression test for bug https://github.com/mongomock/mongomock/issues/503."""
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({})
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
+        self.cmp.do.insert_one({'a': [1,2,3]})
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', '$index']}}}])
+
     def test_aggregate_bug_607(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/607."""
         self.cmp.do.drop()
