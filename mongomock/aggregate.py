@@ -1010,11 +1010,10 @@ def _handle_lookup_stage(in_collection, database, options):
     local_name = options['as']
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
-        try:
-            query = helpers.get_value_by_dot(doc, local_field)
-        except KeyError:
+        query = helpers.get_value_by_dot(doc, local_field)
+        if query is NOTHING:
             query = None
-        if isinstance(query, list):
+        elif isinstance(query, list):
             query = {'$in': query}
         matches = foreign_collection.find({foreign_field: query})
         doc[local_name] = [foreign_doc for foreign_doc in matches]
