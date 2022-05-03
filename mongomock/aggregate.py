@@ -258,7 +258,7 @@ class _Parser(object):
             if k in boolean_operators:
                 return self._handle_boolean_operator(k, v)
             if k in text_search_operators + projection_operators + object_operators:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
             if k.startswith('$'):
                 raise OperationFailure("Unrecognized expression '%s'" % k)
@@ -369,9 +369,10 @@ class _Parser(object):
             except IndexError:
                 return NOTHING
 
-        raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                  'aggregation pipeline, it is currently not implemented '
-                                  'in Mongomock.' % operator)
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid project operator for the "
+            'aggregation pipeline, it is currently not implemented '
+            'in Mongomock.' % operator)
 
     def _handle_projection_operator(self, operator, value):
         if operator == '$literal':
@@ -392,9 +393,10 @@ class _Parser(object):
                 self._doc_dict,
                 user_vars=dict(self._user_vars, **user_vars),
             ).parse(value['in'])
-        raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                  'aggregation pipeline, it is currently not implemented '
-                                  'in Mongomock.' % operator)
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid project operator for the "
+            'aggregation pipeline, it is currently not implemented '
+            'in Mongomock.' % operator)
 
     def _handle_comparison_operator(self, operator, values):
         assert len(values) == 2, 'Comparison requires two expressions'
@@ -406,7 +408,7 @@ class _Parser(object):
             return a != b
         if operator in filtering.SORTING_OPERATOR_MAP:
             return filtering.bson_compare(filtering.SORTING_OPERATOR_MAP[operator], a, b)
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid comparison operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
@@ -552,26 +554,26 @@ class _Parser(object):
                     'that has "format" and "date" field.'
                 )
             if '%L' in out_value['format']:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     'Although %L is a valid date format for the '
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             if 'onNull' in values:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     'Although onNull is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             if 'timezone' in values.keys():
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     'Although timezone is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             return out_value['date'].strftime(out_value['format'])
 
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '
             ' in Mongomock.' % operator)
@@ -696,7 +698,7 @@ class _Parser(object):
                 start = 0
             return array_value[start:stop]
 
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid array operator for the "
             'aggregation pipeline, it is currently not implemented '
             'in Mongomock.' % operator)
@@ -720,7 +722,7 @@ class _Parser(object):
                 if isinstance(parsed, decimal128.Decimal128):
                     return int(parsed.to_decimal())
                 return int(parsed)
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 'You need to import the pymongo library to support decimal128 type.'
             )
 
@@ -732,14 +734,14 @@ class _Parser(object):
                 if isinstance(parsed, decimal128.Decimal128):
                     return int(parsed.to_decimal())
                 return int(parsed)
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 'You need to import the pymongo library to support decimal128 type.'
             )
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
         if operator == '$toDecimal':
             if not decimal_support:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     'You need to import the pymongo library to support decimal128 type.'
                 )
             parsed = self.parse(values)
@@ -805,13 +807,13 @@ class _Parser(object):
                 )
 
             if len(parsed) > 1 and sys.version_info < (3, 6):
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     "Although '%s' is a valid type conversion, it is not implemented for Python 2 "
                     'and Python 3.5 in Mongomock yet.' % operator)
 
             return [{'k': k, 'v': v} for k, v in parsed.items()]
 
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid type conversion operator for the "
             'aggregation pipeline, it is currently not implemented '
             'in Mongomock.' % operator)
@@ -907,7 +909,7 @@ class _Parser(object):
                 if set1 != set2:
                     return False
             return True
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
@@ -956,12 +958,12 @@ def _accumulate_group(output_fields, group_list):
                 else:
                     doc_dict[field].extend(values)
             elif operator in group_operators:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     'Although %s is a valid group operator for the '
                     'aggregation pipeline, it is currently not implemented '
                     'in Mongomock.' % operator)
             else:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     '%s is not a valid group operator for the aggregation '
                     'pipeline. See http://docs.mongodb.org/manual/meta/'
                     'aggregation-quick-reference/ for a complete list of '
@@ -982,24 +984,24 @@ def _fix_sort_key(key_getter):
 def _handle_lookup_stage(in_collection, database, options):
     for operator in ('let', 'pipeline'):
         if operator in options:
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 "Although '%s' is a valid lookup operator for the "
                 'aggregation pipeline, it is currently not '
                 'implemented in Mongomock.' % operator)
     for operator in ('from', 'localField', 'foreignField', 'as'):
         if operator not in options:
-            raise OperationFailure(
+            raise OperationFailure(  # pragma: no cover
                 "Must specify '%s' field for a $lookup" % operator)
         if not isinstance(options[operator], str):
-            raise OperationFailure(
+            raise OperationFailure(  # pragma: no cover
                 'Arguments to $lookup must be strings')
         if operator in ('as', 'localField', 'foreignField') and \
                 options[operator].startswith('$'):
-            raise OperationFailure(
+            raise OperationFailure(  # pragma: no cover
                 "FieldPath field names may not start with '$'")
         if operator == 'as' and \
                 '.' in options[operator]:
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 "Although '.' is valid in the 'as' "
                 'parameters for the lookup stage of the aggregation '
                 'pipeline, it is currently not implemented in Mongomock.')
@@ -1063,7 +1065,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         if options[operator].startswith('$'):
             raise OperationFailure("FieldPath field names may not start with '$'")
         if operator == 'as' and '.' in options[operator]:
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 "Although '.' is valid in the '%s' "
                 'parameter for the $graphLookup stage of the aggregation '
                 'pipeline, it is currently not implemented in Mongomock.' % operator)
@@ -1485,19 +1487,19 @@ _PIPELINE_HANDLERS = {
 
 def process_pipeline(collection, database, pipeline, session):
     if session:
-        raise NotImplementedError('Mongomock does not handle sessions yet')
+        raise NotImplementedError('Mongomock does not handle sessions yet')  # pragma: no cover
 
     for stage in pipeline:
         for operator, options in stage.items():
             try:
                 handler = _PIPELINE_HANDLERS[operator]
             except KeyError as err:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     '%s is not a valid operator for the aggregation pipeline. '
                     'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
                     'for a complete list of valid operators.' % operator) from err
             if not handler:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     "Although '%s' is a valid operator for the aggregation pipeline, it is "
                     'currently not implemented in Mongomock.' % operator)
             collection = handler(collection, database, options)
