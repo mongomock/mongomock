@@ -3956,6 +3956,20 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate__dateTrunc(self):
+        pipeline = [
+            {
+                "$group": {
+                    "_id": {
+                        "truncatedMonth": {"$dateTrunc": {"date": "$date", "unit": "month"}},
+                        "truncatedYear": {"$dateTrunc": {"date": "$date", "unit": "year"}},
+                    },
+                    "total": {"$sum": "$count"},
+                }
+            }
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

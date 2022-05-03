@@ -51,3 +51,6 @@ flycheck-*
 
 ### vim
 .ropeproject/
+
+### pyenv
+.python-version
