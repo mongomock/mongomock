@@ -215,9 +215,8 @@ _GROUPING_OPERATOR_MAP = {
 class _Parser(object):
     """Helper to parse expressions within the aggregate pipeline."""
 
-    def __init__(self, doc_dict, user_vars=None, ignore_missing_keys=False):
+    def __init__(self, doc_dict, *, user_vars=None):
         self._doc_dict = doc_dict
-        self._ignore_missing_keys = ignore_missing_keys
         self._user_vars = user_vars or {}
 
     def parse(self, expression):
@@ -271,27 +270,11 @@ class _Parser(object):
 
     def parse_many(self, values):
         for value in values:
-            try:
-                yield self.parse(value)
-            except KeyError:
-                if self._ignore_missing_keys:
-                    yield None
-                else:
-                    raise
+            yield self.parse(value)
 
     def _parse_to_bool(self, expression):
         """Parse a MongoDB expression and then convert it to bool"""
-        # handles converting `undefined` (in form of KeyError) to False
-        try:
-            return helpers.mongodb_to_bool(self.parse(expression))
-        except KeyError:
-            return False
-
-    def _parse_or_nothing(self, expression):
-        try:
-            return self.parse(expression)
-        except KeyError:
-            return NOTHING
+        return helpers.mongodb_to_bool(self.parse(expression))
 
     def _parse_basic_expression(self, expression):
         if isinstance(expression, str) and expression.startswith('$'):
@@ -303,7 +286,6 @@ class _Parser(object):
             return helpers.get_value_by_dot(
                 self._doc_dict, expression[1:],
                 can_generate_array=True,
-                ignore_missing_keys=self._ignore_missing_keys,
             )
         return expression
 
@@ -408,8 +390,7 @@ class _Parser(object):
             }
             return _Parser(
                 self._doc_dict,
-                dict(self._user_vars, **user_vars),
-                ignore_missing_keys=self._ignore_missing_keys,
+                user_vars=dict(self._user_vars, **user_vars),
             ).parse(value['in'])
         raise NotImplementedError("Although '%s' is a valid project operator for the "
                                   'aggregation pipeline, it is currently not implemented '
@@ -486,13 +467,13 @@ class _Parser(object):
                 raise OperationFailure(
                     '$regexMatch found an unknown argument: %s' % list(unknown_args)[0])
 
-            input_value = self._parse_or_nothing(values['input'])
+            input_value = self.parse(values['input'])
             if input_value is NOTHING:
                 return False
             if not isinstance(input_value, str):
                 raise OperationFailure("$regexMatch needs 'input' to be of type string")
 
-            regex_val = self._parse_or_nothing(values['regex'])
+            regex_val = self.parse(values['regex'])
             if regex_val is NOTHING:
                 return False
             options = None
@@ -631,7 +612,7 @@ class _Parser(object):
                 if k not in {'input', 'as', 'in'}:
                     raise OperationFailure('Unrecognized parameter to $map: %s' % k)
 
-            input_array = self._parse_or_nothing(value['input'])
+            input_array = self.parse(value['input'])
 
             if input_array is None or input_array is NOTHING:
                 return None
@@ -644,8 +625,7 @@ class _Parser(object):
             return [
                 _Parser(
                     self._doc_dict,
-                    dict(self._user_vars, **{fieldname: item}),
-                    ignore_missing_keys=self._ignore_missing_keys,
+                    user_vars=dict(self._user_vars, **{fieldname: item}),
                 ).parse(in_expr)
                 for item in input_array
             ]
@@ -656,7 +636,7 @@ class _Parser(object):
                     raise OperationFailure('Expression $size takes exactly 1 arguments. '
                                            '%d were passed in.' % len(value))
                 value = value[0]
-            array_value = self._parse_or_nothing(value)
+            array_value = self.parse(value)
             if not isinstance(array_value, (list, tuple)):
                 raise OperationFailure(
                     'The argument to $size must be an array, but was of type: %s' %
@@ -680,8 +660,7 @@ class _Parser(object):
                 item for item in input_array
                 if _Parser(
                     self._doc_dict,
-                    dict(self._user_vars, **{fieldname: item}),
-                    ignore_missing_keys=self._ignore_missing_keys,
+                    user_vars=dict(self._user_vars, **{fieldname: item}),
                 ).parse(cond)
             ]
         if operator == '$slice':
@@ -724,7 +703,7 @@ class _Parser(object):
 
     def _handle_type_convertion_operator(self, operator, values):
         if operator == '$toString':
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if parsed is NOTHING:
                 return None
             if isinstance(parsed, bool):
@@ -734,7 +713,7 @@ class _Parser(object):
             return str(parsed)
 
         if operator == '$toInt':
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if parsed is NOTHING:
                 return None
             if decimal_support:
@@ -746,7 +725,7 @@ class _Parser(object):
             )
 
         if operator == '$toLong':
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if parsed is NOTHING:
                 return None
             if decimal_support:
@@ -763,7 +742,7 @@ class _Parser(object):
                 raise NotImplementedError(
                     'You need to import the pymongo library to support decimal128 type.'
                 )
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if parsed is NOTHING:
                 return None
             if isinstance(parsed, bool):
@@ -794,7 +773,7 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
         if operator == '$arrayToObject':
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if _is_nullish(parsed):
                 return None
 
@@ -816,7 +795,7 @@ class _Parser(object):
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
         if operator == '$objectToArray':
-            parsed = self._parse_or_nothing(values)
+            parsed = self.parse(values)
             if _is_nullish(parsed):
                 return None
 
@@ -840,7 +819,7 @@ class _Parser(object):
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
             field, fallback = values
-            out_value = self._parse_or_nothing(field)
+            out_value = self.parse(field)
             if not _is_nullish(out_value):
                 return out_value
             return self.parse(fallback)
@@ -933,17 +912,18 @@ class _Parser(object):
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
 
-def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
+def _parse_expression(expression, doc_dict):
     """Parse an expression.
 
     Args:
         expression: an Aggregate Expression, see
             https://docs.mongodb.com/manual/meta/aggregation-quick-reference/#aggregation-expressions.
         doc_dict: the document on which to evaluate the expression.
-        ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
-            if it is possible.
+
+    Returns:
+        the result of evaluating the expression, or NOTHING if it is undefined.
     """
-    return _Parser(doc_dict, ignore_missing_keys=ignore_missing_keys).parse(expression)
+    return _Parser(doc_dict).parse(expression)
 
 
 filtering.register_parse_expression(_parse_expression)
@@ -957,10 +937,9 @@ def _accumulate_group(output_fields, group_list):
         for operator, key in value.items():
             values = []
             for doc in group_list:
-                try:
-                    values.append(_parse_expression(key, doc))
-                except KeyError:
-                    continue
+                value = _parse_expression(key, doc)
+                if value is not NOTHING:
+                    values.append(value)
             if operator in _GROUPING_OPERATOR_MAP:
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$addToSet':
@@ -1118,9 +1097,8 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     for doc in out_doc:
         found_items = set()
         depth = 0
-        try:
-            result = _parse_expression(start_with, doc)
-        except KeyError:
+        result = _parse_expression(start_with, doc)
+        if result is NOTHING:
             continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
         while origin_matches and (max_depth is None or depth < max_depth):
@@ -1141,10 +1119,8 @@ def _handle_group_stage(in_collection, unused_database, options):
     if _id:
 
         def _key_getter(doc):
-            try:
-                return _parse_expression(_id, doc)
-            except KeyError:
-                return None
+            key = _parse_expression(_id, doc)
+            return None if key is NOTHING else key
 
         def _sort_key_getter(doc):
             return filtering.BsonComparable(_key_getter(doc))
@@ -1208,9 +1184,8 @@ def _handle_bucket_stage(in_collection, unused_database, options):
         param being a sort key to sort the default bucket even
         if it's not the same type as the boundaries.
         """
-        try:
-            value = _parse_expression(group_by, doc)
-        except KeyError:
+        value = _parse_expression(group_by, doc)
+        if value is NOTHING:
             return (is_default_last, _get_default_bucket())
         index = bisect.bisect_right(boundaries, value)
         if index and index < len(boundaries):
@@ -1268,13 +1243,8 @@ def _handle_unwind_stage(in_collection, unused_database, options):
     include_array_index = options.get('includeArrayIndex')
     unwound_collection = []
     for doc in in_collection:
-        try:
-            array_value = helpers.get_value_by_dot(doc, path)
-        except KeyError:
-            if should_preserve_null_and_empty:
-                unwound_collection.append(doc)
-            continue
-        if array_value is None:
+        array_value = helpers.get_value_by_dot(doc, path)
+        if _is_nullish(array_value):
             if should_preserve_null_and_empty:
                 unwound_collection.append(doc)
             continue
@@ -1365,7 +1335,7 @@ def _handle_replace_root_stage(in_collection, unused_database, options):
     new_root = options['newRoot']
     out_collection = []
     for doc in in_collection:
-        new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
+        new_doc = _parse_expression(new_root, doc)
         if not isinstance(new_doc, dict):
             raise OperationFailure(
                 "'newRoot' expression must evaluate to an object, but resulting value was: {}"
@@ -1400,7 +1370,7 @@ def _handle_project_stage(in_collection, unused_database, options):
             new_fields_collection = [{} for unused_doc in in_collection]
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
-            out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+            out_value = _parse_expression(value, in_doc)
             if out_value is not NOTHING:
                 out_doc[field] = out_value
 
@@ -1431,7 +1401,7 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     out_collection = [dict(doc) for doc in in_collection]
     for field, value in options.items():
         for in_doc, out_doc in zip(in_collection, out_collection):
-            out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+            out_value = _parse_expression(value, in_doc)
             if out_value is NOTHING:
                 continue
             parts = field.split('.')
