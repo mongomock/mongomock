@@ -97,4 +97,8 @@ def patch(servers='localhost', on_new='error'):
         raise ValueError(
             'MongoDB server %s:%d does not exist.\n' % client.address + '%s' % parsed_servers)
 
-    return mock.patch('pymongo.MongoClient', _create_persistent_client)
+    class _PersistentClient:
+        def __new__(cls, *args, **kwargs):
+            return _create_persistent_client(*args, **kwargs)
+
+    return mock.patch('pymongo.MongoClient', _PersistentClient)
