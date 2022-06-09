@@ -1018,7 +1018,7 @@ class Collection(object):
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
              batch_size=0, manipulate=True, collation=None, session=None,
-             max_time_ms=None, **kwargs):
+             max_time_ms=None, allow_disk_use=None, **kwargs):
         spec = filter
         if spec is None:
             spec = {}
@@ -1818,7 +1818,7 @@ class Collection(object):
             cursor_type=None, sort=None, allow_partial_results=False,
             oplog_replay=False, modifiers=None, batch_size=0, manipulate=True, collation=None,
             hint=None, max_scan=None, max_time_ms=None, max=None, min=None, return_key=False,
-            how_record_id=False, snapshot=False, comment=None):
+            how_record_id=False, snapshot=False, comment=None, allow_disk_use=None):
         raise NotImplementedError('find_raw_batches method is not implemented in mongomock yet')
 
     def aggregate_raw_batches(self, pipeline, **kwargs):
