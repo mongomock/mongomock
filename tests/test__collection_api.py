@@ -6867,3 +6867,12 @@ class CollectionAPITest(TestCase):
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
             mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')
+
+    def test__cursor_allow_disk_use(self):
+        col = self.db.col
+        col.find().allow_disk_use(True)
+        col.find().allow_disk_use(False)
+        col.find().allow_disk_use()
+
+        with self.assertRaises(TypeError):
+            col.find().allow_disk_use(1)
