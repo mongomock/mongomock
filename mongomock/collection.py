@@ -1018,7 +1018,7 @@ class Collection(object):
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
              batch_size=0, manipulate=True, collation=None, session=None,
-             max_time_ms=None, **kwargs):
+             max_time_ms=None, allow_disk_use=False, **kwargs):
         spec = filter
         if spec is None:
             spec = {}
@@ -1027,7 +1027,7 @@ class Collection(object):
             if value:
                 raise OperationFailure("Unrecognized field '%s'" % kwarg)
         return Cursor(self, spec, sort, projection, skip, limit,
-                      collation=collation).max_time_ms(max_time_ms)
+                      collation=collation).max_time_ms(max_time_ms).allow_disk_use(allow_disk_use)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = self._iter_documents(spec)
@@ -1818,7 +1818,7 @@ class Collection(object):
             cursor_type=None, sort=None, allow_partial_results=False,
             oplog_replay=False, modifiers=None, batch_size=0, manipulate=True, collation=None,
             hint=None, max_scan=None, max_time_ms=None, max=None, min=None, return_key=False,
-            how_record_id=False, snapshot=False, comment=None):
+            how_record_id=False, snapshot=False, comment=None, allow_disk_use=False):
         raise NotImplementedError('find_raw_batches method is not implemented in mongomock yet')
 
     def aggregate_raw_batches(self, pipeline, **kwargs):
@@ -1994,6 +1994,11 @@ class Cursor(object):
         if max_time_ms is not None and not isinstance(max_time_ms, int):
             raise TypeError('max_time_ms must be an integer or None')
         # Currently the value is ignored as mongomock never times out.
+        return self
+
+    def allow_disk_use(self, allow_disk_use=False):
+        if allow_disk_use is not None and not isinstance(allow_disk_use, bool):
+            raise TypeError('allow_disk_use must be a bool')
         return self
 
 
