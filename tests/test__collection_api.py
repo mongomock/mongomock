@@ -17,12 +17,10 @@ from mongomock import helpers
 
 try:
     from unittest import mock
-
     _HAVE_MOCK = True
 except ImportError:
     try:
         import mock
-
         _HAVE_MOCK = True
     except ImportError:
         _HAVE_MOCK = False
@@ -43,6 +41,7 @@ except ImportError:
     from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
     from tests.utils import DBRef
+
 
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
@@ -3979,7 +3978,6 @@ class CollectionAPITest(TestCase):
                     'default': 'f',
                 }
             }
-
         self.db.collection.insert_one({'_id': 1})
         actual = self.db.collection.aggregate([
             {'$project': {
@@ -4638,7 +4636,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.find_one({
                 '$where':
-                    'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
+                'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
             })
 
     def test__unwind_no_prefix(self):
@@ -6088,14 +6086,14 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(
             original_document, stored_document,
             msg='The document is not the same because the date TZ has been stripped of and the '
-                'microseconds truncated.')
+            'microseconds truncated.')
         self.assertNotEqual(
             original_document['date'].timestamp(), stored_document['date'].timestamp())
         self.assertEqual(
             datetime(2000, 1, 1, 10, 30, 30, 12000),
             stored_document['date'],
             msg='The stored document holds a date as timezone naive UTC and without '
-                'microseconds')
+            'microseconds')
 
         # The objects are not linked: modifying the inserted document or the fetched one will
         # have no effect on future retrievals.
@@ -6866,7 +6864,7 @@ class CollectionAPITest(TestCase):
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
         with self.assertRaises(
-                TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
+            TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
             mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')
 
