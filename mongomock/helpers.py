@@ -8,6 +8,7 @@ import time
 from urllib.parse import unquote_plus
 import warnings
 
+from sentinels import NOTHING
 
 # Get ObjectId from bson if available or import a crafted one. This is not used
 # in this module but is made available for callers of this module.
@@ -359,24 +360,30 @@ def get_value_by_dot(doc, key, can_generate_array=False):
     key_items = key.split('.')
     for key_index, key_item in enumerate(key_items):
         if isinstance(result, dict):
+            if key_item not in result:
+                return NOTHING
             result = result[key_item]
 
         elif isinstance(result, (list, tuple)):
             try:
                 int_key = int(key_item)
-            except ValueError as err:
+            except ValueError:
                 if not can_generate_array:
-                    raise KeyError(key_index) from err
+                    return NOTHING
                 remaining_key = '.'.join(key_items[key_index:])
-                return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
+                values = [
+                    get_value_by_dot(subdoc, remaining_key)
+                    for subdoc in result
+                ]
+                return [v for v in values if v is not NOTHING]
 
             try:
                 result = result[int_key]
-            except (ValueError, IndexError) as err:
-                raise KeyError(key_index) from err
+            except (ValueError, IndexError):
+                return NOTHING
 
         else:
-            raise KeyError(key_index)
+            return NOTHING
 
     return result
 
@@ -423,4 +430,4 @@ def delete_value_by_dot(doc, key):
 def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
-    return value not in [False, None, 0]
+    return value not in [False, None, NOTHING, 0]

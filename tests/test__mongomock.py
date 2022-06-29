@@ -542,6 +542,11 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'_id': 4})
         self.cmp.compare_exceptions.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}})
 
+        self.cmp.compare.find({'$expr': {'$eq': [{'$last': '$a'}, 3]}})
+
+        self.cmp.do.insert_one({'_id': 6, 'array': [{'a': 0}, {'a': 1, 'b': 3}]})
+        self.cmp.compare.find({'$expr': {'$not': {'$gt': [{'$last': '$array.b'}, 2]}}})
+
     def test_double_negation(self):
         self.cmp.do.insert_many([
             {'_id': 1, 'a': 'some str'},
@@ -2567,6 +2572,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test_aggregate_project_array_with_missing_subfields(self):
+        # $last with a subfield should pick the last subdoc with
+        # the subfield defined, not necessarily the last in the array
+        self.cmp.do.insert_many([
+            {'a': [{'b': 1}, {'b': 2, 'c': 2}, {}]},
+        ])
+        pipeline = [
+            {'$project': {'_id': False, 'e': {'$last': '$a.c'}}}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_unwind_project_id(self):
         self.cmp.do.insert_one({
             '_id': 'id0',
@@ -3240,6 +3256,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 'other_user_id': {'$arrayElemAt': ['$values_list', -1]},
             },
         }])
+
+    def test_aggregate_bug_503(self):
+        """Regression test for bug https://github.com/mongomock/mongomock/issues/503."""
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({})
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
+        self.cmp.do.insert_one({'a': [1, 2, 3]})
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', 0]}}}])
+        self.cmp.compare.aggregate([{'$project': {'b': {'$arrayElemAt': ['$a', '$index']}}}])
 
     def test_aggregate_bug_607(self):
         """Regression test for bug https://github.com/mongomock/mongomock/issues/607."""

@@ -535,10 +535,10 @@ class Collection(object):
             is_sparse = index.get('sparse')
             find_kwargs = {}
             for key, _ in unique:
-                try:
-                    find_kwargs[key] = helpers.get_value_by_dot(new_data, key)
-                except KeyError:
-                    find_kwargs[key] = None
+                value = helpers.get_value_by_dot(new_data, key)
+                if value is NOTHING:
+                    value = None
+                find_kwargs[key] = value
             if is_sparse and set(find_kwargs.values()) == {None}:
                 continue
             answer_count = len(list(self._iter_documents(find_kwargs)))
@@ -1502,12 +1502,12 @@ class Collection(object):
             for doc in documents_gen:
                 index = []
                 for key, unused_order in index_list:
-                    try:
-                        index.append(helpers.get_value_by_dot(doc, key))
-                    except KeyError:
+                    value = helpers.get_value_by_dot(doc, key)
+                    if value is NOTHING:
                         if is_sparse:
                             continue
-                        index.append(None)
+                        value = None
+                    index.append(value)
                 if is_sparse and not index:
                     continue
                 index = tuple(index)
