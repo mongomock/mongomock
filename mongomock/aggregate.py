@@ -98,6 +98,7 @@ date_operators = [
     '$second',
     '$week',
     '$year',
+    '$dateTrunc',
 ]
 conditional_operators = ['$cond', '$ifNull']
 array_operators = [
@@ -539,6 +540,8 @@ class _Parser(object):
 
     def _handle_date_operator(self, operator, values):
         out_value = self.parse(values)
+        if operator == '$dateTrunc':
+            return out_value['date']
         if operator == '$dayOfYear':
             return out_value.timetuple().tm_yday
         if operator == '$dayOfMonth':
