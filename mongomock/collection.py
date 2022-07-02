@@ -533,6 +533,7 @@ class Collection(object):
                 continue
             unique = index.get('key')
             is_sparse = index.get('sparse')
+            partial_filter_expression = index.get('partialFilterExpression')
             find_kwargs = {}
             for key, _ in unique:
                 try:
@@ -541,6 +542,8 @@ class Collection(object):
                     find_kwargs[key] = None
             if is_sparse and set(find_kwargs.values()) == {None}:
                 continue
+            if partial_filter_expression is not None:
+                find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 1:
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
@@ -1492,6 +1495,8 @@ class Collection(object):
             index_dict['unique'] = True
         if 'expireAfterSeconds' in kwargs and kwargs['expireAfterSeconds'] is not None:
             index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
+        if 'partialFilterExpression' in kwargs and kwargs['partialFilterExpression'] is not None:
+            index_dict['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
 
         existing_index = self._store.indexes.get(index_name)
         if existing_index and index_dict != existing_index:
