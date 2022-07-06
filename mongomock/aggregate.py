@@ -47,23 +47,27 @@ group_operators = [
     '$stdDevSamp',
     '$sum',
 ]
-arithmetic_operators = [
+unary_arithmetic_operators = {
     '$abs',
-    '$add',
     '$ceil',
-    '$divide',
     '$exp',
     '$floor',
     '$ln',
-    '$log',
     '$log10',
-    '$mod',
-    '$multiply',
-    '$pow',
     '$sqrt',
-    '$subtract',
     '$trunc',
-]
+}
+binary_arithmetic_operators = {
+    '$divide',
+    '$log',
+    '$mod',
+    '$pow',
+    '$subtract',
+}
+arithmetic_operators = unary_arithmetic_operators | binary_arithmetic_operators | {
+    '$add',
+    '$multiply',
+}
 project_operators = [
     '$max',
     '$min',
@@ -318,51 +322,78 @@ class _Parser(object):
         )
 
     def _handle_arithmetic_operator(self, operator, values):
-        if operator == '$abs':
-            return abs(self.parse(values))
+        if operator in unary_arithmetic_operators:
+            try:
+                number = self.parse(values)
+            except KeyError:
+                return None
+            if number is None:
+                return None
+            if not isinstance(number, numbers.Number):
+                raise OperationFailure(
+                    "Parameter to %s must evaluate to a number, got '%s'" %
+                    (operator, type(number)))
+
+            if operator == '$abs':
+                return abs(number)
+            if operator == '$ceil':
+                return math.ceil(number)
+            if operator == '$exp':
+                return math.exp(number)
+            if operator == '$floor':
+                return math.floor(number)
+            if operator == '$ln':
+                return math.log(number)
+            if operator == '$log10':
+                return math.log10(number)
+            if operator == '$sqrt':
+                return math.sqrt(number)
+            if operator == '$trunc':
+                return math.trunc(number)
+
+        if operator in binary_arithmetic_operators:
+            if not isinstance(values, (tuple, list)):
+                raise OperationFailure(
+                    "Parameter to %s must evaluate to a list, got '%s'" %
+                    (operator, type(values)))
+
+            if len(values) != 2:
+                raise OperationFailure('%s must have only 2 parameters' % operator)
+            number_0, number_1 = self.parse_many(values)
+            if number_0 is None or number_1 is None:
+                return None
+
+            if operator == '$divide':
+                return number_0 / number_1
+            if operator == '$log':
+                return math.log(number_0, number_1)
+            if operator == '$mod':
+                return math.fmod(number_0, number_1)
+            if operator == '$pow':
+                return math.pow(number_0, number_1)
+            if operator == '$subtract':
+                if isinstance(number_0, datetime.datetime) and \
+                        isinstance(number_1, (int, float)):
+                    number_1 = datetime.timedelta(milliseconds=number_1)
+                res = number_0 - number_1
+                if isinstance(res, datetime.timedelta):
+                    return round(res.total_seconds() * 1000)
+                return res
+
+        assert isinstance(values, (tuple, list)), \
+            "Parameter to %s must evaluate to a list, got '%s'" % (operator, type(values))
+
+        parsed_values = list(self.parse_many(values))
+        assert parsed_values, '%s must have at least one parameter' % operator
+        for value in parsed_values:
+            if value is None:
+                return None
+            assert isinstance(value, numbers.Number), '%s only uses numbers' % operator
         if operator == '$add':
-            return sum(self.parse(value) for value in values)
-        if operator == '$ceil':
-            return math.ceil(self.parse(values))
-        if operator == '$divide':
-            assert len(values) == 2, 'divide must have only 2 items'
-            return self.parse(values[0]) / self.parse(values[1])
-        if operator == '$exp':
-            return math.exp(self.parse(values))
-        if operator == '$floor':
-            return math.floor(self.parse(values))
-        if operator == '$ln':
-            return math.log(self.parse(values))
-        if operator == '$log':
-            assert len(values) == 2, 'log must have only 2 items'
-            return math.log(self.parse(values[0]), self.parse(values[1]))
-        if operator == '$log10':
-            return math.log10(self.parse(values))
-        if operator == '$mod':
-            assert len(values) == 2, 'mod must have only 2 items'
-            return math.fmod(self.parse(values[0]), self.parse(values[1]))
+            return sum(parsed_values)
         if operator == '$multiply':
-            return functools.reduce(
-                lambda x, y: x * y,
-                (self.parse(value) for value in values))
-        if operator == '$pow':
-            assert len(values) == 2, 'pow must have only 2 items'
-            return math.pow(self.parse(values[0]), self.parse(values[1]))
-        if operator == '$sqrt':
-            return math.sqrt(self.parse(values))
-        if operator == '$subtract':
-            assert len(values) == 2, 'subtract must have only 2 items'
-            value_0 = self.parse(values[0])
-            value_1 = self.parse(values[1])
-            if isinstance(value_0, datetime.datetime) and \
-                    isinstance(value_1, (int, float)):
-                value_1 = datetime.timedelta(milliseconds=value_1)
-            res = value_0 - value_1
-            if isinstance(res, datetime.timedelta):
-                return round(res.total_seconds() * 1000)
-            return res
-        if operator == '$trunc':
-            return math.trunc(self.parse(values))
+            return functools.reduce(lambda x, y: x * y, parsed_values)
+
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid aritmetic operator for the aggregation "
@@ -1153,7 +1184,7 @@ def _handle_group_stage(in_collection, unused_database, options):
 
         def _key_getter(doc):
             try:
-                return _parse_expression(_id, doc)
+                return _parse_expression(_id, doc, ignore_missing_keys=True)
             except KeyError:
                 return None
 
