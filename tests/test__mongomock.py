@@ -3534,6 +3534,40 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test__aggregate36(self):
+        self.cmp.compare.aggregate([{'$project': {'c': {'$abs': -2}}}])
+        self.cmp.compare.aggregate([{'$project': {'d': {'$floor': 2.3}}}])
+        self.cmp.compare.aggregate([{'$project': {'e': {'$ln': None}}}])
+        self.cmp.compare.aggregate([{'$project': {'f': {'$exp': '$non_existent_key'}}}])
+        self.cmp.compare.aggregate([{'$project': {'g': {'$divide': [7, 3]}}}])
+        self.cmp.compare.aggregate([{'$project': {'h': {'$log': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'i': {'$mod': [1, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'j': {'$pow': [None, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'k': {'$subtract': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'k': {'$subtract': ['$non_existent_key', 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'o': {'$multiply': [4]}}}])
+        self.cmp.compare.aggregate([{'$project': {'p': {'$add': [1, 2, 3]}}}])
+        self.cmp.compare.aggregate([{'$project': {'s': {'$multiply': [1, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'t': {'$add': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'u': {'$multiply': ['$a', '$b', 4]}}}])
+
+    def test__aggregate_exception(self):
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$abs': [-2, 4]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$floor': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$divide': 5}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$log': [5]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$mod': [5, 3, 1]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$sum': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$multiply': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'n': {'$add': '$a'}}}])
+        self.cmp.compare_exceptions.aggregate(
+            [{'$project': {'q': {'$multiply': [1, '$non_existent_key']}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'r': {'$add': '$non_existent_key'}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'v': {'$multiply': '$b'}}}])
+        # TODO(pascal): Enable this test, for now it's not the same kind of error.
+        # self.cmp.compare_exceptions.aggregate(
+        #     [{'$project': {'c': {'$add': ['$date', 1, '$date']}}}])
+
     def test__aggregate_add_fields_with_sum_avg(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many([
@@ -3953,6 +3987,84 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 '_id': '$a',
                 'merged_b': {'$mergeObjects': '$b'},
             }}
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__add_fields(self):
+        self.cmp.compare.aggregate([{'$addFields': {'c': 3}}])
+        self.cmp.compare.aggregate([{'$addFields': {'c': 4}}])
+        self.cmp.compare.aggregate([{'$addFields': {'b': {'$add': ['$a', '$b', 5]}}}])
+
+    def test__aggregate_with_missing_fields1(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0, 'b': 1},
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': '$a', 'b': {'$sum': '$b'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields1(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0, 'b': 0},
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId(), 'b': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': {'a': '$a', 'b': '$b'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields2(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': {'a': '$a'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields3(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': '$a'}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__add_fields_with_missing_fields(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'a': 0},
+            {},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$addFields': {'b': '$a'}},
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
