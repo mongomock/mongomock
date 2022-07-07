@@ -303,7 +303,7 @@ class _Parser(object):
                 return helpers.get_value_by_dot(dict({
                     'ROOT': self._doc_dict,
                     'CURRENT': self._doc_dict,
-                }, **self._user_vars), expression[2:])
+                }, **self._user_vars), expression[2:], can_generate_array=True)
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
 
