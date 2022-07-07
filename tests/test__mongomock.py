@@ -2373,25 +2373,6 @@ class GroupTest(_CollectionComparisonTest):
             initial={'count': 0},
             reduce=reducer)
 
-    def test__partial_filter_expression_unique_index(self):
-        self.cmp.do.ensure_index([('value', 1), ('partialFilterExpression_value',1)], unique=True, partialFilterExpression={"partialFilterExpression_value":{"$exists":True}})
-
-        # we should be able to add documents with duplicated `value` if partialFilterExpression_value isn't set
-        self.cmp.do.insert({'value':4})
-        self.cmp.do.insert({'value':4})
-        self.cmp.compare.find({'value': 4})
-
-        # we should be able to add documents with distinct `value` values and duplicated `partialFilterExpression_value` value.
-        self.cmp.do.insert({'partialFilterExpression_value': 1, 'value':2})
-        self.cmp.do.insert({'partialFilterExpression_value': 1, 'value':3})
-        self.cmp.compare.find({'partialFilterExpression_value': 1})
-
-        # we should not be able to add documents with duplicated `partialFilterExpression_value` and `value` values
-        self.cmp.do.insert({'partialFilterExpression_value': 2, 'value':3})
-        self.cmp.do.compare_exceptions.insert({'partialFilterExpression_value': 2, 'value': 3})
-        self.cmp.compare.find({'partialFilterExpression_value': 2, 'value':3 })
-
-        self.cmp.compare.count_documents({})
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientAggregateTest(_CollectionComparisonTest):
@@ -3871,6 +3852,32 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.create_index([('value', 1)])
         self.cmp.do.create_index([('value', 1)])
         self.cmp.compare_exceptions.create_index([('value', 1)], unique=True)
+
+    def test__partial_filter_expression_unique_index(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.create_index(
+            (('value', 1), ('partialFilterExpression_value', 1)), unique=True,
+            partialFilterExpression={'partialFilterExpression_value': {'$exists': True}})
+
+        # We should be able to add documents with duplicated `value` if
+        # partialFilterExpression_value isn't set.
+        self.cmp.do.insert_one({'value': 4})
+        self.cmp.do.insert_one({'value': 4})
+        self.cmp.compare.find({'value': 4})
+
+        # We should be able to add documents with distinct `value` values and duplicated
+        # `partialFilterExpression_value` value.
+        self.cmp.do.insert_one({'partialFilterExpression_value': 1, 'value': 2})
+        self.cmp.do.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+        self.cmp.compare.find({'partialFilterExpression_value': 1})
+
+        # We should not be able to add documents with duplicated `partialFilterExpression_value`
+        # and `value` values.
+        self.cmp.do.insert_one({'partialFilterExpression_value': 2, 'value': 3})
+        self.cmp.compare_exceptions.insert_one({'partialFilterExpression_value': 2, 'value': 3})
+        self.cmp.compare.find({'partialFilterExpression_value': 2, 'value': 3})
+
+        self.cmp.compare.find({})
 
     def test_aggregate_project_with_boolean(self):
         self.cmp.do.drop()
