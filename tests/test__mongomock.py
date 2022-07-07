@@ -2097,6 +2097,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             function(cur, result) { result.count += cur.count }
         '''))
 
+    def test__aggregate_system_variables_generate_array(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one(
+            {'name': 'foo', 'errors': [
+                {'error_type': 1, 'description': 'problem 1'},
+                {'error_type': 2, 'description': 'problem 2'}]})
+        self.cmp.compare.aggregate([{'$project': {'error_type': '$$ROOT.errors.error_type'}}])
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
