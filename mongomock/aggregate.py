@@ -405,7 +405,7 @@ class _Parser(object):
             return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
             key, value = values
-            array = self._parse_basic_expression(key)
+            array = self.parse(key)
             index = self.parse(value)
             try:
                 return array[index]

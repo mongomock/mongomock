@@ -3402,6 +3402,39 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         }}])
 
+    def test__aggregate_filter_in_arrayElemAt(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {
+                '_id': 0,
+                'items': [
+                    {'item_id': 11, 'category': 'book'},
+                    {'item_id': 234, 'category': 'journal'}
+                ]
+            },
+            {
+                '_id': 1,
+                'items': [
+                    {'item_id': 23, 'category': 'book'}
+                ]
+            },
+            {
+                '_id': 2,
+                'items': [
+                    {'item_id': 232, 'category': 'book'}
+                ]
+            }
+        ])
+        self.cmp.compare.aggregate([{'$project': {'item': {
+            '$arrayElemAt': [
+                {'$filter': {
+                    'input': '$items',
+                    'cond': {'$eq': ['$$this.category', 'book']}
+                }},
+                0
+            ]
+        }}}])
+
     def test__aggregate_slice(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
