@@ -122,6 +122,15 @@ class DatabaseGettingTest(TestCase):
         self.client.drop_database(db)
         self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
 
+    def test__drop_database_system_collection(self):
+        db = self.client.a
+        collection = db['system.foo']
+        doc_id = collection.insert_one({'aa': 'bb'}).inserted_id
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 1)
+
+        self.client.drop_database('a')
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
+
     def test__drop_database_indexes(self):
         db = self.client.somedb
         collection = db.a
