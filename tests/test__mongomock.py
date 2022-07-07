@@ -1641,6 +1641,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 {'$addToSet': {'shirt.color': {'$each': ['green', 'yellow']}}})
             self.cmp.compare.find({'name': 'bob'})
 
+    def test__addToSet_dollar_operand(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_one({'takes': [{'a': 2, 'tags': []}, {'a': 1, 'tags': [2]}]})
+        self.cmp.do.update_many(
+            {'takes': {'$elemMatch': {'a': 1}}},
+            {'$addToSet': {'takes.$.tags': 3}})
+
     def test__pop(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_one({'name': 'bob', 'hat': ['green', 'tall']})
@@ -1784,20 +1791,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.update_many({'name': 'bob'}, {'$pullAll': {'hat': ['green']}})
         self.cmp.compare.find({'name': 'bob'})
 
-    def test__pullAll_nested_dict(self):
+    def test__pullAll_dollar_operand(self):
         self.cmp.do.delete_many({})
-        self.cmp.do.insert_one(
-            {'name': 'bob', 'hat': {'properties': {'sizes': ['M', 'L', 'XL']}}})
+        self.cmp.do.insert_one({'name': 'bob', 'takes': [
+            {'a': 1, 'tags': [0, 1, 2, 4]},
+            {'a': 2, 'tags': [0, 1, 2, 4]},
+            {'a': 1, 'tags': [0, 1, 4]},
+            {'a': 1, 'tags': [2, 3, 5]}]})
         self.cmp.do.update_many(
-            {'name': 'bob'}, {'$pullAll': {'hat.properties.sizes': ['M']}})
-        self.cmp.compare.find({'name': 'bob'})
-
-        self.cmp.do.delete_many({})
-        self.cmp.do.insert_one(
-            {'name': 'bob', 'hat': {'properties': {'sizes': ['M', 'L', 'XL']}}})
-        self.cmp.do.update_many(
-            {'name': 'bob'},
-            {'$pullAll': {'hat.properties.sizes': ['M', 'L']}})
+            {'name': 'bob', 'takes': {'$elemMatch': {'a': 1}}},
+            {'$pullAll': {'takes.$.tags': [1, 2, 3]}})
         self.cmp.compare.find({'name': 'bob'})
 
     def test__push(self):
