@@ -1611,6 +1611,29 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 5)
 
+    def test__ensure_partial_filter_expression_unique_index(self):
+        self.db.collection.delete_many({})
+        self.db.collection.create_index(
+            (('partialFilterExpression_value', 1), ('value', 1)),
+            unique=True, partialFilterExpression={'partialFilterExpression_value': {'$eq': 1}})
+
+        # We should be able to add documents with duplicated `value` and
+        # `partialFilterExpression_value` if `partialFilterExpression_value` isn't set to 1
+        self.db.collection.insert_one({'partialFilterExpression_value': 3, 'value': 4})
+        self.db.collection.insert_one({'partialFilterExpression_value': 3, 'value': 4})
+
+        # We should be able to add documents with distinct `value` values and duplicated
+        # `partialFilterExpression_value` value set to 1.
+        self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 2})
+        self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+
+        # We should not be able to add documents with duplicated `partialFilterExpression_value` and
+        # `value` values if `partialFilterExpression_value` is 1.
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+
+        self.assertEqual(self.db.collection.count_documents({}), 4)
+
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
 
