@@ -192,6 +192,21 @@ The branching model used for this project follows the `gitflow workflow`_.  This
 should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
 the legacy 2.x branch then your pull request should go into the `support/2.x` branch.
 
+Releasing
+~~~~~~~~~
+
+When ready for a release, tag the `develop` branch with a new tag (please keep semver names) and
+push your tags to GitHub. The CI should do the rest.
+
+To add release notes, create a release in GitHub's `Releases Page <https://github.com/mongomock/mongomock/releases>`_
+then generate the release notes locally with:
+
+.. code-block:: bash
+
+python3 -c "from pbr import git; git.write_git_changelog()"
+
+Then you can get the relevant section in the generated `Changelog` file.
+
 Acknowledgements
 ----------------
 
