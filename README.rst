@@ -160,6 +160,12 @@ Similarly, if you'd like to run tox against a specific environment in the contai
 
  docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs
 
+If you'd like to run only one test, you can also add the test name at the end of your command:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs tests.test__mongomock.MongoClientCollectionTest.test__aggregate_system_variables_generate_array
+
 NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
 you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
 the intended version.
