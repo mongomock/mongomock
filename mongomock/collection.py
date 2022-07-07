@@ -1198,9 +1198,9 @@ class Collection(object):
                     subspec = spec
                     for part in field_name_parts[:-1]:
                         if part == '$':
-                            subspec = subspec.get('$elemMatch', subspec)
+                            subspec_dollar = subspec.get('$elemMatch', subspec)
                             for item in current_doc:
-                                if filter_applies(subspec, item):
+                                if filter_applies(subspec_dollar, item):
                                     current_doc = item
                                     break
                             continue
@@ -1219,7 +1219,8 @@ class Collection(object):
                     subdocument = current_doc
                     if field_name_parts[-1] == '$' and isinstance(subdocument, list):
                         for i, doc in enumerate(subdocument):
-                            if filter_applies(subspec, doc):
+                            subspec_dollar = subspec.get('$elemMatch', subspec)
+                            if filter_applies(subspec_dollar, doc):
                                 subdocument[i] = v
                                 break
                         continue

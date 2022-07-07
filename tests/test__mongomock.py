@@ -1615,6 +1615,15 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'$setOnInsert': {'data.$.age': 1}}, True)
         self.cmp.compare.find()
 
+    def test__set_dollar_operand(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_one({'recordId': 1234, 'app': [
+            {'application': 'AppName', 'code': 1234, 'property': 'oldValue'},
+            {'application': 'AppName1', 'code': 1235, 'property': 'oldValue1'}]})
+        self.cmp.do.update_many(
+            {'app': {'$elemMatch': {'application': 'AppName', 'code': 1234}}},
+            {'$set': {'app.$': {'application': 'AppName', 'code': 1234, 'property': 'newValue'}}})
+
     def test__addToSet(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_one({'name': 'bob'})
