@@ -60,12 +60,13 @@ deploy:
   username: __token__
   distributions: "bdist_wheel sdist"
   password:
-    secure: V77o/nLMWGzQ83Ilpb7zqLmQZAGWRScAQDqloBFeriJXrjh8IFETjl4euWYNbFPzlImXb/ujxYoW0Jd3IdWY/WNTgWaasW++RRBSguwhMzAYZrL2xLOMw23zFOtvOuQ9JEKSJyS3G3GvadUdzQC1Wt/H6LPOuclxJF5oIgQUVU9T4mXpr6xMhw1D86joLCFD
+    secure: "V77o/nLMWGzQ83Ilpb7zqLmQZAGWRScAQDqloBFeriJXrjh8IFETjl4euWYNbFPzlImXb/ujxYoW0Jd3IdWY/WNTgWaasW++RRBSguwhMzAYZrL2xLOMw23zFOtvOuQ9JEKSJyS3G3GvadUdzQC1Wt/H6LPOuclxJF5oIgQUVU9T4mXpr6xMhw1D86joLCFD
 juzvZux02CDfUryRmcNqVd8KDYcs7JCLC9bgJxEB/7nBJEdICONZ8J/kGaiMEFDfplgdpAfR1KX/sVBEMYBCG5eDin1S2Bi22mgJ6FRsTegd5dy1sj+sT+sATmWJ8IlCpnkCszg/psQRmSiSkNEpH2mSUp3KZLspUSS+E9gWwbOyYGR+5OwHQ0NQzfCyPf8nADP/l1v3Wxdw
 4gqZUynAmV4cWmGP1tnKCpgkGvTr3QRCLmjQGXPnhgYOcJpu6TT5UhmdB5dhdVWYgYqGu27pjAVy+grK9GmtHYAg5MmZC0v6GClEsxeA/qXe9McyFU13YHKppmAelzIcewy+tJxwFmFSPvscHK8Q/j58C5NIOBqVT9GR3jWQqtsvA8yCxmp/KD1sPSF1KSHHUHlCMlmOpmzc
-ZLkLaskRWqznM6wxiLs8UeuyaEEA5R/BdZs4oNZFm9ls0gsf5GPZA6r+8GI5OrSWs6uun/+Th+Xys9yNiMU=
+ZLkLaskRWqznM6wxiLs8UeuyaEEA5R/BdZs4oNZFm9ls0gsf5GPZA6r+8GI5OrSWs6uun/+Th+Xys9yNiMU="
   on:
-    condition: $TOX_ENV = py310
+    condition: "$TOX_ENV = py310"
+    python: "3.10"
     tags: true
     all_branches: true
     repo: mongomock/mongomock
