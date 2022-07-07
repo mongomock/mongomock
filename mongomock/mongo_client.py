@@ -130,7 +130,8 @@ class MongoClient(object):
     def drop_database(self, name_or_db):
 
         def drop_collections_for_db(_db):
-            for col_name in _db.list_collection_names():
+            db_store = self._store[_db.name]
+            for col_name in db_store.list_created_collection_names():
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):
