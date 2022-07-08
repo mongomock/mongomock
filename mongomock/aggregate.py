@@ -14,6 +14,7 @@ import re
 import sys
 import warnings
 
+import pytz
 from sentinels import NOTHING
 
 from mongomock import command_cursor
@@ -569,7 +570,13 @@ class _Parser(object):
             'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
     def _handle_date_operator(self, operator, values):
-        out_value = self.parse(values)
+        if isinstance(values, dict) and collections.Counter(["date", "timezone"]) == collections.Counter(values.keys()):
+            value = self.parse(values["date"])
+            target_tz = pytz.timezone(values["timezone"])
+            out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
+        else:
+            out_value = self.parse(values)
+
         if operator == '$dayOfYear':
             return out_value.timetuple().tm_yday
         if operator == '$dayOfMonth':
