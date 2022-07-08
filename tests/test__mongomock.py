@@ -22,9 +22,11 @@ try:
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
+    from pymongo import read_concern
     from pymongo.read_preferences import ReadPreference
 except ImportError:
     from mongomock.object_id import ObjectId
+    from mongomock import read_concern
     from tests.utils import DBRef
 try:
     from bson.code import Code
@@ -87,6 +89,11 @@ class DatabaseGettingTest(TestCase):
     def setUp(self):
         super(DatabaseGettingTest, self).setUp()
         self.client = mongomock.MongoClient()
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__get_database_read_concern(self):
+        db = self.client.get_database('a', read_concern=read_concern.ReadConcern('majority'))
+        self.assertEqual('majority', db.read_concern.level)
 
     def test__getting_database_via_getattr(self):
         db1 = self.client.some_database_here
@@ -3100,6 +3107,73 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ])
         self.cmp.compare.aggregate([
             {'$count': 'my_count'}
+        ])
+
+    def test__aggregate_if_null(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        self.cmp.compare.aggregate([
+            {
+                '$project': {
+                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
+                    'b': {'$ifNull': ['$elem_b', '<missing_b>']},
+                }
+            }
+        ])
+
+    def test__aggregate_if_null_multi_field(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        # Multiple input expressions in $ifNull are not supported in MongoDB v4.4 and earlier.
+        if SERVER_VERSION > version.parse('4.4'):
+            compare = self.cmp.compare
+        else:
+            compare = self.cmp.compare_exceptions
+        compare.aggregate([
+            {
+                '$project': {
+                    'a_and_b': {'$ifNull': ['$elem_a', '$elem_b', '<missing_both>']},
+                    'b_and_a': {'$ifNull': ['$elem_b', '$elem_a', '<missing_both>']},
+                    'b_and_c': {'$ifNull': ['$elem_b', '$elem_c', '<missing_both>']},
+                }
+            }
+        ])
+
+    def test__aggregate_is_number(self):
+        self.cmp.do.insert_one(
+            {'_id': 1, 'int': 3, 'big_int': 3 ** 10, 'negative': -3,
+             'str': 'not_a_number', 'str_numeric': '3', 'float': 3.3,
+             'negative_float': -3.3, 'bool': True, 'none': None})
+        self.cmp.compare.aggregate([
+            {'$project': {
+                '_id': False, 'int': {'$isNumber': '$int'},
+                'big_int': {'$isNumber': '$big_int'},
+                'negative': {'$isNumber': '$negative'},
+                'str': {'$isNumber': '$str'},
+                'str_numeric': {'$isNumber': '$str_numeric'},
+                'float': {'$isNumber': '$float'},
+                'negative_float': {'$isNumber': '$negative_float'},
+                'bool': {'$isNumber': '$bool'},
+                'none': {'$isNumber': '$none'},
+            }}
+        ])
+
+    def test__aggregate_is_array(self):
+        self.cmp.do.insert_one(
+            {
+                '_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3),
+                'empty_list': [], 'empty_tuple': (),
+                'int': 3, 'str': '123', 'bool': True, 'none': None
+            })
+        self.cmp.compare.aggregate([
+            {'$project':
+                {
+                    '_id': False,
+                    'list': {'$isArray': '$list'}, 'tuple': {'$isArray': '$tuple'},
+                    'empty_list': {'$isArray': '$empty_list'},
+                    'empty_tuple': {'$isArray': '$empty_tuple'},
+                    'int': {'$isArray': '$int'}, 'str': {'$isArray': '$str'},
+                    'bool': {'$isArray': '$bool'},
+                    'none': {'$isArray': '$none'}
+                }}
         ])
 
     def test__aggregate_facet(self):
