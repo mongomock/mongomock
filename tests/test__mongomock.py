@@ -22,9 +22,11 @@ try:
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
+    from pymongo import read_concern
     from pymongo.read_preferences import ReadPreference
 except ImportError:
     from mongomock.object_id import ObjectId
+    from mongomock import read_concern
     from tests.utils import DBRef
 try:
     from bson.code import Code
@@ -87,6 +89,11 @@ class DatabaseGettingTest(TestCase):
     def setUp(self):
         super(DatabaseGettingTest, self).setUp()
         self.client = mongomock.MongoClient()
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__get_database_read_concern(self):
+        db = self.client.get_database('a', read_concern=read_concern.ReadConcern('majority'))
+        self.assertEqual('majority', db.read_concern.level)
 
     def test__getting_database_via_getattr(self):
         db1 = self.client.some_database_here
