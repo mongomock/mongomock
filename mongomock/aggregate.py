@@ -578,9 +578,9 @@ class _Parser(object):
 
     def _handle_date_operator(self, operator, values):
         if isinstance(values, dict) and \
-                collections.Counter(["date", "timezone"]) == collections.Counter(values.keys()):
-            value = self.parse(values["date"])
-            target_tz = pytz.timezone(values["timezone"])
+                collections.Counter(['date', 'timezone']) == collections.Counter(values.keys()):
+            value = self.parse(values['date'])
+            target_tz = pytz.timezone(values['timezone'])
             out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
         else:
             out_value = self.parse(values)
