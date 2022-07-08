@@ -3646,9 +3646,15 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {
                 '$addFields': {
-                    'year': {'$year': {'date': '$start_date', 'timezone': 'America/New_York'}},
-                    'week': {'$week': {'date': '$start_date', 'timezone': 'America/New_York'}},
-                    'dayOfWeek': {'$dayOfWeek': {'date': '$start_date', 'timezone': 'America/New_York'}},
+                    'year': {'$year': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
+                    'week': {'$week': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
+                    'dayOfWeek': {'$dayOfWeek': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
                 }
             },
             {'$project': {'_id': 0}},
