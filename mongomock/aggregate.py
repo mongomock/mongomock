@@ -577,8 +577,7 @@ class _Parser(object):
             'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
     def _handle_date_operator(self, operator, values):
-        if isinstance(values, dict) and \
-                collections.Counter(['date', 'timezone']) == collections.Counter(values.keys()):
+        if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
             value = self.parse(values['date'])
             target_tz = pytz.timezone(values['timezone'])
             out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
