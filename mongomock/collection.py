@@ -502,7 +502,8 @@ class Collection(object):
 
         if BSON:
             # bson validation
-            BSON.encode(data, check_keys=True)
+            BSON.encode(data, check_keys=True,
+                    codec_options=self._codec_options)
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
