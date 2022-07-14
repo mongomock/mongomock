@@ -156,7 +156,8 @@ class DatabaseAPITest(TestCase):
             self.database.with_options(custom_unicode_error_hander)
 
         custom_tzinfo = codec_options.CodecOptions(tz_aware=True, tzinfo=UTCPlus2())
-        self.database.with_options(custom_tzinfo)
+        with self.assertRaises(NotImplementedError):
+            self.database.with_options(custom_tzinfo)
 
     @skipIf(
         not helpers.HAVE_PYMONGO or helpers.PYMONGO_VERSION < version.parse('3.8'),
