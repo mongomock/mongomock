@@ -870,7 +870,7 @@ class Collection(object):
                             existing_document['_id'] = _id
                         if BSON:
                             # bson validation
-                            BSON.encode(document, check_keys=True)
+                            BSON.encode(document, check_keys=True, codec_options=self._codec_options)
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
@@ -1266,7 +1266,7 @@ class Collection(object):
             else:
                 return
         field_name = field_name_parts[-1]
-        updater(doc, field_name, field_value)
+        updater(doc, field_name, field_value, codec_options=self._codec_options)
 
     def _iter_documents(self, filter):
         # Validate the filter even if no documents can be returned.
@@ -2012,12 +2012,12 @@ class Cursor(object):
         return self
 
 
-def _set_updater(doc, field_name, value):
+def _set_updater(doc, field_name, value, codec_options = None):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
     if BSON:
         # bson validation
-        BSON.encode({field_name: value}, check_keys=True)
+        BSON.encode({field_name: value}, check_keys=True, codec_options=codec_options)
     if isinstance(doc, dict):
         doc[field_name] = value
     if isinstance(doc, list):
