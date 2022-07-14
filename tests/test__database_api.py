@@ -144,21 +144,17 @@ class DatabaseAPITest(TestCase):
             tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)))
 
         custom_document_class = codec_options.CodecOptions(document_class=collections.OrderedDict)
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(custom_document_class)
+        self.database.with_options(custom_document_class)
 
         custom_uuid_representation = codec_options.CodecOptions(uuid_representation=4)
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(custom_uuid_representation)
+        self.database.with_options(custom_uuid_representation)
 
         custom_unicode_error_hander = codec_options.CodecOptions(
             unicode_decode_error_handler='ignore')
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(custom_unicode_error_hander)
+        self.database.with_options(custom_unicode_error_hander)
 
         custom_tzinfo = codec_options.CodecOptions(tz_aware=True, tzinfo=UTCPlus2())
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(custom_tzinfo)
+        self.database.with_options(custom_tzinfo)
 
     @skipIf(
         not helpers.HAVE_PYMONGO or helpers.PYMONGO_VERSION < version.parse('3.8'),
