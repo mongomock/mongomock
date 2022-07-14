@@ -3,6 +3,7 @@ import datetime
 from packaging import version
 import sys
 from unittest import TestCase, skipIf, skipUnless
+from uuid import uuid4
 
 import mongomock
 from mongomock import helpers
@@ -148,7 +149,8 @@ class DatabaseAPITest(TestCase):
             self.database.with_options(custom_document_class)
 
         custom_uuid_representation = codec_options.CodecOptions(uuid_representation=4)
-        self.database.with_options(custom_uuid_representation)
+        db = self.database.with_options(custom_uuid_representation)
+        db.yes_hello.insert_one({'_id': uuid4()})
 
         custom_unicode_error_hander = codec_options.CodecOptions(
             unicode_decode_error_handler='ignore')
