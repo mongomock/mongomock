@@ -92,6 +92,7 @@ projection_operators = [
 date_operators = [
     '$dateFromString',
     '$dateToString',
+    '$dateFromParts',
     '$dayOfMonth',
     '$dayOfWeek',
     '$dayOfYear',
@@ -634,7 +635,60 @@ class _Parser(object):
                     ' in Mongomock.'
                 )
             return out_value['date'].strftime(out_value['format'])
+        if operator == '$dateFromParts':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$dateFromParts operator must correspond a dict'
+                    'that has "year" or "isoWeekYear" field.'
+                )
+            if not isinstance(values, dict) or not "year" in values.keys():
+                raise OperationFailure(
+                    '$dateFromParts operator must correspond a dict'
+                    'that has "year" field.'
+                )
+            if 'isoWeekYear' in values.keys():
+                raise NotImplementedError(
+                    'Although isoWeekYear is a valid field for the '
+                    '$dateFromParts operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'isoWeek' in values.keys():
+                raise NotImplementedError(
+                    'Although isoWeek is a valid field for the '
+                    '$dateFromParts operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'isoDayOfWeek' in values.keys():
+                raise NotImplementedError(
+                    'Although isoDayOfWeek is a valid field for the '
+                    '$dateFromParts operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'timezone' in values.keys():
+                raise NotImplementedError(
+                    'Although timezone is a valid field for the '
+                    '$dateFromParts operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            
+            year = values.get("year")  # TODO: add range validation
+            month = values.get("month", 1) or 1
+            day = values.get("day", 1) or 1
+            hour = values.get("hour", 0) or 0
+            minute = values.get("minute", 0) or 0
+            second = values.get("second", 0) or 0
+            millisecond = values.get("millisecond", 0) or 0
 
+            return datetime.datetime(
+                year=year,
+                month=month,
+                day=day,
+                hour=hour,
+                minute=minute,
+                second=second,
+                microsecond=millisecond
+            )
+            
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '
