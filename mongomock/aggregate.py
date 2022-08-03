@@ -638,46 +638,49 @@ class _Parser(object):
         if operator == '$dateFromParts':
             if not isinstance(values, dict):
                 raise OperationFailure(
-                    '$dateFromParts operator must correspond a dict'
+                    '$dateFromParts operator must correspond a dict '
                     'that has "year" or "isoWeekYear" field.'
                 )
-            if not isinstance(values, dict) or not "year" in values.keys():
+            if (
+                not isinstance(values, dict)
+                or len(set(values.keys()).intersection({'year', 'isoWeekYear'})) != 1
+            ):
                 raise OperationFailure(
-                    '$dateFromParts operator must correspond a dict'
-                    'that has "year" field.'
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
                 )
             if 'isoWeekYear' in values.keys():
                 raise NotImplementedError(
                     'Although isoWeekYear is a valid field for the '
-                    '$dateFromParts operator, it is currently not implemented '
+                    f'{operator} operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             if 'isoWeek' in values.keys():
                 raise NotImplementedError(
                     'Although isoWeek is a valid field for the '
-                    '$dateFromParts operator, it is currently not implemented '
+                    f'{operator} operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             if 'isoDayOfWeek' in values.keys():
                 raise NotImplementedError(
                     'Although isoDayOfWeek is a valid field for the '
-                    '$dateFromParts operator, it is currently not implemented '
+                    f'{operator} operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
             if 'timezone' in values.keys():
                 raise NotImplementedError(
                     'Although timezone is a valid field for the '
-                    '$dateFromParts operator, it is currently not implemented '
+                    f'{operator} operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
-            
-            year = values.get("year")  # TODO: add range validation
-            month = values.get("month", 1) or 1
-            day = values.get("day", 1) or 1
-            hour = values.get("hour", 0) or 0
-            minute = values.get("minute", 0) or 0
-            second = values.get("second", 0) or 0
-            millisecond = values.get("millisecond", 0) or 0
+
+            year = out_value.get('year')
+            month = out_value.get('month', 1) or 1
+            day = out_value.get('day', 1) or 1
+            hour = out_value.get('hour', 0) or 0
+            minute = out_value.get('minute', 0) or 0
+            second = out_value.get('second', 0) or 0
+            millisecond = out_value.get('millisecond', 0) or 0
 
             return datetime.datetime(
                 year=year,
@@ -688,7 +691,7 @@ class _Parser(object):
                 second=second,
                 microsecond=millisecond
             )
-            
+
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
             'aggregation pipeline, it is currently not implemented '

@@ -6494,6 +6494,104 @@ class CollectionAPITest(TestCase):
                 [{'$project': {'a': {'$dateToString': '10'}}}]
             )
 
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_date_from_parts(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'start_date': datetime(2022, 8, 3, 0, 5, 23),
+        })
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'year': {'$year': '$start_date'},
+                                'month': {'$month': '$start_date'},
+                                'day': {'$dayOfMonth': '$start_date'},
+                            }
+                        }
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+
+        expect = [{
+            'start_date': datetime(2022, 8, 3),
+        }]
+
+        self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'day': 1,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                                'isoWeek': 53,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                                'isoDayOfWeek': 7,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'year': {'$year': '$start_date'},
+                                'timezone': 'America/New_York',
+                            }
+                        }
+                    }
+                }
+            ])
+
     def test__aggregate_array_to_object(self):
         collection = self.db.collection
         collection.insert_many([{
