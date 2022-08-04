@@ -6501,22 +6501,20 @@ class CollectionAPITest(TestCase):
             'start_date': datetime(2022, 8, 3, 0, 5, 23),
         })
 
-        actual = collection.aggregate(
-            [
-                {
-                    '$addFields': {
-                        'start_date': {
-                            '$dateFromParts': {
-                                'year': {'$year': '$start_date'},
-                                'month': {'$month': '$start_date'},
-                                'day': {'$dayOfMonth': '$start_date'},
-                            }
+        actual = collection.aggregate([
+            {
+                '$addFields': {
+                    'start_date': {
+                        '$dateFromParts': {
+                            'year': {'$year': '$start_date'},
+                            'month': {'$month': '$start_date'},
+                            'day': {'$dayOfMonth': '$start_date'},
                         }
                     }
-                },
-                {'$project': {'_id': 0}},
-            ]
-        )
+                }
+            },
+            {'$project': {'_id': 0}},
+        ])
 
         expect = [{
             'start_date': datetime(2022, 8, 3),

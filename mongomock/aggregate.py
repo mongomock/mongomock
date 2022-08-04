@@ -636,45 +636,25 @@ class _Parser(object):
                 )
             return out_value['date'].strftime(out_value['format'])
         if operator == '$dateFromParts':
-            if not isinstance(values, dict):
-                raise OperationFailure(
-                    '$dateFromParts operator must correspond a dict '
-                    'that has "year" or "isoWeekYear" field.'
-                )
-            if (
-                not isinstance(values, dict)
-                or len(set(values.keys()).intersection({'year', 'isoWeekYear'})) != 1
-            ):
+            if not isinstance(out_value, dict):
                 raise OperationFailure(
                     f'{operator} operator must correspond a dict '
                     'that has "year" or "isoWeekYear" field.'
                 )
-            if 'isoWeekYear' in values.keys():
-                raise NotImplementedError(
-                    'Although isoWeekYear is a valid field for the '
-                    f'{operator} operator, it is currently not implemented '
-                    ' in Mongomock.'
+            if len(set(out_value) & {'year', 'isoWeekYear'}) != 1:
+                raise OperationFailure(
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
                 )
-            if 'isoWeek' in values.keys():
-                raise NotImplementedError(
-                    'Although isoWeek is a valid field for the '
-                    f'{operator} operator, it is currently not implemented '
-                    ' in Mongomock.'
-                )
-            if 'isoDayOfWeek' in values.keys():
-                raise NotImplementedError(
-                    'Although isoDayOfWeek is a valid field for the '
-                    f'{operator} operator, it is currently not implemented '
-                    ' in Mongomock.'
-                )
-            if 'timezone' in values.keys():
-                raise NotImplementedError(
-                    'Although timezone is a valid field for the '
-                    f'{operator} operator, it is currently not implemented '
-                    ' in Mongomock.'
-                )
+            for field in ('isoWeekYear', 'isoWeek', 'isoDayOfWeek', 'timezone'):
+                if field in out_value:
+                    raise NotImplementedError(
+                        f'Although {field} is a valid field for the '
+                        f'{operator} operator, it is currently not implemented '
+                        'in Mongomock.'
+                    )
 
-            year = out_value.get('year')
+            year = out_value['year']
             month = out_value.get('month', 1) or 1
             day = out_value.get('day', 1) or 1
             hour = out_value.get('hour', 0) or 0
