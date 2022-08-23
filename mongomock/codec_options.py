@@ -50,8 +50,6 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
 
         if uuid_representation is None:
             uuid_representation = _DEFAULT_UUID_REPRESENTATION
-        if uuid_representation != _DEFAULT_UUID_REPRESENTATION:
-            raise NotImplementedError('Mongomock does not handle custom uuid_representation yet')
 
         if unicode_decode_error_handler not in ('strict', None):
             raise NotImplementedError(
