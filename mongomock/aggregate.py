@@ -92,6 +92,7 @@ projection_operators = [
 date_operators = [
     '$dateFromString',
     '$dateToString',
+    '$dateFromParts',
     '$dayOfMonth',
     '$dayOfWeek',
     '$dayOfYear',
@@ -634,6 +635,42 @@ class _Parser(object):
                     ' in Mongomock.'
                 )
             return out_value['date'].strftime(out_value['format'])
+        if operator == '$dateFromParts':
+            if not isinstance(out_value, dict):
+                raise OperationFailure(
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
+                )
+            if len(set(out_value) & {'year', 'isoWeekYear'}) != 1:
+                raise OperationFailure(
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
+                )
+            for field in ('isoWeekYear', 'isoWeek', 'isoDayOfWeek', 'timezone'):
+                if field in out_value:
+                    raise NotImplementedError(
+                        f'Although {field} is a valid field for the '
+                        f'{operator} operator, it is currently not implemented '
+                        'in Mongomock.'
+                    )
+
+            year = out_value['year']
+            month = out_value.get('month', 1) or 1
+            day = out_value.get('day', 1) or 1
+            hour = out_value.get('hour', 0) or 0
+            minute = out_value.get('minute', 0) or 0
+            second = out_value.get('second', 0) or 0
+            millisecond = out_value.get('millisecond', 0) or 0
+
+            return datetime.datetime(
+                year=year,
+                month=month,
+                day=day,
+                hour=hour,
+                minute=minute,
+                second=second,
+                microsecond=millisecond
+            )
 
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
