@@ -3872,6 +3872,28 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_date_from_parts(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'start_date': datetime.datetime(2022, 8, 3, 16, 6, 0)
+        })
+
+        additional_fields_pipeline = [
+            {
+                '$addFields': {
+                    'start_date': {
+                        '$dateFromParts': {
+                            'year': {'$year': '$start_date'},
+                            'month': {'$month': '$start_date'},
+                            'day': {'$dayOfMonth': '$start_date'},
+                        }
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(additional_fields_pipeline)
+
     def test_aggregate_array_to_object(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([{
