@@ -13,8 +13,10 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON
+    from bson.codec_options import CodecOptions
 except ImportError:
     json_utils = SON = BSON = None
+    CodecOptions = type(None)
 try:
     import execjs
 except ImportError:
@@ -72,6 +74,14 @@ _WITH_OPTIONS_KWARGS = {
         'pymongo.write_concern.WriteConcern', WriteConcern(),
         ('acknowledged', 'document')),
 }
+
+
+def _bson_encode(document, codec_options):
+    if isinstance(codec_options, CodecOptions):
+        BSON.encode(document, check_keys=True,
+                    codec_options=codec_options)
+    else:
+        BSON.encode(document, check_keys=True)
 
 
 def validate_is_mapping(option, value):
@@ -502,7 +512,7 @@ class Collection(object):
 
         if BSON:
             # bson validation
-            BSON.encode(data, check_keys=True)
+            _bson_encode(data, self._codec_options)
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -869,7 +879,7 @@ class Collection(object):
                             existing_document['_id'] = _id
                         if BSON:
                             # bson validation
-                            BSON.encode(document, check_keys=True)
+                            _bson_encode(document, self.codec_options)
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
@@ -1265,7 +1275,7 @@ class Collection(object):
             else:
                 return
         field_name = field_name_parts[-1]
-        updater(doc, field_name, field_value)
+        updater(doc, field_name, field_value, codec_options=self._codec_options)
 
     def _iter_documents(self, filter):
         # Validate the filter even if no documents can be returned.
@@ -2011,12 +2021,12 @@ class Cursor(object):
         return self
 
 
-def _set_updater(doc, field_name, value):
+def _set_updater(doc, field_name, value, codec_options=None):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
     if BSON:
         # bson validation
-        BSON.encode({field_name: value}, check_keys=True)
+        _bson_encode({field_name: value}, codec_options)
     if isinstance(doc, dict):
         doc[field_name] = value
     if isinstance(doc, list):
@@ -2029,12 +2039,12 @@ def _set_updater(doc, field_name, value):
         doc[field_index] = value
 
 
-def _unset_updater(doc, field_name, value):
+def _unset_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc.pop(field_name, None)
 
 
-def _inc_updater(doc, field_name, value):
+def _inc_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
 
@@ -2050,17 +2060,17 @@ def _inc_updater(doc, field_name, value):
             doc[field_index] = value
 
 
-def _max_updater(doc, field_name, value):
+def _max_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = max(doc.get(field_name, value), value)
 
 
-def _min_updater(doc, field_name, value):
+def _min_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
-def _pop_updater(doc, field_name, value):
+def _pop_updater(doc, field_name, value, codec_options=None):
     if value not in {1, -1}:
         raise WriteError('$pop expects 1 or -1, found: ' + str(value))
 
@@ -2080,7 +2090,7 @@ def _pop_updater(doc, field_name, value):
         _pop_from_list(doc[field_index], value)
 
 
-def _pop_from_list(list_instance, mongo_pop_value):
+def _pop_from_list(list_instance, mongo_pop_value, codec_options=None):
     if not list_instance:
         return
 
@@ -2090,7 +2100,7 @@ def _pop_from_list(list_instance, mongo_pop_value):
         list_instance.pop(0)
 
 
-def _current_date_updater(doc, field_name, value):
+def _current_date_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
             # TODO(juannyg): get_current_timestamp should also be using helpers utcnow,
