@@ -3894,6 +3894,76 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(additional_fields_pipeline)
 
+    @skipIf(SERVER_VERSION < version.parse('5.0'), '$dateAdd is not supported prior to MongoDB 5.0')
+    def test_aggregate_date_add(self):
+        self.cmp.do.drop()
+        start = datetime.datetime(2022, 11, 6, 0, 0, 0)
+        self.cmp.do.insert_one({})
+        pipeline = [
+            {
+                '$addFields': {
+                    'add_seconds': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'second',
+                            'amount': 34
+                        }
+                    },
+                    'add_minutes': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'minute',
+                            'amount': 2
+                        }
+                    },
+                    'add_hours': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'hour',
+                            'amount': 2
+                        }
+                    },
+                    'add_days': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'day',
+                            'amount': 3
+                        }
+                    },
+                    'add_weeks': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'week',
+                            'amount': 2
+                        }
+                    },
+                    'add_months': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'month',
+                            'amount': 1
+                        }
+                    },
+                    'add_quarters': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'quarter',
+                            'amount': 1
+                        }
+                    },
+                    'add_years': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'year',
+                            'amount': 2
+                        }
+                    }
+                }
+            },
+            {'$project': {'_id': 0}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_array_to_object(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([{
