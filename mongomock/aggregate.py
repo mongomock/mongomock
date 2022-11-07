@@ -768,28 +768,29 @@ class _Parser(object):
             if len(value) < 2 or len(value) > 3:
                 raise OperationFailure('Expression $slice takes at least 2 arguments, and at most '
                                        '3, but {} were passed in'.format(len(value)))
-            array_value = self.parse(value[0])
+            out_value = list(self.parse_many(value))
+            array_value = out_value[0]
             if not isinstance(array_value, list):
                 raise OperationFailure(
                     'First argument to $slice must be an array, but is of type: {}'
                     .format(type(array_value)))
-            for num, v in zip(('Second', 'Third'), value[1:]):
+            for num, v in zip(('Second', 'Third'), out_value[1:]):
                 if not isinstance(v, int):
                     raise OperationFailure(
                         '{} argument to $slice must be numeric, but is of type: {}'
                         .format(num, type(v)))
-            if len(value) > 2 and value[2] <= 0:
+            if len(out_value) > 2 and out_value[2] <= 0:
                 raise OperationFailure('Third argument to $slice must be '
-                                       'positive: {}'.format(value[2]))
+                                       'positive: {}'.format(out_value[2]))
 
-            start = value[1]
+            start = out_value[1]
             if start < 0:
-                if len(value) > 2:
-                    stop = len(array_value) + start + value[2]
+                if len(out_value) > 2:
+                    stop = len(array_value) + start + out_value[2]
                 else:
                     stop = None
-            elif len(value) > 2:
-                stop = start + value[2]
+            elif len(out_value) > 2:
+                stop = start + out_value[2]
             else:
                 stop = start
                 start = 0

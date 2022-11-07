@@ -3589,6 +3589,9 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$project': {'slice': {
             '$slice': ['$items', -10, 5]
         }}}])
+        self.cmp.compare.aggregate([{'$project': {'slice': {
+            '$slice': ['$items', {'$add': [2, 3]}, {'$add': [1, 4]}]
+        }}}])
 
     def test__aggregate_no_entries(self):
         pipeline = [

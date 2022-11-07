@@ -5921,6 +5921,9 @@ class CollectionAPITest(TestCase):
         self.assertEqual(last_five, list(collection.aggregate([
             {'$project': {'slice': {'$slice': ['$items', -5, 5]}}}
         ])))
+        self.assertEqual(last_five, list(collection.aggregate([
+            {'$project': {'slice': {'$slice': ['$items', {'$add': [2, 3]}, {'$add': [1, 4]}]}}}
+        ])))
 
     def test__aggregate_slice_wrong(self):
         # inserts an item otherwise the slice is not even evaluated
