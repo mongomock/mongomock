@@ -229,6 +229,8 @@ class _Parser(object):
 
     def parse(self, expression):
         """Parse a MongoDB expression."""
+        if isinstance(expression, list):
+            return list(self.parse_many(expression))
         if not isinstance(expression, dict):
             # May raise a KeyError despite the ignore missing key.
             return self._parse_basic_expression(expression)
