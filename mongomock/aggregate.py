@@ -50,6 +50,28 @@ group_operators = [
     '$stdDevSamp',
     '$sum',
 ]
+set_window_fields_operators = [
+    '$addToSet',
+    '$avg',
+    '$count',
+    '$covariancePop',
+    '$covarianceSamp',
+    '$derivative',
+    '$expMovingAvg',
+    '$integral',
+    '$max',
+    '$min',
+    '$push',
+    '$stdDevSamp',
+    '$stdDevPop',
+    '$sum',
+    '$first',
+    '$last',
+    '$shift',
+    '$denseRank',
+    '$documentNumber',
+    '$rank'
+]
 unary_arithmetic_operators = {
     '$abs',
     '$ceil',
@@ -1111,6 +1133,43 @@ def _accumulate_group(output_fields, group_list):
     return doc_dict
 
 
+def _accumulate_set_window_fields(output_fields, partition, options):
+    processed_partition = []
+    for (field, field_value) in output_fields.items():
+        window_operator = next((x for x in field_value if x.startswith('$')), None)
+        if window_operator not in set_window_fields_operators:
+            raise OperationFailure(
+                    '%s is not a valid window operator for the aggregation '
+                    'pipeline. See https://www.mongodb.com/docs/manual/reference/'
+                    'operator/aggregation/setWindowFields/#std-label-setWindowFields-window-operators'
+                    'for a complete list of valid operators.' % window_operator)
+        if 'window' in field_value:
+            raise NotImplementedError(f'Although "window" is a valid field for $setWindowFields aggregator'
+                                      f'it is currently not implemented in Mongomock')
+        operator_value = field_value[window_operator]
+        if window_operator == '$shift':
+            if 'sortBy' not in options:
+                raise OperationFailure(f'The {window_operator} operator requires a "sortBy" field')
+            expr = operator_value['output']
+            by = operator_value['by']
+            default = operator_value.get('default')
+            values = [_parse_expression(expr, doc) for doc in partition]
+            for (index, item) in enumerate(partition):
+                doc_dict = dict(item)
+                by_index = index + by
+                if by_index < 0 or by_index >= len(values):
+                    value = default
+                else:
+                    value = values[by_index]
+                doc_dict[field] = value
+                processed_partition.append(doc_dict)
+        else:
+            raise NotImplementedError('Although %s is a valid window operator for the '
+                                      'aggregation pipeline, it is currently not implemented '
+                                      'in Mongomock.' % window_operator)
+    return processed_partition
+
+
 def _fix_sort_key(key_getter):
     def fixed_getter(doc):
         key = key_getter(doc)
@@ -1285,6 +1344,37 @@ def _handle_group_stage(in_collection, unused_database, options):
 
     return grouped_collection
 
+
+def _handle_set_window_fields_stage(in_collection, unused_database, options):
+    partition_key = options.get('partitionBy')
+    processed_partitions = []
+    if partition_key is not None:
+        def _key_getter(doc):
+            try:
+                return _parse_expression(partition_key, doc, ignore_missing_keys=True)
+            except KeyError:
+                return None
+
+        def _sort_key_getter(doc):
+            return filtering.BsonComparable(_key_getter(doc))
+
+        # Sort the collection only for the itertools.groupby.
+        # $setWindowFields does not order its output document.
+        sorted_collection = sorted(in_collection, key=_sort_key_getter)
+        partitions = itertools.groupby(sorted_collection, _key_getter)
+        partitions = [list(partition[1]) for partition in partitions]
+    else:
+        partitions = [in_collection]
+    sort = options.get('sortBy')
+    if sort is not None:
+        partitions = [_handle_sort_stage(partition, unused_database, sort) for partition in partitions]
+    output_fields = options.get('output')
+    if output_fields is None:
+        raise OperationFailure(f'The "output" field is required for $setWindowsFields')
+    for partition in partitions:
+        processed_partition = _accumulate_set_window_fields(output_fields, partition, options)
+        processed_partitions.append(processed_partition)
+    return list(itertools.chain(*processed_partitions))
 
 def _handle_bucket_stage(in_collection, unused_database, options):
     unknown_options = set(options) - {'groupBy', 'boundaries', 'output', 'default'}
@@ -1617,6 +1707,7 @@ _PIPELINE_HANDLERS = {
     '$geoNear': None,
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
+    '$setWindowFields': _handle_set_window_fields_stage,
     '$indexStats': None,
     '$limit': lambda c, d, o: c[:o],
     '$listLocalSessions': None,

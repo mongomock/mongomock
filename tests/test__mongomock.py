@@ -4203,6 +4203,117 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$addFields': {'c': 4}}])
         self.cmp.compare.aggregate([{'$addFields': {'b': {'$add': ['$a', '$b', 5]}}}])
 
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__set_window_fields_no_output(self):
+        self.cmp.do.drop()
+        self.cmp.compare_exceptions.aggregate([{
+            '$setWindowFields': {}
+        }])
+
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__set_window_fields_shift(self):
+        self.cmp.do.drop()
+        data = [
+            {
+                'type': 1,
+                'value': 15
+            },
+            {
+                'type': 1,
+                'value': 10
+            },
+            {
+                'type': 2,
+                'value': 20
+            },
+            {
+                'type': 2,
+                'value': 25
+            }
+        ]
+        self.cmp.do.insert_many(data)
+        self.cmp.compare.aggregate([{
+            '$setWindowFields': {
+                'partitionBy': "$type",
+                'sortBy': {'value': -1},
+                'output': {
+                    'out': {
+                        '$shift':  {
+                            'output': '$value',
+                            'by': 1,
+                            'default': 0
+                        }
+                    }
+                }
+            }
+        }])
+
+        # Test no sortBy field
+        self.cmp.compare_exceptions.aggregate([{
+            '$setWindowFields': {
+                'partitionBy': "$type",
+                'output': {
+                    'out': {
+                        '$shift':  {
+                            'output': '$value',
+                            'by': 1,
+                            'default': 0
+                        }
+                    }
+                }
+            }
+        }])
+
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__set_window_fields_partition_none(self):
+        self.cmp.do.drop()
+        data = [
+            {
+                'type': 1,
+                'value': 15
+            },
+            {
+                'type': 1,
+                'value': 10
+            },
+            {
+                'type': 2,
+                'value': 20
+            },
+            {
+                'type': 2,
+                'value': 25
+            }
+        ]
+        self.cmp.do.insert_many(data)
+        self.cmp.compare.aggregate([{
+            '$setWindowFields': {
+                'sortBy': {'value': -1},
+                'output': {
+                    'out': {
+                        '$shift':  {
+                            'output': '$value',
+                            'by': 1,
+                        }
+                    }
+                }
+            }
+        }])
+
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__set_window_fields_invalid_operator(self):
+        self.cmp.do.drop()
+        self.cmp.compare_exceptions.aggregate([{
+            '$setWindowFields': {
+                'output': {
+                    'out': {
+                        '$doesnt_exist':  {}
+                    }
+                }
+            }
+        }])
+
+
     def test__aggregate_with_missing_fields1(self):
         self.cmp.do.delete_many({})
 

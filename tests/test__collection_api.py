@@ -5302,6 +5302,111 @@ class CollectionAPITest(TestCase):
         ])
         self.assertCountEqual([{'_id': 1}, {'_id': 2}], list(actual))
 
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__aggregate_set_window_fields_basic(self):
+        collection = self.db.collection
+        collection.insert_one({'a': 1, 'b': 2})
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{
+                '$setWindowFields': {}
+            }])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{
+                '$setWindowFields': {
+                    'output': {
+                        'out': {
+                            '$doesnt_exist': {}
+                        }
+                    }
+                }
+            }])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{
+                '$setWindowFields': {
+                    'output': {
+                        'field': {'$sum': 1}
+                    }
+                }
+            }])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{
+                '$setWindowFields': {
+                    'sortBy': {'a': 1},
+                    'output': {
+                        'field': {
+                            '$shift': {
+                                'output': '$b',
+                                'by': 1
+                            },
+                            'window': {}
+                        }
+                    }
+                }
+            }])
+
+    @skipIf(SERVER_VERSION < version.parse('5.0'), "$setWindowFields is not supported before MongoDB 5.0")
+    def test__aggregate_set_window_fields_shift(self):
+        collection = self.db.collection
+        data = [
+            {
+                'type': 1,
+                'value': 15
+            },
+            {
+                'type': 1,
+                'value': 10
+            },
+            {
+                'type': 2,
+                'value': 20
+            },
+            {
+                'type': 2,
+                'value': 25
+            }
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate([{
+            '$setWindowFields': {
+                'partitionBy': "$type",
+                'sortBy': {'value': -1},
+                'output': {
+                    'out': {
+                        '$shift':  {
+                            'output': '$value',
+                            'by': 1,
+                            'default': 0
+                        }
+                    }
+                }
+            }
+        }, {'$project': {'_id': 0}}])
+        expected = [{'out': 10, 'type': 1, 'value': 15},
+                    {'out': 0, 'type': 1, 'value': 10},
+                    {'out': 20, 'type': 2, 'value': 25},
+                    {'out': 0, 'type': 2, 'value': 20}]
+        self.assertEqual(expected, list(actual))
+
+        # Test no sortBy field
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{
+                '$setWindowFields': {
+                    'partitionBy': "$type",
+                    'output': {
+                        'out': {
+                            '$shift':  {
+                                'output': '$value',
+                                'by': 1,
+                                'default': 0
+                            }
+                        }
+                    }
+                }
+            }])
+
     @skipIf(
         helpers.PYMONGO_VERSION >= version.parse('4.0'),
         'pymongo v4 or above do not specify uuid encoding')
