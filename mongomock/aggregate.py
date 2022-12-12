@@ -580,7 +580,8 @@ class _Parser(object):
     def _handle_date_operator(self, operator, values):
         if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
             value = self.parse(values['date'])
-            target_tz = pytz.timezone(values['timezone'])
+            tz = self.parse(values['timezone'])
+            target_tz = pytz.timezone(tz)
             out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
         else:
             out_value = self.parse(values)

@@ -3661,6 +3661,32 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_date_with_timezone_expression(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'start_date': datetime.datetime(2011, 11, 4, 0, 5, 23),
+            'info': {
+                'tmz': 'America/New_York'
+            }
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'year': {'$year': {
+                        'date': '$start_date', 'timezone': '$info.tmz'}
+                    },
+                    'week': {'$week': {
+                        'date': '$start_date', 'timezone': '$info.tmz'}
+                    },
+                    'dayOfWeek': {'$dayOfWeek': {
+                        'date': '$start_date', 'timezone': '$info.tmz'}
+                    },
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_add_fields(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many([
