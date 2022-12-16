@@ -16,7 +16,7 @@ try:
     from bson.codec_options import CodecOptions
 except ImportError:
     json_utils = SON = BSON = None
-    CodecOptions = type(None)
+    CodecOptions = None
 try:
     import execjs
 except ImportError:
@@ -77,7 +77,7 @@ _WITH_OPTIONS_KWARGS = {
 
 
 def _bson_encode(document, codec_options):
-    if isinstance(codec_options, CodecOptions):
+    if CodecOptions and isinstance(codec_options, CodecOptions):
         BSON.encode(document, check_keys=True, codec_options=codec_options)
     else:
         BSON.encode(document, check_keys=True)
