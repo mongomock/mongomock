@@ -77,8 +77,11 @@ _WITH_OPTIONS_KWARGS = {
 
 
 def _bson_encode(document, codec_options):
-    if CodecOptions and isinstance(codec_options, CodecOptions):
-        BSON.encode(document, check_keys=True, codec_options=codec_options)
+    if CodecOptions:
+        if isinstance(codec_options, mongomock_codec_options.CodecOptions):
+            codec_options = codec_options.to_pymongo()
+        if isinstance(codec_options, CodecOptions):
+            BSON.encode(document, check_keys=True, codec_options=codec_options)
     else:
         BSON.encode(document, check_keys=True)
 

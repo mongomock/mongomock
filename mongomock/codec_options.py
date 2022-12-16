@@ -76,6 +76,13 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
         opts.update(kwargs)
         return CodecOptions(**opts)
 
+    def to_pymongo(self):
+        if not codec_options:
+            return None
+        return codec_options.CodecOptions(
+            uuid_representation=self.uuid_representation,
+            unicode_decode_error_handler=self.unicode_decode_error_handler)
+
 
 def is_supported(custom_codec_options):
 
