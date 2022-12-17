@@ -7,8 +7,10 @@ from mongomock import helpers
 
 try:
     from bson import codec_options
+    from pymongo.common import _UUID_REPRESENTATIONS
 except ImportError:
     codec_options = None
+    _UUID_REPRESENTATIONS = None
 
 
 class TypeRegistry(object):
@@ -79,8 +81,13 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
     def to_pymongo(self):
         if not codec_options:
             return None
+
+        uuid_representation = self.uuid_representation
+        if _UUID_REPRESENTATIONS and isinstance(self.uuid_representation, str):
+            uuid_representation = _UUID_REPRESENTATIONS[uuid_representation]
+
         return codec_options.CodecOptions(
-            uuid_representation=self.uuid_representation,
+            uuid_representation=uuid_representation,
             unicode_decode_error_handler=self.unicode_decode_error_handler)
 
 
