@@ -3960,30 +3960,31 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
             {'_id': ObjectId(),
-             'a': { 'a': '1' }, 'b': {'c': '1', 'd': 2}},
+             'a': {'a': '1'}, 'b': {'c': '1', 'd': 2}},
             {'_id': ObjectId(),
-             'a': { 'a': '1' }, 'b': {'e': 3, 'f': '4'}},
+             'a': {'a': '1'}, 'b': {'e': 3, 'f': '4'}},
             {'_id': ObjectId(),
-             'a': { 'a': '1' }, 'c': '2'},
+             'a': {'a': '1'}, 'c': '2'},
             {'_id': ObjectId(),
-             'a': { 'a': '1' }, 'b': None},
+             'a': {'a': '1'}, 'b': None},
             {'_id': ObjectId(),
-             'a': { 'a': 2 }, 'b': None},
+             'a': {'a': 2}, 'b': None},
             {'_id': ObjectId(),
-             'a': { 'a': 2 }, 'b': {'c': None, 'd': 6}},
+             'a': {'a': 2}, 'b': {'c': None, 'd': 6}},
             {'_id': ObjectId(),
-             'a': { 'a': 2 }, 'b': {'c': '7', 'd': None, 'e': 9, 'f': '10'}},
+             'a': {'a': 2}, 'b': {'c': '7', 'd': None, 'e': 9, 'f': '10'}},
             {'_id': ObjectId(),
-             'a': { 'a': 3 }, 'b': None},
+             'a': {'a': 3}, 'b': None},
             {'_id': ObjectId(),
-             'a': { 'a': 3 }, 'b': dict()},
+             'a': {'a': 3}, 'b': dict()},
             {'_id': ObjectId(),
-             'a': { 'a': 4 }, 'b': None},
+             'a': {'a': 4}, 'b': None},
         ])
         pipeline = [
-            { '$replaceRoot': { 'newRoot': { '$mergeObjects': [ '$a', '$b' ] } } }
+            {'$replaceRoot': {'newRoot': {'$mergeObjects': ['$a', '$b']}}}
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

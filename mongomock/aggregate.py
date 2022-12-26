@@ -949,8 +949,9 @@ class _Parser(object):
         if operator == "$mergeObjects":
             values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
             return _merge_objects_operation(values)
-        
-        raise NotImplementedError(
+
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError( # pragma: no cover
             "Although '%s' is a valid object operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
