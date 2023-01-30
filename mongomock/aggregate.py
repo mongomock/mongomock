@@ -60,13 +60,14 @@ unary_arithmetic_operators = {
     '$sqrt',
     '$trunc',
 }
+binary_arithmetic_operators_with_optional_second_number = {'$round'}
 binary_arithmetic_operators = {
     '$divide',
     '$log',
     '$mod',
     '$pow',
     '$subtract',
-}
+} | binary_arithmetic_operators_with_optional_second_number
 arithmetic_operators = unary_arithmetic_operators | binary_arithmetic_operators | {
     '$add',
     '$multiply',
@@ -366,10 +367,16 @@ class _Parser(object):
                     "Parameter to %s must evaluate to a list, got '%s'" %
                     (operator, type(values)))
 
-            if len(values) != 2:
-                raise OperationFailure('%s must have only 2 parameters' % operator)
-            number_0, number_1 = self.parse_many(values)
-            if number_0 is None or number_1 is None:
+            supports_optional_number_2 = operator in binary_arithmetic_operators_with_optional_second_number
+            if supports_optional_number_2:
+                if len(values) not in [1, 2]:
+                    raise OperationFailure('%s must have 1 or 2 parameters' % operator)
+            else:
+                if len(values) != 2:
+                    raise OperationFailure('%s must have only 2 parameters' % operator)
+
+            number_0, number_1, *_unused_ = list(self.parse_many(values)) + [None] * 2
+            if number_0 is None or (number_1 is None and not supports_optional_number_2):
                 return None
 
             if operator == '$divide':
@@ -380,6 +387,8 @@ class _Parser(object):
                 return math.fmod(number_0, number_1)
             if operator == '$pow':
                 return math.pow(number_0, number_1)
+            if operator == '$round':
+                return round(number_0, number_1)
             if operator == '$subtract':
                 if isinstance(number_0, datetime.datetime) and \
                         isinstance(number_1, (int, float)):
