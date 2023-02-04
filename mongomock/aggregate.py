@@ -9,13 +9,16 @@ import functools
 import itertools
 import math
 import numbers
+from packaging import version
 import random
 import re
 import sys
 import warnings
 
+import pytz
 from sentinels import NOTHING
 
+import mongomock
 from mongomock import command_cursor
 from mongomock import filtering
 from mongomock import helpers
@@ -47,23 +50,27 @@ group_operators = [
     '$stdDevSamp',
     '$sum',
 ]
-arithmetic_operators = [
+unary_arithmetic_operators = {
     '$abs',
-    '$add',
     '$ceil',
-    '$divide',
     '$exp',
     '$floor',
     '$ln',
-    '$log',
     '$log10',
-    '$mod',
-    '$multiply',
-    '$pow',
     '$sqrt',
-    '$subtract',
     '$trunc',
-]
+}
+binary_arithmetic_operators = {
+    '$divide',
+    '$log',
+    '$mod',
+    '$pow',
+    '$subtract',
+}
+arithmetic_operators = unary_arithmetic_operators | binary_arithmetic_operators | {
+    '$add',
+    '$multiply',
+}
 project_operators = [
     '$max',
     '$min',
@@ -85,6 +92,7 @@ projection_operators = [
 date_operators = [
     '$dateFromString',
     '$dateToString',
+    '$dateFromParts',
     '$dayOfMonth',
     '$dayOfWeek',
     '$dayOfYear',
@@ -104,7 +112,6 @@ array_operators = [
     '$concatArrays',
     '$filter',
     '$indexOfArray',
-    '$isArray',
     '$map',
     '$range',
     '$reduce',
@@ -158,6 +165,10 @@ type_convertion_operators = [
     '$toLong',
     '$arrayToObject',
     '$objectToArray',
+]
+type_operators = [
+    '$isNumber',
+    '$isArray',
 ]
 
 
@@ -252,6 +263,8 @@ class _Parser(object):
                 return self._handle_string_operator(k, v)
             if k in type_convertion_operators:
                 return self._handle_type_convertion_operator(k, v)
+            if k in type_operators:
+                return self._handle_type_operator(k, v)
             if k in boolean_operators:
                 return self._handle_boolean_operator(k, v)
             if k in object_operators:
@@ -301,7 +314,7 @@ class _Parser(object):
                 return helpers.get_value_by_dot(dict({
                     'ROOT': self._doc_dict,
                     'CURRENT': self._doc_dict,
-                }, **self._user_vars), expression[2:])
+                }, **self._user_vars), expression[2:], can_generate_array=True)
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
 
@@ -320,51 +333,78 @@ class _Parser(object):
         )
 
     def _handle_arithmetic_operator(self, operator, values):
-        if operator == '$abs':
-            return abs(self.parse(values))
+        if operator in unary_arithmetic_operators:
+            try:
+                number = self.parse(values)
+            except KeyError:
+                return None
+            if number is None:
+                return None
+            if not isinstance(number, numbers.Number):
+                raise OperationFailure(
+                    "Parameter to %s must evaluate to a number, got '%s'" %
+                    (operator, type(number)))
+
+            if operator == '$abs':
+                return abs(number)
+            if operator == '$ceil':
+                return math.ceil(number)
+            if operator == '$exp':
+                return math.exp(number)
+            if operator == '$floor':
+                return math.floor(number)
+            if operator == '$ln':
+                return math.log(number)
+            if operator == '$log10':
+                return math.log10(number)
+            if operator == '$sqrt':
+                return math.sqrt(number)
+            if operator == '$trunc':
+                return math.trunc(number)
+
+        if operator in binary_arithmetic_operators:
+            if not isinstance(values, (tuple, list)):
+                raise OperationFailure(
+                    "Parameter to %s must evaluate to a list, got '%s'" %
+                    (operator, type(values)))
+
+            if len(values) != 2:
+                raise OperationFailure('%s must have only 2 parameters' % operator)
+            number_0, number_1 = self.parse_many(values)
+            if number_0 is None or number_1 is None:
+                return None
+
+            if operator == '$divide':
+                return number_0 / number_1
+            if operator == '$log':
+                return math.log(number_0, number_1)
+            if operator == '$mod':
+                return math.fmod(number_0, number_1)
+            if operator == '$pow':
+                return math.pow(number_0, number_1)
+            if operator == '$subtract':
+                if isinstance(number_0, datetime.datetime) and \
+                        isinstance(number_1, (int, float)):
+                    number_1 = datetime.timedelta(milliseconds=number_1)
+                res = number_0 - number_1
+                if isinstance(res, datetime.timedelta):
+                    return round(res.total_seconds() * 1000)
+                return res
+
+        assert isinstance(values, (tuple, list)), \
+            "Parameter to %s must evaluate to a list, got '%s'" % (operator, type(values))
+
+        parsed_values = list(self.parse_many(values))
+        assert parsed_values, '%s must have at least one parameter' % operator
+        for value in parsed_values:
+            if value is None:
+                return None
+            assert isinstance(value, numbers.Number), '%s only uses numbers' % operator
         if operator == '$add':
-            return sum(self.parse(value) for value in values)
-        if operator == '$ceil':
-            return math.ceil(self.parse(values))
-        if operator == '$divide':
-            assert len(values) == 2, 'divide must have only 2 items'
-            return self.parse(values[0]) / self.parse(values[1])
-        if operator == '$exp':
-            return math.exp(self.parse(values))
-        if operator == '$floor':
-            return math.floor(self.parse(values))
-        if operator == '$ln':
-            return math.log(self.parse(values))
-        if operator == '$log':
-            assert len(values) == 2, 'log must have only 2 items'
-            return math.log(self.parse(values[0]), self.parse(values[1]))
-        if operator == '$log10':
-            return math.log10(self.parse(values))
-        if operator == '$mod':
-            assert len(values) == 2, 'mod must have only 2 items'
-            return math.fmod(self.parse(values[0]), self.parse(values[1]))
+            return sum(parsed_values)
         if operator == '$multiply':
-            return functools.reduce(
-                lambda x, y: x * y,
-                (self.parse(value) for value in values))
-        if operator == '$pow':
-            assert len(values) == 2, 'pow must have only 2 items'
-            return math.pow(self.parse(values[0]), self.parse(values[1]))
-        if operator == '$sqrt':
-            return math.sqrt(self.parse(values))
-        if operator == '$subtract':
-            assert len(values) == 2, 'subtract must have only 2 items'
-            value_0 = self.parse(values[0])
-            value_1 = self.parse(values[1])
-            if isinstance(value_0, datetime.datetime) and \
-                    isinstance(value_1, (int, float)):
-                value_1 = datetime.timedelta(milliseconds=value_1)
-            res = value_0 - value_1
-            if isinstance(res, datetime.timedelta):
-                return round(res.total_seconds() * 1000)
-            return res
-        if operator == '$trunc':
-            return math.trunc(self.parse(values))
+            return functools.reduce(lambda x, y: x * y, parsed_values)
+
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             "Although '%s' is a valid aritmetic operator for the aggregation "
@@ -376,7 +416,7 @@ class _Parser(object):
             return _GROUPING_OPERATOR_MAP[operator](values)
         if operator == '$arrayElemAt':
             key, value = values
-            array = self._parse_basic_expression(key)
+            array = self.parse(key)
             index = self.parse(value)
             try:
                 return array[index]
@@ -540,7 +580,13 @@ class _Parser(object):
             'pipeline, it is currently not implemented  in Mongomock.' % operator)
 
     def _handle_date_operator(self, operator, values):
-        out_value = self.parse(values)
+        if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
+            value = self.parse(values['date'])
+            target_tz = pytz.timezone(values['timezone'])
+            out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
+        else:
+            out_value = self.parse(values)
+
         if operator == '$dayOfYear':
             return out_value.timetuple().tm_yday
         if operator == '$dayOfMonth':
@@ -591,6 +637,42 @@ class _Parser(object):
                     ' in Mongomock.'
                 )
             return out_value['date'].strftime(out_value['format'])
+        if operator == '$dateFromParts':
+            if not isinstance(out_value, dict):
+                raise OperationFailure(
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
+                )
+            if len(set(out_value) & {'year', 'isoWeekYear'}) != 1:
+                raise OperationFailure(
+                    f'{operator} operator must correspond a dict '
+                    'that has "year" or "isoWeekYear" field.'
+                )
+            for field in ('isoWeekYear', 'isoWeek', 'isoDayOfWeek', 'timezone'):
+                if field in out_value:
+                    raise NotImplementedError(
+                        f'Although {field} is a valid field for the '
+                        f'{operator} operator, it is currently not implemented '
+                        'in Mongomock.'
+                    )
+
+            year = out_value['year']
+            month = out_value.get('month', 1) or 1
+            day = out_value.get('day', 1) or 1
+            hour = out_value.get('hour', 0) or 0
+            minute = out_value.get('minute', 0) or 0
+            second = out_value.get('second', 0) or 0
+            millisecond = out_value.get('millisecond', 0) or 0
+
+            return datetime.datetime(
+                year=year,
+                month=month,
+                day=day,
+                hour=hour,
+                minute=minute,
+                second=second,
+                microsecond=millisecond
+            )
 
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
@@ -847,15 +929,43 @@ class _Parser(object):
             'aggregation pipeline, it is currently not implemented '
             'in Mongomock.' % operator)
 
+    def _handle_type_operator(self, operator, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
+        if operator == '$isNumber':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return False
+            return False if isinstance(parsed, bool) else isinstance(parsed, numbers.Number)
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isArray/
+        if operator == '$isArray':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return False
+            return isinstance(parsed, (tuple, list))
+
+        raise NotImplementedError(  # pragma: no cover
+            "Although '%s' is a valid type operator for the aggregation pipeline, it is currently "
+            'not implemented in Mongomock.' % operator)
+
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
-            field, fallback = values
-            try:
-                out_value = self.parse(field)
-                if out_value is not None:
-                    return out_value
-            except KeyError:
-                pass
+            fields = values[:-1]
+            if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
+                raise OperationFailure(
+                    '$ifNull supports only one input expression '
+                    ' in MongoDB v4.4 and lower'
+                )
+            fallback = values[-1]
+            for field in fields:
+                try:
+                    out_value = self.parse(field)
+                    if out_value is not None:
+                        return out_value
+                except KeyError:
+                    pass
             return self.parse(fallback)
         if operator == '$cond':
             if isinstance(values, list):
@@ -1165,7 +1275,7 @@ def _handle_group_stage(in_collection, unused_database, options):
 
         def _key_getter(doc):
             try:
-                return _parse_expression(_id, doc)
+                return _parse_expression(_id, doc, ignore_missing_keys=True)
             except KeyError:
                 return None
 

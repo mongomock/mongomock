@@ -22,9 +22,11 @@ try:
     from bson.objectid import ObjectId
     import pymongo
     from pymongo import MongoClient as PymongoClient
+    from pymongo import read_concern
     from pymongo.read_preferences import ReadPreference
 except ImportError:
     from mongomock.object_id import ObjectId
+    from mongomock import read_concern
     from tests.utils import DBRef
 try:
     from bson.code import Code
@@ -88,6 +90,11 @@ class DatabaseGettingTest(TestCase):
         super(DatabaseGettingTest, self).setUp()
         self.client = mongomock.MongoClient()
 
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__get_database_read_concern(self):
+        db = self.client.get_database('a', read_concern=read_concern.ReadConcern('majority'))
+        self.assertEqual('majority', db.read_concern.level)
+
     def test__getting_database_via_getattr(self):
         db1 = self.client.some_database_here
         db2 = self.client.some_database_here
@@ -120,6 +127,15 @@ class DatabaseGettingTest(TestCase):
         self.assertEqual(collection.count_documents({'_id': doc_id}), 1)
 
         self.client.drop_database(db)
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
+
+    def test__drop_database_system_collection(self):
+        db = self.client.a
+        collection = db['system.foo']
+        doc_id = collection.insert_one({'aa': 'bb'}).inserted_id
+        self.assertEqual(collection.count_documents({'_id': doc_id}), 1)
+
+        self.client.drop_database('a')
         self.assertEqual(collection.count_documents({'_id': doc_id}), 0)
 
     def test__drop_database_indexes(self):
@@ -1054,6 +1070,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             'int',
             'long',
             'decimal',
+            'number',
         )
         self.cmp.do.insert_many([
             {'a': 1.2},  # double
@@ -1605,6 +1622,15 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'$setOnInsert': {'data.$.age': 1}}, True)
         self.cmp.compare.find()
 
+    def test__set_dollar_operand(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_one({'recordId': 1234, 'app': [
+            {'application': 'AppName', 'code': 1234, 'property': 'oldValue'},
+            {'application': 'AppName1', 'code': 1235, 'property': 'oldValue1'}]})
+        self.cmp.do.update_many(
+            {'app': {'$elemMatch': {'application': 'AppName', 'code': 1234}}},
+            {'$set': {'app.$': {'application': 'AppName', 'code': 1234, 'property': 'newValue'}}})
+
     def test__addToSet(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_one({'name': 'bob'})
@@ -1640,6 +1666,13 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 {'name': 'bob'},
                 {'$addToSet': {'shirt.color': {'$each': ['green', 'yellow']}}})
             self.cmp.compare.find({'name': 'bob'})
+
+    def test__addToSet_dollar_operand(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_one({'takes': [{'a': 2, 'tags': []}, {'a': 1, 'tags': [2]}]})
+        self.cmp.do.update_many(
+            {'takes': {'$elemMatch': {'a': 1}}},
+            {'$addToSet': {'takes.$.tags': 3}})
 
     def test__pop(self):
         self.cmp.do.delete_many({})
@@ -1784,20 +1817,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.update_many({'name': 'bob'}, {'$pullAll': {'hat': ['green']}})
         self.cmp.compare.find({'name': 'bob'})
 
-    def test__pullAll_nested_dict(self):
+    def test__pullAll_dollar_operand(self):
         self.cmp.do.delete_many({})
-        self.cmp.do.insert_one(
-            {'name': 'bob', 'hat': {'properties': {'sizes': ['M', 'L', 'XL']}}})
+        self.cmp.do.insert_one({'name': 'bob', 'takes': [
+            {'a': 1, 'tags': [0, 1, 2, 4]},
+            {'a': 2, 'tags': [0, 1, 2, 4]},
+            {'a': 1, 'tags': [0, 1, 4]},
+            {'a': 1, 'tags': [2, 3, 5]}]})
         self.cmp.do.update_many(
-            {'name': 'bob'}, {'$pullAll': {'hat.properties.sizes': ['M']}})
-        self.cmp.compare.find({'name': 'bob'})
-
-        self.cmp.do.delete_many({})
-        self.cmp.do.insert_one(
-            {'name': 'bob', 'hat': {'properties': {'sizes': ['M', 'L', 'XL']}}})
-        self.cmp.do.update_many(
-            {'name': 'bob'},
-            {'$pullAll': {'hat.properties.sizes': ['M', 'L']}})
+            {'name': 'bob', 'takes': {'$elemMatch': {'a': 1}}},
+            {'$pullAll': {'takes.$.tags': [1, 2, 3]}})
         self.cmp.compare.find({'name': 'bob'})
 
     def test__push(self):
@@ -2093,6 +2122,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.group(['a'], {'a': {'$lt': 3}}, {'count': 0}, Code('''
             function(cur, result) { result.count += cur.count }
         '''))
+
+    def test__aggregate_system_variables_generate_array(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one(
+            {'name': 'foo', 'errors': [
+                {'error_type': 1, 'description': 'problem 1'},
+                {'error_type': 2, 'description': 'problem 2'}]})
+        self.cmp.compare.aggregate([{'$project': {'error_type': '$$ROOT.errors.error_type'}}])
 
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
@@ -3072,6 +3109,73 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$count': 'my_count'}
         ])
 
+    def test__aggregate_if_null(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        self.cmp.compare.aggregate([
+            {
+                '$project': {
+                    'a': {'$ifNull': ['$elem_a', '<missing_a>']},
+                    'b': {'$ifNull': ['$elem_b', '<missing_b>']},
+                }
+            }
+        ])
+
+    def test__aggregate_if_null_multi_field(self):
+        self.cmp.do.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        # Multiple input expressions in $ifNull are not supported in MongoDB v4.4 and earlier.
+        if SERVER_VERSION > version.parse('4.4'):
+            compare = self.cmp.compare
+        else:
+            compare = self.cmp.compare_exceptions
+        compare.aggregate([
+            {
+                '$project': {
+                    'a_and_b': {'$ifNull': ['$elem_a', '$elem_b', '<missing_both>']},
+                    'b_and_a': {'$ifNull': ['$elem_b', '$elem_a', '<missing_both>']},
+                    'b_and_c': {'$ifNull': ['$elem_b', '$elem_c', '<missing_both>']},
+                }
+            }
+        ])
+
+    def test__aggregate_is_number(self):
+        self.cmp.do.insert_one(
+            {'_id': 1, 'int': 3, 'big_int': 3 ** 10, 'negative': -3,
+             'str': 'not_a_number', 'str_numeric': '3', 'float': 3.3,
+             'negative_float': -3.3, 'bool': True, 'none': None})
+        self.cmp.compare.aggregate([
+            {'$project': {
+                '_id': False, 'int': {'$isNumber': '$int'},
+                'big_int': {'$isNumber': '$big_int'},
+                'negative': {'$isNumber': '$negative'},
+                'str': {'$isNumber': '$str'},
+                'str_numeric': {'$isNumber': '$str_numeric'},
+                'float': {'$isNumber': '$float'},
+                'negative_float': {'$isNumber': '$negative_float'},
+                'bool': {'$isNumber': '$bool'},
+                'none': {'$isNumber': '$none'},
+            }}
+        ])
+
+    def test__aggregate_is_array(self):
+        self.cmp.do.insert_one(
+            {
+                '_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3),
+                'empty_list': [], 'empty_tuple': (),
+                'int': 3, 'str': '123', 'bool': True, 'none': None
+            })
+        self.cmp.compare.aggregate([
+            {'$project':
+                {
+                    '_id': False,
+                    'list': {'$isArray': '$list'}, 'tuple': {'$isArray': '$tuple'},
+                    'empty_list': {'$isArray': '$empty_list'},
+                    'empty_tuple': {'$isArray': '$empty_tuple'},
+                    'int': {'$isArray': '$int'}, 'str': {'$isArray': '$str'},
+                    'bool': {'$isArray': '$bool'},
+                    'none': {'$isArray': '$none'}
+                }}
+        ])
+
     def test__aggregate_facet(self):
         self.cmp.do.insert_many([
             {'_id': i} for i in range(5)
@@ -3399,6 +3503,39 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         }}])
 
+    def test__aggregate_filter_in_arrayElemAt(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([
+            {
+                '_id': 0,
+                'items': [
+                    {'item_id': 11, 'category': 'book'},
+                    {'item_id': 234, 'category': 'journal'}
+                ]
+            },
+            {
+                '_id': 1,
+                'items': [
+                    {'item_id': 23, 'category': 'book'}
+                ]
+            },
+            {
+                '_id': 2,
+                'items': [
+                    {'item_id': 232, 'category': 'book'}
+                ]
+            }
+        ])
+        self.cmp.compare.aggregate([{'$project': {'item': {
+            '$arrayElemAt': [
+                {'$filter': {
+                    'input': '$items',
+                    'cond': {'$eq': ['$$this.category', 'book']}
+                }},
+                0
+            ]
+        }}}])
+
     def test__aggregate_slice(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([
@@ -3501,6 +3638,29 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         })
         self.cmp.compare.find_one()
 
+    def test_aggregate_date_with_timezone(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'start_date': datetime.datetime(2011, 11, 4, 0, 5, 23)
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'year': {'$year': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
+                    'week': {'$week': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
+                    'dayOfWeek': {'$dayOfWeek': {
+                        'date': '$start_date', 'timezone': 'America/New_York'}
+                    },
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_add_fields(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many([
@@ -3533,6 +3693,40 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }}
         ]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate36(self):
+        self.cmp.compare.aggregate([{'$project': {'c': {'$abs': -2}}}])
+        self.cmp.compare.aggregate([{'$project': {'d': {'$floor': 2.3}}}])
+        self.cmp.compare.aggregate([{'$project': {'e': {'$ln': None}}}])
+        self.cmp.compare.aggregate([{'$project': {'f': {'$exp': '$non_existent_key'}}}])
+        self.cmp.compare.aggregate([{'$project': {'g': {'$divide': [7, 3]}}}])
+        self.cmp.compare.aggregate([{'$project': {'h': {'$log': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'i': {'$mod': [1, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'j': {'$pow': [None, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'k': {'$subtract': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'k': {'$subtract': ['$non_existent_key', 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'o': {'$multiply': [4]}}}])
+        self.cmp.compare.aggregate([{'$project': {'p': {'$add': [1, 2, 3]}}}])
+        self.cmp.compare.aggregate([{'$project': {'s': {'$multiply': [1, None]}}}])
+        self.cmp.compare.aggregate([{'$project': {'t': {'$add': [None, 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'u': {'$multiply': ['$a', '$b', 4]}}}])
+
+    def test__aggregate_exception(self):
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$abs': [-2, 4]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$floor': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$divide': 5}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$log': [5]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$mod': [5, 3, 1]}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$sum': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$multiply': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'n': {'$add': '$a'}}}])
+        self.cmp.compare_exceptions.aggregate(
+            [{'$project': {'q': {'$multiply': [1, '$non_existent_key']}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'r': {'$add': '$non_existent_key'}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'v': {'$multiply': '$b'}}}])
+        # TODO(pascal): Enable this test, for now it's not the same kind of error.
+        # self.cmp.compare_exceptions.aggregate(
+        #     [{'$project': {'c': {'$add': ['$date', 1, '$date']}}}])
 
     def test__aggregate_add_fields_with_sum_avg(self):
         self.cmp.do.delete_many({})
@@ -3678,6 +3872,28 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_date_from_parts(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'start_date': datetime.datetime(2022, 8, 3, 16, 6, 0)
+        })
+
+        additional_fields_pipeline = [
+            {
+                '$addFields': {
+                    'start_date': {
+                        '$dateFromParts': {
+                            'year': {'$year': '$start_date'},
+                            'month': {'$month': '$start_date'},
+                            'day': {'$dayOfMonth': '$start_date'},
+                        }
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(additional_fields_pipeline)
+
     def test_aggregate_array_to_object(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([{
@@ -3755,6 +3971,32 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.create_index([('value', 1)])
         self.cmp.do.create_index([('value', 1)])
         self.cmp.compare_exceptions.create_index([('value', 1)], unique=True)
+
+    def test__partial_filter_expression_unique_index(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.create_index(
+            (('value', 1), ('partialFilterExpression_value', 1)), unique=True,
+            partialFilterExpression={'partialFilterExpression_value': {'$exists': True}})
+
+        # We should be able to add documents with duplicated `value` if
+        # partialFilterExpression_value isn't set.
+        self.cmp.do.insert_one({'value': 4})
+        self.cmp.do.insert_one({'value': 4})
+        self.cmp.compare.find({'value': 4})
+
+        # We should be able to add documents with distinct `value` values and duplicated
+        # `partialFilterExpression_value` value.
+        self.cmp.do.insert_one({'partialFilterExpression_value': 1, 'value': 2})
+        self.cmp.do.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+        self.cmp.compare.find({'partialFilterExpression_value': 1})
+
+        # We should not be able to add documents with duplicated `partialFilterExpression_value`
+        # and `value` values.
+        self.cmp.do.insert_one({'partialFilterExpression_value': 2, 'value': 3})
+        self.cmp.compare_exceptions.insert_one({'partialFilterExpression_value': 2, 'value': 3})
+        self.cmp.compare.find({'partialFilterExpression_value': 2, 'value': 3})
+
+        self.cmp.compare.find({})
 
     def test_aggregate_project_with_boolean(self):
         self.cmp.do.drop()
@@ -3984,7 +4226,82 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$replaceRoot': {'newRoot': {'$mergeObjects': ['$a', '$b']}}}
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
+        
+    def test__add_fields(self):
+        self.cmp.compare.aggregate([{'$addFields': {'c': 3}}])
+        self.cmp.compare.aggregate([{'$addFields': {'c': 4}}])
+        self.cmp.compare.aggregate([{'$addFields': {'b': {'$add': ['$a', '$b', 5]}}}])
 
+    def test__aggregate_with_missing_fields1(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0, 'b': 1},
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': '$a', 'b': {'$sum': '$b'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields1(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0, 'b': 0},
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId(), 'b': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': {'a': '$a', 'b': '$b'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields2(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': {'a': '$a'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__group_with_missing_fields3(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': ObjectId(), 'a': 0},
+            {'_id': ObjectId()},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$group': {'_id': '$a'}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__add_fields_with_missing_fields(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'a': 0},
+            {},
+        ]
+        self.cmp.do.insert_many(data)
+
+        pipeline = [
+            {'$addFields': {'b': '$a'}},
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

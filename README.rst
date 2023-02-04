@@ -160,6 +160,12 @@ Similarly, if you'd like to run tox against a specific environment in the contai
 
  docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs
 
+If you'd like to run only one test, you can also add the test name at the end of your command:
+
+.. code-block:: bash
+
+ docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs tests.test__mongomock.MongoClientCollectionTest.test__aggregate_system_variables_generate_array
+
 NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
 you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
 the intended version.
@@ -185,6 +191,21 @@ Branching model
 The branching model used for this project follows the `gitflow workflow`_.  This means that pull requests
 should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
 the legacy 2.x branch then your pull request should go into the `support/2.x` branch.
+
+Releasing
+~~~~~~~~~
+
+When ready for a release, tag the `develop` branch with a new tag (please keep semver names) and
+push your tags to GitHub. The CI should do the rest.
+
+To add release notes, create a release in GitHub's `Releases Page <https://github.com/mongomock/mongomock/releases>`_
+then generate the release notes locally with:
+
+.. code-block:: bash
+
+python3 -c "from pbr import git; git.write_git_changelog()"
+
+Then you can get the relevant section in the generated `Changelog` file.
 
 Acknowledgements
 ----------------

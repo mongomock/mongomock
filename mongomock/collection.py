@@ -533,6 +533,7 @@ class Collection(object):
                 continue
             unique = index.get('key')
             is_sparse = index.get('sparse')
+            partial_filter_expression = index.get('partialFilterExpression')
             find_kwargs = {}
             for key, _ in unique:
                 try:
@@ -541,6 +542,8 @@ class Collection(object):
                     find_kwargs[key] = None
             if is_sparse and set(find_kwargs.values()) == {None}:
                 continue
+            if partial_filter_expression is not None:
+                find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
             answer_count = len(list(self._iter_documents(find_kwargs)))
             if answer_count > 1:
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
@@ -710,10 +713,16 @@ class Collection(object):
                             # create nested attributes if they do not exist
                             subdocument = existing_document
                             for field_part in nested_field_list[:-1]:
+                                if field_part == '$':
+                                    break
                                 if field_part not in subdocument:
                                     subdocument[field_part] = {}
 
                                 subdocument = subdocument[field_part]
+
+                            # get subdocument with $ oprator support
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
 
                             # we're pushing a list
                             push_results = []
@@ -791,11 +800,8 @@ class Collection(object):
                                     obj for obj in arr if obj not in value]
                             continue
                         else:
-                            subdocument = existing_document
-                            for nested_field in nested_field_list[:-1]:
-                                if nested_field not in subdocument:
-                                    break
-                                subdocument = subdocument[nested_field]
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list)
 
                             if nested_field_list[-1] in subdocument:
                                 arr = subdocument[nested_field_list[-1]]
@@ -1018,7 +1024,7 @@ class Collection(object):
              no_cursor_timeout=False, cursor_type=None, sort=None,
              allow_partial_results=False, oplog_replay=False, modifiers=None,
              batch_size=0, manipulate=True, collation=None, session=None,
-             max_time_ms=None, **kwargs):
+             max_time_ms=None, allow_disk_use=False, **kwargs):
         spec = filter
         if spec is None:
             spec = {}
@@ -1027,7 +1033,7 @@ class Collection(object):
             if value:
                 raise OperationFailure("Unrecognized field '%s'" % kwarg)
         return Cursor(self, spec, sort, projection, skip, limit,
-                      collation=collation).max_time_ms(max_time_ms)
+                      collation=collation).max_time_ms(max_time_ms).allow_disk_use(allow_disk_use)
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = self._iter_documents(spec)
@@ -1195,9 +1201,9 @@ class Collection(object):
                     subspec = spec
                     for part in field_name_parts[:-1]:
                         if part == '$':
-                            subspec = subspec.get('$elemMatch', subspec)
+                            subspec_dollar = subspec.get('$elemMatch', subspec)
                             for item in current_doc:
-                                if filter_applies(subspec, item):
+                                if filter_applies(subspec_dollar, item):
                                     current_doc = item
                                     break
                             continue
@@ -1216,7 +1222,8 @@ class Collection(object):
                     subdocument = current_doc
                     if field_name_parts[-1] == '$' and isinstance(subdocument, list):
                         for i, doc in enumerate(subdocument):
-                            if filter_applies(subspec, doc):
+                            subspec_dollar = subspec.get('$elemMatch', subspec)
+                            if filter_applies(subspec_dollar, doc):
                                 subdocument[i] = v
                                 break
                         continue
@@ -1488,6 +1495,8 @@ class Collection(object):
             index_dict['unique'] = True
         if 'expireAfterSeconds' in kwargs and kwargs['expireAfterSeconds'] is not None:
             index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
+        if 'partialFilterExpression' in kwargs and kwargs['partialFilterExpression'] is not None:
+            index_dict['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
 
         existing_index = self._store.indexes.get(index_name)
         if existing_index and index_dict != existing_index:
@@ -1818,7 +1827,7 @@ class Collection(object):
             cursor_type=None, sort=None, allow_partial_results=False,
             oplog_replay=False, modifiers=None, batch_size=0, manipulate=True, collation=None,
             hint=None, max_scan=None, max_time_ms=None, max=None, min=None, return_key=False,
-            how_record_id=False, snapshot=False, comment=None):
+            how_record_id=False, snapshot=False, comment=None, allow_disk_use=False):
         raise NotImplementedError('find_raw_batches method is not implemented in mongomock yet')
 
     def aggregate_raw_batches(self, pipeline, **kwargs):
@@ -1994,6 +2003,11 @@ class Cursor(object):
         if max_time_ms is not None and not isinstance(max_time_ms, int):
             raise TypeError('max_time_ms must be an integer or None')
         # Currently the value is ignored as mongomock never times out.
+        return self
+
+    def allow_disk_use(self, allow_disk_use=False):
+        if allow_disk_use is not None and not isinstance(allow_disk_use, bool):
+            raise TypeError('allow_disk_use must be a bool')
         return self
 
 

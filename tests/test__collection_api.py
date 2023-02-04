@@ -45,6 +45,7 @@ except ImportError:
 
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
+SERVER_VERSION = version.parse(mongomock.SERVER_VERSION)
 
 
 class UTCPlus2(tzinfo):
@@ -1610,6 +1611,29 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_one({'c': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 5)
+
+    def test__ensure_partial_filter_expression_unique_index(self):
+        self.db.collection.delete_many({})
+        self.db.collection.create_index(
+            (('partialFilterExpression_value', 1), ('value', 1)),
+            unique=True, partialFilterExpression={'partialFilterExpression_value': {'$eq': 1}})
+
+        # We should be able to add documents with duplicated `value` and
+        # `partialFilterExpression_value` if `partialFilterExpression_value` isn't set to 1
+        self.db.collection.insert_one({'partialFilterExpression_value': 3, 'value': 4})
+        self.db.collection.insert_one({'partialFilterExpression_value': 3, 'value': 4})
+
+        # We should be able to add documents with distinct `value` values and duplicated
+        # `partialFilterExpression_value` value set to 1.
+        self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 2})
+        self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+
+        # We should not be able to add documents with duplicated `partialFilterExpression_value` and
+        # `value` values if `partialFilterExpression_value` is 1.
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
+
+        self.assertEqual(self.db.collection.count_documents({}), 4)
 
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -3837,6 +3861,41 @@ class CollectionAPITest(TestCase):
         ])
         self.assertEqual([{'a': '<present_a>', 'b': '<missing_b>'}], list(actual))
 
+    @skipIf(
+        SERVER_VERSION > version.parse('4.4'),
+        'multiple input expressions in $ifNull are not supported in MongoDB v4.4 and earlier')
+    def test__aggregate_project_if_null_multi_field_not_supported(self):
+        self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {'$match': {'_id': 1}},
+                {'$project': collections.OrderedDict([
+                    ('_id', False),
+                    ('a_and_b', {'$ifNull': ['$elem_a', '$elem_b', '<missing_both>']}),
+                    ('b_and_a', {'$ifNull': ['$elem_b', '$elem_a', '<missing_both>']}),
+                    ('b_and_c', {'$ifNull': ['$elem_b', '$elem_c', '<missing_both>']}),
+                ])}
+            ])
+
+    @skipIf(
+        SERVER_VERSION <= version.parse('4.4'),
+        'multiple input expressions in $ifNull are not supported in MongoDB v4.4 and earlier')
+    def test__aggregate_project_if_null_multi_field(self):
+        self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
+        actual = list(self.db.collection.aggregate([
+            {'$match': {'_id': 1}},
+            {'$project': collections.OrderedDict([
+                ('_id', False),
+                ('a_and_b', {'$ifNull': ['$elem_a', '$elem_b', '<missing_both>']}),
+                ('b_and_a', {'$ifNull': ['$elem_b', '$elem_a', '<missing_both>']}),
+                ('b_and_c', {'$ifNull': ['$elem_b', '$elem_c', '<missing_both>']}),
+            ])}
+        ]))
+        expected = [{'a_and_b': '<present_a>', 'b_and_a': '<present_a>',
+                     'b_and_c': '<missing_both>'}]
+
+        self.assertEqual(expected, list(actual))
+
     def test__aggregate_project_if_null_expression(self):
         self.db.collection.insert_many([
             {'_id': 1, 'description': 'Description 1', 'title': 'Title 1'},
@@ -4539,11 +4598,6 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$isArray': [1, 2]}}}
-            ])
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate([
                 {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
             ])
 
@@ -4586,6 +4640,21 @@ class CollectionAPITest(TestCase):
         actual = self.db.collection.find({'arr': {'$type': 'object'}})
         expect = [{'_id': 2, 'arr': {'a': 4, 'b': 5}}]
 
+        self.assertEqual(expect, list(actual))
+
+    def test__find_type_number(self):
+        self.db.collection.insert_many([
+            {'_id': 1, 'a': 'str'},
+            {'_id': 2, 'a': 1},
+            {'_id': 3, 'a': {'b': 1}},
+            {'_id': 4, 'a': 1.2},
+            {'_id': 5, 'a': None},
+        ])
+        actual = self.db.collection.find({'a': {'$type': 'number'}})
+        expect = [
+            {'_id': 2, 'a': 1},
+            {'_id': 4, 'a': 1.2},
+        ]
         self.assertEqual(expect, list(actual))
 
     def test__find_unknown_type(self):
@@ -6425,6 +6494,102 @@ class CollectionAPITest(TestCase):
                 [{'$project': {'a': {'$dateToString': '10'}}}]
             )
 
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_date_from_parts(self):
+        collection = self.db.collection
+        collection.insert_one({
+            'start_date': datetime(2022, 8, 3, 0, 5, 23),
+        })
+
+        actual = collection.aggregate([
+            {
+                '$addFields': {
+                    'start_date': {
+                        '$dateFromParts': {
+                            'year': {'$year': '$start_date'},
+                            'month': {'$month': '$start_date'},
+                            'day': {'$dayOfMonth': '$start_date'},
+                        }
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ])
+
+        expect = [{
+            'start_date': datetime(2022, 8, 3),
+        }]
+
+        self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'day': 1,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                                'isoWeek': 53,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'isoWeekYear': 1,
+                                'isoDayOfWeek': 7,
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            self.db.collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateFromParts': {
+                                'year': {'$year': '$start_date'},
+                                'timezone': 'America/New_York',
+                            }
+                        }
+                    }
+                }
+            ])
+
     def test__aggregate_array_to_object(self):
         collection = self.db.collection
         collection.insert_many([{
@@ -6621,6 +6786,68 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test_aggregate_is_number(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {'_id': 1, 'int': 3, 'big_int': 3 ** 10, 'negative': -3,
+             'str': 'not_a_number', 'str_numeric': '3', 'float': 3.3,
+             'negative_float': -3.3, 'bool': True,
+             'none': None}
+        )
+
+        expect = [
+            {'int': True, 'big_int': True, 'negative': True,
+             'str': False, 'str_numeric': False, 'float': True, 'negative_float': True,
+             'bool': False, 'none': False},
+        ]
+
+        actual = collection.aggregate([{
+            '$project': {
+                '_id': False,
+                'int': {'$isNumber': '$int'},
+                'big_int': {'$isNumber': '$big_int'},
+                'negative': {'$isNumber': '$negative'},
+                'str': {'$isNumber': '$str'},
+                'str_numeric': {'$isNumber': '$str_numeric'},
+                'float': {'$isNumber': '$float'},
+                'negative_float': {'$isNumber': '$negative_float'},
+                'bool': {'$isNumber': '$bool'},
+                'none': {'$isNumber': '$none'},
+            },
+        }])
+
+        self.assertEqual(expect, list(actual))
+
+    def test_aggregate_is_array(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {'_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3),
+             'empty_list': [], 'empty_tuple': (),
+             'int': 3, 'str': '123', 'bool': True, 'none': None}
+        )
+
+        expect = [
+            {'list': True, 'tuple': True,
+             'empty_list': True, 'empty_tuple': True,
+             'int': False, 'str': False, 'bool': False, 'none': False},
+        ]
+
+        actual = collection.aggregate([{
+            '$project': {
+                '_id': False,
+                'list': {'$isArray': '$list'}, 'tuple': {'$isArray': '$tuple'},
+                'empty_list': {'$isArray': '$empty_list'},
+                'empty_tuple': {'$isArray': '$empty_tuple'},
+                'int': {'$isArray': '$int'}, 'str': {'$isArray': '$str'},
+                'bool': {'$isArray': '$bool'},
+                'none': {'$isArray': '$none'},
+            },
+        }])
+
+        self.assertEqual(expect, list(actual))
+
     def test_aggregate_project_with_boolean(self):
         collection = self.db.collection
 
@@ -6781,7 +7008,7 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         collection.insert_one({'a': 1})
 
-        if version.parse(mongomock.SERVER_VERSION) >= version.parse('5.0'):
+        if SERVER_VERSION >= version.parse('5.0'):
             collection.update_one({}, {'$set': {}})
             collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
             return
@@ -6867,3 +7094,17 @@ class CollectionAPITest(TestCase):
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
             mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')
+
+    def test__cursor_allow_disk_use(self):
+        col = self.db.col
+        col.find().allow_disk_use(True)
+        col.find().allow_disk_use(False)
+        col.find().allow_disk_use()
+        with self.assertRaises(TypeError):
+            col.find().allow_disk_use(1)
+        # use the keyword argument
+        col.find(allow_disk_use=True)
+        col.find(allow_disk_use=False)
+        col.find()
+        with self.assertRaises(TypeError):
+            col.find(allow_disk_use=1)

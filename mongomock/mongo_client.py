@@ -130,7 +130,8 @@ class MongoClient(object):
     def drop_database(self, name_or_db):
 
         def drop_collections_for_db(_db):
-            for col_name in _db.list_collection_names():
+            db_store = self._store[_db.name]
+            for col_name in db_store.list_created_collection_names():
                 _db.drop_collection(col_name)
 
         if isinstance(name_or_db, Database):
@@ -143,12 +144,13 @@ class MongoClient(object):
             drop_collections_for_db(db)
 
     def get_database(self, name=None, codec_options=None, read_preference=None,
-                     write_concern=None):
+                     write_concern=None, read_concern=None):
         if name is None:
             db = self.get_default_database(
                 codec_options=codec_options,
                 read_preference=read_preference,
                 write_concern=write_concern,
+                read_concern=read_concern,
             )
         else:
             db = self._database_accesses.get(name)
@@ -156,7 +158,8 @@ class MongoClient(object):
             db_store = self._store[name]
             db = self._database_accesses[name] = Database(
                 self, name, read_preference=read_preference or self.read_preference,
-                codec_options=codec_options or self._codec_options, _store=db_store)
+                codec_options=codec_options or self._codec_options, _store=db_store,
+                read_concern=read_concern)
         return db
 
     def get_default_database(self, default=None, **kwargs):
