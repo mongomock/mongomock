@@ -4302,6 +4302,8 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
 
         pipeline = [
             {'$addFields': {'b': '$a'}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):
