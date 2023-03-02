@@ -41,7 +41,7 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
                 tz_aware=False,
                 uuid_representation=None,
                 unicode_decode_error_handler='strict',
-                tzinfo=None, type_registry = None):
+                tzinfo=None, type_registry=None):
 
         if document_class != dict:
             raise NotImplementedError(
