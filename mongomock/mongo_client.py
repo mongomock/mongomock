@@ -31,7 +31,7 @@ class MongoClient(object):
 
     def __init__(self, host=None, port=None, document_class=dict,
                  tz_aware=False, connect=True, _store=None, read_preference=None,
-                 **kwargs):
+                 uuidRepresentation=None, type_registry = None,**kwargs):
         if host:
             self.host = host[0] if isinstance(host, (list, tuple)) else host
         else:
@@ -39,7 +39,9 @@ class MongoClient(object):
         self.port = port or self.PORT
 
         self._tz_aware = tz_aware
-        self._codec_options = mongomock_codec_options.CodecOptions(tz_aware=tz_aware)
+        self._codec_options = mongomock_codec_options.CodecOptions(
+            tz_aware=tz_aware, uuid_representation=uuidRepresentation, 
+            type_registry=type_registry)
         self._database_accesses = {}
         self._store = _store or ServerStore()
         self._id = next(self._CONNECTION_ID)
