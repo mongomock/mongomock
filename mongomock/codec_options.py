@@ -41,7 +41,7 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
                 tz_aware=False,
                 uuid_representation=None,
                 unicode_decode_error_handler='strict',
-                tzinfo=None, type_registry=None):
+                tzinfo=None, type_registry = None):
 
         if document_class != dict:
             raise NotImplementedError(
@@ -66,9 +66,6 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
         if 'type_registry' in _FIELDS:
             if not type_registry:
                 type_registry = _DEFAULT_TYPE_REGISTRY
-            elif not type_registry == _DEFAULT_TYPE_REGISTRY:
-                raise NotImplementedError(
-                    'Mongomock does not handle custom type_registry yet %r' % type_registry)
             values = values + (type_registry,)
 
         return tuple.__new__(cls, values)
@@ -88,7 +85,8 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
 
         return codec_options.CodecOptions(
             uuid_representation=uuid_representation,
-            unicode_decode_error_handler=self.unicode_decode_error_handler)
+            unicode_decode_error_handler=self.unicode_decode_error_handler,
+            type_registry=self.type_registry)
 
 
 def is_supported(custom_codec_options):
