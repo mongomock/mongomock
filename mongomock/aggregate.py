@@ -1095,7 +1095,7 @@ def _accumulate_group(output_fields, group_list):
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$addToSet':
                 value = []
-                val_it = (val or None for val in values)
+                val_it = (val for val in values)
                 # Don't use set in case elt in not hashable (like dicts).
                 for elt in val_it:
                     if elt not in value:
