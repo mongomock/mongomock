@@ -6848,6 +6848,42 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
+    def test_aggregate_type(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {'_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3), 'string': "lol", "int": 10, "long": 2 ** 32, "bool": True,
+             "object": {}, "null": None})
+
+        expected = [{
+            'list': 'array',
+            'tuple': 'array',
+            'string': 'string',
+            'int': 'int',
+            'long': 'long',
+            'bool': 'bool',
+            'object': 'object',
+            'null': 'null',
+            'missing': 'missing'
+        }]
+
+        actual = collection.aggregate([{
+            "$project": {
+                '_id': False,
+                'list': {'$type': "$list"},
+                'tuple': {'$type': "$tuple"},
+                'string': {'$type': "$string"},
+                'int': {'$type': "$int"},
+                'long': {'$type': "$long"},
+                'bool': {'$type': "$bool"},
+                'object': {'$type': "$object"},
+                'null': {'$type': "$null"},
+                'missing': {'$type': "$object.doesnt_exist"},
+            }
+        }])
+
+        self.assertListEqual(expected, list(actual))
+
     def test_aggregate_project_with_boolean(self):
         collection = self.db.collection
 
