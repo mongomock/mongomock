@@ -172,6 +172,7 @@ type_operators = [
     '$isArray',
 ]
 
+DEFAULT_TRIM_CHARS = "\u0000\u0020\u0009\u000A\u000B\u000C\u000D\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A"
 
 def _avg_operation(values):
     values_list = list(v for v in values if isinstance(v, numbers.Number))
@@ -499,6 +500,32 @@ class _Parser(object):
             if not isinstance(delimiter, str):
                 raise TypeError('split second argument must evaluate to string')
             return string.split(delimiter)
+        if operator == '$trim':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$trim expects an object of named arguments but found: %s' % type(values))
+            if "input" not in values:
+                raise OperationFailure("$trim requires 'input' parameter")
+            unknown_args = set(values) - {'input', 'chars'}
+            if unknown_args:
+                raise OperationFailure(
+                    '$trim found an unknown argument: %s' % list(unknown_args)[0])
+
+            try:
+                input_value = self.parse(values['input'])
+            except KeyError:
+                return False
+            if not isinstance(input_value, str):
+                raise OperationFailure("$trim needs 'input' to be of type string")
+
+            try:
+                chars = self.parse(values['chars']) if "chars" in values else DEFAULT_TRIM_CHARS
+            except KeyError:
+                return False
+            if not isinstance(chars, str):
+                raise OperationFailure("$trim needs 'chars' to be of type string")
+            
+            return input_value.strip(chars)
         if operator == '$substr':
             if len(values) != 3:
                 raise OperationFailure('substr must have 3 items')
