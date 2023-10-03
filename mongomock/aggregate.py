@@ -60,13 +60,14 @@ unary_arithmetic_operators = {
     '$sqrt',
     '$trunc',
 }
+binary_arithmetic_operators_with_optional_second_number = {'$round'}
 binary_arithmetic_operators = {
     '$divide',
     '$log',
     '$mod',
     '$pow',
     '$subtract',
-}
+} | binary_arithmetic_operators_with_optional_second_number
 arithmetic_operators = unary_arithmetic_operators | binary_arithmetic_operators | {
     '$add',
     '$multiply',
@@ -171,6 +172,7 @@ type_operators = [
     '$isArray',
 ]
 
+DEFAULT_TRIM_CHARS = "\u0000\u0020\u0009\u000A\u000B\u000C\u000D\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A"
 
 def _avg_operation(values):
     values_list = list(v for v in values if isinstance(v, numbers.Number))
@@ -366,10 +368,16 @@ class _Parser(object):
                     "Parameter to %s must evaluate to a list, got '%s'" %
                     (operator, type(values)))
 
-            if len(values) != 2:
-                raise OperationFailure('%s must have only 2 parameters' % operator)
-            number_0, number_1 = self.parse_many(values)
-            if number_0 is None or number_1 is None:
+            supports_optional_number_2 = operator in binary_arithmetic_operators_with_optional_second_number
+            if supports_optional_number_2:
+                if len(values) not in [1, 2]:
+                    raise OperationFailure('%s must have 1 or 2 parameters' % operator)
+            else:
+                if len(values) != 2:
+                    raise OperationFailure('%s must have only 2 parameters' % operator)
+
+            number_0, number_1, *_unused_ = list(self.parse_many(values)) + [None] * 2
+            if number_0 is None or (number_1 is None and not supports_optional_number_2):
                 return None
 
             if operator == '$divide':
@@ -380,6 +388,8 @@ class _Parser(object):
                 return math.fmod(number_0, number_1)
             if operator == '$pow':
                 return math.pow(number_0, number_1)
+            if operator == '$round':
+                return round(number_0, number_1)
             if operator == '$subtract':
                 if isinstance(number_0, datetime.datetime) and \
                         isinstance(number_1, (int, float)):
@@ -490,6 +500,32 @@ class _Parser(object):
             if not isinstance(delimiter, str):
                 raise TypeError('split second argument must evaluate to string')
             return string.split(delimiter)
+        if operator == '$trim':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$trim expects an object of named arguments but found: %s' % type(values))
+            if "input" not in values:
+                raise OperationFailure("$trim requires 'input' parameter")
+            unknown_args = set(values) - {'input', 'chars'}
+            if unknown_args:
+                raise OperationFailure(
+                    '$trim found an unknown argument: %s' % list(unknown_args)[0])
+
+            try:
+                input_value = self.parse(values['input'])
+            except KeyError:
+                return False
+            if not isinstance(input_value, str):
+                raise OperationFailure("$trim needs 'input' to be of type string")
+
+            try:
+                chars = self.parse(values['chars']) if "chars" in values else DEFAULT_TRIM_CHARS
+            except KeyError:
+                return False
+            if not isinstance(chars, str):
+                raise OperationFailure("$trim needs 'chars' to be of type string")
+            
+            return input_value.strip(chars)
         if operator == '$substr':
             if len(values) != 3:
                 raise OperationFailure('substr must have 3 items')
@@ -1086,7 +1122,7 @@ def _accumulate_group(output_fields, group_list):
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$addToSet':
                 value = []
-                val_it = (val or None for val in values)
+                val_it = (val for val in values)
                 # Don't use set in case elt in not hashable (like dicts).
                 for elt in val_it:
                     if elt not in value:
@@ -1660,3 +1696,8 @@ def process_pipeline(collection, database, pipeline, session):
             collection = handler(collection, database, options)
 
     return command_cursor.CommandCursor(collection)
+
+
+def validate_stage_name(name):
+    if name not in _PIPELINE_HANDLERS:
+        raise OperationFailure("Unrecognized pipeline stage name: '%s'" % name)
