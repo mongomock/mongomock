@@ -2886,6 +2886,73 @@ class CollectionAPITest(TestCase):
             {'_id': 4, 'b': [], 'should': 'skip'}
         ], list(actual))
 
+    def test__aggregate_redact(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 3, 'b': 4},
+            {'_id': 3, 'a': 5, 'b': 6},
+            {'_id': 4, 'a': 7, 'b': 8},
+            {'_id': 5, 'a': 9, 'b': 10}
+        ])
+        actual = self.db.a.aggregate([{
+            '$redact': {
+                '$cond': {
+                    'if': {'$lt': ['$a', 5]},
+                    'then': '$$KEEP',
+                    'else': '$$PRUNE'
+                }
+            }
+        }])
+        self.assertEqual([
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 3, 'b': 4}
+        ], list(actual))
+
+    def test__aggregate_redact_descend_nested_document(self):
+        # Testing descend within arrays and nested objects
+        self.db.a.insert_one({
+            '_id': 1,
+            'a': 1,
+            'b': {
+                'a': 4,
+                'b': {
+                    'a': 10,
+                    'c': 'xyz'
+                }
+            },
+            'c': 'xyz',
+            'd': [
+                {'a': 1, 'b': 2},
+                {'a': 8, 'b': 3},
+                {'b': 4}
+            ],
+            'e': ['a', 'b', 'c']
+        })
+
+        actual = self.db.a.aggregate([{
+            '$redact': {
+                '$cond': {
+                    'if': {'$lt': ['$a', 5]},
+                    'then': '$$DESCEND',
+                    'else': '$$PRUNE'
+                }
+            }
+        }])
+
+        self.assertEqual([{
+            '_id': 1,
+            'a': 1,
+            'b': {
+                'a': 4,
+                'b': None
+            },
+            'c': 'xyz',
+            'd': [
+                {'a': 1, 'b': 2},
+            ],
+            'e': ['a', 'b', 'c']
+        }], list(actual))
+
     def test__aggregate_lookup_dot_in_as(self):
         with self.assertRaises(NotImplementedError) as err:
             self.db.a.aggregate([

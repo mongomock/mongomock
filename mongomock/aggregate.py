@@ -442,8 +442,7 @@ class _Parser(object):
             }
             return _Parser(
                 self._doc_dict,
-                dict(self._user_vars, **user_vars),
-                ignore_missing_keys=self._ignore_missing_keys,
+                dict(self._user_vars, **user_vars)
             ).parse(value['in'])
         raise NotImplementedError("Although '%s' is a valid project operator for the "
                                   'aggregation pipeline, it is currently not implemented '
@@ -1054,7 +1053,7 @@ class _Parser(object):
             'pipeline, it is currently not implemented in Mongomock.' % operator)
 
 
-def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
+def _parse_expression(expression, doc_dict, user_vars=None, ignore_missing_keys=False):
     """Parse an expression.
 
     Args:
@@ -1064,7 +1063,7 @@ def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
         ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
             if it is possible.
     """
-    return _Parser(doc_dict, ignore_missing_keys=ignore_missing_keys).parse(expression)
+    return _Parser(doc_dict, user_vars=user_vars, ignore_missing_keys=ignore_missing_keys).parse(expression)
 
 
 filtering.register_parse_expression(_parse_expression)
@@ -1549,6 +1548,49 @@ def _handle_project_stage(in_collection, unused_database, options):
     return out_collection
 
 
+def _handle_redact_stage(in_collection, unused_database, options):
+    if not options:
+        raise OperationFailure(
+            'Invalid $redact :: caused by :: specification must have at least one field')
+
+    out_collection = []
+    for doc in in_collection:
+        out_doc = _handle_redact_stage_expression(options, doc)
+        if out_doc is not None:
+            out_collection.append(out_doc)
+    return out_collection
+
+
+def _handle_redact_stage_expression(expression, doc):
+    redact_vars = {i: i for i in ["PRUNE", "KEEP", "DESCEND"]}
+    try:
+        expr_result = _parse_expression(expression, doc, user_vars=redact_vars)
+    except KeyError as ex:
+        raise OperationFailure(
+            f'Invalid $redact :: caused by :: {str(ex)}')
+
+    if expr_result == "PRUNE":
+        return None
+    elif expr_result == "KEEP":
+        return doc
+    elif expr_result == "DESCEND":
+        return {k: _handle_redact_descend_values(expression, v) for k, v in doc.items()}
+
+
+def _handle_redact_descend_values(expression, value):
+    if isinstance(value, dict):
+        return _handle_redact_stage_expression(expression, value)
+    elif isinstance(value, list):
+        out_value = []
+        for item in value:
+            new_item = _handle_redact_descend_values(expression, item)
+            if new_item is not None:
+                out_value.append(new_item)
+        return out_value
+
+    return value
+
+
 def _handle_add_fields_stage(in_collection, unused_database, options):
     if not options:
         raise OperationFailure(
@@ -1627,7 +1669,7 @@ _PIPELINE_HANDLERS = {
     '$out': _handle_out_stage,
     '$planCacheStats': None,
     '$project': _handle_project_stage,
-    '$redact': None,
+    '$redact': _handle_redact_stage,
     '$replaceRoot': _handle_replace_root_stage,
     '$replaceWith': None,
     '$sample': _handle_sample_stage,
