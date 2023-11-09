@@ -3872,6 +3872,28 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_convert(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'boolean_true': True,
+        })
+        pipeline = [
+            {
+                '$addFields': {
+                    'test_string': {'$convert': {"input": '$boolean_true', "to": "string"}},
+                    'test_int': {'$convert': {"input": '$boolean_true', "to": "int"}},
+                    'test_long': {'$convert': {"input": '$boolean_true', "to": "long"}},
+                    'test_decimal': {'$convert': {"input": '$boolean_true', "to": "decimal"}},
+                    'test_number_2': {'$convert': {"input": '$boolean_true', "to": 2}},
+                    'test_number_16': {'$convert': {"input": '$boolean_true', "to": 16}},
+                    'test_number_18': {'$convert': {"input": '$boolean_true', "to": 18}},
+                    'test_number_19': {'$convert': {"input": '$boolean_true', "to": 19}},
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_date_from_parts(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one({
