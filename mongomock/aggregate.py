@@ -27,6 +27,7 @@ from mongomock import OperationFailure
 try:
     from bson.errors import InvalidDocument
     from bson import Regex, decimal128
+
     decimal_support = True
     _RE_TYPES = (helpers.RE_TYPE, Regex)
 except ImportError:
@@ -35,7 +36,6 @@ except ImportError:
     _RE_TYPES = (helpers.RE_TYPE)
 
 _random = random.Random()
-
 
 group_operators = [
     '$addToSet',
@@ -141,10 +141,10 @@ string_operators = [
     '$trim',
 ]
 comparison_operators = [
-    '$cmp',
-    '$eq',
-    '$ne',
-] + list(filtering.SORTING_OPERATOR_MAP.keys())
+                           '$cmp',
+                           '$eq',
+                           '$ne',
+                       ] + list(filtering.SORTING_OPERATOR_MAP.keys())
 boolean_operators = ['$and', '$or', '$not']
 set_operators = [
     '$in',
@@ -1118,48 +1118,97 @@ def _fix_sort_key(key_getter):
         if isinstance(key, dict):
             return [(k, v) for (k, v) in sorted(key.items())]
         return key
+
     return fixed_getter
 
 
-def _handle_lookup_stage(in_collection, database, options):
-    for operator in ('let', 'pipeline'):
-        if operator in options:
-            raise NotImplementedError(
-                "Although '%s' is a valid lookup operator for the "
-                'aggregation pipeline, it is currently not '
-                'implemented in Mongomock.' % operator)
-    for operator in ('from', 'localField', 'foreignField', 'as'):
-        if operator not in options:
-            raise OperationFailure(
-                "Must specify '%s' field for a $lookup" % operator)
-        if not isinstance(options[operator], str):
-            raise OperationFailure(
-                'Arguments to $lookup must be strings')
-        if operator in ('as', 'localField', 'foreignField') and \
-                options[operator].startswith('$'):
-            raise OperationFailure(
-                "FieldPath field names may not start with '$'")
-        if operator == 'as' and \
-                '.' in options[operator]:
-            raise NotImplementedError(
-                "Although '.' is valid in the 'as' "
-                'parameters for the lookup stage of the aggregation '
-                'pipeline, it is currently not implemented in Mongomock.')
+def _substitute_stage_values(stage, let_values):
+    """
+    Substitute values in a single stage of the pipeline.
+    """
+    stage_names = _PIPELINE_HANDLERS.keys()
+    for stage_name in stage_names:
+        if stage_name in stage:
+            # Recursively replace values in the 'stage_name' stage
+            stage[stage_name] = _replace_values(stage[stage_name], let_values)
+    return stage
 
-    foreign_name = options['from']
-    local_field = options['localField']
-    foreign_field = options['foreignField']
-    local_name = options['as']
-    foreign_collection = database.get_collection(foreign_name)
-    for doc in in_collection:
-        try:
-            query = helpers.get_value_by_dot(doc, local_field)
-        except KeyError:
-            query = None
-        if isinstance(query, list):
-            query = {'$in': query}
-        matches = foreign_collection.find({foreign_field: query})
-        doc[local_name] = [foreign_doc for foreign_doc in matches]
+
+def _replace_values(obj, let_values):
+    """
+    Recursively replace placeholders in an object (dict, list) with values from let_values.
+    """
+    if isinstance(obj, dict):
+        return {k: _replace_values(v, let_values) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_replace_values(elem, let_values) for elem in obj]
+    elif isinstance(obj, str) and obj.startswith('$'):
+        # Replace placeholder with value from let_values, if available
+        key = obj[1:]  # Remove the leading '$'
+        return let_values.get(key, obj)  # Return the original string if no replacement found
+    else:
+        return obj
+
+
+def _substitute_pipeline_values(pipeline, let_values):
+    import copy
+    """
+    Replace placeholders in the pipeline stages with actual values based on let_values.
+    """
+    substituted_pipeline = []
+    for stage in pipeline:
+        substituted_stage = _substitute_stage_values(copy.deepcopy(stage), let_values)
+        substituted_pipeline.append(substituted_stage)
+    return substituted_pipeline
+
+
+def _handle_lookup_stage(in_collection, database, options):
+    for required_option in ('from', 'as'):
+        if required_option not in options:
+            raise OperationFailure(f"Must specify '{required_option}' field for a $lookup")
+
+        # Using 'let' and 'pipeline' changes the behavior
+    if 'let' in options and 'pipeline' in options:
+        # Handle 'let' and 'pipeline' logic here
+        let_vars = options.get('let', {})
+        pipeline = options.get('pipeline', [])
+
+        if not isinstance(let_vars, dict):
+            raise OperationFailure("'let' must be a dictionary")
+        if not isinstance(pipeline, list):
+            raise OperationFailure("'pipeline' must be a list of aggregation stages")
+
+        foreign_name = options['from']
+        local_name = options['as']
+        foreign_collection = database.get_collection(foreign_name)
+
+        for doc in in_collection:
+            let_values = {var: doc.get(val[1:], None) for var, val in let_vars.items()}
+            substituted_pipeline = _substitute_pipeline_values(pipeline, let_values)
+            matches = foreign_collection.aggregate(substituted_pipeline)
+            doc[local_name] = [match for match in matches]
+    else:
+        # Original logic for 'localField', 'foreignField', and 'as'
+        for operator in ('localField', 'foreignField'):
+            if operator not in options:
+                raise OperationFailure(f"Must specify '{operator}' field for a $lookup")
+            if not isinstance(options[operator], str):
+                raise OperationFailure('Arguments to $lookup must be strings')
+
+        foreign_name = options['from']
+        local_field = options['localField']
+        foreign_field = options['foreignField']
+        local_name = options['as']
+        foreign_collection = database.get_collection(foreign_name)
+        for doc in in_collection:
+            try:
+                query = helpers.get_value_by_dot(doc, local_field)
+            except KeyError:
+                query = None
+            if isinstance(query, list):
+                query = {'$in': query}
+            matches = foreign_collection.find({foreign_field: query})
+            doc[local_name] = [foreign_doc for foreign_doc in matches]
 
     return in_collection
 
@@ -1658,5 +1707,4 @@ def process_pipeline(collection, database, pipeline, session):
                     "Although '%s' is a valid operator for the aggregation pipeline, it is "
                     'currently not implemented in Mongomock.' % operator)
             collection = handler(collection, database, options)
-
     return command_cursor.CommandCursor(collection)
