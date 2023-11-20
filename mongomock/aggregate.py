@@ -1175,7 +1175,8 @@ def _replace_values(obj, let_values):
     elif isinstance(obj, str) and obj.startswith('$$'):
         # Replace placeholder with value from let_values, if available
         key = obj.lstrip("$").split('.')  # Remove the leading '$$'
-        if len(key) > 1:
+        # Get attribute if available
+        if len(key) > 1 and isinstance(let_values.get(key[0], obj), dict):
             return let_values.get(key[0], obj).get(key[1])
         return let_values.get(key[0], obj)  # Return the original string if no replacement found
     else:
