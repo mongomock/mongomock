@@ -1142,9 +1142,9 @@ def _replace_values(obj, let_values):
         return {k: _replace_values(v, let_values) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_replace_values(elem, let_values) for elem in obj]
-    elif isinstance(obj, str) and obj.startswith('$'):
+    elif isinstance(obj, str) and obj.startswith('$$'):
         # Replace placeholder with value from let_values, if available
-        key = obj[1:]  # Remove the leading '$'
+        key = obj.lstrip("$")  # Remove the leading '$$'
         return let_values.get(key, obj)  # Return the original string if no replacement found
     else:
         return obj
@@ -1209,7 +1209,6 @@ def _handle_lookup_stage(in_collection, database, options):
                 query = {'$in': query}
             matches = foreign_collection.find({foreign_field: query})
             doc[local_name] = [foreign_doc for foreign_doc in matches]
-
     return in_collection
 
 
