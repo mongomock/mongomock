@@ -1133,6 +1133,36 @@ def _substitute_stage_values(stage, let_values):
             stage[stage_name] = _replace_values(stage[stage_name], let_values)
     return stage
 
+def _evaluate_expression(expression, doc):
+    """
+    Evaluate a MongoDB-like expression against a document.
+    This function currently supports basic operators and needs to be expanded.
+    """
+    if isinstance(expression, str) and expression.startswith('$'):
+        # Simple field reference
+        return doc.get(expression[1:], None)
+    elif isinstance(expression, dict):
+        # Handle operators like $last, $slice, etc.
+        for operator, value in expression.items():
+            array = _evaluate_expression(value, doc)
+            return array[-1] if array and isinstance(array, list) else None
+
+    elif isinstance(expression, list):
+        # Handle array expressions
+        return [_evaluate_expression(elem, doc) for elem in expression]
+
+    # Fallback for literals and other cases
+    return expression
+
+def _substitute_let_values(let_vars, doc):
+    """
+    Substitute let variable values based on the current document.
+    """
+    let_values = {}
+    for var, expr in let_vars.items():
+        let_values[var] = _evaluate_expression(expr, doc)
+    return let_values
+
 
 def _replace_values(obj, let_values):
     """
@@ -1183,7 +1213,7 @@ def _handle_lookup_stage(in_collection, database, options):
         foreign_collection = database.get_collection(foreign_name)
 
         for doc in in_collection:
-            let_values = {var: doc.get(val[1:], None) for var, val in let_vars.items()}
+            let_values = _substitute_let_values(let_vars, doc)
             substituted_pipeline = _substitute_pipeline_values(pipeline, let_values)
             matches = foreign_collection.aggregate(substituted_pipeline)
             doc[local_name] = [match for match in matches]
