@@ -1,3 +1,3 @@
 import pkg_resources
 
-__version__ = pkg_resources.get_distribution('mongomock').version
+__version__ = "0.0.3"
