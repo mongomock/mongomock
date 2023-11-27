@@ -4598,7 +4598,7 @@ class CollectionAPITest(TestCase):
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.aggregate([
-                {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
+                {'$project': {'a': {'$setDifference': [[2], [1, 2, 3]]}}},
             ])
 
     def test__aggregate_project_let(self):
@@ -6095,6 +6095,24 @@ class CollectionAPITest(TestCase):
             'ne_in_another_order': False,
             'three_equal': True,
             'three_not_equal': False,
+        }]
+        self.assertEqual(expect, list(actual))
+
+    def test__set_intersection(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {'array': ['one', 'three']},
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'array': {'$setIntersection': [['one', 'two'], '$array']},
+            'distinct': {'$setIntersection': [['one', 'two'], ['three'], ['four']]},
+            'nested': {'$setIntersection': [['one', 'two'], [['one', 'two']]]},
+        }}])
+        expect = [{
+            'array': ['one'],
+            'distinct': [],
+            'nested': [],
         }]
         self.assertEqual(expect, list(actual))
 

@@ -232,6 +232,7 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * Emily Rosengren
 * Eugene Chernyshov
 * Grigoriy Osadchenko
+* `Heisson Willen <https://github.com/heissonwillen/>`_
 * Israel Teixeira
 * Jacob Perkins
 * Jason Burchfield
