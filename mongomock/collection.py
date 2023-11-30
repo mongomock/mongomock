@@ -13,6 +13,7 @@ import warnings
 
 try:
     from bson import json_util, SON, BSON
+    from bson.errors import InvalidDocument
 except ImportError:
     json_utils = SON = BSON = None
 try:
@@ -252,6 +253,22 @@ def _copy_field(obj, container):
             new[key] = _copy_field(value, container)
         return new
     return copy.copy(obj)
+
+
+def _recursive_key_check_null_character(data):
+    for key, value in data.items():
+        if '\0' in key:
+            raise InvalidDocument(f'Field names cannot contain the null character (found: {key})')
+        if isinstance(value, Mapping):
+            _recursive_key_check_null_character(value)
+
+
+def _validate_data_fields(data):
+    _recursive_key_check_null_character(data)
+    for key in data.keys():
+        if key.startswith('$'):
+            raise InvalidDocument(f'Top-level field names cannot start with the "$" sign '
+                                  f'(found: {key})')
 
 
 class BulkOperationBuilder(object):
@@ -502,7 +519,11 @@ class Collection(object):
 
         if BSON:
             # bson validation
-            BSON.encode(data, check_keys=True)
+            check_keys = helpers.PYMONGO_VERSION < version.parse('3.6')
+            if not check_keys:
+                _validate_data_fields(data)
+
+            BSON.encode(data, check_keys=check_keys)
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -869,7 +890,10 @@ class Collection(object):
                             existing_document['_id'] = _id
                         if BSON:
                             # bson validation
-                            BSON.encode(document, check_keys=True)
+                            check_keys = helpers.PYMONGO_VERSION < version.parse('3.6')
+                            if not check_keys:
+                                _validate_data_fields(document)
+                            BSON.encode(document, check_keys=check_keys)
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
@@ -2016,7 +2040,14 @@ def _set_updater(doc, field_name, value):
         value = copy.deepcopy(value)
     if BSON:
         # bson validation
-        BSON.encode({field_name: value}, check_keys=True)
+        check_keys = helpers.PYMONGO_VERSION < version.parse('3.6')
+        if not check_keys:
+            if '\0' in field_name or field_name.startswith('$'):
+                raise InvalidDocument(
+                    f'Field name cannot contain the null character and top-level field name '
+                    f'cannot start with "$" (found: {field_name})'
+                )
+        BSON.encode({field_name: value}, check_keys=check_keys)
     if isinstance(doc, dict):
         doc[field_name] = value
     if isinstance(doc, list):

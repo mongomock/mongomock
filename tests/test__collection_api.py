@@ -5169,7 +5169,26 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert_one({'$foo': 'bar'})
-        self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
+        self.assertEqual(str(cm.exception), 'Top-level field names cannot start with the "$"'
+                                            ' sign (found: $foo)')
+        with self.assertRaises(InvalidDocument):
+            collection.insert_one({'foo': {'foo\0bar': 'bar'}})
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test_update_bson_invalid_encode_type(self):
+        self.db.collection.insert_one({'a': 1})
+        with self.assertRaises(InvalidDocument):
+            self.db.collection.update_one(filter={'a': 1}, update={'$set': {'$a': 2}})
+
+    @skipIf(helpers.PYMONGO_VERSION >= version.parse('3.6'),
+            'pymongo has less strict naming requirements after v3.6')
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test_insert_bson_special_characters(self):
+        collection = self.db.collection
+        collection.insert_one({'foo.bar.zoo': {'foo.bar': '$zoo'}, 'foo.$bar': 'zoo'})
+        actual = self.db.collection.find_one()
+        assert actual['foo.bar.zoo'] == {'foo.bar': '$zoo'}
+        assert actual['foo.$bar'] == 'zoo'
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__update_invalid_encode_type(self):
