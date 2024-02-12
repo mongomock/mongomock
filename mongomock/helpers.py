@@ -98,7 +98,9 @@ def create_index_list(key_or_list, direction=None):
         https://pymongo.readthedocs.io/en/4.4.0/api/pymongo/collection.html#pymongo.collection.Collection.create_index
         """
         for index, field_config in enumerate(key_or_list):
-            if isinstance(field_config, str) or (isinstance(field_config, tuple) and len(field_config) == 1):
+            if isinstance(field_config, str):
+                key_or_list[index] = (field_config, ASCENDING)
+            elif isinstance(field_config, tuple) and len(field_config) == 1:
                 key_or_list[index] = (field_config[0], ASCENDING)
 
     return key_or_list
