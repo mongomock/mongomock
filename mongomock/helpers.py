@@ -87,9 +87,20 @@ def create_index_list(key_or_list, direction=None):
     """
     if isinstance(key_or_list, str):
         return [(key_or_list, direction or ASCENDING)]
+
     if not isinstance(key_or_list, (list, tuple, abc.Iterable)):
         raise TypeError('if no direction is specified, '
                         'key_or_list must be an instance of list')
+    elif version.parse('4.4.0') <= PYMONGO_VERSION:
+        """
+        Since pymongo 4.4.0 setting a direction with field name is optional.
+        It is assumed that in this case a field should be sorted in ASCENDING order:
+        https://pymongo.readthedocs.io/en/4.4.0/api/pymongo/collection.html#pymongo.collection.Collection.create_index
+        """
+        for index, field_config in enumerate(key_or_list):
+            if isinstance(field_config, str) or (isinstance(field_config, tuple) and len(field_config) == 1):
+                key_or_list[index] = (field_config[0], ASCENDING)
+
     return key_or_list
 
 
