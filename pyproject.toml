@@ -48,3 +48,30 @@ source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mongomock"]
+
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-docstring",
+    "R",
+    "invalid-name",
+    "fixme",
+    "unused-argument",
+    "redefined-builtin",
+    "protected-access",
+    "wrong-import-order",
+    "attribute-defined-outside-init",
+    "cell-var-from-loop",
+    "broad-except",
+    "dangerous-default-value",
+    "too-many-lines",
+    "ungrouped-imports",
+    "no-member",
+    "too-many-function-args",
+    "consider-using-f-string",
+    "deprecated-class",
+    "redundant-u-string-prefix",
+    "unused-private-member",
+    "unspecified-encoding",
+]
+enable = ["no-else-return"]

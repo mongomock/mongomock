@@ -32,7 +32,7 @@ try:
 except ImportError:
     InvalidDocument = OperationFailure
     decimal_support = False
-    _RE_TYPES = (helpers.RE_TYPE)
+    _RE_TYPES = (helpers.RE_TYPE,)
 
 _random = random.Random()
 
@@ -1538,7 +1538,7 @@ def _handle_project_stage(in_collection, unused_database, options):
     # Final steps: include or exclude fields and merge with newly created fields.
     projection_spec = _combine_projection_spec(filter_list, original_filter=options)
     out_collection = [
-        _project_by_spec(doc, projection_spec, is_include=(method == 'include'))
+        _project_by_spec(doc, projection_spec, is_include=method == 'include')
         for doc in in_collection
     ]
     if new_fields_collection:

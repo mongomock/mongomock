@@ -9,7 +9,7 @@ class CommandCursor(object):
         self._data = {}
         self._retrieved = retrieved
         self._batch_size = 0
-        self._killed = (self._id == 0)
+        self._killed = self._id == 0
 
     @property
     def address(self):
