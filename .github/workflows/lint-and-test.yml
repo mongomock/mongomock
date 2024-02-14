@@ -45,11 +45,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+      - name: Set up NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.10.0
         with:
           mongodb-version: "5.0.5"
       - name: Install dependencies
         run: pip install hatch
-      - name: Test
-        run: hatch run +py=${{ matrix.python-version }} test:test-ci
+      - name: Run tests
+        run: hatch run +py=${{ matrix.python-version }} test:run
+      - name: Collect coverage
+        run: hatch run cov:collect
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
