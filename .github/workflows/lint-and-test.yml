@@ -45,6 +45,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.10.0
+        with:
+          mongodb-version: "5.0.5"
       - name: Install dependencies
         run: pip install hatch
       - name: Test
