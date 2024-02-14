@@ -1488,8 +1488,13 @@ class Collection(object):
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
         unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
-        if self.database.client.server_info()['versionArray'] < [5]:
-            unknown_kwargs.discard('skip')
+
+        if self.database.client.server_info()["versionArray"] < [5]:
+            unknown_kwargs -= {"skip"}
+
+        if helpers.PYMONGO_VERSION >= version.parse("4.2"):
+            unknown_kwargs -= {"skip"}
+
         if unknown_kwargs:
             raise OperationFailure(
                 "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
