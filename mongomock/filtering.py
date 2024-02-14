@@ -285,7 +285,7 @@ def _in_op(doc_val, search_val):
 
 def _not_nothing_and(f):
     """wrap an operator to return False if the first arg is NOTHING"""
-    return lambda v, l: v is not NOTHING and f(v, l)
+    return lambda a, b: a is not NOTHING and f(a, b)
 
 
 def _compare_objects(op):
