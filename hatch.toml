@@ -1,0 +1,27 @@
+[envs.test]
+dependencies = [
+  "pytest==7.3.*",
+  "pytest-cov==4.1.*",
+  "codecov==2.1.*",
+  "nodeenv==1.8.*",
+]
+features = ["pyexecjs"]
+
+[envs.test.env-vars]
+EXECJS_RUNTIME = "node"
+
+[envs.test.scripts]
+setup-node = "nodeenv --prebuilt --python-virtualenv"
+test =  "pytest --cov=mongomock {args:.}"
+test-ci = ["setup-node", "test", "codecov"]
+
+[envs.test.overrides]
+matrix.pymongo.extra-dependencies = [
+  { value = "pymongo<4.0", if = ["3"]},
+  { value = "pymongo<5.0", if = ["4"]},
+]
+
+[[envs.test.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy3"]
+pymongo = ["3", "4", "none"]
+
