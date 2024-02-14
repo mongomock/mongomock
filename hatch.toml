@@ -25,3 +25,16 @@ matrix.pymongo.extra-dependencies = [
 python = ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy3"]
 pymongo = ["3", "4", "none"]
 
+[envs.lint]
+dependencies = [
+  "pylint==3.0.*",
+  "mypy==1.8.*",
+  "hacking==6.1.0",
+]
+
+[envs.lint.scripts]
+style = [
+  "pylint mongomock tests {args}",
+  "flake8 {args}",
+]
+typing = "mypy --install-types --non-interactive tests/types"

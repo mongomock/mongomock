@@ -1,0 +1,4 @@
+[flake8]
+ignore = H803,H301,H302,H802,E402,W503,H216
+exclude = .venv,.tox,dist,doc,*.egg,build,.ropeproject,.nodeenv
+max-line-length = 100
