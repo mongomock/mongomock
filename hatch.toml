@@ -22,6 +22,11 @@ matrix.pymongo.extra-dependencies = [
 python = ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy3"]
 pymongo = ["3", "4", "none"]
 
+[envs.cov]
+dependencies = [
+  "coverage[toml]==7.2.*",
+]
+
 [envs.cov.scripts]
 collect = [
   "- coverage combine",
