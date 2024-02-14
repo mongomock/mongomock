@@ -1424,6 +1424,13 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_index([('value', 1, 'foo', 'bar')])
 
+    @skipIf(not helpers.PYMONGO_VERSION >= version.parse('4.4.0'), 'pymongo version smaller then 4.4.0')
+    def test__create_index_optional_direction(self):
+        index_name = self.db.collection.create_index([('keyA', 1), 'keyB'])
+        index_information = self.db.collection.index_information()
+
+        self.assertEqual(index_information[index_name], {'key': [('keyA', 1), ('keyB', 1)]})
+
     def test__ttl_index_ignores_record_in_the_future(self):
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=0)
         self.db.collection.insert_one({'value': datetime.utcnow() + timedelta(seconds=100)})
