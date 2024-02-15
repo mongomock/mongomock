@@ -4276,6 +4276,66 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__redact_simple_condition(self):
+        self.cmp.do.delete_many({})
+
+        data = [
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 3, 'b': 4},
+            {'_id': 3, 'a': 5, 'b': 6},
+            {'_id': 4, 'a': 7, 'b': 8},
+            {'_id': 5, 'a': 9, 'b': 10}
+        ]
+
+        self.cmp.do.insert_many(data)
+
+        self.cmp.compare_ignore_order.aggregate([{
+            '$redact': {
+                '$cond': {
+                    'if': {'$lt': ['a', 5]},
+                    'then': '$$KEEP',
+                    'else': '$$PRUNE'
+                }
+            }
+        }])
+
+    def test__redact_missing_expression(self):
+        self.cmp.compare_exceptions.aggregate([{
+            '$redact': {}
+        }])
+
+    def test__redact_descend_nested_document(self):
+        self.cmp.do.delete_many({})
+
+        # Testing descend within arrays and nested objects
+        data = {
+            '_id': 1,
+            'a': 1
+        }
+
+        self.cmp.do.insert_one(data)
+
+        self.cmp.compare_ignore_order.aggregate([{
+            '$redact': {
+                '$cond': {
+                    'if': {'$lt': ['$a', 5]},
+                    'then': '$$KEEP',
+                    'else': '$$PRUNE'
+                }
+            }
+        }])
+
+    def test__redact_invalid_value(self):
+        self.cmp.compare_exceptions.aggregate([{
+            '$redact': {
+                '$cond': {
+                    'if': {'$lt': ['$a', 5]},
+                    'then': '$$INVALID',
+                    'else': '$$PRUNE'
+                }
+            }
+        }])
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):
