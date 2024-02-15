@@ -1,11 +1,13 @@
 import json
 import os
+import sys
 
 from mongomock.helpers import hashdict
 from mongomock.helpers import get_value_by_dot, set_value_by_dot
 from mongomock.helpers import parse_uri
 from mongomock.helpers import print_deprecation_warning
-from unittest import TestCase
+from mongomock.helpers import to_hashable
+from unittest import TestCase, skipIf
 
 
 class HashdictTest(TestCase):
@@ -162,3 +164,57 @@ class ValueByDotTest(TestCase):
                 ({'a': [{'b': 1}]}, 'a.1.b'),
                 ({'a': [{'b': 1}]}, 'a.1')):
             self.assertRaises(KeyError, set_value_by_dot, doc, key, 42)
+
+
+class ToHashableTests(TestCase):
+    def test__to_hashable_as_key(self):
+        """Test that results of to_hashable can be used as keys"""
+        for value in (1, 2.4, 'foo', True, [1, 2, 3], frozenset({1, 2, 3})):
+            h = to_hashable(value)
+            d = {}
+            d[h] = 'foo'
+            self.assertEqual(d[h], 'foo')
+            self.assertIs(h.original, value)
+
+    def test__to_hashable_equality(self):
+        """Test that results of to_hashable pass equality checks"""
+        for value in (1, 2.4, 'foo', True, [1, 2, 3], frozenset({1, 2, 3})):
+            h = to_hashable(value)
+            self.assertEqual(h, to_hashable(value))
+            self.assertEqual(h, value)
+            self.assertNotEqual(h, 'bar')
+
+    def test__to_hashable_tuples_and_lists(self):
+        """Test equivalence between lists and tuples"""
+        self.assertEqual(
+            to_hashable([1, 2, 3]),
+            to_hashable((1, 2, 3)),
+        )
+        self.assertEqual(
+            to_hashable([1, (2, 3), 4]),
+            to_hashable((1, [2, 3], 4)),
+        )
+
+    def test__to_hashable_recursive_structure(self):
+        """Test error when using recursive structure as argument"""
+        value = [1, 2, 3]
+        value.append(value)
+        msg = 'unexpected error: recursive structure detected'
+        with self.assertRaises(RuntimeError, msg=msg):
+            to_hashable(value)
+
+    @skipIf(sys.version_info < (3, 7), 'order of keys are kept for Python>=3.7')
+    def test__to_hashable_dict(self):
+        """Test that to_hashable works with dicts as expected"""
+        h = to_hashable({'a': 1, 'b': 2})
+        self.assertEqual(h, {'a': 1, 'b': 2})
+        self.assertNotEqual(h, {'b': 2, 'a': 1})
+        d = {h: 'foo'}
+        self.assertEqual(d[h], 'foo')
+
+    def test__to_hashable_nested(self):
+        """Test to_hashable with nested structure"""
+        h = to_hashable([[1, 2], ['three', 'four'], 5])
+        self.assertEqual(h.original, [[1, 2], ['three', 'four'], 5])
+        d = {h: 'foo'}
+        self.assertEqual(d[h], 'foo')

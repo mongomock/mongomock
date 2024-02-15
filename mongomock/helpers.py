@@ -1,39 +1,46 @@
+import sys
+import time
+import warnings
 from collections import abc
 from collections import OrderedDict
 from datetime import datetime, timedelta, tzinfo
-from mongomock import InvalidURI
-from packaging import version
 import re
-import time
-from urllib.parse import unquote_plus
-import warnings
+from six import PY3, iteritems
 
+from six.moves.urllib_parse import unquote_plus
+from packaging import version
+
+from mongomock import InvalidURI
 
 # Get ObjectId from bson if available or import a crafted one. This is not used
 # in this module but is made available for callers of this module.
 try:
     from bson import ObjectId  # pylint: disable=unused-import
+    from bson import SON
     from bson import Timestamp
     from pymongo import version as pymongo_version
+
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
+
+    SON = None
     Timestamp = None
     # Default Pymongo version if not present.
-    PYMONGO_VERSION = version.parse('4.0')
+    PYMONGO_VERSION = version.parse("4.0")
     HAVE_PYMONGO = False
 
 # Cache the RegExp pattern type.
-RE_TYPE = type(re.compile(''))
-_HOST_MATCH = re.compile(r'^([^@]+@)?([^:]+|\[[^\]]+\])(:([^:]+))?$')
-_SIMPLE_HOST_MATCH = re.compile(r'^([^:]+|\[[^\]]+\])(:([^:]+))?$')
+RE_TYPE = type(re.compile(""))
+_HOST_MATCH = re.compile(r"^([^@]+@)?([^:]+|\[[^\]]+\])(:([^:]+))?$")
+_SIMPLE_HOST_MATCH = re.compile(r"^([^:]+|\[[^\]]+\])(:([^:]+))?$")
 
 try:
     from bson.tz_util import utc
 except ImportError:
-    class _FixedOffset(tzinfo):
 
+    class _FixedOffset(tzinfo):
         def __init__(self, offset, name):
             self.__offset = timedelta(minutes=offset)
             self.__name = name
@@ -49,7 +56,8 @@ except ImportError:
 
         def dst(self, dt):
             return timedelta(0)
-    utc = _FixedOffset(0, 'UTC')
+
+    utc = _FixedOffset(0, "UTC")
 
 
 ASCENDING = 1
@@ -76,27 +84,28 @@ def utcnow():
 def print_deprecation_warning(old_param_name, new_param_name):
     warnings.warn(
         "'%s' has been deprecated to be in line with pymongo implementation, a new parameter '%s' "
-        'should be used instead. the old parameter will be kept for backward compatibility '
-        'purposes.' % (old_param_name, new_param_name), DeprecationWarning)
+        "should be used instead. the old parameter will be kept for backward compatibility "
+        "purposes." % (old_param_name, new_param_name),
+        DeprecationWarning,
+    )
 
 
 def create_index_list(key_or_list, direction=None):
     """Helper to generate a list of (key, direction) pairs.
 
-       It takes such a list, or a single key, or a single key and direction.
+    It takes such a list, or a single key, or a single key and direction.
     """
     if isinstance(key_or_list, str):
         return [(key_or_list, direction or ASCENDING)]
     if not isinstance(key_or_list, (list, tuple, abc.Iterable)):
-        raise TypeError('if no direction is specified, '
-                        'key_or_list must be an instance of list')
+        raise TypeError("if no direction is specified, " "key_or_list must be an instance of list")
     return key_or_list
 
 
 def gen_index_name(index_list):
     """Generate an index name based on the list of keys with directions."""
 
-    return u'_'.join(['%s_%s' % item for item in index_list])
+    return "_".join(["%s_%s" % item for item in index_list])
 
 
 class hashdict(dict):
@@ -118,48 +127,40 @@ class hashdict(dict):
     based on answers from
     http://stackoverflow.com/questions/1151658/python-hashable-dicts
     """
+
     def __key(self):
-        return frozenset((k,
-                          hashdict(v) if isinstance(v, dict) else
-                          tuple(v) if isinstance(v, list) else
-                          v)
-                         for k, v in self.items())
+        return frozenset(
+            (k, hashdict(v) if isinstance(v, dict) else tuple(v) if isinstance(v, list) else v) for k, v in self.items()
+        )
 
     def __repr__(self):
-        return '{0}({1})'.format(
-            self.__class__.__name__,
-            ', '.join('{0}={1}'.format(str(i[0]), repr(i[1])) for i in sorted(self.__key())))
+        return "{0}({1})".format(
+            self.__class__.__name__, ", ".join("{0}={1}".format(str(i[0]), repr(i[1])) for i in sorted(self.__key()))
+        )
 
     def __hash__(self):
         return hash(self.__key())
 
     def __setitem__(self, key, value):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def __delitem__(self, key):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def clear(self):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def pop(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def popitem(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def setdefault(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def update(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
-                        .format(self.__class__.__name__))
+        raise TypeError("{0} does not support item assignment".format(self.__class__.__name__))
 
     def __add__(self, right):
         result = hashdict(self)
@@ -179,7 +180,7 @@ def fields_list_to_dict(fields):
     as_dict = {}
     for field in fields:
         if not isinstance(field, str):
-            raise TypeError('fields must be a list of key names, each an instance of str')
+            raise TypeError("fields must be a list of key names, each an instance of str")
         as_dict[field] = 1
     return as_dict
 
@@ -201,39 +202,36 @@ def parse_uri(uri, default_port=27017, warn=False):
 
     'mongodb://host1' becomes 'host1', 27017, None
     """
-    SCHEME = 'mongodb://'
+    SCHEME = "mongodb://"
 
     if not uri.startswith(SCHEME):
-        raise InvalidURI('Invalid URI scheme: URI '
-                         "must begin with '%s'" % (SCHEME,))
+        raise InvalidURI("Invalid URI scheme: URI " "must begin with '%s'" % (SCHEME,))
 
-    scheme_free = uri[len(SCHEME):]
+    scheme_free = uri[len(SCHEME) :]
 
     if not scheme_free:
-        raise InvalidURI('Must provide at least one hostname or IP.')
+        raise InvalidURI("Must provide at least one hostname or IP.")
 
     dbase = None
 
     # Check for unix domain sockets in the uri
-    if '.sock' in scheme_free:
-        host_part, _, path_part = scheme_free.rpartition('/')
+    if ".sock" in scheme_free:
+        host_part, _, path_part = scheme_free.rpartition("/")
         if not host_part:
             host_part = path_part
-            path_part = ''
-        if '/' in host_part:
-            raise InvalidURI("Any '/' in a unix domain socket must be"
-                             ' URL encoded: %s' % host_part)
+            path_part = ""
+        if "/" in host_part:
+            raise InvalidURI("Any '/' in a unix domain socket must be" " URL encoded: %s" % host_part)
         path_part = unquote_plus(path_part)
     else:
-        host_part, _, path_part = scheme_free.partition('/')
+        host_part, _, path_part = scheme_free.partition("/")
 
-    if not path_part and '?' in host_part:
-        raise InvalidURI("A '/' is required between "
-                         'the host list and any options.')
+    if not path_part and "?" in host_part:
+        raise InvalidURI("A '/' is required between " "the host list and any options.")
 
     nodelist = []
-    if ',' in host_part:
-        hosts = host_part.split(',')
+    if "," in host_part:
+        hosts = host_part.split(",")
     else:
         hosts = [host_part]
     for host in hosts:
@@ -242,9 +240,10 @@ def parse_uri(uri, default_port=27017, warn=False):
             raise ValueError(
                 "Reserved characters such as ':' must be escaped according RFC "
                 "2396. An IPv6 address literal must be enclosed in '[' and ']' "
-                'according to RFC 2732.')
+                "according to RFC 2732."
+            )
         host = match.group(2)
-        if host.startswith('[') and host.endswith(']'):
+        if host.startswith("[") and host.endswith("]"):
             host = host[1:-1]
 
         port = match.group(4)
@@ -254,30 +253,30 @@ def parse_uri(uri, default_port=27017, warn=False):
                 if port < 0 or port > 65535:
                     raise ValueError()
             except ValueError as err:
-                raise ValueError('Port must be an integer between 0 and 65535:', port) from err
+                raise ValueError("Port must be an integer between 0 and 65535:", port) from err
         else:
             port = default_port
 
         nodelist.append((host, port))
 
-    if path_part and path_part[0] != '?':
-        dbase, _, _ = path_part.partition('?')
-        if '.' in dbase:
-            dbase, _ = dbase.split('.', 1)
+    if path_part and path_part[0] != "?":
+        dbase, _, _ = path_part.partition("?")
+        if "." in dbase:
+            dbase, _ = dbase.split(".", 1)
 
     if dbase is not None:
         dbase = unquote_plus(dbase)
 
-    return {'nodelist': tuple(nodelist), 'database': dbase}
+    return {"nodelist": tuple(nodelist), "database": dbase}
 
 
 def split_hosts(hosts, default_port=27017):
     """Split the entity into a list of tuples of host and port."""
 
     nodelist = []
-    for entity in hosts.split(','):
+    for entity in hosts.split(","):
         port = default_port
-        if entity.endswith('.sock'):
+        if entity.endswith(".sock"):
             port = None
 
         match = _SIMPLE_HOST_MATCH.match(entity)
@@ -285,9 +284,10 @@ def split_hosts(hosts, default_port=27017):
             raise ValueError(
                 "Reserved characters such as ':' must be escaped according RFC "
                 "2396. An IPv6 address literal must be enclosed in '[' and ']' "
-                'according to RFC 2732.')
+                "according to RFC 2732."
+            )
         host = match.group(1)
-        if host.startswith('[') and host.endswith(']'):
+        if host.startswith("[") and host.endswith("]"):
             host = host[1:-1]
 
         if match.group(3):
@@ -296,7 +296,7 @@ def split_hosts(hosts, default_port=27017):
                 if port < 0 or port > 65535:
                     raise ValueError()
             except ValueError as err:
-                raise ValueError('Port must be an integer between 0 and 65535:', port) from err
+                raise ValueError("Port must be an integer between 0 and 65535:", port) from err
 
         nodelist.append((host, port))
 
@@ -309,7 +309,7 @@ _LAST_TIMESTAMP_INC = []
 def get_current_timestamp():
     """Get the current timestamp as a bson Timestamp object."""
     if not Timestamp:
-        raise NotImplementedError('timestamp is not supported. Import pymongo to use it.')
+        raise NotImplementedError("timestamp is not supported. Import pymongo to use it.")
     now = int(time.time())
     if _LAST_TIMESTAMP_INC and _LAST_TIMESTAMP_INC[0] == now:
         _LAST_TIMESTAMP_INC[1] += 1
@@ -356,7 +356,7 @@ def make_datetime_timezone_aware_in_document(value):
 def get_value_by_dot(doc, key, can_generate_array=False):
     """Get dictionary value using dotted key"""
     result = doc
-    key_items = key.split('.')
+    key_items = key.split(".")
     for key_index, key_item in enumerate(key_items):
         if isinstance(result, dict):
             result = result[key_item]
@@ -367,7 +367,7 @@ def get_value_by_dot(doc, key, can_generate_array=False):
             except ValueError as err:
                 if not can_generate_array:
                     raise KeyError(key_index) from err
-                remaining_key = '.'.join(key_items[key_index:])
+                remaining_key = ".".join(key_items[key_index:])
                 return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
 
             try:
@@ -384,7 +384,7 @@ def get_value_by_dot(doc, key, can_generate_array=False):
 def set_value_by_dot(doc, key, value):
     """Set dictionary value using dotted key"""
     try:
-        parent_key, child_key = key.rsplit('.', 1)
+        parent_key, child_key = key.rsplit(".", 1)
         parent = get_value_by_dot(doc, parent_key)
     except ValueError:
         child_key = key
@@ -409,7 +409,7 @@ def delete_value_by_dot(doc, key):
     This function assumes that the value exists.
     """
     try:
-        parent_key, child_key = key.rsplit('.', 1)
+        parent_key, child_key = key.rsplit(".", 1)
         parent = get_value_by_dot(doc, parent_key)
     except ValueError:
         child_key = key
@@ -424,3 +424,105 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
+
+
+def to_long(value):
+    """Backwards compatible `long` function. It tries to convert input to a long integer."""
+    if PY3:
+        global long  # pylint: disable=global-variable-undefined
+        long = int
+    return long(value)
+
+
+class _ToHashableParser(object):
+    ORDERED_TYPES = (OrderedDict, SON) if SON else (OrderedDict,)
+
+    def __init__(self, value):
+        self.__visiting = set()
+        self.__root_value = value
+        self.__has_warned_ordered_dict = False
+
+    def parse(self):
+        return self.__parse(self.__root_value)
+
+    def __parse(self, value):
+        if id(value) in self.__visiting:
+            raise RuntimeError("unexpected error: recursive structure detected")
+        self.__visiting.add(id(value))
+
+        if isinstance(value, (list, tuple)):
+            hashable = ("list", tuple(self.__parse(v) for v in value))
+        elif isinstance(value, dict):
+            if (
+                sys.version_info < (3, 7)
+                and not isinstance(value, self.ORDERED_TYPES)
+                and not self.__has_warned_ordered_dict
+            ):
+                warnings.warn(
+                    "not using collections.OrderedDict or bson.son.SON for "
+                    "(sub)documents used in operations that compare them with "
+                    "others might yield unexpected results in Python<3.7"
+                )
+                self.__has_warned_ordered_dict = True
+            hashable = ("dict", tuple((k, self.__parse(v)) for k, v in iteritems(value)))
+        else:
+            # We are trusting value is hashable already (int, float, etc)
+            hashable = ("other", value)
+
+        self.__visiting.remove(id(value))
+
+        if value is self.__root_value:
+            return ToHashableResult(hashable, value)
+        return hashable
+
+
+class ToHashableResult(object):
+    def __init__(self, hashable, original):
+        self.hashable = hashable
+        self.original = original
+
+    def __hash__(self):
+        return hash(self.hashable)
+
+    def __repr__(self):
+        return repr(self.original)
+
+    def __eq__(self, other):
+        if not isinstance(other, ToHashableResult):
+            other = to_hashable(other)
+        return self.hashable == other.hashable
+
+
+def to_hashable(value):
+    """Convert a value to a representation that can be used as a hashable object.
+
+    This function returns a ToHashableResult object, which can be used in
+    places where a hashable object is expected. The original object can be
+    retrived with the via the attribute "original".
+
+    For example, it is possible to use a list as element of a set:
+
+    >>> s = {to_hashable([1, 2, 3]), to_hashable([4, 5, 6])}
+    >>> to_hashable([1, 2, 3]) in s
+    True
+
+    Notes:
+
+    - Order of keys in dictionaries are taken into account, meaning that, for
+      Python>=3.7, the following is expected::
+
+      >>> to_hashable({'a': 1, 'b': 2}) == to_hashable({'b': 2, 'a': 1}).
+      False
+
+    - Lists and tuples are considered equivalent::
+
+      >>> to_hashable([1, 2, 3]) == to_hashable((1, 2, 3))
+      True
+
+    The returned object is also comparable with values that are not wrapped
+    with to_hashable()::
+
+    >>> to_hashable('foo') == 'foo'
+    True
+    """
+    return _ToHashableParser(value).parse()
