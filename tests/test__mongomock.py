@@ -1666,6 +1666,16 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 {'name': 'bob'},
                 {'$addToSet': {'shirt.color': {'$each': ['green', 'yellow']}}})
             self.cmp.compare.find({'name': 'bob'})
+        for _ in range(3):
+            self.cmp.do.update_many(
+                {'name': 'bob'},
+                {'$addToSet': {'tie': {'$each': ['blue', 'blue', 'blue', 'red']}}})
+            self.cmp.compare.find({'name': 'bob'})
+        for _ in range(3):
+            self.cmp.do.update_many(
+                {'name': 'bob'},
+                {'$addToSet': {'buttons': {'$each': [[1, 2, 3], [1, 2, 3], [1, 2, 3], [3, 2, 1]]}}})
+            self.cmp.compare.find({'name': 'bob'})
 
     def test__addToSet_dollar_operand(self):
         self.cmp.do.delete_many({})

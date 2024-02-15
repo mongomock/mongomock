@@ -721,10 +721,10 @@ class Collection(object):
                             # document should be a list append to it
                             if isinstance(value, dict):
                                 if '$each' in value:
-                                    # append the list to the field
-                                    existing_document[field] += [
-                                        obj for obj in list(value['$each'])
-                                        if obj not in existing_document[field]]
+                                    # append the objects to the field
+                                    for obj in list(value['$each']):
+                                        if obj not in existing_document[field]:
+                                            existing_document[field].append(obj)
                                     continue
                             if value not in existing_document[field]:
                                 existing_document[field].append(value)
