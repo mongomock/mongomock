@@ -4,13 +4,14 @@
 # Packages
 *.egg
 *.egg-info
+.eggs/
 dist
 build
-.eggs/
 
 # Unit test / coverage reports
 coverage.xml
 .coverage
+.coverage.*
 .tox
 .cache/
 .pytest_cache/
