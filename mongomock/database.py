@@ -28,11 +28,11 @@ _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
 def _verify_list_collection_supported_op(keys):
     if set(keys) - _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS:
         raise NotImplementedError(
-            'list collection names filter operator {0} is not implemented yet in mongomock '
-            'allowed operators are {1}'.format(keys, _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS))
+            'list collection names filter operator {} is not implemented yet in mongomock '
+            'allowed operators are {}'.format(keys, _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS))
 
 
-class Database(object):
+class Database:
 
     def __init__(
         self, client, name, _store, read_preference=None, codec_options=None, read_concern=None
@@ -59,7 +59,7 @@ class Database(object):
         return self[attr]
 
     def __repr__(self):
-        return "Database({0}, '{1}')".format(self._client, self.name)
+        return f"Database({self._client}, '{self.name}')"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -114,7 +114,7 @@ class Database(object):
 
         if filter:
             if not filter.get('name'):
-                raise NotImplementedError('list collection {0} might be valid but is not '
+                raise NotImplementedError('list collection {} might be valid but is not '
                                           'implemented yet in mongomock'.format(filter))
 
             filter = {field_name: {'$eq': filter.get(field_name)}} \
@@ -190,13 +190,13 @@ class Database(object):
         # https://docs.mongodb.com/manual/reference/command/renameCollection/
         if not self._store[name].is_created:
             raise OperationFailure(
-                'The collection "{0}" does not exist.'.format(name), 10026)
+                f'The collection "{name}" does not exist.', 10026)
         if new_name in self._store:
             if dropTarget:
                 self.drop_collection(new_name)
             else:
                 raise OperationFailure(
-                    'The target collection "{0}" already exists'.format(new_name),
+                    f'The target collection "{new_name}" already exists',
                     10027)
         self._store.rename(name, new_name)
         return {'ok': 1}

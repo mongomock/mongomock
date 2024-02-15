@@ -1,15 +1,7 @@
 from .mongo_client import MongoClient
 import time
 
-try:
-    from unittest import mock
-    _IMPORT_MOCK_ERROR = None
-except ImportError:
-    try:
-        import mock
-        _IMPORT_MOCK_ERROR = None
-    except ImportError as error:
-        _IMPORT_MOCK_ERROR = error
+from unittest import mock
 
 try:
     import pymongo
@@ -54,9 +46,6 @@ def patch(servers='localhost', on_new='error'):
             'pymongo': use an actual pymongo client.
         servers: a list of server that are avaiable.
     """
-
-    if _IMPORT_MOCK_ERROR:
-        raise _IMPORT_MOCK_ERROR  # pylint: disable=raising-bad-type
 
     if _IMPORT_PYMONGO_ERROR:
         PyMongoClient = None

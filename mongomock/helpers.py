@@ -96,7 +96,7 @@ def create_index_list(key_or_list, direction=None):
 def gen_index_name(index_list):
     """Generate an index name based on the list of keys with directions."""
 
-    return u'_'.join(['%s_%s' % item for item in index_list])
+    return '_'.join(['%s_%s' % item for item in index_list])
 
 
 class hashdict(dict):
@@ -126,39 +126,39 @@ class hashdict(dict):
                          for k, v in self.items())
 
     def __repr__(self):
-        return '{0}({1})'.format(
+        return '{}({})'.format(
             self.__class__.__name__,
-            ', '.join('{0}={1}'.format(str(i[0]), repr(i[1])) for i in sorted(self.__key())))
+            ', '.join(f'{str(i[0])}={repr(i[1])}' for i in sorted(self.__key())))
 
     def __hash__(self):
         return hash(self.__key())
 
     def __setitem__(self, key, value):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def __delitem__(self, key):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def clear(self):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def pop(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def popitem(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def setdefault(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def update(self, *args, **kwargs):
-        raise TypeError('{0} does not support item assignment'
+        raise TypeError('{} does not support item assignment'
                         .format(self.__class__.__name__))
 
     def __add__(self, right):

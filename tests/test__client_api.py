@@ -1,20 +1,10 @@
+import mongomock
+from mongomock import helpers
 from packaging import version
 import sys
 import unittest
 from unittest import skipIf, skipUnless
-
-try:
-    from unittest import mock
-    _HAVE_MOCK = True
-except ImportError:
-    try:
-        import mock
-        _HAVE_MOCK = True
-    except ImportError:
-        _HAVE_MOCK = False
-
-import mongomock
-from mongomock import helpers
+from unittest import mock
 
 try:
     from bson import codec_options
@@ -133,7 +123,6 @@ class MongoClientApiTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             mongomock.MongoClient('localhost:mongoport')
 
-    @unittest.skipIf(not _HAVE_MOCK, 'mock not installed')
     def test_database_names(self):
         client = mongomock.MongoClient()
         client.one_db.my_collec.insert_one({})

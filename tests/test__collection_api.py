@@ -14,16 +14,7 @@ import warnings
 
 import mongomock
 from mongomock import helpers
-
-try:
-    from unittest import mock
-    _HAVE_MOCK = True
-except ImportError:
-    try:
-        import mock
-        _HAVE_MOCK = True
-    except ImportError:
-        _HAVE_MOCK = False
+from unittest import mock
 
 try:
     from bson import codec_options
@@ -1487,7 +1478,6 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': ['a', 'b', 'c', 1, 2, 3]})
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-    @skipIf(not _HAVE_MOCK, 'mock not installed')
     def test__ttl_expiry_with_mock(self):
         now = datetime.utcnow()
         self.db.collection.create_index([('value', 1)], expireAfterSeconds=100)
@@ -6760,9 +6750,6 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure):
                 collection.aggregate(item)
 
-    # https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/#examples
-    @skipIf(
-        sys.version_info < (3, 6), "It's harder to keep dict sorted in older versions of Python")
     def test_aggregate_object_to_array_with_example(self):
         collection = self.db.collection
 
