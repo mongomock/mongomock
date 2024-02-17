@@ -1049,6 +1049,25 @@ class _Parser(object):
                 if set1 != set2:
                     return False
             return True
+        if operator == '$setIntersection':
+            union_set = []
+            for set_value in values:
+                for value in self.parse(set_value):
+                    if value not in union_set: 
+                        union_set.append(value)
+            
+            intersection_set = []
+            for value in union_set:
+                is_present_in_all_sets = True
+                for set_value in values:
+                    if value not in self.parse(set_value):
+                        is_present_in_all_sets = False
+                if is_present_in_all_sets:
+                    intersection_set.append(value)
+
+            return intersection_set
+
+
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
