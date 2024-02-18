@@ -13,12 +13,13 @@ import warnings
 # in this module but is made available for callers of this module.
 try:
     from bson import ObjectId  # pylint: disable=unused-import
-    from bson import Timestamp
+    from bson import DBRef, Timestamp
     from pymongo import version as pymongo_version
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
     from mongomock.object_id import ObjectId  # noqa
+    DBRef = None
     Timestamp = None
     # Default Pymongo version if not present.
     PYMONGO_VERSION = version.parse('4.0')
@@ -374,6 +375,9 @@ def get_value_by_dot(doc, key, can_generate_array=False):
                 result = result[int_key]
             except (ValueError, IndexError) as err:
                 raise KeyError(key_index) from err
+
+        elif DBRef and isinstance(result, DBRef):
+            result = result.as_doc()[key_item]
 
         else:
             raise KeyError(key_index)
