@@ -25,6 +25,14 @@ if codec_options and helpers.PYMONGO_VERSION >= version.parse('3.8'):
 else:
     _DEFAULT_TYPE_REGISTRY = TypeRegistry()
 
+if codec_options and helpers.PYMONGO_VERSION >= version.parse('4.3.0'):
+    _DATETIME_CONVERSION_VALUES = codec_options.DatetimeConversion._value2member_map_
+    _DATETIME_CONVERSION_DEFAULT_VALUE = codec_options.DatetimeConversion.DATETIME
+    _FIELDS = _FIELDS + ('datetime_conversion',)
+else:
+    _DATETIME_CONVERSION_VALUES = ()
+    _DATETIME_CONVERSION_DEFAULT_VALUE = None
+
 # New default in Pymongo v4:
 # https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
 if helpers.PYMONGO_VERSION >= version.parse('4.0'):
@@ -39,7 +47,8 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
                 tz_aware=False,
                 uuid_representation=None,
                 unicode_decode_error_handler='strict',
-                tzinfo=None, type_registry=None):
+                tzinfo=None, type_registry=None,
+                datetime_conversion=_DATETIME_CONVERSION_DEFAULT_VALUE):
 
         if document_class != dict:
             raise NotImplementedError(
@@ -70,6 +79,11 @@ class CodecOptions(collections.namedtuple('CodecOptions', _FIELDS)):
                 raise NotImplementedError(
                     'Mongomock does not handle custom type_registry yet %r' % type_registry)
             values = values + (type_registry,)
+
+        if 'datetime_conversion' in _FIELDS:
+            if datetime_conversion and datetime_conversion not in _DATETIME_CONVERSION_VALUES:
+                raise TypeError('datetime_conversion must be member of DatetimeConversion')
+            values = values + (datetime_conversion,)
 
         return tuple.__new__(cls, values)
 
