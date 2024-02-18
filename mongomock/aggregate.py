@@ -1153,7 +1153,11 @@ def _handle_lookup_stage(in_collection, database, options):
     foreign_collection = database.get_collection(foreign_name)
     for doc in in_collection:
         try:
-            query = helpers.get_value_by_dot(doc, local_field)
+            query = helpers.get_value_by_dot(
+                doc,
+                local_field,
+                can_generate_array=True
+            )
         except KeyError:
             query = None
         if isinstance(query, list):
