@@ -22,7 +22,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$redact <https://docs.mongodb.com/manual/reference/operator/aggregation/redact/>`_
   * `$replaceWith <https://docs.mongodb.com/manual/reference/operator/aggregation/replaceWith/>`_
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
-  * `$unset <https://docs.mongodb.com/manual/reference/operator/aggregation/unset/>` _
 * Operators within the aggregate pipeline:
   * Arithmetic operations on dates:
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_

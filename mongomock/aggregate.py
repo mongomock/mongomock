@@ -1570,6 +1570,24 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     return out_collection
 
 
+def _handle_remove_fields_stage(in_collection, unused_database, options):
+    out_collection = in_collection
+    if not options:
+        raise OperationFailure(
+            'Invalid $unset :: caused by :: $unset specification must be a string or an array with at least one field')
+    if not isinstance(options, list | str):
+        raise OperationFailure(
+            'Invalid $unset :: caused by :: specification must be a string or an array')
+
+    if not isinstance(options, list):
+        options = list(options)
+    for option in options:
+        for entry in out_collection:
+            if option in entry:
+                del entry[option]
+    return out_collection
+
+
 def _handle_out_stage(in_collection, database, options):
     # TODO(MetrodataTeam): should leave the origin collection unchanged
     out_collection = database.get_collection(options)
@@ -1635,7 +1653,7 @@ _PIPELINE_HANDLERS = {
     '$skip': lambda c, d, o: c[o:],
     '$sort': _handle_sort_stage,
     '$sortByCount': None,
-    '$unset': None,
+    '$unset': _handle_remove_fields_stage,
     '$unwind': _handle_unwind_stage,
 }
 

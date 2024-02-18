@@ -4624,6 +4624,28 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([
                 {'$project': {'a': {'$literal': False, 'hint': False}}},
             ])
+    def test__aggregate_unset(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$unset': 'a'}])
+        self.assertEqual(
+            [{'b': 2, 'c': 2}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
+    def test__aggregate_unset_multi(self):
+        self.db.collection.insert_one({
+            'a': 1.5,
+            'b': 2,
+            'c': 2,
+        })
+        actual = self.db.collection.aggregate([{'$unset': ['a', 'b']}])
+        self.assertEqual(
+            [{'c': 2}],
+            [{k: v for k, v in doc.items() if k != '_id'} for doc in actual])
+
 
     def test__find_type_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2]})
