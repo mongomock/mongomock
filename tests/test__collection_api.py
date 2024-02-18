@@ -2819,6 +2819,43 @@ class CollectionAPITest(TestCase):
             {'_id': 3, 'b': [{'_id': 4, 'arr': [1, 3]}]}
         ], list(actual))
 
+    def test__aggregate_lookup_dbref(self):
+        self.db.a.insert_many([
+            {'_id': 2},
+            {'_id': 3},
+            {'_id': 4}
+        ])
+        self.db.b.insert_one({
+            '_id': 1,
+            'refs': [
+                DBRef('a', 2),
+                DBRef('a', 4, self.db.name)
+            ]
+        })
+        actual = self.db.b.aggregate([
+            {
+                '$lookup': {
+                    'from': 'a',
+                    'localField': 'refs.$id',
+                    'foreignField': '_id',
+                    'as': 'related'
+                }
+            }
+        ])
+        self.assertEqual([
+            {
+                '_id': 1,
+                'refs': [
+                    DBRef('a', 2),
+                    DBRef('a', 4, self.db.name)
+                ],
+                'related': [
+                    {'_id': 2},
+                    {'_id': 4}
+                ]
+            }
+        ], list(actual))
+
     def test__aggregate_lookup_not_implemented_operators(self):
         with self.assertRaises(NotImplementedError) as err:
             self.db.a.aggregate([
