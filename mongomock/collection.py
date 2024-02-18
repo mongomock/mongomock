@@ -1484,16 +1484,17 @@ class Collection(object):
         count = max(doc_num - skip, 0)
         return count if limit is None else min(count, limit)
 
-    def estimated_document_count(self, **kwargs):
-        if kwargs.pop('session', None):
-            raise ConfigurationError('estimated_document_count does not support sessions')
-        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
-        if self.database.client.server_info()['versionArray'] < [5]:
-            unknown_kwargs.discard('skip')
-        if unknown_kwargs:
-            raise OperationFailure(
-                "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
-        return self.count_documents({}, **kwargs)
+    if helpers.PYMONGO_VERSION >= version.parse('3.7.0'):
+        def estimated_document_count(self, **kwargs):
+            if kwargs.pop('session', None):
+                raise ConfigurationError('estimated_document_count does not support sessions')
+            unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
+            if helpers.PYMONGO_VERSION >= version.parse('4.2.0'):
+                unknown_kwargs.discard('skip')
+            if unknown_kwargs:
+                raise OperationFailure(
+                    "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
+            return self.count_documents({}, **kwargs)
 
     def drop(self, session=None):
         if session:
