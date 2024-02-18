@@ -2143,6 +2143,20 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_one({'a': {'$in': 'not a list'}})
 
+    def test__find_in_by_empty_list(self):
+        sample_dicts = [
+            {'key': 1},
+            {'key': []},
+            {'key': ''},
+            {'key': []}
+        ]
+
+        self.db.collection.insert_many(sample_dicts)
+
+        filter_by = [[]]
+        returned_document = self.db.collection.find_one({'key': {'$in': filter_by}})
+        self.assertTrue(returned_document)
+
     def test__with_options(self):
         self.db.collection.with_options(read_preference=None)
         self.db.collection.with_options(write_concern=self.db.collection.write_concern)
