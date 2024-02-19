@@ -198,17 +198,20 @@ class CollectionStore(object):
 
     def to_dict(self):
         lst = []
-        for k, v in self._documents.items():
-            v['_id'] = str(v['_id'])
-            lst.append((str(k), v))
+        for key, val in self._documents.items():
+            val['_id'] = str(val['_id'])
+            lst.append((str(key), val))
         return {'name': self.name, 'documents': lst}
 
     @classmethod
     def from_dict(cls, dct):
         lst = []
-        for k, v in dct['documents']:
-            v['_id'] = bson.ObjectId(v['_id'])
-            lst.append((bson.ObjectId(k), v))
+        for key, val in dct['documents']:
+            assert key == val['_id']
+            if isinstance(key, str) and len(key) == 24:
+                val['_id'] = bson.ObjectId(val['_id'])
+                key = bson.ObjectId(key)
+            lst.append((key, val))
         return cls(dct['name'], collections.OrderedDict(lst))
 
 
