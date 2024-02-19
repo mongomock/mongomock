@@ -801,131 +801,8 @@ class _Parser(object):
             'in Mongomock.' % operator)
 
     def _handle_type_convertion_operator(self, operator, values):
-        if operator == '$toString':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if isinstance(parsed, bool):
-                return str(parsed).lower()
-            if isinstance(parsed, datetime.datetime):
-                return parsed.isoformat()[:-3] + 'Z'
-            return str(parsed)
-
-        if operator == '$toInt':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if decimal_support:
-                if isinstance(parsed, decimal128.Decimal128):
-                    return int(parsed.to_decimal())
-                return int(parsed)
-            raise NotImplementedError(
-                'You need to import the pymongo library to support decimal128 type.'
-            )
-
-        if operator == '$toLong':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if decimal_support:
-                if isinstance(parsed, decimal128.Decimal128):
-                    return int(parsed.to_decimal())
-                return int(parsed)
-            raise NotImplementedError(
-                'You need to import the pymongo library to support decimal128 type.'
-            )
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
-        if operator == '$toDecimal':
-            if not decimal_support:
-                raise NotImplementedError(
-                    'You need to import the pymongo library to support decimal128 type.'
-                )
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if isinstance(parsed, bool):
-                parsed = '1' if parsed is True else '0'
-                decimal_value = decimal128.Decimal128(parsed)
-            elif isinstance(parsed, int):
-                decimal_value = decimal128.Decimal128(str(parsed))
-            elif isinstance(parsed, float):
-                exp = decimal.Decimal('.00000000000000')
-                decimal_value = decimal.Decimal(str(parsed)).quantize(exp)
-                decimal_value = decimal128.Decimal128(decimal_value)
-            elif isinstance(parsed, decimal128.Decimal128):
-                decimal_value = parsed
-            elif isinstance(parsed, str):
-                try:
-                    decimal_value = decimal128.Decimal128(parsed)
-                except decimal.InvalidOperation as err:
-                    raise OperationFailure(
-                        "Failed to parse number '%s' in $convert with no onError value:"
-                        'Failed to parse string to decimal' % parsed) from err
-            elif isinstance(parsed, datetime.datetime):
-                epoch = datetime.datetime.utcfromtimestamp(0)
-                string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
-                decimal_value = decimal128.Decimal128(string_micro_seconds)
-            else:
-                raise TypeError("'%s' type is not supported" % type(parsed))
-            return decimal_value
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
-        if operator == '$arrayToObject':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
-                return None
-
-            if not isinstance(parsed, (list, tuple)):
-                raise OperationFailure(
-                    '$arrayToObject requires an array input, found: {}'.format(type(parsed))
-                )
-
-            if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
-                return {d['k']: d['v'] for d in parsed}
-
-            if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in parsed):
-                return dict(parsed)
-
-            raise OperationFailure(
-                'arrays used with $arrayToObject must contain documents '
-                'with k and v fields or two-element arrays'
-            )
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
-        if operator == '$objectToArray':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
-                return None
-
-            if not isinstance(parsed, (dict, collections.OrderedDict)):
-                raise OperationFailure(
-                    '$objectToArray requires an object input, found: {}'.format(type(parsed))
-                )
-
-            if len(parsed) > 1 and sys.version_info < (3, 6):
-                raise NotImplementedError(
-                    "Although '%s' is a valid type conversion, it is not implemented for Python 2 "
-                    'and Python 3.5 in Mongomock yet.' % operator)
-
-            return [{'k': k, 'v': v} for k, v in parsed.items()]
-
-        raise NotImplementedError(
-            "Although '%s' is a valid type conversion operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            'in Mongomock.' % operator)
+        handler = self._TYPE_CONVERTION_HANDLERS[operator]
+        return handler(self, values)
 
     def _handle_type_operator(self, operator, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
@@ -1052,6 +929,189 @@ class _Parser(object):
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
+
+    def _handle_type_convertion_to_string(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if isinstance(parsed, bool):
+            return str(parsed).lower()
+        if isinstance(parsed, datetime.datetime):
+            return parsed.isoformat()[:-3] + 'Z'
+        return str(parsed)
+
+    def _handle_type_convertion_to_int(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if decimal_support:
+            if isinstance(parsed, decimal128.Decimal128):
+                return int(parsed.to_decimal())
+            return int(parsed)
+        raise NotImplementedError(
+            'You need to import the pymongo library to support decimal128 type.'
+        )
+
+    def _handle_type_convertion_to_long(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if decimal_support:
+            if isinstance(parsed, decimal128.Decimal128):
+                return int(parsed.to_decimal())
+            return int(parsed)
+        raise NotImplementedError(
+            'You need to import the pymongo library to support decimal128 type.'
+        )
+
+    def _handle_type_convertion_to_decimal(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
+        if not decimal_support:
+            raise NotImplementedError(
+                'You need to import the pymongo library to support decimal128 type.'
+            )
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if isinstance(parsed, bool):
+            parsed = '1' if parsed is True else '0'
+            decimal_value = decimal128.Decimal128(parsed)
+        elif isinstance(parsed, int):
+            decimal_value = decimal128.Decimal128(str(parsed))
+        elif isinstance(parsed, float):
+            exp = decimal.Decimal('.00000000000000')
+            decimal_value = decimal.Decimal(str(parsed)).quantize(exp)
+            decimal_value = decimal128.Decimal128(decimal_value)
+        elif isinstance(parsed, decimal128.Decimal128):
+            decimal_value = parsed
+        elif isinstance(parsed, str):
+            try:
+                decimal_value = decimal128.Decimal128(parsed)
+            except decimal.InvalidOperation as err:
+                raise OperationFailure(
+                    "Failed to parse number '%s' in $convert with no onError value:"
+                    'Failed to parse string to decimal' % parsed) from err
+        elif isinstance(parsed, datetime.datetime):
+            epoch = datetime.datetime.utcfromtimestamp(0)
+            string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
+            decimal_value = decimal128.Decimal128(string_micro_seconds)
+        else:
+            raise TypeError("'%s' type is not supported" % type(parsed))
+        return decimal_value
+
+    def _handle_type_convertion_array_to_object(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+
+        if parsed is None:
+            return None
+
+        if not isinstance(parsed, (list, tuple)):
+            raise OperationFailure(
+                '$arrayToObject requires an array input, found: {}'.format(type(parsed))
+            )
+
+        if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
+            return {d['k']: d['v'] for d in parsed}
+
+        if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in parsed):
+            return dict(parsed)
+
+        raise OperationFailure(
+            'arrays used with $arrayToObject must contain documents '
+            'with k and v fields or two-element arrays'
+        )
+
+    def _handle_type_convertion_object_to_array(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+
+        if parsed is None:
+            return None
+
+        if not isinstance(parsed, (dict, collections.OrderedDict)):
+            raise OperationFailure(
+                '$objectToArray requires an object input, found: {}'.format(type(parsed))
+            )
+
+        if len(parsed) > 1 and sys.version_info < (3, 6):
+            raise NotImplementedError(
+                "Although '$objectToArray' is a valid type conversion, it is not implemented for Python 2 "
+                'and Python 3.5 in Mongomock yet.')
+
+        return [{'k': k, 'v': v} for k, v in parsed.items()]
+
+    def _handle_convert(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        input_ = parsed['input']
+        to_ = parsed['to']
+        on_error = parsed.get("onError", None)
+        on_null = parsed.get('onNull', None)
+        if (on_error is not None) or (on_null is not None):
+            raise NotImplementedError(
+                'Although onError and onNull are valid fields for the '
+                "'$convert' operator, they are currently not implemented "
+                'in Mongomock.')
+        try:
+            handler = self._CONVERT_TO_HANDLERS[to_]
+        except KeyError as err :
+            raise OperationFailure(
+                "'%s' is not a valid Input Type for '$convert'."
+                    % input_) from err
+
+        return handler(self, input_)
+
+    @staticmethod
+    def _raise_convert_not_implemented(to_):
+        def handler(_self, _values):
+            raise NotImplementedError(
+                "Although %s is a valid identifier for the '$convert' operator's 'to' field, "
+                'it is currently not implemented in Mongomock.' % to_)
+
+        return handler
+
+    _TYPE_CONVERTION_HANDLERS = {
+        '$toString': _handle_type_convertion_to_string,
+        '$toInt': _handle_type_convertion_to_int,
+        '$toLong': _handle_type_convertion_to_long,
+        '$toDecimal': _handle_type_convertion_to_decimal,
+        '$arrayToObject': _handle_type_convertion_array_to_object,
+        '$objectToArray': _handle_type_convertion_object_to_array,
+        '$convert': _handle_convert
+    }
+
+    # Document: https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/#syntax
+    _CONVERT_TO_HANDLERS = {
+        'double': _raise_convert_not_implemented('double'),
+        'string': _handle_type_convertion_to_string,
+        'objectId': _raise_convert_not_implemented('objectId'),
+        'bool': _raise_convert_not_implemented('bool'),
+        'date': _raise_convert_not_implemented('date'),
+        'int': _handle_type_convertion_to_int,
+        'long': _handle_type_convertion_to_long,
+        'decimal': _handle_type_convertion_to_decimal,
+        1: _raise_convert_not_implemented(1),   # double
+        2: _handle_type_convertion_to_string,   # string
+        7: _raise_convert_not_implemented(7),   # objectId
+        8: _raise_convert_not_implemented(8),   # bool
+        9: _raise_convert_not_implemented(9),   # date
+        16: _handle_type_convertion_to_int,     # int
+        18: _handle_type_convertion_to_long,    # long
+        19: _handle_type_convertion_to_decimal, # decimal
+    }
 
 
 def _parse_expression(expression, doc_dict, ignore_missing_keys=False):
