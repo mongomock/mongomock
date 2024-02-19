@@ -12,11 +12,15 @@ from mongomock.thread import RWLock
 class ServerStore(object):
     """Object holding the data for a whole server (many databases)."""
 
-    def __init__(self, databases=None, filename=None):
-        self._databases = databases or {}
+    def __init__(self, filename=None):
         self._filename = filename
         if self._filename:
+            with open(self._filename, 'r', encoding='utf-8') as fh:
+                dct = json.load(fh)
+            self._databases = {k: DatabaseStore.from_dict(v) for k, v in dct.items()}
             weakref.finalize(self, self._to_file)
+        else:
+            self._databases = {}
 
     def __getitem__(self, db_name):
         try:
@@ -34,20 +38,9 @@ class ServerStore(object):
     def to_dict(self):
         return {k: v.to_dict() for k, v in self._databases.items()}
 
-    @classmethod
-    def from_dict(cls, dct, **kwargs):
-        databases = {k: DatabaseStore.from_dict(v) for k, v in dct.items()}
-        return cls(databases, **kwargs)
-
     def _to_file(self):
         with open(self._filename, 'w', encoding='utf-8') as fh:
             json.dump(self.to_dict(), fh, default=str)
-
-    @classmethod
-    def from_file(cls, filename):
-        with open(filename, 'r', encoding='utf-8') as fh:
-            dct = json.load(fh)
-        return cls.from_dict(dct, filename=filename)
 
 
 class DatabaseStore(object):
