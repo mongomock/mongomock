@@ -2,17 +2,22 @@
 FROM ubuntu:focal
 
 RUN apt-get update \
- && apt-get install -y make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev git netcat
+ && apt-get install -y make wget curl llvm git netcat \
+    build-essential \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libncurses5-dev
 RUN curl -L https://raw.githubusercontent.com/yyuu/pyenv-installer/master/bin/pyenv-installer | bash
 
 ENV PYENV_ROOT /root/.pyenv
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 RUN eval "$(pyenv init -)" && eval "$(pyenv virtualenv-init -)"
-RUN pyenv install 3.8.12
-RUN pyenv install 3.9.10
-RUN pyenv install pypy3.8-7.3.7
-RUN pyenv install 3.10.2
-RUN pyenv local 3.6.15 3.7.9 3.8.12 3.9.10 3.10.2 pypy3.8-7.3.7
+RUN pyenv install 3.8.18 3.9.18 3.10.13 3.11.8 3.12.2 pypy3.10-7.3.15 \
+ && pyenv local   3.8.18 3.9.18 3.10.13 3.11.8 3.12.2 pypy3.10-7.3.15
 
-RUN pip install tox
+RUN pip install hatch
