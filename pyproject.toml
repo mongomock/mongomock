@@ -11,6 +11,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "Rotem Yaari", email = "vmalloc@gmail.com" },
     { name = "Martin Domke", email = "mail@martindomke.net" },
+    { name = "Pascal Corpet", email = "pascal@corpet.net" },
 ]
 classifiers = [
     "License :: OSI Approved :: ISC License (ISCL)",
