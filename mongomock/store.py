@@ -1,8 +1,8 @@
+import os
 import collections
 import datetime
 import functools
 import weakref
-import json
 import bson
 
 import mongomock
@@ -13,10 +13,10 @@ class ServerStore(object):
     """Object holding the data for a whole server (many databases)."""
 
     def __init__(self, filename=None):
-        self._filename = filename
+        self._filename = filename or os.environ.get('MONGOMOCK_SERVERSTORE_FILE')
         if self._filename:
             with open(self._filename, 'r', encoding='utf-8') as fh:
-                dct = json.load(fh)
+                dct = bson.json_util.loads(fh.read())
             self._databases = {k: DatabaseStore.from_dict(v) for k, v in dct.items()}
             weakref.finalize(self, self._to_file)
         else:
@@ -40,7 +40,7 @@ class ServerStore(object):
 
     def _to_file(self):
         with open(self._filename, 'w', encoding='utf-8') as fh:
-            json.dump(self.to_dict(), fh, default=str)
+            fh.write(bson.json_util.dumps(self.to_dict()))
 
 
 class DatabaseStore(object):
@@ -197,22 +197,11 @@ class CollectionStore(object):
             return False
 
     def to_dict(self):
-        lst = []
-        for key, val in self._documents.items():
-            val['_id'] = str(val['_id'])
-            lst.append((str(key), val))
-        return {'name': self.name, 'documents': lst}
+        return {'name': self.name, 'documents': list(self._documents.items())}
 
     @classmethod
     def from_dict(cls, dct):
-        lst = []
-        for key, val in dct['documents']:
-            assert key == val['_id']
-            if isinstance(key, str) and len(key) == 24:
-                val['_id'] = bson.ObjectId(val['_id'])
-                key = bson.ObjectId(key)
-            lst.append((key, val))
-        return cls(dct['name'], collections.OrderedDict(lst))
+        return cls(dct['name'], collections.OrderedDict(dct['documents']))
 
 
 def _get_min_datetime_from_value(val):
