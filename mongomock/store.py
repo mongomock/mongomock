@@ -1,6 +1,9 @@
 import collections
 import datetime
 import functools
+import weakref
+import json
+import bson
 
 import mongomock
 from mongomock.thread import RWLock
@@ -9,8 +12,11 @@ from mongomock.thread import RWLock
 class ServerStore(object):
     """Object holding the data for a whole server (many databases)."""
 
-    def __init__(self):
-        self._databases = {}
+    def __init__(self, databases=None, filename=None):
+        self._databases = databases or {}
+        self._filename = filename
+        if self._filename:
+            weakref.finalize(self, self._to_file)
 
     def __getitem__(self, db_name):
         try:
@@ -25,12 +31,30 @@ class ServerStore(object):
     def list_created_database_names(self):
         return [name for name, db in self._databases.items() if db.is_created]
 
+    def to_dict(self):
+        return {k: v.to_dict() for k, v in self._databases.items()}
+
+    @classmethod
+    def from_dict(cls, dct, **kwargs):
+        databases = {k: DatabaseStore.from_dict(v) for k, v in dct.items()}
+        return cls(databases, **kwargs)
+
+    def _to_file(self):
+        with open(self._filename, 'w', encoding='utf-8') as fh:
+            json.dump(self.to_dict(), fh, default=str)
+
+    @classmethod
+    def from_file(cls, filename):
+        with open(filename, 'r', encoding='utf-8') as fh:
+            dct = json.load(fh)
+        return cls.from_dict(dct, filename=filename)
+
 
 class DatabaseStore(object):
     """Object holding the data for a database (many collections)."""
 
-    def __init__(self):
-        self._collections = {}
+    def __init__(self, _collections=None):
+        self._collections = _collections or {}
 
     def __getitem__(self, col_name):
         try:
@@ -59,12 +83,19 @@ class DatabaseStore(object):
     def is_created(self):
         return any(col.is_created for col in self._collections.values())
 
+    def to_dict(self):
+        return {k: v.to_dict() for k, v in self._collections.items()}
+
+    @classmethod
+    def from_dict(cls, dct):
+        return cls({k: CollectionStore.from_dict(v) for k, v in dct.items()})
+
 
 class CollectionStore(object):
     """Object holding the data for a collection."""
 
-    def __init__(self, name):
-        self._documents = collections.OrderedDict()
+    def __init__(self, name, documents=None):
+        self._documents = documents or collections.OrderedDict()
         self.indexes = {}
         self._is_force_created = False
         self.name = name
@@ -171,6 +202,21 @@ class CollectionStore(object):
             return (ttl_now - val_to_compare).total_seconds() >= expiry
         except TypeError:
             return False
+
+    def to_dict(self):
+        lst = []
+        for k, v in self._documents.items():
+            v['_id'] = str(v['_id'])
+            lst.append((str(k), v))
+        return {'name': self.name, 'documents': lst}
+
+    @classmethod
+    def from_dict(cls, dct):
+        lst = []
+        for k, v in dct['documents']:
+            v['_id'] = bson.ObjectId(v['_id'])
+            lst.append((bson.ObjectId(k), v))
+        return cls(dct['name'], collections.OrderedDict(lst))
 
 
 def _get_min_datetime_from_value(val):
