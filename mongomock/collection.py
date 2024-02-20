@@ -528,7 +528,9 @@ class Collection(object):
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
         if '_id' not in data:
-            data['_id'] = ObjectId()
+            # Additionally, pymongo will return a dict where the "_id" field is inserted first, and some libraries
+            # (mongoengine for example) depend on this implementation detail
+            data = {'_id': ObjectId(), **data}
 
         object_id = data['_id']
         if isinstance(object_id, dict):
