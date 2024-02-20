@@ -6609,6 +6609,112 @@ class CollectionAPITest(TestCase):
                 }
             ])
 
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(SERVER_VERSION < version.parse('5.0'), '$dateDiff is not supported prior to MongoDB 5.0')
+    def test__aggregate_date_diff(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        start_date = datetime(2022, 11, 7, 12, 54, 32, 543)
+        actual = collection.aggregate([
+            {
+                '$addFields': {
+                    'diff_milliseconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(microseconds=123 * 1000),
+                            'unit': 'millisecond'
+                        }
+                    },
+                    'diff_seconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(seconds=22),
+                            'unit': 'second'
+                        }
+                    },
+                    'diff_minutes': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(minutes=17),
+                            'unit': 'minute'
+                        }
+                    },
+                    'diff_hours': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(hours=56),
+                            'unit': 'hour'
+                        }
+                    },
+                    'diff_days': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=28),
+                            'unit': 'day'
+                        }
+                    },
+                    'diff_months': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=29),
+                            'unit': 'month'
+                        }
+                    },
+                    'diff_years': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=200),
+                            'unit': 'year'
+                        }
+                    },
+                }
+            },
+            {'$project': {'_id': 0}}
+        ])
+        expected = [{'diff_milliseconds': 123, 'diff_seconds': 22, 'diff_minutes': 17, 'diff_hours': 56, 'diff_days': 28, 'diff_months': 1, 'diff_years': 1}]
+        self.assertEqual(expected, list(actual))
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{
+                "$addFields": {
+                    'diff_seconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=200),
+                            'unit': 'second',
+                            'startOfWeek': 'monday'
+                        }
+                    },
+                }
+            }])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{
+                "$addFields": {
+                    'diff_weeks': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=200),
+                            'unit': 'week'
+                        }
+                    },
+                }
+            }])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{
+                "$addFields": {
+                    'diff_seconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + timedelta(days=200),
+                            'unit': 'non-existent'
+                        }
+                    },
+                }
+            }])
+
+
     def test__aggregate_array_to_object(self):
         collection = self.db.collection
         collection.insert_many([{

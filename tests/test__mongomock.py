@@ -3894,6 +3894,70 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(additional_fields_pipeline)
 
+    @skipIf(SERVER_VERSION < version.parse('5.0'), '$dateDiff is not supported prior to MongoDB 5.0')
+    def test_aggregate_date_diff(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({})
+        start_date = datetime.datetime(2022, 11, 7, 12, 54, 32, 543)
+        pipeline = [
+            {
+                '$addFields': {
+                    'diff_milliseconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(microseconds=123 * 1000),
+                            'unit': 'millisecond'
+                        }
+                    },
+                    'diff_seconds': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(seconds=22),
+                            'unit': 'second'
+                        }
+                    },
+                    'diff_minutes': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(minutes=17),
+                            'unit': 'minute'
+                        }
+                    },
+                    'diff_hours': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(hours=56),
+                            'unit': 'hour'
+                        }
+                    },
+                    'diff_days': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(days=28),
+                            'unit': 'day'
+                        }
+                    },
+                    'diff_months': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(days=29),
+                            'unit': 'month'
+                        }
+                    },
+                    'diff_years': {
+                        '$dateDiff': {
+                            'startDate': start_date,
+                            'endDate': start_date + datetime.timedelta(days=200),
+                            'unit': 'year'
+                        }
+                    },
+                }
+            },
+            {'$project': {'_id': 0}}
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+
     def test_aggregate_array_to_object(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([{

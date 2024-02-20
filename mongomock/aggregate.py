@@ -93,6 +93,7 @@ date_operators = [
     '$dateFromString',
     '$dateToString',
     '$dateFromParts',
+    '$dateDiff',
     '$dayOfMonth',
     '$dayOfWeek',
     '$dayOfYear',
@@ -671,6 +672,53 @@ class _Parser(object):
                 second=second,
                 microsecond=millisecond
             )
+        if operator == '$dateDiff':
+            if not isinstance(values, dict) or not {'startDate', 'endDate', 'unit'} <= set(values):
+                raise OperationFailure(
+                    '$dateDiff operator must correspond a dict'
+                    'that has "startDate", "endDate" and "unit" fields.'
+                )
+            if 'timezone' in values.keys():
+                raise NotImplementedError(
+                    'Although timezone is a valid field for the '
+                    '$dateDiff operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            if 'startOfWeek' in values.keys():
+                raise NotImplementedError(
+                    'Although startOfWeek is a valid field for the '
+                    '$dateDiff operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            start_date = out_value.get('startDate')
+            end_date = out_value.get('endDate')
+            unit = out_value.get('unit')
+            delta = end_date - start_date
+            if unit == 'millisecond':
+                result = delta.total_seconds() * 1000
+            elif unit == 'second':
+                result = delta.total_seconds()
+            elif unit == 'minute':
+                result = delta.total_seconds() / 60
+            elif unit == 'hour':
+                result = delta.total_seconds() / (60 * 60)
+            elif unit == 'day':
+                result = delta.days
+            elif unit == 'week':
+                raise NotImplementedError(
+                    'Although {"unit": "week"} is a valid field for the '
+                    '$dateDiff operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+            elif unit == 'month':
+                result = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+            elif unit == 'year':
+                result = end_date.year - start_date.year
+            else:
+                raise OperationFailure(
+                    f'{unit} is not a valid value for the "unit" field in $dateDiff'
+                )
+            return math.floor(result)
 
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "
