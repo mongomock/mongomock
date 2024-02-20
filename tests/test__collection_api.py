@@ -6117,6 +6117,37 @@ class CollectionAPITest(TestCase):
         }]
         self.assertEqual(expect, list(actual))
 
+    def test__set_is_subset(self):
+        collection = self.db.collection
+        collection.insert_many([
+            {
+                'array': ['one', 'three'],
+                'nested_array': [{'a': 'b', 'c': 'd'}]
+            },
+        ])
+        actual = collection.aggregate([{'$project': {
+            '_id': 0,
+            'same_array': {'$setIsSubset': ['$array', '$array']},
+            'eq_array': {'$setIsSubset': [['one', 'three'], '$array']},
+            'ne_array': {'$setIsSubset': [['one', 'two'], '$array']},
+            'eq_in_another_order': {'$setIsSubset': [['one', 'two'], ['two', 'one']]},
+            'ne_in_another_order': {'$setIsSubset': [['one', 'two'], ['three', 'one', 'two']]},
+            'same_nested_array': {'$setIsSubset': ['$nested_array', '$nested_array']},
+            'eq_nested_array': {'$setIsSubset': [[{'a': 'b'}, {'c': 'd'}], [{'a': 'b'}, {'c': 'd'}]]},
+            'ne_nested_array': {'$setIsSubset': [[{'a': 'b'}, {'c': 'e'}], [{'a': 'b'}, {'c': 'd'}]]},
+        }}])
+        expect = [{
+            'same_array': True,
+            'eq_array': True,
+            'ne_array': False,
+            'eq_in_another_order': True,
+            'ne_in_another_order': True,
+            'same_nested_array': True,
+            'eq_nested_array': True,
+            'ne_nested_array': False,
+        }]
+        self.assertEqual(expect, list(actual))
+
     def test__add_to_set_missing_value(self):
         collection = self.db.collection
         collection.insert_many([

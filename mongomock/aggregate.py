@@ -1049,6 +1049,18 @@ class _Parser(object):
                 if set1 != set2:
                     return False
             return True
+        if operator == '$setIsSubset':
+            set1, set2 = values
+
+            def parse_set(to_parse):
+                """Convert a given (nested) set to hashable types to check equality"""
+                if isinstance(to_parse, list):
+                    return tuple(parse_set(v) for v in to_parse)
+                if isinstance(to_parse, dict):
+                    return helpers.hashdict({k: parse_set(v) for k, v in to_parse.items()})
+                return to_parse
+
+            return set(parse_set(self.parse(set1))).issubset(set(parse_set(self.parse(set2))))
         raise NotImplementedError(
             "Although '%s' is a valid set operator for the aggregation "
             'pipeline, it is currently not implemented in Mongomock.' % operator)
