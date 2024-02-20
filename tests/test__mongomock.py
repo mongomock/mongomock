@@ -3503,6 +3503,121 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             }},
         }}])
 
+    def test__aggregate_reduce(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({
+            'array': [1, 2, 3, 4],
+            'val': 5
+        })
+        self.cmp.compare.aggregate([
+            {
+                '$project': {
+                    '_id': 0,
+                    'array': {
+                        '$reduce': {
+                            'initialValue': 0,
+                            'input': "$array",
+                            'in': {'$add': ['$$value', '$$this']}
+                        }
+                    },
+                    'using_doc_val': {
+                        '$reduce': {
+                            'initialValue': '$val',
+                            'input': "$array",
+                            'in': {'$add': ['$$value', '$$this', '$val']}
+                        }
+                    },
+                    'empty_list': {
+                        '$reduce': {
+                            'initialValue': 0,
+                            'input': [],
+                            'in': {'$add': ['$$value', 1]}
+                        }
+                    },
+                    'none': {
+                        '$reduce': {
+                            'initialValue': 0,
+                            'input': None,
+                            'in': 0
+                        }
+                    },
+                    'nested_reduce': {
+                        '$reduce': {
+                            'initialValue': 0,
+                            'input': {
+                                '$reduce': {
+                                    'initialValue': [],
+                                    'input': '$array',
+                                    'in': {'$concatArrays': ["$$value", ["$$this"]]}
+                                }
+                            },
+                            'in': {'$add': ['$$this', '$$value']}
+                        }
+                    },
+                    'missing_key': {
+                        '$reduce': {
+                            'input': '$missing.key',
+                            'initialValue': 0,
+                            'in': '$$this',
+                        }
+                    },
+                }
+            }
+        ])
+
+        self.cmp.compare_exceptions.aggregate([
+            {
+                '$project': {
+                    'field': {
+                        '$reduce': {
+                            'initialValue': 0,
+                            'in': 0
+                        }
+                    }
+                }
+            }
+        ])
+
+        self.cmp.compare_exceptions.aggregate([
+            {
+                '$project': {
+                    'field': {
+                        '$reduce': {
+                            'input': [1, 2, 3, 4, 5],
+                            'in': 0
+                        }
+                    }
+                }
+            }
+        ])
+
+        self.cmp.compare_exceptions.aggregate([
+            {
+                '$project': {
+                    'field': {
+                        '$reduce': {
+                            'input': [1, 2, 3, 4, 5],
+                            'initialValue': 12
+                        }
+                    }
+                }
+            }
+        ])
+
+        self.cmp.compare_exceptions.aggregate([
+            {
+                '$project': {
+                    'field': {
+                        '$reduce': {
+                            'input': 'string',
+                            'in': {'$add': ['$$this', '$$value']},
+                            'initialValue': 0
+                        }
+                    }
+                }
+            }
+        ])
+
     def test__aggregate_filter_in_arrayElemAt(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many([

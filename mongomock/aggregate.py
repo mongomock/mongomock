@@ -229,6 +229,8 @@ class _Parser(object):
 
     def parse(self, expression):
         """Parse a MongoDB expression."""
+        if isinstance(expression, list):
+            return list(self.parse_many(expression))
         if not isinstance(expression, dict):
             # May raise a KeyError despite the ignore missing key.
             return self._parse_basic_expression(expression)
@@ -727,6 +729,28 @@ class _Parser(object):
                 ).parse(in_expr)
                 for item in input_array
             ]
+
+        if operator == '$reduce':
+            for k in ('input', 'initialValue', 'in'):
+                if k not in value:
+                    raise OperationFailure("Missing '%s' parameter to $reduce" % k)
+
+            input_array = self._parse_or_nothing(value['input'])
+            if input_array is None or input_array is NOTHING:
+                return None
+
+            if not isinstance(input_array, (list, tuple)):
+                raise OperationFailure('input to $reduce must be an array not %s' % type(input_array))
+
+            current = self.parse(value['initialValue'])
+            in_expr = value['in']
+            for item in input_array:
+                current = _Parser(
+                    self._doc_dict,
+                    dict(self._user_vars, this=item, value=current),
+                    ignore_missing_keys=self._ignore_missing_keys
+                ).parse(in_expr)
+            return current
 
         if operator == '$size':
             if isinstance(value, list):
