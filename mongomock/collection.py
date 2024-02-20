@@ -565,7 +565,7 @@ class Collection(object):
                 continue
             if partial_filter_expression is not None:
                 find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
-            answer_count = len(list(self._iter_documents(find_kwargs)))
+            answer_count = helpers.count_iter(self._iter_documents(find_kwargs))
             if answer_count > 1:
                 raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
@@ -660,7 +660,7 @@ class Collection(object):
         upserted_id = None
         num_updated = 0
         num_matched = 0
-        for existing_document in itertools.chain(self._iter_documents(spec), [None]):
+        for existing_document in itertools.chain(list(self._iter_documents(spec)), [None]):
             # we need was_insert for the setOnInsert update operation
             was_insert = False
             # the sentinel document means we should do an upsert
@@ -929,6 +929,9 @@ class Collection(object):
                 # Make sure it still respect the unique indexes and, if not, to
                 # revert modifications
                 try:
+                    # Save the updated document in the store as the store may have provided a copy of the
+                    # document rather than a dict that is being mutated in place.
+                    self._store[existing_document['_id']] = existing_document
                     self._ensure_uniques(existing_document)
                     num_updated += 1
                 except DuplicateKeyError:
@@ -1296,7 +1299,7 @@ class Collection(object):
         if self._store.is_empty:
             filter_applies(filter, {})
 
-        return (document for document in list(self._store.documents)
+        return (document for document in self._store.documents
                 if filter_applies(filter, document))
 
     def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
@@ -1455,7 +1458,7 @@ class Collection(object):
             if filter is None:
                 return len(self._store)
             spec = helpers.patch_datetime_awareness_in_document(filter)
-            return len(list(self._iter_documents(spec)))
+            return helpers.count_iter(self._iter_documents(spec))
 
     def count_documents(self, filter, **kwargs):
         if kwargs.pop('collation', None):
@@ -1480,7 +1483,7 @@ class Collection(object):
             raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
 
         spec = helpers.patch_datetime_awareness_in_document(filter)
-        doc_num = len(list(self._iter_documents(spec)))
+        doc_num = helpers.count_iter(self._iter_documents(spec))
         count = max(doc_num - skip, 0)
         return count if limit is None else min(count, limit)
 
@@ -1527,7 +1530,7 @@ class Collection(object):
             raise OperationFailure(
                 'Index with name: %s already exists with different options' % index_name)
 
-        # Check that documents already verify the uniquess of this new index.
+        # Check that documents already verify the uniqueness of this new index.
         if is_unique:
             indexed = set()
             indexed_list = []

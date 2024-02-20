@@ -14,13 +14,16 @@ import warnings
 
 import mongomock
 from mongomock import helpers
+from mongomock import store
 
 try:
     from unittest import mock
+
     _HAVE_MOCK = True
 except ImportError:
     try:
         import mock
+
         _HAVE_MOCK = True
     except ImportError:
         _HAVE_MOCK = False
@@ -41,7 +44,6 @@ except ImportError:
     from mongomock.read_concern import ReadConcern
     from mongomock.write_concern import WriteConcern
     from tests.utils import DBRef
-
 
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
@@ -4037,6 +4039,7 @@ class CollectionAPITest(TestCase):
                     'default': 'f',
                 }
             }
+
         self.db.collection.insert_one({'_id': 1})
         actual = self.db.collection.aggregate([
             {'$project': {
@@ -4705,7 +4708,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.db.collection.find_one({
                 '$where':
-                'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
+                    'function() {return (hex_md5(this.name) == "9b53e667f30cd329dca1ec9e6a83e994")}',
             })
 
     def test__unwind_no_prefix(self):
@@ -6174,14 +6177,14 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(
             original_document, stored_document,
             msg='The document is not the same because the date TZ has been stripped of and the '
-            'microseconds truncated.')
+                'microseconds truncated.')
         self.assertNotEqual(
             original_document['date'].timestamp(), stored_document['date'].timestamp())
         self.assertEqual(
             datetime(2000, 1, 1, 10, 30, 30, 12000),
             stored_document['date'],
             msg='The stored document holds a date as timezone naive UTC and without '
-            'microseconds')
+                'microseconds')
 
         # The objects are not linked: modifying the inserted document or the fetched one will
         # have no effect on future retrievals.
@@ -7110,7 +7113,7 @@ class CollectionAPITest(TestCase):
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
         with self.assertRaises(
-            TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
+                TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
             mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')
 
@@ -7127,3 +7130,60 @@ class CollectionAPITest(TestCase):
         col.find()
         with self.assertRaises(TypeError):
             col.find(allow_disk_use=1)
+
+    def test_offline_store(self):
+        """
+        Test a custom store that always returns copies of the documents in a collection
+        (emulating what a disk-based store would do)
+        """
+
+        class ServerStore(store.ServerStore):
+            def __getitem__(self, db_name):
+                try:
+                    return self._databases[db_name]
+                except KeyError:
+                    db = self._databases[db_name] = DatabaseStore()
+                    return db
+
+        class DatabaseStore(store.DatabaseStore):
+            def __getitem__(self, col_name):
+                try:
+                    return self._collections[col_name]
+                except KeyError:
+                    col = self._collections[col_name] = CollectionStore(col_name)
+                    return col
+
+            def rename(self, name, new_name):
+                col = self._collections.pop(name, CollectionStore(new_name))
+                col.name = new_name
+                self._collections[new_name] = col
+
+        class CustomDict(collections.OrderedDict):
+            def __getitem__(self, key):
+                return copy.deepcopy(super().__getitem__(key))
+
+            def values(self):
+                for value in super().values():
+                    yield copy.deepcopy(value)
+
+        class CollectionStore(store.CollectionStore):
+            def __init__(self, name):
+                super().__init__(name)
+                self._documents = CustomDict()
+
+        # Replace the current store
+        self.client = mongomock.MongoClient(_store=ServerStore())
+        self.db = self.client['somedb']
+
+        # Test from update_one
+        insert_result = self.db.collection.insert_one({'a': 1})
+        update_result = self.db.collection.update_one(
+            filter={'a': 1},
+            update={'$set': {'a': 2}}
+        )
+        self.assertEqual(update_result.matched_count, 1)
+        self.assertEqual(update_result.modified_count, 1)
+        self.assertIsNone(update_result.upserted_id)
+        doc = self.db.collection.find_one({'a': 2})
+        self.assertEqual(insert_result.inserted_id, doc['_id'])
+        self.assertEqual(doc['a'], 2)

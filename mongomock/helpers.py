@@ -5,6 +5,7 @@ from mongomock import InvalidURI
 from packaging import version
 import re
 import time
+from typing import Iterable
 from urllib.parse import unquote_plus
 import warnings
 
@@ -90,7 +91,7 @@ def create_index_list(key_or_list, direction=None):
     if not isinstance(key_or_list, (list, tuple, abc.Iterable)):
         raise TypeError('if no direction is specified, '
                         'key_or_list must be an instance of list')
-    return key_or_list
+    return list(key_or_list)
 
 
 def gen_index_name(index_list):
@@ -424,3 +425,13 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
+
+def count_iter(iterable: Iterable) -> int:
+    """
+    Count the number of entries in an iterable.
+    Note, that this will consume the iterable.
+
+    :param iterable: the iterable to count
+    :return: the number of terms in the iterable
+    """
+    return sum(1 for _ in iterable)
