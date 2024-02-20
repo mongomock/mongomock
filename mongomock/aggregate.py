@@ -9,6 +9,7 @@ import functools
 import itertools
 import math
 import numbers
+from dateutil.relativedelta import relativedelta
 from packaging import version
 import random
 import re
@@ -93,6 +94,7 @@ date_operators = [
     '$dateFromString',
     '$dateToString',
     '$dateFromParts',
+    '$dateAdd',
     '$dayOfMonth',
     '$dayOfWeek',
     '$dayOfYear',
@@ -671,6 +673,47 @@ class _Parser(object):
                 second=second,
                 microsecond=millisecond
             )
+        if operator == '$dateAdd':
+            if not isinstance(values, dict) or not {'startDate', 'amount', 'unit'} <= set(values):
+                raise OperationFailure(
+                    '$dateAdd operator must correspond a dict'
+                    'that has "startDate", "amount" and "unit" fields.'
+                )
+            if 'timezone' in values.keys():
+                raise NotImplementedError(
+                    'Although timezone is a valid field for the '
+                    '$dateAdd operator, it is currently not implemented '
+                    ' in Mongomock.'
+                )
+
+            amount = out_value.get('amount')
+            if not isinstance(amount, int):
+                raise OperationFailure(
+                    f'{out_value.get("amount")} is an invalid "amount" value. Must be an integer'
+                )
+            unit = out_value.get('unit')
+            date = out_value.get('startDate')
+            if unit == 'millisecond':
+                delta = datetime.timedelta(milliseconds=amount)
+            elif unit == 'second':
+                delta = datetime.timedelta(seconds=amount)
+            elif unit == 'minute':
+                delta = datetime.timedelta(minutes=amount)
+            elif unit == 'hour':
+                delta = datetime.timedelta(hours=amount)
+            elif unit == 'day':
+                delta = datetime.timedelta(days=amount)
+            elif unit == 'week':
+                delta = datetime.timedelta(weeks=amount)
+            elif unit == 'month':
+                delta = relativedelta(months=amount)
+            elif unit == 'quarter':
+                delta = relativedelta(months=amount * 3)
+            elif unit == 'year':
+                delta = relativedelta(years=amount)
+            else:
+                raise OperationFailure(f'{unit} is not a valid value for the "unit" field')
+            return date + delta
 
         raise NotImplementedError(
             "Although '%s' is a valid date operator for the "

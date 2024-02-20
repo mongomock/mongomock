@@ -6609,6 +6609,131 @@ class CollectionAPITest(TestCase):
                 }
             ])
 
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(SERVER_VERSION <= version.parse('5.0'), '$dateAdd is not supported prior to MongoDB 5.0')
+    def test__aggregate_date_add(self):
+        collection = self.db.collection
+        start = datetime(2022, 11, 6, 20, 4, 1)
+        collection.insert_one({})
+        actual = collection.aggregate([
+            {
+                '$addFields': {
+                    'add_seconds': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'second',
+                            'amount': 34
+                        }
+                    },
+                    'add_minutes': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'minute',
+                            'amount': 2
+                        }
+                    },
+                    'add_hours': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'hour',
+                            'amount': 2
+                        }
+                    },
+                    'add_days': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'day',
+                            'amount': 3
+                        }
+                    },
+                    'add_weeks': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'week',
+                            'amount': 2
+                        }
+                    },
+                    'add_months': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'month',
+                            'amount': 1
+                        }
+                    },
+                    'add_quarters': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'quarter',
+                            'amount': 1
+                        }
+                    },
+                    'add_years': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'year',
+                            'amount': 2
+                        }
+                    }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ])
+
+        expect = [{
+            'add_seconds': datetime(2022, 11, 6, 20, 4, 1 + 34),
+            'add_minutes': datetime(2022, 11, 6, 20, 4 + 2, 1),
+            'add_hours': datetime(2022, 11, 6, 20 + 2, 4, 1),
+            'add_days': datetime(2022, 11, 6 + 3, 20, 4, 1),
+            'add_weeks': datetime(2022, 11, 6 + (2 * 7), 20, 4, 1),
+            'add_months': datetime(2022, 11 + 1, 6, 20, 4, 1),
+            'add_quarters': datetime(2023, 2, 6, 20, 4, 1),
+            'add_years': datetime(2022 + 2, 11, 6, 20, 4, 1),
+        }]
+
+        self.assertEqual(expect, list(actual))
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([
+                {
+                    '$addFields': {
+                        'start_date': {
+                            '$dateAdd': {
+                                'startDate': start,
+                                'unit': 'second',
+                                'amount': 34.55
+                            }
+                        }
+                    }
+                }
+            ])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{
+                '$addFields': {
+                    'start_date': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'second',
+                            'amount': 34,
+                            'timezone': "+03"
+                        }
+                    }
+                }
+            }])
+
+        with self.assertRaises(mongomock.OperationFailure):
+            collection.aggregate([{
+                '$addFields': {
+                    'start_date': {
+                        '$dateAdd': {
+                            'startDate': start,
+                            'unit': 'non-existent',
+                            'amount': 34,
+                        }
+                    }
+                }
+            }])
+
     def test__aggregate_array_to_object(self):
         collection = self.db.collection
         collection.insert_many([{
