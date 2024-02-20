@@ -3176,6 +3176,28 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 }}
         ])
 
+    def test__aggregate_type(self):
+        self.cmp.do.insert_one(
+            {
+                '_id': 1, 'list': [1, 2, 3], 'tuple': (1, 2, 3),
+                'empty_list': [], 'empty_tuple': (),
+                'int': 3, 'str': '123', 'bool': True, 'none': None
+            })
+        self.cmp.compare.aggregate([{
+            "$project": {
+                '_id': False,
+                'list': {'$type': "$list"},
+                'tuple': {'$type': "$tuple"},
+                'string': {'$type': "$string"},
+                'int': {'$type': "$int"},
+                'long': {'$type': "$long"},
+                'bool': {'$type': "$bool"},
+                'object': {'$type': "$object"},
+                'null': {'$type': "$null"},
+                'missing': {'$type': "$object.doesnt_exist"},
+            }
+        }])
+
     def test__aggregate_facet(self):
         self.cmp.do.insert_many([
             {'_id': i} for i in range(5)
