@@ -13,12 +13,12 @@ class ServerStore(object):
     """Object holding the data for a whole server (many databases)."""
 
     def __init__(self, filename=None):
-        self._filename = filename or os.environ.get('MONGOMOCK_SERVERSTORE_FILE')
+        self._filename = os.environ.get('MONGOMOCK_SERVERSTORE_FILE', filename)
         if self._filename:
             with open(self._filename, 'r', encoding='utf-8') as fh:
                 dct = bson.json_util.loads(fh.read())
             self._databases = {k: DatabaseStore.from_dict(v) for k, v in dct.items()}
-            weakref.finalize(self, self._to_file)
+            self._finalizer = weakref.finalize(self, self._to_file)
         else:
             self._databases = {}
 
