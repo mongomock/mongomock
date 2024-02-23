@@ -1,4 +1,3 @@
-from __future__ import division
 import collections
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, MutableMapping
@@ -27,10 +26,10 @@ try:
     from pymongo import ReturnDocument
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
-    class IndexModel(object):
+    class IndexModel:
         pass
 
-    class ReturnDocument(object):
+    class ReturnDocument:
         BEFORE = False
         AFTER = True
 
@@ -111,7 +110,7 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
-class BulkWriteOperation(object):
+class BulkWriteOperation:
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
         self.selector = selector
@@ -205,7 +204,7 @@ def _combine_projection_spec(projection_fields_spec):
             if not isinstance(tmp_spec.get(base_field), dict):
                 if base_field in tmp_spec:
                     raise OperationFailure(
-                        'Path collision at %s remaining portion %s' % (f, new_field))
+                        f'Path collision at {f} remaining portion {new_field}')
                 tmp_spec[base_field] = OrderedDict()
             tmp_spec[base_field][new_field] = v
 
@@ -271,7 +270,7 @@ def _validate_data_fields(data):
                                   f'(found: {key})')
 
 
-class BulkOperationBuilder(object):
+class BulkOperationBuilder:
     def __init__(self, collection, ordered=False, bypass_document_validation=False):
         self.collection = collection
         self.ordered = ordered
@@ -382,7 +381,7 @@ class BulkOperationBuilder(object):
         write_operation.register_remove_op(not just_one, hint=hint)
 
 
-class Collection(object):
+class Collection:
 
     def __init__(
             self, database, name, _db_store, write_concern=None, read_concern=None,
@@ -398,7 +397,7 @@ class Collection(object):
         self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
 
     def __repr__(self):
-        return "Collection({0}, '{1}')".format(self.database, self.name)
+        return f"Collection({self.database}, '{self.name}')"
 
     def __getitem__(self, name):
         return self.database[self.name + '.' + name]
@@ -427,7 +426,7 @@ class Collection(object):
 
     @property
     def full_name(self):
-        return '{0}.{1}'.format(self.database.name, self._name)
+        return f'{self.database.name}.{self._name}'
 
     @property
     def name(self):
@@ -883,7 +882,7 @@ class Collection(object):
                             if key.startswith('$'):
                                 # can't mix modifiers with non-modifiers in
                                 # update
-                                raise ValueError('field names cannot start with $ [{}]'.format(k))
+                                raise ValueError(f'field names cannot start with $ [{k}]')
                         _id = spec.get('_id', existing_document.get('_id'))
                         existing_document.clear()
                         if _id is not None:
@@ -897,13 +896,13 @@ class Collection(object):
                         existing_document.update(self._internalize_dict(document))
                         if existing_document['_id'] != _id:
                             raise OperationFailure(
-                                'The _id field cannot be changed from {0} to {1}'
+                                'The _id field cannot be changed from {} to {}'
                                 .format(existing_document['_id'], _id))
                         break
                     else:
                         # can't mix modifiers with non-modifiers in update
                         raise ValueError(
-                            'Invalid modifier specified: {}'.format(k))
+                            f'Invalid modifier specified: {k}')
                 first = False
             # if empty document comes
             if not document:
@@ -1069,7 +1068,7 @@ class Collection(object):
                     continue
                 if sort_key.startswith('$'):
                     raise NotImplementedError(
-                        'Sorting by {} is not implemented in mongomock yet'.format(sort_key))
+                        f'Sorting by {sort_key} is not implemented in mongomock yet')
                 dataset = iter(sorted(
                     dataset, key=lambda x: filtering.resolve_sort_key(sort_key, x),
                     reverse=sort_direction < 0))
@@ -1084,7 +1083,7 @@ class Collection(object):
             if isinstance(value, dict):
                 for op in value:
                     if op not in allowed_projection_operators:
-                        raise ValueError('Unsupported projection option: {}'.format(op))
+                        raise ValueError(f'Unsupported projection option: {op}')
                 result[key] = value
 
         for key in result:
@@ -1609,8 +1608,7 @@ class Collection(object):
         if not self._store.is_created:
             return
         yield '_id_', {'key': [('_id', 1)]}
-        for name, information in self._store.indexes.items():
-            yield name, information
+        yield from self._store.indexes.items()
 
     def list_indexes(self, session=None):
         if session:
@@ -1816,7 +1814,7 @@ class Collection(object):
             for attr in options.attrs:
                 if not hasattr(value, attr):
                     raise TypeError(
-                        '{} must be an instance of {}'.format(key, options.typename))
+                        f'{key} must be an instance of {options.typename}')
 
         mongomock_codec_options.is_supported(codec_options)
         if codec_options != self.codec_options:
@@ -1864,11 +1862,11 @@ class Collection(object):
             'aggregate_raw_batches method is not implemented in mongomock yet')
 
 
-class Cursor(object):
+class Cursor:
 
     def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
                  collation=None, no_cursor_timeout=False, batch_size=0, session=None):
-        super(Cursor, self).__init__()
+        super().__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)
         self._spec = spec

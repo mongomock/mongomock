@@ -9,10 +9,7 @@ try:
 except ImportError:
     _HAVE_PYMONGO = False
 
-try:
-    from unittest import mock
-except ImportError:
-    import mock
+from unittest import mock
 
 import platform
 _USING_PYPY = platform.python_implementation() == 'PyPy'

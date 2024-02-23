@@ -3,16 +3,7 @@ import os
 import mongomock
 from mongomock import helpers
 from packaging import version
-
-try:
-    from unittest import mock
-    _HAVE_MOCK = True
-except ImportError:
-    try:
-        import mock
-        _HAVE_MOCK = True
-    except ImportError:
-        _HAVE_MOCK = False
+from unittest import mock
 
 try:
     import pymongo
@@ -147,7 +138,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({'a': 2}, 1)
         self.__check_number_of_elements(1)
 
-    @skipIf(not _HAVE_MOCK, 'The mock library is not installed')
     def test_upsert_replace_one_on_empty_set(self):
         self.bulk_op.find({}).upsert().replace_one({'x': 1})
         self.__execute_and_check_result(nUpserted=1, upserted=[{'index': 0, '_id': mock.ANY}])
@@ -161,7 +151,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({'x': 1}, 1)
         self.__check_number_of_elements(2)
 
-    @skipIf(not _HAVE_MOCK, 'The mock library is not installed')
     def test_upsert_update_on_empty_set(self):
         self.bulk_op.find({}).upsert().update({'$set': {'a': 1, 'b': 2}})
         self.__execute_and_check_result(nUpserted=1, upserted=[{'index': 0, '_id': mock.ANY}])

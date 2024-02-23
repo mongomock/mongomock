@@ -12,7 +12,7 @@ except ImportError:
     codec_options = None
 
 
-class TypeRegistry(object):
+class TypeRegistry:
     pass
 
 
