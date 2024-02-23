@@ -14,7 +14,7 @@ authors = [
     { name = "Pascal Corpet", email = "pascal@corpet.net" },
 ]
 classifiers = [
-    "License :: OSI Approved :: ISC License (ISCL)",
+    "License :: OSI Approved :: BSD License",
     "Topic :: Database",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
