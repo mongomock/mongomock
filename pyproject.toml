@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mongomock"
+dynamic = ["version"]
+description = "Fake pymongo stub for testing simple MongoDB-dependent code"
+readme = { file = "README.rst", content-type = "text/x-rst" }
+license = { file = "LICENSE" }
+authors = [
+    { name = "Rotem Yaari", email = "vmalloc@gmail.com" },
+    { name = "Martin Domke", email = "mail@martindomke.net" },
+    { name = "Pascal Corpet", email = "pascal@corpet.net" },
+]
+classifiers = [
+    "License :: OSI Approved :: BSD License",
+    "Topic :: Database",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "packaging",
+    "pytz",
+    "sentinels",
+]
+
+[project.optional-dependencies]
+pyexecjs = ["pyexecjs"]
+pymongo = ["pymongo"]
+
+[project.urls]
+Homepage = "https://github.com/mongomock/mongomock"
+Changelog = "https://github.com/mongomock/mongomock/blob/develop/CHANGELOG.md"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mongomock"]
+
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-docstring",
+    "R",
+    "invalid-name",
+    "fixme",
+    "unused-argument",
+    "redefined-builtin",
+    "protected-access",
+    "wrong-import-order",
+    "attribute-defined-outside-init",
+    "cell-var-from-loop",
+    "broad-except",
+    "dangerous-default-value",
+    "too-many-lines",
+    "ungrouped-imports",
+    "no-member",
+    "too-many-function-args",
+    "consider-using-f-string",
+    "deprecated-class",
+    "redundant-u-string-prefix",
+    "unused-private-member",
+    "unspecified-encoding",
+]
+enable = ["no-else-return"]

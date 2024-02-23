@@ -1,0 +1,49 @@
+[envs.test]
+dependencies = [
+  "pytest==7.3.*",
+  "pytest-cov==4.1.*",
+  "coverage[toml]==7.2.*",
+]
+features = ["pyexecjs"]
+
+[envs.test.env-vars]
+EXECJS_RUNTIME = "node"
+
+[envs.test.scripts]
+run =  "coverage run -p -m pytest {args:.}"
+
+[envs.test.overrides]
+matrix.pymongo.extra-dependencies = [
+  { value = "pymongo<4.0", if = ["3"]},
+  { value = "pymongo<5.0", if = ["4"]},
+]
+
+[[envs.test.matrix]]
+python = ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy3"]
+pymongo = ["3", "4", "none"]
+
+[envs.cov]
+dependencies = [
+  "coverage[toml]==7.2.*",
+]
+
+[envs.cov.scripts]
+collect = [
+  "- coverage combine",
+  "coverage xml",
+  "coverage report",
+]
+
+[envs.lint]
+dependencies = [
+  "pylint==3.0.*",
+  "mypy==1.8.*",
+  "hacking==6.1.0",
+]
+
+[envs.lint.scripts]
+style = [
+  "pylint mongomock tests {args}",
+  "flake8 {args}",
+]
+typing = "mypy --install-types --non-interactive tests/types"

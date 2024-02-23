@@ -6,7 +6,7 @@ services:
       context: .
     image: mongomock:latest
     working_dir: /project
-    command: tox
+    command: hatch run test:run
     environment:
       - TEST_MONGO_HOST=mongodb://mongo/mock
       - MONGODB=5.0.5
@@ -19,3 +19,5 @@ services:
     # The image chosen here should be kept in sync with the .travis.yml mongo version and with
     # the value in mongomock/__init__.py
     image: mongo:5.0.5
+    ports:
+      - 127.0.0.1:27017:27017
