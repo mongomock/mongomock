@@ -214,6 +214,9 @@ def iter_key_candidates(key, doc):
 
     if doc is None:
         return ()
+    
+    if isinstance(doc, DBRef) and key == '$id':
+        return [doc.id]
 
     if isinstance(doc, list):
         return _iter_key_candidates_sublist(key, doc)
