@@ -28,7 +28,7 @@ def _parse_any_host(host, default_port=27017):
     return split_hosts(host, default_port=default_port)
 
 
-def patch(servers='localhost', on_new='error'):
+def patch(servers='localhost', on_new='error', ClientClass = MongoClient):
     """Patch pymongo.MongoClient.
 
     This will patch the class MongoClient and use mongomock to mock MongoDB
@@ -44,6 +44,9 @@ def patch(servers='localhost', on_new='error'):
     ```
 
     The data is persisted as long as the patch lives.
+
+    You can use a custom MongoMock client class through the ClientClass argument.
+    By default it uses the `mongomock.mongo_client.MongoClient` class.
 
     Args:
         on_new: Behavior when accessing a new server (not in servers):
@@ -72,7 +75,7 @@ def patch(servers='localhost', on_new='error'):
         if _IMPORT_PYMONGO_ERROR:
             raise _IMPORT_PYMONGO_ERROR  # pylint: disable=raising-bad-type
 
-        client = MongoClient(*args, **kwargs)
+        client = ClientClass(*args, **kwargs)
 
         try:
             persisted_client = persisted_clients[client.address]

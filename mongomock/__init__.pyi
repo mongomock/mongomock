@@ -1,4 +1,4 @@
-from typing import Any, Callable, Literal, Sequence, Tuple, Union
+from typing import Any, Callable, Literal, Sequence, Tuple, Union, TypeVar, Type
 from unittest import mock
 
 from bson.objectid import ObjectId as ObjectId
@@ -13,9 +13,12 @@ from pymongo.errors import (
 )
 
 
+_ClientType = TypeVar("_ClientType")
+
 def patch(
         servers: Union[str, Tuple[str, int], Sequence[Union[str, Tuple[str, int]]]] = ...,
         on_new: Literal['error', 'create', 'timeout', 'pymongo'] = ...,
+        ClientClass: Type[_ClientType] = ...,
         ) -> mock._patch:
     ...
 
