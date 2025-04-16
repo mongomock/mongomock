@@ -139,7 +139,7 @@ When submitting a PR, please make sure that:
 3. The code is auto-formatted (``hatch fmt``).
 4. The build passes on your PR.
 
-To download, setup and perfom tests, run the following commands on Mac / Linux:
+To download, setup and perform tests, run the following commands on Mac / Linux:
 
 .. code-block:: console
 
