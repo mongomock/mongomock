@@ -39,7 +39,7 @@ class BulkOperationsTest(TestCase):
 
     def __check_document(self, doc, count=1):
         """
-            Check count of query based find
+        Check count of query based find
         """
         found_num = self.db.collection.find(doc).count()
         if found_num != count:

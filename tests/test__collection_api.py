@@ -8302,7 +8302,7 @@ class CollectionAPITest(TestCase):
 
     def test__find_one_and_update_comment(self):
         col = self.db.col
-        col.find_one_and_update({},{'$set': {'final': True}}, comment='this_query')
+        col.find_one_and_update({}, {'$set': {'final': True}}, comment='this_query')
 
     def test__find_one_and_update_hint(self):
         col = self.db.col
@@ -8318,7 +8318,7 @@ class CollectionAPITest(TestCase):
 
     def test__estimated_document_count_comment(self):
         col = self.db.col
-        col.estimated_document_count( comment='this_query')
+        col.estimated_document_count(comment='this_query')
 
     def test__distinct_comment(self):
         col = self.db.col

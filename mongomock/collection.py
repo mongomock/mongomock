@@ -1750,18 +1750,12 @@ class Collection:
             spec = helpers.patch_datetime_awareness_in_document(filter)
             return len(list(self._iter_documents(spec)))
 
-    def count_documents(self, filter, comment=None,  **kwargs):
+    def count_documents(self, filter, comment=None, **kwargs):
         if comment:
-            raise_not_implemented(
-                'comment',
-                'comment not implemented, but accepts'
-            )
+            raise_not_implemented('comment', 'comment not implemented, but accepts')
 
         if kwargs.pop('hint', None):
-            raise_not_implemented(
-                'hint',
-                'hint not implemented, but accepts'
-            )
+            raise_not_implemented('hint', 'hint not implemented, but accepts')
 
         if kwargs.pop('collation', None):
             raise_not_implemented(
