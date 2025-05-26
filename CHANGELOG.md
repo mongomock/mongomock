@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [4.4.1] - 2025-05-26
+### Added
+- Add support for options of comment and hint to:
+  - find
+  - find_one
+  - find_one_and_update
+  - find_one_and_replace
+  - count_documents
+  - estimated_document_count (not support "hint")
+  - distinct
+
+
 ## [4.4.0] - tbd
 ### Added
 - Add support for Python 3.13

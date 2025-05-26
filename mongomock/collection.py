@@ -1756,7 +1756,7 @@ class Collection:
                 'comment',
                 'comment not implemented, but accepts'
             )
-        
+
         if kwargs.pop('hint', None):
             raise_not_implemented(
                 'hint',
