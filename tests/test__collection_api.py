@@ -8282,3 +8282,56 @@ class CollectionAPITest(TestCase):
         col.find()
         with self.assertRaises(TypeError):
             col.find(allow_disk_use=1)
+
+    # comment and hint options
+    def test__find_comment(self):
+        col = self.db.col
+        col.find({}, comment="this_query")
+
+    def test__find_hint(self):
+        col = self.db.col
+        col.find({}, hint="this_index")
+
+    def test__find_one_comment(self):
+        col = self.db.col
+        col.find_one({}, comment="this_query")
+
+    def test__find_one_hint(self):
+        col = self.db.col
+        col.find_one({}, hint="this_index")
+
+    def test__find_one_and_update_comment(self):
+        col = self.db.col
+        col.find_one_and_update({},{'$set': {'final': True}}, comment="this_query")
+
+    def test__find_one_and_update_hint(self):
+        col = self.db.col
+        col.find_one_and_update({}, {'$set': {'final': True}}, hint="this_index")
+
+    def test__count_documents_comment(self):
+        col = self.db.col
+        col.count_documents({}, comment="this_query")
+
+    def test__count_documents_hint(self):
+        col = self.db.col
+        col.count_documents({}, hint="this_index")
+    
+    def test__estimated_document_count_comment(self):
+        col = self.db.col
+        col.estimated_document_count( comment="this_query")
+
+    def test__distinct_comment(self):
+        col = self.db.col
+        col.distinct("a", comment="this_query")
+
+    def test__distinct_hint(self):
+        col = self.db.col
+        col.distinct("a", hint="this_index")
+    
+    def test__find_one_and_replace_comment(self):
+        col = self.db.col
+        col.find_one_and_replace({}, {"a": "b"}, comment="this_query")
+
+    def test__find_one_and_replace_hint(self):
+        col = self.db.col
+        col.find_one_and_replace({}, {"a": "b"}, hint="this_index")

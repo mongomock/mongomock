@@ -38,6 +38,9 @@ class BulkOperationsTest(TestCase):
         self.bulk_op = self.db.collection.initialize_ordered_bulk_op()
 
     def __check_document(self, doc, count=1):
+        """
+            Check count of query based find
+        """
         found_num = self.db.collection.find(doc).count()
         if found_num != count:
             all = list(self.db.collection.find())

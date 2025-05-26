@@ -1281,6 +1281,8 @@ class Collection:
         session=None,
         max_time_ms=None,
         allow_disk_use=False,
+        comment=None,
+        hint=None,
         **kwargs,
     ):
         spec = filter
@@ -1748,7 +1750,19 @@ class Collection:
             spec = helpers.patch_datetime_awareness_in_document(filter)
             return len(list(self._iter_documents(spec)))
 
-    def count_documents(self, filter, **kwargs):
+    def count_documents(self, filter, comment=None,  **kwargs):
+        if comment:
+            raise_not_implemented(
+                'comment',
+                'comment not implemented, but accepts'
+            )
+        
+        if kwargs.pop('hint', None):
+            raise_not_implemented(
+                'hint',
+                'hint not implemented, but accepts'
+            )
+
         if kwargs.pop('collation', None):
             raise_not_implemented(
                 'collation',
@@ -1776,10 +1790,13 @@ class Collection:
         count = max(doc_num - skip, 0)
         return count if limit is None else min(count, limit)
 
-    def estimated_document_count(self, **kwargs):
+    def estimated_document_count(self, comment=None, **kwargs):
+        """
+        https://pymongo.readthedocs.io/en/stable/api/pymongo/collection.html#pymongo.collection.Collection.estimated_document_count
+        """
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
-        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
+        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint', 'comment'}
 
         if self.database.client.server_info()['versionArray'] < [5]:
             unknown_kwargs -= {'skip'}
@@ -2025,10 +2042,13 @@ class Collection:
                 map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session
             )
 
-    def distinct(self, key, filter=None, session=None):
+    def distinct(self, key, filter=None, session=None, comment=None, hint=None):
+        """
+        https://pymongo.readthedocs.io/en/stable/api/pymongo/collection.html#pymongo.collection.Collection.distinct
+        """
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        return self.find(filter).distinct(key)
+        return self.find(filter, comment=comment, hint=hint).distinct(key)
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
 
