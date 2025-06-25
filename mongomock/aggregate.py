@@ -275,7 +275,9 @@ class _Parser:
                 return self._handle_type_operator(k, v)
             if k in boolean_operators:
                 return self._handle_boolean_operator(k, v)
-            if k in text_search_operators + projection_operators + object_operators:
+            if k in object_operators:
+                return self._handle_object_operator(k, v)
+            if k in text_search_operators + projection_operators:
                 raise NotImplementedError(
                     f"'{k}' is a valid operation but it is not supported by Mongomock yet."
                 )
@@ -300,6 +302,28 @@ class _Parser:
                     yield None
                 else:
                     raise
+
+    def _handle_object_operator(self, operator, expression):
+        if operator == '$mergeObjects':
+            return self._merge_objects(expression)
+
+    def _merge_objects(self, docs):
+        """
+        Merges a list of dictionaries into a single dictionary.
+        Ignores values that are not dictionaries.
+        """
+        merged = {}
+        # Parse the expression to resolve any nested operations
+        docs = self.parse(docs) if not isinstance(docs, list) else docs
+    
+        for doc in docs:
+            # Handle all value types
+            parsed = self.parse(doc) if isinstance(doc, dict) else doc
+        
+            if isinstance(parsed, dict):
+                merged.update(parsed)
+    
+        return merged
 
     def _parse_to_bool(self, expression):
         """Parse a MongoDB expression and then convert it to bool"""

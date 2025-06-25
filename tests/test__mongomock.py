@@ -4704,6 +4704,12 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 {'_id': ObjectId(), 'a': 3, 'b': None},
                 {'_id': ObjectId(), 'a': 3, 'b': {}},
                 {'_id': ObjectId(), 'a': 4, 'b': None},
+                {'_id': ObjectId(), 'a': 'multi', 'b': {'x': 1}},
+                {'_id': ObjectId(), 'a': 'multi', 'b': {'y': 2}},
+                {'_id': ObjectId(), 'a': 'multi', 'b': {'z': 3}},
+                {'a': 'non_dict', 'b': {'note': 'was a string'}},   
+                {'_id': ObjectId(), 'a': 'non_dict', 'b': {'valid': True}},
+                {'_id': ObjectId(), 'a': 'empty', 'b': {}}
             ]
         )
         pipeline = [
