@@ -913,6 +913,8 @@ class CollectionAPITest(TestCase):
                 {'_id': 2, 'a': 1, 'b': 2},
                 {'_id': 3, 'a': 1, 'b': 2},
                 {'_id': 4, 'a': 1, 'b': 2},
+                {'_id': 5, 'a': 1, 'b': 2, 'c': {'d': 3}}, # Added for $unset tests
+                {'_id': 6, 'a': 1, 'b': 2, 'c': {'d': 3}} 
             ]
         )
         # TODO(guludo): add test cases for other stages when they become
@@ -939,6 +941,17 @@ class CollectionAPITest(TestCase):
                 4,
                 [{'$replaceRoot': {'newRoot': {'_id': '$_id', 'x': {'$add': ['$a', '$b']}}}}],
                 {'_id': 4, 'x': 3},
+            ),
+                    # Test cases for $unset
+            (
+                5,
+                [{'$unset': 'b'}],  # Single field removal
+                {'_id': 5, 'a': 1, 'c': {'d': 3}},
+            ),
+            (
+                6,
+                [{'$unset': ['a', 'c.d']}],  # Multiple fields and nested removal
+                {'_id': 5, 'b': 2, 'c': {}},
             ),
         )
         for doc_id, update, expected in data:

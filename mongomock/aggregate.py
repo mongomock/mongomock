@@ -1664,6 +1664,43 @@ def _handle_match_stage(in_collection, database, options, user_vars):
     ]
 
 
+def _handle_unset_stage(in_collection, database, options, user_vars=None):
+    """
+    Removes specified fields (including nested fields via dot notation) from each document in a collection.
+    Accepts either a single field name (string) or a list of field names.
+    Safely handles missing paths and does not raise errors if a field is absent.
+    """
+    # Make a shallow copy of each document to avoid mutating the input collection
+    out_collection = [dict(doc) for doc in in_collection]
+
+    # Normalize options to a list of field names to remove
+    if isinstance(options, str):
+        fields = [options]
+    elif isinstance(options, list):
+        fields = options
+    else:
+        # Raise an error if the options are not valid
+        raise OperationFailure('$unset options must be a string or list of strings')
+
+    # Iterate over each document in the output collection
+    for out_doc in out_collection:
+        # For each field to remove
+        for field in fields:
+            # Support nested fields using dot notation
+            parts = field.split('.')
+            sub_doc = out_doc
+            # Traverse to the parent of the field to remove
+            for subfield in parts[:-1]:
+                sub_doc = sub_doc.get(subfield, {})
+                # If the path does not exist or is not a dict, stop traversing
+                if not isinstance(sub_doc, dict):
+                    break
+            else:
+                # Remove the field if it exists
+                sub_doc.pop(parts[-1], None)
+    return out_collection
+
+
 _PIPELINE_HANDLERS = {
     '$addFields': _handle_add_fields_stage,
     '$bucket': _handle_bucket_stage,
@@ -1693,7 +1730,7 @@ _PIPELINE_HANDLERS = {
     '$skip': lambda c, d, o, v: c[o:],
     '$sort': _handle_sort_stage,
     '$sortByCount': None,
-    '$unset': None,
+    '$unset': _handle_unset_stage,
     '$unwind': _handle_unwind_stage,
 }
 
