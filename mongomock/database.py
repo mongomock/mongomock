@@ -5,14 +5,12 @@ from packaging import version
 from mongomock import codec_options as mongomock_codec_options
 from mongomock import helpers
 from mongomock import read_preferences
-from mongomock import store
 
 from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
 from .filtering import filter_applies
-
 
 try:
     from pymongo import ReadPreference
@@ -44,7 +42,7 @@ class Database:
         self.name = name
         self._client = client
         self._collection_accesses = {}
-        self._store = _store or store.DatabaseStore()
+        self._store = _store or getattr(self._client, '_store')[self.name]
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
         mongomock_codec_options.is_supported(codec_options)
         self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
