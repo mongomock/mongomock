@@ -1803,6 +1803,28 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 4)
 
+    def test__ensure_partial_filter_expression_unique_indexes(self):
+        indexes = [
+            pymongo.operations.IndexModel([('obj.val_a', pymongo.ASCENDING), ('obj.val_b', pymongo.ASCENDING)],
+                                          unique=True,
+                                          partialFilterExpression={'obj': {"$exists": True}})
+        ]
+        self.db.collection.create_indexes(indexes)
+
+        # We should be able to add documents with duplicated `value` if `obj` doesn't exist
+        self.db.collection.insert_one({'value': 1})
+        self.db.collection.insert_one({'value': 1})
+
+        # We should be able to add documents with duplicated `value` and distinct `obj` vals
+        self.db.collection.insert_one({'value': 1, 'obj': {'val_a': 1, 'val_b': 1}})
+        self.db.collection.insert_one({'value': 1, 'obj': {'val_a': 1, 'val_b': 2}})
+
+        # We should not be able to add documents with duplicated `obj` vals
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'value': 2, 'obj': {'val_a': 1, 'val_b': 1}})
+
+        self.assertEqual(self.db.collection.count_documents({}), 4)
+
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
 

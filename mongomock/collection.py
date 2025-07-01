@@ -1873,6 +1873,7 @@ class Collection:
                 index.document['key'].items(),
                 session=session,
                 expireAfterSeconds=index.document.get('expireAfterSeconds'),
+                partialFilterExpression=index.document.get('partialFilterExpression'),
                 unique=index.document.get('unique', False),
                 sparse=index.document.get('sparse', False),
                 name=index.document.get('name'),
