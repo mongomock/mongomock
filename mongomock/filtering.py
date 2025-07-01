@@ -284,7 +284,7 @@ def _iter_key_candidates_sublist(key, doc):
 
 
 def _force_list(v):
-    return v if isinstance(v, (list, tuple)) else [v]
+    return v if v and isinstance(v, (list, tuple)) else [v]
 
 
 def _in_op(doc_val, search_val):
