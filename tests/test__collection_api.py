@@ -2769,7 +2769,7 @@ class CollectionAPITest(TestCase):
 
         # Upsert == True
         operations = [pymongo.UpdateMany({'a': 2}, {'$set': {'a': 3}}, upsert=True)]
-        result = self.db.collection.bulk_write(operations)
+        result = self.db.collection.bulk_write(operations, comment='bulk comment')
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
