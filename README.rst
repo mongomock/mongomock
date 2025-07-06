@@ -100,6 +100,13 @@ mongomock.patch (NOTE: you should use :code:`pymongo.MongoClient(...)` rather th
     call_endpoint('/votes')
     ... verify client.db.collection
 
+Usage Examples
+--------------
+
+You can find runnable example scripts under the ``examples/`` folder.
+They demonstrate basic usage of mongomock for testing code without
+a real MongoDB instance.
+
 
 Important Note About Project Status & Development
 -------------------------------------------------
