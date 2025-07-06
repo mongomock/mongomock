@@ -26,6 +26,7 @@ _SUPPORTED_BASE_TYPES = (
     bool,
     str,
     datetime.datetime,
+    datetime.date,
     type(None),
     uuid.UUID,
     int,

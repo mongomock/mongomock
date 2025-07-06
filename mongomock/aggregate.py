@@ -99,6 +99,7 @@ projection_operators = [
 date_operators = [
     '$dateFromString',
     '$dateToString',
+    '$dateTrunc',
     '$dateFromParts',
     '$dayOfMonth',
     '$dayOfWeek',
@@ -702,6 +703,14 @@ class _Parser:
                 second=second,
                 microsecond=millisecond,
             )
+        if operator == '$dateTrunc':
+            if not isinstance(values, dict):
+                raise OperationFailure(
+                    '$dateTrunc operator must correspond a dict' 'that has "unit" and "date" field.'
+                )
+            unit = values['unit']
+            if unit == 'day':
+                return out_value['date'].date()
 
         raise NotImplementedError(
             f"Although '{operator}' is a valid date operator for the "

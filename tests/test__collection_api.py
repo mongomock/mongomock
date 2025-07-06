@@ -7593,6 +7593,31 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([{'$project': {'a': {'$dateToString': '10'}}}])
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_date_trunc(self):
+        collection = self.db.collection
+        collection.insert_one(
+            {
+                'start_date': datetime(2011, 11, 4, 0, 5, 23),
+            }
+        )
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'start_date': {'$dateTrunc': {'date': '$start_date', 'unit': 'day'}}
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expect = [
+            {
+                'start_date': datetime(2011, 11, 4, 0).date(),
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_from_parts(self):
         collection = self.db.collection
         collection.insert_one(

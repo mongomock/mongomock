@@ -2131,7 +2131,14 @@ class Collection:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return self.database.rename_collection(self.name, new_name, **kwargs)
 
-    def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
+    def bulk_write(
+        self,
+        requests,
+        ordered=True,
+        bypass_document_validation=False,
+        session=None,
+        comment=None,
+    ):
         if bypass_document_validation:
             raise NotImplementedError(
                 'Skipping document validation is a valid MongoDB operation;'
