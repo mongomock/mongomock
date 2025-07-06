@@ -174,10 +174,7 @@ type_convertion_operators = [
     '$arrayToObject',
     '$objectToArray',
 ]
-type_operators = [
-    '$isNumber',
-    '$isArray',
-]
+type_operators = ['$isNumber', '$isArray', '$type']
 
 
 def _avg_operation(values):
@@ -979,6 +976,28 @@ class _Parser:
                 return False
             return isinstance(parsed, (tuple, list))
 
+        if operator == '$type':
+            try:
+                parsed = self.parse(values)
+                if isinstance(parsed, bool):
+                    return 'bool'
+                elif isinstance(parsed, str):
+                    return 'string'
+                elif isinstance(parsed, dict):
+                    return 'object'
+                elif isinstance(parsed, (list, tuple)):
+                    return 'array'
+                elif parsed is None:
+                    return 'null'
+                elif isinstance(parsed, int) and parsed > 2**31 - 1:
+                    return 'long'
+                elif isinstance(parsed, int):
+                    return 'int'
+                elif isinstance(parsed, datetime.datetime):
+                    return 'date'
+            except KeyError:
+                return 'missing'
+            raise NotImplementedError(f"Type '{type(parsed)}' is not supported yet")
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid type operator for the aggregation pipeline, "
             f'it is currently not implemented in Mongomock.'
