@@ -384,13 +384,15 @@ class _Parser:
                     f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
                 )
 
-            supports_optional_number_2 = operator in binary_arithmetic_operators_with_optional_second_number
+            supports_optional_number_2 = (
+                operator in binary_arithmetic_operators_with_optional_second_number
+            )
             if supports_optional_number_2:
                 if len(values) not in [1, 2]:
-                    raise OperationFailure('%s must have 1 or 2 parameters' % operator)
+                    raise OperationFailure(f'{operator} must have 1 or 2 parameters')
             else:
                 if len(values) != 2:
-                    raise OperationFailure('%s must have only 2 parameters' % operator)
+                    raise OperationFailure(f'{operator} must have only 2 parameters')
 
             number_0, number_1, *_unused_ = list(self.parse_many(values)) + [None] * 2
             if number_0 is None or (number_1 is None and not supports_optional_number_2):

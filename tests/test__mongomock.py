@@ -2857,13 +2857,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'sqrt': {'$sqrt': 100},
                     'trunc': {'$trunc': 8.35},
                     'round': {'$round': [9.51, 1]},
-                    'round': {'$round': [
-                                {
-                                    '$divide': [
-                                        {'$subtract': [1500.1234, 500]},
-                                        100,
-                                    ]
-                                }]},
                 }
             }
         ]
