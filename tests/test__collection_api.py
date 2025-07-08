@@ -2957,6 +2957,22 @@ class CollectionAPITest(TestCase):
         )
         self.assertEqual([2], [d['x'] for d in self.db.collection.find(search_filter)])
 
+    def test__aggregate_fill(self):
+        self.db.a.insert_many([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, "in_farm":False},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4},"in_farm":True},
+            {'_id': 3, 'pets': { 'cats': 4}},
+        ])
+        actual = self.db.a.aggregate([
+            {'$fill': {"output": {"in_farm": {"value": False}}}}
+        ])
+        self.assertListEqual([
+            {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, "in_farm":False},
+            {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4},"in_farm":True},
+            {'_id': 3, 'pets': { 'cats': 4},"in_farm":False},
+        ], list(actual))
+
+    
     def test__aggregate_replace_root(self):
         self.db.a.insert_many(
             [
