@@ -643,6 +643,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'array_field': [['abc']]})
         self.cmp.compare.find({'array_field': 'def'})
         self.cmp.compare.find({'array_field': ['def']})
+        self.cmp.compare.find({'array_field': {'$in': [['def'], [['abc']]]}})
 
     def test__find_by_objectid_in_list(self):
         # See #79
