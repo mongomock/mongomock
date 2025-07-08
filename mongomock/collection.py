@@ -2467,8 +2467,16 @@ def _current_date_updater(doc, field_name, value, codec_options=None):
         else:
             doc[field_name] = mongomock.utcnow()
 
+def _bit_updater(doc,field_name,value):
+    if value.get("or"):
+        doc[field] = doc[field] | value["or"]
+    if value.get("and"):
+        doc[field] = doc[field] & value["and"]
+    if value.get("xor"):
+        doc[field] = doc[field] | value["xor"]
 
 _updaters = {
+    '$bit': _bit_updater,
     '$set': _set_updater,
     '$unset': _unset_updater,
     '$inc': _inc_updater,
