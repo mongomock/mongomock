@@ -405,9 +405,9 @@ class _Parser:
                     return round(res.total_seconds() * 1000)
                 return res
 
-        assert isinstance(
-            values, (tuple, list)
-        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        assert isinstance(values, (tuple, list)), (
+            f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        )
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
@@ -723,6 +723,60 @@ class _Parser:
 
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
 
+        if operator == '$indexOfArray':
+            if not isinstance(value, list):
+                raise OperationFailure('$indexOfArray only supports a list as its argument')
+
+            if len(value) < 2 or len(value) > 4:
+                raise OperationFailure(
+                    f'Expression $indexOfArray takes at least 2 arguments, and at most '
+                    f'4, but {len(value)} were passed in'
+                )
+
+            array_value = self._parse_or_nothing(value[0])
+            # Mirrors mongo behaviour for missing array value
+            if array_value is NOTHING:
+                return None
+
+            array_index = self._parse_or_nothing(value[1])
+            if array_index is NOTHING:
+                return -1
+
+            array_start = self._parse_or_nothing(value[2]) if len(value) > 2 else 0
+            if not isinstance(array_start, (float, int)):
+                raise OperationFailure(
+                    'Expression $indexOfArray requires an integral starting index, found a value of type: %s, with value: %s'
+                    % (type(array_start), array_start)
+                )
+            if array_start and array_start < 0:
+                raise OperationFailure(
+                    'Expression $indexOfArray requires a nonnegative starting index, found: %d'
+                    % array_start
+                )
+
+            array_end = self._parse_or_nothing(value[3]) if len(value) > 3 else None
+            if array_end is not None and not isinstance(array_end, (float, int)):
+                raise OperationFailure(
+                    'Expression $indexOfArray requires an integral ending index, found a value of type: %s, with value: %s'
+                    % (type(array_end), array_end)
+                )
+            if array_end and array_end < 0:
+                raise OperationFailure(
+                    'Expression $indexOfArray requires a nonnegative ending index, found: %d'
+                    % array_end
+                )
+
+            if not isinstance(array_value, (list, tuple)):
+                raise OperationFailure(
+                    'The first argument to $indexOfArray must be an array, but was of type: %s'
+                    % ('missing' if array_value is NOTHING else type(array_value))
+                )
+
+            try:
+                return array_start + array_value[array_start:array_end].index(array_index)
+            except ValueError:
+                return -1
+
         if operator == '$map':
             if not isinstance(value, dict):
                 raise OperationFailure('$map only supports an object as its argument')
@@ -989,7 +1043,7 @@ class _Parser:
             fields = values[:-1]
             if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
                 raise OperationFailure(
-                    '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
+                    '$ifNull supports only one input expression  in MongoDB v4.4 and lower'
                 )
             fallback = values[-1]
             for field in fields:
@@ -1441,8 +1495,7 @@ def _handle_unwind_stage(in_collection, unused_database, options, unused_user_va
     path = options['path']
     if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
-            f'$unwind failed: exception: field path references must be prefixed '
-            f"with a '$' '{path}'"
+            f"$unwind failed: exception: field path references must be prefixed with a '$' '{path}'"
         )
     path = path[1:]
     should_preserve_null_and_empty = options.get('preserveNullAndEmptyArrays')

@@ -6051,7 +6051,7 @@ class CollectionAPITest(TestCase):
             collection.insert_one({'$foo': 'bar'})
         self.assertEqual(
             str(cm.exception),
-            'Top-level field names cannot start with the "$"' ' sign (found: $foo)',
+            'Top-level field names cannot start with the "$" sign (found: $foo)',
         )
         with self.assertRaises(InvalidDocument):
             collection.insert_one({'foo': {'foo\0bar': 'bar'}})
@@ -6964,6 +6964,155 @@ class CollectionAPITest(TestCase):
             with self.assertRaises(mongomock.OperationFailure, msg=option):
                 self.db.collection.aggregate([{'$project': {'slice': {'$slice': option}}}])
 
+    def test__aggregate_indexofarray(self):
+        self.db.collection.drop()
+        collection = self.db.collection
+        self.db.collection.insert_many(
+            [
+                {'_id': 0, 'items': list(range(10)), 'label': 'zero'},
+                {'_id': 1, 'items': list(range(10, 25)), 'label': 'one'},
+                {
+                    '_id': 2,
+                    'items': list(range(20, 30)),
+                },
+            ]
+        )
+
+        self.assertEqual(
+            [{'_id': 0, 'index': 0}, {'_id': 1, 'index': 0}, {'_id': 2, 'index': 0}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], 0]}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': -1}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], -5]}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': 0}, {'_id': 1, 'index': 1}, {'_id': 2, 'index': 2}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], '$_id']}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': -1}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': [[-1, -2, -3], '$_id']}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': 0}, {'_id': 1, 'index': 1}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$project': {
+                                'index': {
+                                    '$indexOfArray': [['zero', 'one', 'two', 'three'], '$label']
+                                }
+                            }
+                        }
+                    ]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': None}, {'_id': 1, 'index': None}, {'_id': 2, 'index': None}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': ['$empty', '$label']}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': 0}, {'_id': 1, 'index': -1}, {'_id': 2, 'index': -1}],
+            list(collection.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 0]}}}])),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': 0}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 10]}}}])
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': 13}, {'_id': 2, 'index': 3}],
+            list(
+                collection.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 23]}}}])
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': 13}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': ['$items', 23, 5]}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': -1}, {'_id': 2, 'index': -1}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': ['$items', 23, 15]}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': 13}, {'_id': 2, 'index': 3}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': ['$items', 23, 1]}}}]
+                )
+            ),
+        )
+        self.assertEqual(
+            [{'_id': 0, 'index': -1}, {'_id': 1, 'index': -1}, {'_id': 2, 'index': 3}],
+            list(
+                collection.aggregate(
+                    [{'$project': {'index': {'$indexOfArray': ['$items', 23, 1, 5]}}}]
+                )
+            ),
+        )
+
+    def test__aggregate_indexofarray_wrong(self):
+        # inserts an item otherwise the slice is not even evaluated
+        self.db.collection.insert_one(
+            {
+                '_id': 0,
+                'items': list(range(10)),
+            }
+        )
+        options = [
+            0,
+            {},
+            [],
+            [0],
+            [0, 0],
+            ['$_id', 0],
+            ['$items'],
+            ['$items', 0, -1],
+            ['$items', 0, 0, -1],
+            ['$items', 0, -1, -1],
+            ['$items', 0, -1, 0],
+            ['$items', 0, 'foo'],
+            ['$items', 0, '$foo'],
+            ['$items', 0, 0, 'foo'],
+            ['$items', 0, 0, '$foo'],
+            '$items',
+        ]
+        for option in options:
+            with self.assertRaises(mongomock.OperationFailure, msg=option):
+                self.db.collection.aggregate([{'$project': {'index': {'$indexOfArray': option}}}])
+
     def test__write_concern(self):
         self.assertEqual({}, self.db.collection.write_concern.document)
         self.assertTrue(self.db.collection.write_concern.is_server_default)
@@ -7235,8 +7384,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             datetime(2000, 1, 1, 10, 30, 30, 12000),
             stored_document['date'],
-            msg='The stored document holds a date as timezone naive UTC and without '
-            'microseconds',
+            msg='The stored document holds a date as timezone naive UTC and without microseconds',
         )
 
         # The objects are not linked: modifying the inserted document or the fetched one will

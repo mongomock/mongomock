@@ -199,7 +199,7 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb('mongodb://bob:bar@[::1]:27018/admin')
         self.assertIs(db, c['admin'])
 
-        c, db = gddb('mongodb://%24am:f%3Azzb%40zz@127.0.0.1/' 'admin%3F?authMechanism=MONGODB-CR')
+        c, db = gddb('mongodb://%24am:f%3Azzb%40zz@127.0.0.1/admin%3F?authMechanism=MONGODB-CR')
         self.assertIs(db, c['admin?'])
         c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
         self.assertIs(db, c['foo'])
@@ -4146,6 +4146,48 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -10]}}}])
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -5, 5]}}}])
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -10, 5]}}}])
+
+    def test__aggregate_indexofarray(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'_id': 0, 'items': list(range(10)), 'label': 'zero'},
+                {'_id': 1, 'items': list(range(10, 20)), 'label': 'one'},
+                {
+                    '_id': 2,
+                    'items': list(range(20, 30)),
+                },
+            ]
+        )
+
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], 0]}}}])
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], 0, 0, 10]}}}]
+        )
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], 0, 2, 5]}}}]
+        )
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], -1]}}}])
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], '$_id']}}}]
+        )
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[-1, -2, -3], '$_id']}}}]
+        )
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        'index': {'$indexOfArray': [['zero', 'one', 'two', 'three'], '$label']}
+                    }
+                }
+            ]
+        )
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 0]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 15]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', -1]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$empty', 0]}}}])
 
     def test__aggregate_no_entries(self):
         pipeline = [
