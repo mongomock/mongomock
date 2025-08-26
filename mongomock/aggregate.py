@@ -552,16 +552,10 @@ class _Parser:
                 )
 
             try:
-                input_value = self.parse(values['input'])
-            except KeyError:
-                return False
-            if not isinstance(input_value, str):
-                raise OperationFailure("$regexMatch needs 'input' to be of type string")
-
-            try:
                 regex_val = self.parse(values['regex'])
             except KeyError:
                 return False
+
             options = None
             raw_options = values.get('options', '').lower()
             for option in raw_options:
@@ -581,7 +575,7 @@ class _Parser:
             elif isinstance(regex_val, helpers.RE_TYPE):
                 if options and not regex_val.flags:
                     regex = re.compile(regex_val.pattern, options)
-                elif regex_val.flags & ~(re.I | re.M | re.X | re.S | re.U):
+                elif regex_val.flags & ~(re.I | re.M | re.X | re.S):
                     raise OperationFailure(
                         f'$regexMatch invalid flag in regex options: {regex_val.flags}'
                     )
@@ -589,13 +583,20 @@ class _Parser:
                     regex = regex_val
             elif isinstance(regex_val, _RE_TYPES):
                 # bson.Regex
-                if regex_val.flags & ~(re.I | re.M | re.X | re.S | re.U):
+                if regex_val.flags & ~(re.I | re.M | re.X | re.S):
                     raise OperationFailure(
                         f'$regexMatch invalid flag in regex options: {regex_val.flags}'
                     )
                 regex = re.compile(regex_val.pattern, regex_val.flags or options)
             else:
                 raise OperationFailure("$regexMatch needs 'regex' to be of type string or regex")
+
+            try:
+                input_value = self.parse(values['input'])
+            except KeyError:
+                return False
+            if not isinstance(input_value, str):
+                raise OperationFailure("$regexMatch needs 'input' to be of type string")
 
             return bool(regex.search(input_value))
 

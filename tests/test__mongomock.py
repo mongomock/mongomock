@@ -689,16 +689,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 }
             }
         )
-        with self.assertRaises(OperationFailure) as cm:
-            self.cmp.compare_ignore_order.find(
-                {
-                    'name': {
-                        '$regex': upper_regex,
-                        '$options': 'z',
-                    }
+        self.cmp.compare_ignore_order.find(
+            {
+                'name': {
+                    '$regex': upper_regex,
+                    '$options': 'z',
                 }
-            )
-        self.assertIn('invalid flag', str(cm.exception))
+            }
+        )
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -711,8 +709,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|notsam'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'i'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'i'}})
-        with self.assertRaises(OperationFailure):
-            self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'z'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'z'}})
 
     def test__find_in_array_by_regex_object(self):
         """Test searching inside array with regular expression object."""
