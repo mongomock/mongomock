@@ -792,6 +792,7 @@ class Collection:
         collation=None,
         let=None,
         array_filters=None,
+        sort=None,
         **kwargs,
     ):
         if session:
@@ -837,7 +838,14 @@ class Collection:
         upserted_id = None
         num_updated = 0
         num_matched = 0
-        for existing_document in itertools.chain(self._iter_documents(spec), [None]):
+        
+        # Use _get_dataset to support sorting if sort parameter is provided
+        if sort:
+            documents = list(self._get_dataset(spec, sort, None, dict))
+        else:
+            documents = list(self._iter_documents(spec))
+            
+        for existing_document in itertools.chain(documents, [None]):
             # we need was_insert for the setOnInsert update operation
             was_insert = False
             # the sentinel document means we should do an upsert
@@ -886,6 +894,8 @@ class Collection:
                 # revert modifications
                 try:
                     self._ensure_uniques(existing_document)
+                    # Save the updated document to the store
+                    self._store[existing_document['_id']] = existing_document
                     num_updated += 1
                 except DuplicateKeyError:
                     # Rollback.
