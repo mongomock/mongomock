@@ -838,13 +838,13 @@ class Collection:
         upserted_id = None
         num_updated = 0
         num_matched = 0
-        
+
         # Use _get_dataset to support sorting if sort parameter is provided
         if sort:
             documents = list(self._get_dataset(spec, sort, None, dict))
         else:
             documents = list(self._iter_documents(spec))
-            
+
         for existing_document in itertools.chain(documents, [None]):
             # we need was_insert for the setOnInsert update operation
             was_insert = False

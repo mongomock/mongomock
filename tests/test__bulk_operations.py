@@ -270,7 +270,7 @@ class CollectionComparisonTest(TestCase):
 @skipIf(version.parse('4.0') > helpers.PYMONGO_VERSION, 'pymongo v4 or above required')
 class BulkOperationsWithSortTest(TestCase):
     """Test BulkOperationBuilder.add_update with sort parameter (PyMongo 4.11+ compatibility)"""
-    
+
     def setUp(self):
         super().setUp()
         self.client = mongomock.MongoClient()
@@ -287,15 +287,15 @@ class BulkOperationsWithSortTest(TestCase):
 
     def test_bulk_update_one_with_sort(self):
         from pymongo import UpdateOne
-        
+
         bulk_ops = [UpdateOne(
-            {'age': 25}, 
-            {'$set': {'status': 'young'}}, 
+            {'age': 25},
+            {'$set': {'status': 'young'}},
             sort=[('score', -1)]
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
-        
+
         self.assertEqual(result.modified_count, 1)
         self.assertEqual(result.matched_count, 1)
 
@@ -306,17 +306,17 @@ class BulkOperationsWithSortTest(TestCase):
 
     def test_bulk_update_many_without_sort(self):
         from pymongo import UpdateMany
-        
+
         bulk_ops = [UpdateMany(
-            {'age': 25}, 
+            {'age': 25},
             {'$set': {'status': 'young'}}
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
 
         self.assertEqual(result.modified_count, 3)
         self.assertEqual(result.matched_count, 3)
-        
+
         updated_docs = list(self.collection.find({'status': 'young'}))
         self.assertEqual(len(updated_docs), 3)
 
@@ -325,15 +325,15 @@ class BulkOperationsWithSortTest(TestCase):
 
     def test_bulk_replace_one_with_sort(self):
         from pymongo import ReplaceOne
-        
+
         bulk_ops = [ReplaceOne(
-            {'age': 25}, 
-            {'name': 'Updated', 'age': 25, 'score': 999, 'status': 'replaced'}, 
+            {'age': 25},
+            {'name': 'Updated', 'age': 25, 'score': 999, 'status': 'replaced'},
             sort=[('score', -1)]
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
-        
+
         self.assertEqual(result.modified_count, 1)
         self.assertEqual(result.matched_count, 1)
 
@@ -343,51 +343,51 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(replaced_docs[0]['score'], 999)
 
     def test_bulk_update_without_sort(self):
-        from pymongo import UpdateOne, UpdateMany
-        
+        from pymongo import UpdateMany, UpdateOne
+
         bulk_ops = [UpdateOne(
-            {'age': 25}, 
+            {'age': 25},
             {'$set': {'status': 'young'}}
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
         self.assertEqual(result.modified_count, 1)
-        
+
         bulk_ops = [UpdateMany(
-            {'age': 30}, 
+            {'age': 30},
             {'$set': {'status': 'adult'}}
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
         self.assertEqual(result.modified_count, 1)
-        
+
         young_docs = list(self.collection.find({'status': 'young'}))
         adult_docs = list(self.collection.find({'status': 'adult'}))
-        
+
         self.assertEqual(len(young_docs), 1)
         self.assertEqual(len(adult_docs), 1)
         self.assertEqual(adult_docs[0]['name'], 'Bob')
 
     def test_bulk_update_with_complex_sort(self):
         from pymongo import UpdateOne
-        
+
         self.collection.drop()
         self.collection.insert_many([
             {'name': 'Eve', 'age': 25, 'score': 100, 'priority': 1},
             {'name': 'Frank', 'age': 25, 'score': 100, 'priority': 2},
             {'name': 'Grace', 'age': 25, 'score': 90, 'priority': 1},
         ])
-        
+
         bulk_ops = [UpdateOne(
-            {'age': 25, 'score': 100}, 
-            {'$set': {'status': 'top_priority'}}, 
+            {'age': 25, 'score': 100},
+            {'$set': {'status': 'top_priority'}},
             sort=[('score', -1), ('priority', 1)]
         )]
-        
+
         result = self.collection.bulk_write(bulk_ops)
 
         self.assertEqual(result.modified_count, 1)
-        
+
         updated_docs = list(self.collection.find({'status': 'top_priority'}))
         self.assertEqual(len(updated_docs), 1)
         self.assertEqual(updated_docs[0]['name'], 'Eve')
