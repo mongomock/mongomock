@@ -343,7 +343,7 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(replaced_docs[0]['score'], 999)
 
     def test_bulk_update_without_sort(self):
-        from pymongo import UpdateMany, UpdateOne
+        from pymongo import UpdateOne, UpdateMany
 
         bulk_ops = [UpdateOne(
             {'age': 25},
