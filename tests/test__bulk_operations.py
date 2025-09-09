@@ -279,20 +279,19 @@ class BulkOperationsWithSortTest(TestCase):
         self.collection = self.db['test_collection']
         self.collection.drop()
 
-        self.collection.insert_many([
-            {'name': 'Alice', 'age': 25, 'score': 100},
-            {'name': 'Bob', 'age': 30, 'score': 80},
-            {'name': 'Charlie', 'age': 25, 'score': 90},
-            {'name': 'David', 'age': 25, 'score': 95},
-        ])
+        self.collection.insert_many(
+            [
+                {'name': 'Alice', 'age': 25, 'score': 100},
+                {'name': 'Bob', 'age': 30, 'score': 80},
+                {'name': 'Charlie', 'age': 25, 'score': 90},
+                {'name': 'David', 'age': 25, 'score': 95},
+            ]
+        )
 
     def test_bulk_update_one_with_sort(self):
-
-        bulk_ops = [pymongo.UpdateOne(
-            {'age': 25},
-            {'$set': {'status': 'young'}},
-            sort=[('score', -1)]
-        )]
+        bulk_ops = [
+            pymongo.UpdateOne({'age': 25}, {'$set': {'status': 'young'}}, sort=[('score', -1)])
+        ]
 
         result = self.collection.bulk_write(bulk_ops)
 
@@ -305,11 +304,7 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(updated_docs[0]['score'], 100)
 
     def test_bulk_update_many_without_sort(self):
-
-        bulk_ops = [pymongo.UpdateMany(
-            {'age': 25},
-            {'$set': {'status': 'young'}}
-        )]
+        bulk_ops = [pymongo.UpdateMany({'age': 25}, {'$set': {'status': 'young'}})]
 
         result = self.collection.bulk_write(bulk_ops)
 
@@ -323,12 +318,13 @@ class BulkOperationsWithSortTest(TestCase):
             self.assertEqual(doc['age'], 25)
 
     def test_bulk_replace_one_with_sort(self):
-
-        bulk_ops = [pymongo.ReplaceOne(
-            {'age': 25},
-            {'name': 'Updated', 'age': 25, 'score': 999, 'status': 'replaced'},
-            sort=[('score', -1)]
-        )]
+        bulk_ops = [
+            pymongo.ReplaceOne(
+                {'age': 25},
+                {'name': 'Updated', 'age': 25, 'score': 999, 'status': 'replaced'},
+                sort=[('score', -1)],
+            )
+        ]
 
         result = self.collection.bulk_write(bulk_ops)
 
@@ -341,19 +337,12 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(replaced_docs[0]['score'], 999)
 
     def test_bulk_update_without_sort(self):
-
-        bulk_ops = [pymongo.UpdateOne(
-            {'age': 25},
-            {'$set': {'status': 'young'}}
-        )]
+        bulk_ops = [pymongo.UpdateOne({'age': 25}, {'$set': {'status': 'young'}})]
 
         result = self.collection.bulk_write(bulk_ops)
         self.assertEqual(result.modified_count, 1)
 
-        bulk_ops = [pymongo.UpdateMany(
-            {'age': 30},
-            {'$set': {'status': 'adult'}}
-        )]
+        bulk_ops = [pymongo.UpdateMany({'age': 30}, {'$set': {'status': 'adult'}})]
 
         result = self.collection.bulk_write(bulk_ops)
         self.assertEqual(result.modified_count, 1)
@@ -366,19 +355,22 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(adult_docs[0]['name'], 'Bob')
 
     def test_bulk_update_with_complex_sort(self):
-
         self.collection.drop()
-        self.collection.insert_many([
-            {'name': 'Eve', 'age': 25, 'score': 100, 'priority': 1},
-            {'name': 'Frank', 'age': 25, 'score': 100, 'priority': 2},
-            {'name': 'Grace', 'age': 25, 'score': 90, 'priority': 1},
-        ])
+        self.collection.insert_many(
+            [
+                {'name': 'Eve', 'age': 25, 'score': 100, 'priority': 1},
+                {'name': 'Frank', 'age': 25, 'score': 100, 'priority': 2},
+                {'name': 'Grace', 'age': 25, 'score': 90, 'priority': 1},
+            ]
+        )
 
-        bulk_ops = [pymongo.UpdateOne(
-            {'age': 25, 'score': 100},
-            {'$set': {'status': 'top_priority'}},
-            sort=[('score', -1), ('priority', 1)]
-        )]
+        bulk_ops = [
+            pymongo.UpdateOne(
+                {'age': 25, 'score': 100},
+                {'$set': {'status': 'top_priority'}},
+                sort=[('score', -1), ('priority', 1)],
+            )
+        ]
 
         result = self.collection.bulk_write(bulk_ops)
 
