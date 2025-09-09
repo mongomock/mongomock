@@ -12,6 +12,7 @@ try:
 except ImportError:
     pymongo = None
 
+
 from unittest import skipIf
 from unittest import TestCase
 
@@ -286,9 +287,8 @@ class BulkOperationsWithSortTest(TestCase):
         ])
 
     def test_bulk_update_one_with_sort(self):
-        from pymongo import UpdateOne
 
-        bulk_ops = [UpdateOne(
+        bulk_ops = [pymongo.UpdateOne(
             {'age': 25},
             {'$set': {'status': 'young'}},
             sort=[('score', -1)]
@@ -305,9 +305,8 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(updated_docs[0]['score'], 100)
 
     def test_bulk_update_many_without_sort(self):
-        from pymongo import UpdateMany
 
-        bulk_ops = [UpdateMany(
+        bulk_ops = [pymongo.UpdateMany(
             {'age': 25},
             {'$set': {'status': 'young'}}
         )]
@@ -324,9 +323,8 @@ class BulkOperationsWithSortTest(TestCase):
             self.assertEqual(doc['age'], 25)
 
     def test_bulk_replace_one_with_sort(self):
-        from pymongo import ReplaceOne
 
-        bulk_ops = [ReplaceOne(
+        bulk_ops = [pymongo.ReplaceOne(
             {'age': 25},
             {'name': 'Updated', 'age': 25, 'score': 999, 'status': 'replaced'},
             sort=[('score', -1)]
@@ -343,10 +341,8 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(replaced_docs[0]['score'], 999)
 
     def test_bulk_update_without_sort(self):
-        from pymongo import UpdateMany
-        from pymongo import UpdateOne
 
-        bulk_ops = [UpdateOne(
+        bulk_ops = [pymongo.UpdateOne(
             {'age': 25},
             {'$set': {'status': 'young'}}
         )]
@@ -354,7 +350,7 @@ class BulkOperationsWithSortTest(TestCase):
         result = self.collection.bulk_write(bulk_ops)
         self.assertEqual(result.modified_count, 1)
 
-        bulk_ops = [UpdateMany(
+        bulk_ops = [pymongo.UpdateMany(
             {'age': 30},
             {'$set': {'status': 'adult'}}
         )]
@@ -370,7 +366,6 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(adult_docs[0]['name'], 'Bob')
 
     def test_bulk_update_with_complex_sort(self):
-        from pymongo import UpdateOne
 
         self.collection.drop()
         self.collection.insert_many([
@@ -379,7 +374,7 @@ class BulkOperationsWithSortTest(TestCase):
             {'name': 'Grace', 'age': 25, 'score': 90, 'priority': 1},
         ])
 
-        bulk_ops = [UpdateOne(
+        bulk_ops = [pymongo.UpdateOne(
             {'age': 25, 'score': 100},
             {'$set': {'status': 'top_priority'}},
             sort=[('score', -1), ('priority', 1)]
