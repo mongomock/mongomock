@@ -1311,12 +1311,25 @@ class Collection:
         if sort:
             if isinstance(sort, dict):
                 sort = sort.items()
-            for sort_key, sort_direction in reversed(sort):
+            # Normalize potential nested sort specifications like ([key, -1], 1)
+            normalized_sort = []
+            for sort_key, sort_direction in sort:
+                effective_key = sort_key
+                effective_direction = sort_direction
+                # Handle nested pair provided as a list/tuple e.g. ['field', -1]
+                if isinstance(sort_key, (list, tuple)) and len(sort_key) == 2 and isinstance(
+                    sort_key[0], str
+                ):
+                    effective_key = sort_key[0]
+                    effective_direction = sort_key[1]
+                normalized_sort.append((effective_key, effective_direction))
+
+            for sort_key, sort_direction in reversed(normalized_sort):
                 if sort_key == '$natural':
                     if sort_direction < 0:
                         dataset = iter(reversed(list(dataset)))
                     continue
-                if sort_key.startswith('$'):
+                if isinstance(sort_key, str) and sort_key.startswith('$'):
                     raise NotImplementedError(
                         f'Sorting by {sort_key} is not implemented in mongomock yet'
                     )
