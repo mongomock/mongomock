@@ -1319,16 +1319,7 @@ class Collection:
                     sort_direction = 1
                 else:
                     sort_key, sort_direction = item
-                effective_key = sort_key
-                effective_direction = sort_direction
-                if (
-                    isinstance(sort_key, (list, tuple))
-                    and len(sort_key) == 2
-                    and isinstance(sort_key[0], str)
-                ):
-                    effective_key = sort_key[0]
-                    effective_direction = sort_key[1]
-                normalized_sort.append((effective_key, effective_direction))
+                normalized_sort.append((sort_key, sort_direction))
 
             for sort_key, sort_direction in reversed(normalized_sort):
                 if sort_key == '$natural':
