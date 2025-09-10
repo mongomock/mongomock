@@ -2649,11 +2649,13 @@ class CollectionAPITest(TestCase):
 
     def test__cursor_sort_nested_format(self):
         coll = self.db.create_collection('test_nested_sort')
-        coll.insert_many([
-            {'operator_id': 1, '_id': 1, 'name': 'first'},
-            {'operator_id': 2, '_id': 2, 'name': 'second'},
-            {'operator_id': 1, '_id': 3, 'name': 'third'},
-        ])
+        coll.insert_many(
+            [
+                {'operator_id': 1, '_id': 1, 'name': 'first'},
+                {'operator_id': 2, '_id': 2, 'name': 'second'},
+                {'operator_id': 1, '_id': 3, 'name': 'third'},
+            ]
+        )
 
         # Test nested format that was causing AttributeError
         result = list(coll.find(sort=[(['operator_id', -1], 1), (['_id', -1], 1)]))
@@ -2665,11 +2667,13 @@ class CollectionAPITest(TestCase):
 
     def test__cursor_sort_list_of_field_names(self):
         col = self.db.create_collection('sort_list_of_fields')
-        col.insert_many([
-            {'a': 2, 'b': 2},
-            {'a': 1, 'b': 3},
-            {'a': 1, 'b': 1},
-        ])
+        col.insert_many(
+            [
+                {'a': 2, 'b': 2},
+                {'a': 1, 'b': 3},
+                {'a': 1, 'b': 1},
+            ]
+        )
         # Interpret ['a', 'b'] as [('a', 1), ('b', 1)]
         self.assertEqual([1, 3, 2], [doc['b'] for doc in col.find(sort=['a', 'b'])])
 
