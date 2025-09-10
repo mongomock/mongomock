@@ -2654,11 +2654,11 @@ class CollectionAPITest(TestCase):
             {'operator_id': 2, '_id': 2, 'name': 'second'},
             {'operator_id': 1, '_id': 3, 'name': 'third'},
         ])
-        
+
         # Test nested format that was causing AttributeError
         result = list(coll.find(sort=[(['operator_id', -1], 1), (['_id', -1], 1)]))
         self.assertEqual([2, 3, 1], [doc['_id'] for doc in result])
-        
+
         # Test mixed format: some nested, some regular
         result = list(coll.find(sort=[(['operator_id', -1], 1), ('_id', 1)]))
         self.assertEqual([2, 3, 1], [doc['_id'] for doc in result])
