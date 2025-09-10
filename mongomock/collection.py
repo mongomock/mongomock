@@ -1312,7 +1312,13 @@ class Collection:
             if isinstance(sort, dict):
                 sort = sort.items()
             normalized_sort = []
-            for sort_key, sort_direction in sort:
+            for item in sort:
+                # Support list of field names: ['a', 'b'] interpreted as ascending
+                if isinstance(item, str):
+                    sort_key = item
+                    sort_direction = 1
+                else:
+                    sort_key, sort_direction = item
                 effective_key = sort_key
                 effective_direction = sort_direction
                 if (
