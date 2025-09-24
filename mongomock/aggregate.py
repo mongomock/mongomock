@@ -168,7 +168,8 @@ set_operators = [
 
 type_convertion_operators = [
     '$convert',
-    '$receptoStringToJson$toString',
+    '$receptoStringToJson',
+    '$toString',
     '$toInt',
     '$toDecimal',
     '$toLong',
