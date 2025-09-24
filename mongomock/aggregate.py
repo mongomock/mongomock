@@ -75,7 +75,7 @@ arithmetic_operators = (
     unary_arithmetic_operators
     | binary_arithmetic_operators
     | {
-        '$add',F
+        '$add',
         '$multiply',
     }
 )
@@ -168,8 +168,7 @@ set_operators = [
 
 type_convertion_operators = [
     '$convert',
-    '$receptoStringToJson'
-    '$toString',
+    '$receptoStringToJson$toString',
     '$toInt',
     '$toDecimal',
     '$toLong',
@@ -404,9 +403,9 @@ class _Parser:
                     return round(res.total_seconds() * 1000)
                 return res
 
-        assert isinstance(
-            values, (tuple, list)
-        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        assert isinstance(values, (tuple, list)), (
+            f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        )
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
@@ -1028,7 +1027,7 @@ class _Parser:
             fields = values[:-1]
             if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
                 raise OperationFailure(
-                    '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
+                    '$ifNull supports only one input expression  in MongoDB v4.4 and lower'
                 )
             fallback = values[-1]
             for field in fields:
@@ -1480,8 +1479,7 @@ def _handle_unwind_stage(in_collection, unused_database, options, unused_user_va
     path = options['path']
     if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
-            f'$unwind failed: exception: field path references must be prefixed '
-            f"with a '$' '{path}'"
+            f"$unwind failed: exception: field path references must be prefixed with a '$' '{path}'"
         )
     path = path[1:]
     should_preserve_null_and_empty = options.get('preserveNullAndEmptyArrays')
