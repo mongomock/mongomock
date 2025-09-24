@@ -13,6 +13,7 @@ import numbers
 import random
 import re
 import warnings
+import json
 
 import pytz
 from packaging import version
@@ -74,7 +75,7 @@ arithmetic_operators = (
     unary_arithmetic_operators
     | binary_arithmetic_operators
     | {
-        '$add',
+        '$add',F
         '$multiply',
     }
 )
@@ -167,6 +168,7 @@ set_operators = [
 
 type_convertion_operators = [
     '$convert',
+    '$receptoStringToJson'
     '$toString',
     '$toInt',
     '$toDecimal',
@@ -847,7 +849,24 @@ class _Parser:
             if isinstance(parsed, datetime.datetime):
                 return parsed.isoformat()[:-3] + 'Z'
             return str(parsed)
+        if operator == '$receptoStringToJson':
+            try:
+                json_string = self.parse(values)
+            except KeyError:
+                return None
 
+            if json_string is None:
+                return None
+
+            if not isinstance(json_string, str):
+                raise OperationFailure(
+                    f'$fromJson requires a string input, found: {type(json_string)}'
+                )
+
+            try:
+                return json.loads(json_string)
+            except json.JSONDecodeError as e:
+                raise OperationFailure(f'Invalid JSON string for $fromJson: {str(e)}')
         if operator == '$toInt':
             try:
                 parsed = self.parse(values)
