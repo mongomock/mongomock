@@ -13,6 +13,7 @@ import numbers
 import random
 import re
 import warnings
+import json
 
 import pytz
 from packaging import version
@@ -167,6 +168,7 @@ set_operators = [
 
 type_convertion_operators = [
     '$convert',
+    '$receptoStringToJson',
     '$toString',
     '$toInt',
     '$toDecimal',
@@ -402,9 +404,9 @@ class _Parser:
                     return round(res.total_seconds() * 1000)
                 return res
 
-        assert isinstance(
-            values, (tuple, list)
-        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        assert isinstance(values, (tuple, list)), (
+            f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+        )
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
@@ -847,7 +849,24 @@ class _Parser:
             if isinstance(parsed, datetime.datetime):
                 return parsed.isoformat()[:-3] + 'Z'
             return str(parsed)
+        if operator == '$receptoStringToJson':
+            try:
+                json_string = self.parse(values)
+            except KeyError:
+                return None
 
+            if json_string is None:
+                return None
+
+            if not isinstance(json_string, str):
+                raise OperationFailure(
+                    f'$fromJson requires a string input, found: {type(json_string)}'
+                )
+
+            try:
+                return json.loads(json_string)
+            except json.JSONDecodeError as e:
+                raise OperationFailure(f'Invalid JSON string for $fromJson: {str(e)}')
         if operator == '$toInt':
             try:
                 parsed = self.parse(values)
@@ -1009,7 +1028,7 @@ class _Parser:
             fields = values[:-1]
             if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
                 raise OperationFailure(
-                    '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
+                    '$ifNull supports only one input expression  in MongoDB v4.4 and lower'
                 )
             fallback = values[-1]
             for field in fields:
@@ -1461,8 +1480,7 @@ def _handle_unwind_stage(in_collection, unused_database, options, unused_user_va
     path = options['path']
     if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
-            f'$unwind failed: exception: field path references must be prefixed '
-            f"with a '$' '{path}'"
+            f"$unwind failed: exception: field path references must be prefixed with a '$' '{path}'"
         )
     path = path[1:]
     should_preserve_null_and_empty = options.get('preserveNullAndEmptyArrays')
