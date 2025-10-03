@@ -87,6 +87,7 @@ project_operators = [
     '$stdDevPop',
     '$stdDevSamp',
     '$arrayElemAt',
+    '$getField',
     '$first',
     '$last',
 ]
@@ -437,6 +438,24 @@ class _Parser:
                 return array[index]
             except IndexError as error:
                 raise KeyError('Array have length less than index value') from error
+        if operator == '$getField':
+            if isinstance(values, dict):
+                field = values.get('field', None)
+                input = values.get('input', '$$ROOT')
+                if field is None:
+                    raise OperationFailure('$getField requires "field" parameter')
+
+                field_value = self.parse(field)
+                input_doc = self.parse(input)
+
+                if not isinstance(input_doc, dict):
+                    raise OperationFailure('$getField "input" parameter must resolve to an object')
+                if not isinstance(field_value, str):
+                    raise OperationFailure('$getField "field" parameter must resolve to a string')
+                try:
+                    return input_doc[field_value]
+                except KeyError as error:
+                    raise KeyError(f'Field "{field}" not found in document') from error
 
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
