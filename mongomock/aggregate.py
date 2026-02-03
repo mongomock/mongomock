@@ -171,6 +171,7 @@ type_convertion_operators = [
     '$toInt',
     '$toDecimal',
     '$toLong',
+    '$toObjectId',
     '$arrayToObject',
     '$objectToArray',
 ]
@@ -912,6 +913,27 @@ class _Parser:
             else:
                 raise TypeError(f"'{type(parsed)}' type is not supported")
             return decimal_value
+
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toObjectId/
+        if operator == '$toObjectId':
+            try:
+                parsed = self.parse(values)
+            except KeyError:
+                return None
+            if parsed is None:
+                return None
+            if isinstance(parsed, helpers.ObjectId):
+                return parsed
+            if isinstance(parsed, str):
+                try:
+                    return helpers.ObjectId(parsed)
+                except (ValueError, TypeError) as err:
+                    raise OperationFailure(
+                        f"Failed to parse objectId '{parsed}' in $convert with no onError value"
+                    ) from err
+            raise OperationFailure(
+                f"$toObjectId requires a string, ObjectId, or null input, found: {type(parsed).__name__}"
+            )
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
         if operator == '$arrayToObject':

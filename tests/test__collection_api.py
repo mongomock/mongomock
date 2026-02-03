@@ -7487,6 +7487,94 @@ class CollectionAPITest(TestCase):
                 )
             )
 
+    def test__aggregate_to_object_id(self):
+        collection = self.db.collection
+        object_id_str = '507f1f77bcf86cd799439011'
+        object_id = ObjectId(object_id_str)
+        
+        collection.insert_one(
+            {
+                '_id': 1,
+                'string_id': object_id_str,
+                'object_id': object_id,
+                'null_value': None,
+            }
+        )
+        
+        # Test basic conversion from string to ObjectId
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'converted_from_string': {'$toObjectId': '$string_id'},
+                        'converted_from_object_id': {'$toObjectId': '$object_id'},
+                        'converted_from_null': {'$toObjectId': '$null_value'},
+                        'converted_from_missing': {'$toObjectId': '$missing_field'},
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        result = list(actual)
+        
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0]['converted_from_string'], ObjectId)
+        self.assertEqual(str(result[0]['converted_from_string']), object_id_str)
+        self.assertIsInstance(result[0]['converted_from_object_id'], ObjectId)
+        self.assertEqual(result[0]['converted_from_object_id'], object_id)
+        self.assertIsNone(result[0]['converted_from_null'])
+        self.assertIsNone(result[0]['converted_from_missing'])
+        
+        # Test the user's specific use case
+        collection.drop()
+        collection.insert_one(
+            {
+                '_id': 'assignments',
+                'entity': 'entity',
+                'entity_id': object_id_str,
+            }
+        )
+        
+        actual = collection.aggregate(
+            [
+                {
+                    '$match': {
+                        '_id': {'$in': ['assignments']},
+                        'entity': 'entity'
+                    }
+                },
+                {
+                    '$addFields': {
+                        'entity_id': {'$toObjectId': '$entity_id'}
+                    }
+                }
+            ]
+        )
+        result = list(actual)
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0]['entity_id'], ObjectId)
+        self.assertEqual(str(result[0]['entity_id']), object_id_str)
+        
+        # Test error cases
+        collection.drop()
+        collection.insert_one({'_id': 1, 'invalid_string': 'not_a_valid_objectid'})
+        
+        with self.assertRaises(mongomock.OperationFailure) as context:
+            list(collection.aggregate([
+                {'$addFields': {'converted': {'$toObjectId': '$invalid_string'}}}
+            ]))
+        self.assertIn('Failed to parse objectId', str(context.exception))
+        
+        # Test with integer (should raise error)
+        collection.drop()
+        collection.insert_one({'_id': 1, 'number': 123})
+        
+        with self.assertRaises(mongomock.OperationFailure) as context:
+            list(collection.aggregate([
+                {'$addFields': {'converted': {'$toObjectId': '$number'}}}
+            ]))
+        self.assertIn('requires a string, ObjectId, or null input', str(context.exception))
+
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_to_string(self):
         collection = self.db.collection
