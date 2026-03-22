@@ -1,4 +1,5 @@
 import itertools
+import math
 import numbers
 import operator
 import re
@@ -479,8 +480,16 @@ def _combine_regex_options(search):
     return search_copy
 
 
+def _is_nan(value):
+    """Check if a value is NaN (Not a Number)."""
+    return isinstance(value, float) and math.isnan(value)
+
+
 def operator_eq(doc_val, search_val):
     if doc_val is NOTHING and search_val is None:
+        return True
+    # MongoDB treats all NaN values as equal for comparison purposes
+    if _is_nan(doc_val) and _is_nan(search_val):
         return True
     return operator.eq(doc_val, search_val)
 
