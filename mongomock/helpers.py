@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import time
 import warnings
 from collections import OrderedDict
@@ -77,10 +78,14 @@ def utcnow():
     ```python
     def test_x(self):
         with mock.patch("mongomock.utcnow") as mm_utc:
-            mm_utc = datetime.utcnow() + timedelta(hours=100)
+            mm_utc = datetime.now(UTC) + timedelta(hours=100)
             # Test some things "100 hours" in the future
     ```
     """
+    if sys.version_info >= (3, 11):
+        from datetime import UTC
+
+        return datetime.now(UTC)
     return datetime.utcnow()
 
 
