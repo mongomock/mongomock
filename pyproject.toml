@@ -13,7 +13,7 @@ authors = [
     { name = "Martin Domke", email = "mail@martindomke.net" },
     { name = "Pascal Corpet", email = "pascal@corpet.net" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "License :: OSI Approved :: ISC License (ISCL)",
     "Topic :: Database",
@@ -25,7 +25,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

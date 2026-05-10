@@ -16,4 +16,4 @@ RUN apt-get update \
 
 ENV PATH=/root/.local/bin:${PATH}
 RUN pipx ensurepath && pipx install hatch
-RUN hatch python install 3.9 3.10 3.11 3.12 3.13 pypy3.10
+RUN hatch python install 3.10 3.11 3.12 3.13 pypy3.10
