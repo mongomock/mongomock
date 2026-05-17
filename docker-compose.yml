@@ -9,7 +9,7 @@ services:
       - TEST_MONGO_HOST=mongodb://mongo/mock
       - MONGODB=5.0.5
     volumes:
-      - .:/project
+      - /home/felipe/workspace/mongomock/:/project
     depends_on:
       - mongo
 
