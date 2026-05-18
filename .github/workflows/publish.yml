@@ -1,8 +1,8 @@
 name: publish
 
 on:
-  push:
-    tags: ["*"]
+  pull_request:
+    branches: [develop]
 
 jobs:
   deploy:
