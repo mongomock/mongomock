@@ -5,19 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [7.0.0] - 2026-05-18
-### Added
-- Compatibility and testing support for PyMongo 4 and Mongodb 7.0.34 across test matrix.
-- Improvements to internal behavior and test-suite to reduce flakiness.
-- mypy fixes
-
 ### Changed
-- Internal refactors and API hardening that may affect edge-case behaviors — please
-  review your test-suite when upgrading.
-- During release `mongomock_ng/__version__.py` is pinned to the released version.
-- CI/CD pipelines
+- **Rebranded from `mongomock` to `mongomock_ng`** — all imports must use the new package name
+- Versioned to against MongoDB 7.0.34 server behavior
+- Migrated build system to Hatch with PEP 621
+- Replaced `tox` with Hatch matrix testing (Python 3.10–3.13 × PyMongo 3/4/4.11/7.0/latest/none)
+- Updated CI to GitHub Actions with lint, type-check, test matrix, and code coverage
+- Switched code formatting to Ruff
+- Updated `hatch.toml` test matrix for PyMongo 4.11 and 7.0 compatibility
+- Updated `Makefile` with docker and release helpers
+
+### Removed
+- Legacy build files: `setup.py`, `setup.cfg`, `tox.ini`, `.travis.yml`
 
 ### Fixed
-- Various bug fixes and test stability improvements.
+- Compatibility with PyMongo 4.11 (BSON validation error messages, BulkOperationBuilder)
+- Codec options not forwarded to update methods
+- mypy type errors
 
 ### Notes
 - This is a major release. Consumers should run their project's test-suite against
@@ -57,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove support for deprecated Python versions (everything prior to 3.8)
 
 
+[7.0.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...7.0.0
 [4.4.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...4.4.0
 [4.3.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.2.0...4.3.0
 [4.2.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.1.3...4.2.0
