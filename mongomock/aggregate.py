@@ -13,10 +13,12 @@ import numbers
 import random
 import re
 import warnings
+from typing import Any
+from typing import Optional
 
 import pytz
 from packaging import version
-from sentinels import NOTHING
+from sentinels import NOTHING  # type: ignore[import-untyped]
 
 import mongomock
 from mongomock import command_cursor
@@ -25,17 +27,25 @@ from mongomock import helpers
 from mongomock import OperationFailure
 
 
+# bson types - available only if bson is installed
+Regex: Optional[type[Any]] = None
+InvalidDocument: type[Exception] = OperationFailure
+decimal_support: bool = False
+
 try:
     from bson import decimal128
-    from bson import Regex
-    from bson.errors import InvalidDocument
+    from bson import Regex as _Regex
+    from bson.errors import InvalidDocument as _InvalidDocument
 
+    Regex = _Regex  # type: ignore[misc]
+    InvalidDocument = _InvalidDocument  # type: ignore[misc]
     decimal_support = True
-    _RE_TYPES = (helpers.RE_TYPE, Regex)
 except ImportError:
-    InvalidDocument = OperationFailure
-    decimal_support = False
-    _RE_TYPES = (helpers.RE_TYPE,)
+    pass
+
+_RE_TYPES: tuple[type[Any], ...] = (
+    (helpers.RE_TYPE, Regex) if Regex is not None else (helpers.RE_TYPE,)
+)  # type: ignore[assignment]
 
 _random = random.Random()  # noqa: S311
 

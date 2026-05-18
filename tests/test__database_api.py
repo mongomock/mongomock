@@ -289,4 +289,4 @@ class DatabaseAPITest(TestCase):
             mongomock.database.Database(client, 'foo', None, read_concern='bar')
 
 
-_DBRef = collections.namedtuple('DBRef', ['database', 'collection', 'id'])
+_DBRef = collections.namedtuple('_DBRef', ['database', 'collection', 'id'])

@@ -9,21 +9,38 @@ from collections.abc import Mapping
 from datetime import datetime
 from datetime import timedelta
 from datetime import tzinfo
+from typing import Any
 from typing import Optional
 from urllib.parse import unquote_plus
 
 from packaging import version
 
-from mongomock import InvalidURI
+
+try:
+    from pymongo.errors import InvalidURI
+except ImportError:
+
+    class InvalidURI(Exception):  # type: ignore[no-redef]
+        """Fallback InvalidURI exception when pymongo is not installed."""
+
+        pass
 
 
 # Get ObjectId from bson if available or import a crafted one. This is not used
 # in this module but is made available for callers of this module.
+# Type declarations
+ObjectId: Any
+Timestamp: Optional[type[Any]]
+PYMONGO_VERSION: version.Version
+HAVE_PYMONGO: bool
+
 try:
-    from bson import ObjectId  # pylint: disable=unused-import
-    from bson import Timestamp
+    from bson import ObjectId as BsonObjectId  # pylint: disable=unused-import
+    from bson import Timestamp as BsonTimestamp
     from pymongo import version as pymongo_version
 
+    ObjectId = BsonObjectId
+    Timestamp = BsonTimestamp
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
@@ -40,27 +57,32 @@ _HOST_MATCH = re.compile(r'^([^@]+@)?([^:]+|\[[^\]]+\])(:([^:]+))?$')
 _SIMPLE_HOST_MATCH = re.compile(r'^([^:]+|\[[^\]]+\])(:([^:]+))?$')
 
 try:
-    from bson.tz_util import utc
+    from bson.tz_util import utc as bson_utc
 except ImportError:
+    bson_utc = None  # type: ignore[assignment]
 
-    class _FixedOffset(tzinfo):
-        def __init__(self, offset, name):
-            self.__offset = timedelta(minutes=offset)
-            self.__name = name
 
-        def __getinitargs__(self):
-            return self.__offset, self.__name
+class _FixedOffset(tzinfo):
+    def __init__(self, offset: int, name: str) -> None:
+        self.__offset = timedelta(minutes=offset)
+        self.__name = name
 
-        def utcoffset(self, dt):
-            return self.__offset
+    def __getinitargs__(self) -> tuple[timedelta, str]:
+        return self.__offset, self.__name
 
-        def tzname(self, dt):
-            return self.__name
+    def utcoffset(self, dt: Any) -> timedelta:
+        return self.__offset
 
-        def dst(self, dt):
-            return timedelta(0)
+    def tzname(self, dt: Any) -> str:
+        return self.__name
 
-    utc = _FixedOffset(0, 'UTC')
+    def dst(self, dt: Any) -> timedelta:
+        return timedelta(0)
+
+
+# Assign utc after defining _FixedOffset
+utc_value = bson_utc if bson_utc is not None else _FixedOffset(0, 'UTC')
+utc = utc_value
 
 
 ASCENDING = 1
@@ -95,7 +117,7 @@ def print_deprecation_warning(old_param_name, new_param_name):
 
 
 def create_index_list(
-    keys: str | Iterable[str, tuple[str, int]], direction: Optional[int] = None
+    keys: str | Iterable[str | tuple[str, int]], direction: Optional[int] = None
 ) -> list[tuple[str, int]]:
     """Helper to generate a list of (key, direction) pairs.
 
@@ -314,7 +336,7 @@ def split_hosts(hosts, default_port=27017):
     return nodelist
 
 
-_LAST_TIMESTAMP_INC = []
+_LAST_TIMESTAMP_INC: list[int] = []
 
 
 def get_current_timestamp():

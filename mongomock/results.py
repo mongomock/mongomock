@@ -14,8 +14,8 @@ except ImportError:
         def acknowledged(self):
             return self.__acknowledged
 
-    class InsertOneResult(_WriteResult):
-        __slots__ = ('__inserted_id', '__acknowledged')
+    class _FallbackInsertOneResult(_WriteResult):
+        __slots__ = ('__acknowledged', '__inserted_id')
 
         def __init__(self, inserted_id, acknowledged=True):
             self.__inserted_id = inserted_id
@@ -25,8 +25,8 @@ except ImportError:
         def inserted_id(self):
             return self.__inserted_id
 
-    class InsertManyResult(_WriteResult):
-        __slots__ = ('__inserted_ids', '__acknowledged')
+    class _FallbackInsertManyResult(_WriteResult):
+        __slots__ = ('__acknowledged', '__inserted_ids')
 
         def __init__(self, inserted_ids, acknowledged=True):
             self.__inserted_ids = inserted_ids
@@ -36,8 +36,8 @@ except ImportError:
         def inserted_ids(self):
             return self.__inserted_ids
 
-    class UpdateResult(_WriteResult):
-        __slots__ = ('__raw_result', '__acknowledged')
+    class _FallbackUpdateResult(_WriteResult):
+        __slots__ = ('__acknowledged', '__raw_result')
 
         def __init__(self, raw_result, acknowledged=True):
             self.__raw_result = raw_result
@@ -61,8 +61,8 @@ except ImportError:
         def upserted_id(self):
             return self.__raw_result.get('upserted')
 
-    class DeleteResult(_WriteResult):
-        __slots__ = ('__raw_result', '__acknowledged')
+    class _FallbackDeleteResult(_WriteResult):
+        __slots__ = ('__acknowledged', '__raw_result')
 
         def __init__(self, raw_result, acknowledged=True):
             self.__raw_result = raw_result
@@ -76,8 +76,8 @@ except ImportError:
         def deleted_count(self):
             return self.__raw_result.get('n', 0)
 
-    class BulkWriteResult(_WriteResult):
-        __slots__ = ('__bulk_api_result', '__acknowledged')
+    class _FallbackBulkWriteResult(_WriteResult):
+        __slots__ = ('__acknowledged', '__bulk_api_result')
 
         def __init__(self, bulk_api_result, acknowledged):
             self.__bulk_api_result = bulk_api_result
@@ -113,6 +113,13 @@ except ImportError:
                 return {
                     upsert['index']: upsert['_id'] for upsert in self.bulk_api_result['upserted']
                 }
+
+    # Reatribuir aos nomes esperados (sem duplicação de nome para mypy)
+    InsertOneResult = _FallbackInsertOneResult
+    InsertManyResult = _FallbackInsertManyResult
+    UpdateResult = _FallbackUpdateResult
+    DeleteResult = _FallbackDeleteResult
+    BulkWriteResult = _FallbackBulkWriteResult
 
 
 __all__ = [

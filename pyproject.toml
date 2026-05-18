@@ -9,6 +9,7 @@ description = "Fake pymongo stub for testing simple MongoDB-dependent code"
 readme = "README.rst"
 license = { file = "LICENSE" }
 authors = [
+    { name = "Felipe Monteiro jácome", email = "engfelipe.jacome@gmail.com"},
     { name = "Rotem Yaari", email = "vmalloc@gmail.com" },
     { name = "Martin Domke", email = "mail@martindomke.net" },
     { name = "Pascal Corpet", email = "pascal@corpet.net" },

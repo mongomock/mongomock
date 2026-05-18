@@ -8,3 +8,6 @@ repos:
     rev: v1.13.0
     hooks:
     -   id: mypy
+        exclude: ^mongomock/__init__.pyi$
+        additional_dependencies:
+            - types-pytz

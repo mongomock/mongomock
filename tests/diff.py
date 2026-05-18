@@ -3,6 +3,7 @@ import decimal
 import re
 import uuid
 from collections.abc import Mapping
+from typing import Any
 
 
 try:
@@ -34,8 +35,13 @@ _SUPPORTED_BASE_TYPES = (
     type(re.compile('')),
 )
 
+_SUPPORTED_TYPES: tuple[type[Any], ...]
 if _HAVE_PYMONGO:
-    _SUPPORTED_TYPES = (*_SUPPORTED_BASE_TYPES, decimal.Decimal, decimal128.Decimal128)
+    _SUPPORTED_TYPES = (
+        *_SUPPORTED_BASE_TYPES,
+        decimal.Decimal,
+        decimal128.Decimal128,
+    )
 else:
     _SUPPORTED_TYPES = _SUPPORTED_BASE_TYPES
 

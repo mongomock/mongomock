@@ -36,12 +36,15 @@ try:
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
 
-    class IndexModel:
+    class _FallbackIndexModel:
         pass
 
-    class ReturnDocument:
+    class _FallbackReturnDocument:
         BEFORE = False
         AFTER = True
+
+    IndexModel = _FallbackIndexModel
+    ReturnDocument = _FallbackReturnDocument
 
     from mongomock.read_preferences import PRIMARY as _READ_PREFERENCE_PRIMARY
 
@@ -74,7 +77,7 @@ try:
 except ImportError:
     from mongomock.read_concern import ReadConcern
 
-_KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'attrs'])
+_KwargOption = collections.namedtuple('_KwargOption', ['typename', 'default', 'attrs'])
 
 _WITH_OPTIONS_KWARGS = {
     'read_preference': _KwargOption(
@@ -421,12 +424,9 @@ class BulkOperationBuilder:
         if broken_nModified_info:
             result.pop('nModified')
         elif (
-            has_insert
-            and self._insert_returns_nModified
-            or has_update
-            and self._update_returns_nModified
-            or self._update_returns_nModified
-            and self._insert_returns_nModified
+            (has_insert and self._insert_returns_nModified)
+            or (has_update and self._update_returns_nModified)
+            or (self._update_returns_nModified and self._insert_returns_nModified)
         ):
             pass
         else:
@@ -1403,7 +1403,7 @@ class Collection:
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or not fields and version.parse('4.0') <= helpers.PYMONGO_VERSION:
+        if fields is None or (not fields and version.parse('4.0') <= helpers.PYMONGO_VERSION):
             return _copy_field(doc, container)
 
         if not fields:
@@ -2379,7 +2379,7 @@ def _set_updater(doc, field_name, value, codec_options=None):
     if BSON:
         # bson validation
         check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
-        if not check_keys and '\0' in field_name or field_name.startswith('$'):
+        if (not check_keys and '\0' in field_name) or field_name.startswith('$'):
             raise InvalidDocument(
                 f'Field name cannot contain the null character and top-level field name '
                 f'cannot start with "$" (found: {field_name})'
