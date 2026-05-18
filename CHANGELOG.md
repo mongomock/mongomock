@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-05-18
+### Added
+- Compatibility and testing support for PyMongo 4 and Mongodb 7.0.34 across test matrix.
+- Improvements to internal behavior and test-suite to reduce flakiness.
+- mypy fixes
+
+### Changed
+- Internal refactors and API hardening that may affect edge-case behaviors — please
+  review your test-suite when upgrading.
+- During release `mongomock/__version__.py` is pinned to the released version.
+- CI/CD pipelines
+
+### Fixed
+- Various bug fixes and test stability improvements.
+
+### Notes
+- This is a major release. Consumers should run their project's test-suite against
+  `mongomock` 7.0.0 and review any deprecation warnings.
+
 ## [4.4.0] - tbd
 ### Added
 - Add support for Python 3.13

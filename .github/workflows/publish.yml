@@ -22,8 +22,8 @@ jobs:
           pip install hatch-fancy-pypi-readme
       - name: Build and publish
         env:
-          HATCH_INDEX_USER: ${{ secrets.PYPI_USERNAME }}
-          HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}
+          HATCH_INDEX_USER: "__token__"
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
         run: |
           hatch build
           hatch publish
