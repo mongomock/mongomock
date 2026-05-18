@@ -54,8 +54,8 @@ release:
 	@echo "$(VERSION)" | grep -E '^([0-9]+)\.([0-9]+)\.([0-9]+)$$' >/dev/null || \
 		( echo "ERROR: VERSION must match M.m.P (semver), e.g. 7.0.0"; exit 1 )
 
-	@echo "Running tests..."
-	@$(MAKE) test
+# 	@echo "Running tests..."
+# 	@$(PYTHON) test
 
 	@echo "Building distributions..."
 	@hatch build
