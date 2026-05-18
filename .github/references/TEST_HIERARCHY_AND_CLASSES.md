@@ -158,7 +158,7 @@ def _connect_to_local_mongodb(self, num_retries=60):
 
 ### `.github/workflows/lint-and-test.yml`
 
-**Python Versions**: 3.9, 3.10, 3.11, 3.12, 3.13, PyPy3 (6 total)
+**Python Versions**: 3.10, 3.11, 3.12, 3.13, PyPy3 (6 total)
 
 **PyMongo Versions**: 3.x, 4.x, 4.11.0, 7.0, latest, none (6 total)
 
@@ -310,7 +310,7 @@ Tests are skipped in this order:
 | Mock-Only Test Methods | 1,000+ |
 | CI Test Matrix Combinations | 36 |
 | PyMongo Versions Tested | 6 (3, 4, 4.11, 7, latest, none) |
-| Python Versions Tested | 6 (3.9-3.13, PyPy3) |
+| Python Versions Tested | 6 (3.10-3.13, PyPy3) |
 
 ---
 
