@@ -246,7 +246,7 @@ def parse_uri(uri, default_port=27017, warn=False):
     scheme_free = uri[len(SCHEME) :]
 
     if not scheme_free:
-        raise InvalidURI('Must provide at least one hostname or IP.')
+        raise InvalidURI('Must provide at least one hostname or IP.')  # pragma: no cover
 
     dbase = None
 
@@ -257,13 +257,17 @@ def parse_uri(uri, default_port=27017, warn=False):
             host_part = path_part
             path_part = ''
         if '/' in host_part:
-            raise InvalidURI(f"Any '/' in a unix domain socket must be URL encoded: {host_part}")
+            raise InvalidURI(  # pragma: no cover
+                f"Any '/' in a unix domain socket must be URL encoded: {host_part}"
+            )
         path_part = unquote_plus(path_part)
     else:
         host_part, _, path_part = scheme_free.partition('/')
 
     if not path_part and '?' in host_part:
-        raise InvalidURI("A '/' is required between " 'the host list and any options.')
+        raise InvalidURI(  # pragma: no cover
+            "A '/' is required between " 'the host list and any options.'
+        )
 
     nodelist = []
     hosts = host_part.split(',') if ',' in host_part else [host_part]

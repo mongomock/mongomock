@@ -3,7 +3,7 @@ import os
 
 try:
     from pymongo.errors import PyMongoError
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackPyMongoError(Exception):  # type: ignore[misc]
         pass
@@ -13,7 +13,7 @@ except ImportError:
 
 try:
     from pymongo.errors import OperationFailure
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackOperationFailure(PyMongoError):
         def __init__(self, message, code=None, details=None):
@@ -33,7 +33,7 @@ except ImportError:
 
 try:
     from pymongo.errors import WriteError
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackWriteError(OperationFailure):
         pass
@@ -43,7 +43,7 @@ except ImportError:
 
 try:
     from pymongo.errors import DuplicateKeyError
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackDuplicateKeyError(WriteError):
         pass
@@ -53,7 +53,7 @@ except ImportError:
 
 try:
     from pymongo.errors import BulkWriteError
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackBulkWriteError(OperationFailure):
         def __init__(self, results):
@@ -64,7 +64,7 @@ except ImportError:
 
 try:
     from pymongo.errors import CollectionInvalid
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackCollectionInvalid(PyMongoError):
         pass
@@ -74,7 +74,7 @@ except ImportError:
 
 try:
     from pymongo.errors import InvalidName
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackInvalidName(PyMongoError):
         pass
@@ -84,7 +84,7 @@ except ImportError:
 
 try:
     from pymongo.errors import InvalidOperation
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackInvalidOperation(PyMongoError):
         pass
@@ -94,7 +94,7 @@ except ImportError:
 
 try:
     from pymongo.errors import ConfigurationError
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackConfigurationError(PyMongoError):
         pass
@@ -104,7 +104,7 @@ except ImportError:
 
 try:
     from pymongo.errors import InvalidURI
-except ImportError:
+except ImportError:  # pragma: no cover
 
     class _FallbackInvalidURI(ConfigurationError):
         pass

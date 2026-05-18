@@ -99,7 +99,7 @@ class CodecOptions(_CodecOptions):
         if 'datetime_conversion' in _fields_list:
             datetime_conversion = datetime_conversion or _DEFAULT_DATETIME_CONVERSION
             if datetime_conversion != _DEFAULT_DATETIME_CONVERSION:
-                raise NotImplementedError(
+                raise NotImplementedError(  # pragma: no cover
                     f'Mongomock-ng does not handle custom datetime_conversion '
                     f'yet {datetime_conversion}'
                 )
@@ -113,11 +113,11 @@ class CodecOptions(_CodecOptions):
         return CodecOptions(**opts)
 
     def to_pymongo(self):
-        if not codec_options:
+        if not codec_options:  # pragma: no cover
             return None
 
         uuid_representation = self.uuid_representation
-        if _UUID_REPRESENTATIONS and isinstance(self.uuid_representation, str):
+        if _UUID_REPRESENTATIONS and isinstance(self.uuid_representation, str):  # pragma: no cover
             uuid_representation = _UUID_REPRESENTATIONS[uuid_representation]
 
         return codec_options.CodecOptions(
