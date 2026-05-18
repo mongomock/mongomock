@@ -19,7 +19,7 @@ env: .env/.up-to-date
 	.env/bin/pip install pytest pytest-cov PyExecJS pymongo
 	touch .env/.up-to-date
 
-.PHONY: doc fmt hatch-test docker-build docker-run docker-hatch-test
+.PHONY: doc fmt hatch-test docker-build docker-run docker-hatch-test delete-tag
 
 # Run the Hatch formatter (README: `hatch fmt`)
 fmt:
@@ -43,6 +43,16 @@ docker-hatch-test:
 
 
 .PHONY: doc
+
+# Delete a tag locally and from origin (undo a mistaken release).
+# Usage: `make delete-tag VERSION=7.0.0`
+delete-tag:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Specify VERSION, e.g. make delete-tag VERSION=7.0.0"; exit 1; \
+	fi
+	@echo "Deleting tag v$(VERSION) locally and from origin..."
+	-git tag -d v$(VERSION)
+	-git push origin :refs/tags/v$(VERSION)
 
 # Create a release: run tests, build, create annotated tag `vM.m.P` and push it.
 # Usage: `make release VERSION=7.0.0`
