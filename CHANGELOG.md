@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Internal refactors and API hardening that may affect edge-case behaviors — please
   review your test-suite when upgrading.
-- During release `mongomock/__version__.py` is pinned to the released version.
+- During release `mongomock_ng/__version__.py` is pinned to the released version.
 - CI/CD pipelines
 
 ### Fixed
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - This is a major release. Consumers should run their project's test-suite against
-  `mongomock` 7.0.0 and review any deprecation warnings.
+  `mongomock-ng` 7.0.0 and review any deprecation warnings.
 
 ## [4.4.0] - tbd
 ### Added
@@ -57,6 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove support for deprecated Python versions (everything prior to 3.8)
 
 
-[4.4.0]: https://github.com/mongomock/mongomock/compare/4.3.0...4.4.0
-[4.3.0]: https://github.com/mongomock/mongomock/compare/4.2.0...4.3.0
-[4.2.0]: https://github.com/mongomock/mongomock/compare/4.1.3...4.2.0
+[4.4.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...4.4.0
+[4.3.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.2.0...4.3.0
+[4.2.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.1.3...4.2.0

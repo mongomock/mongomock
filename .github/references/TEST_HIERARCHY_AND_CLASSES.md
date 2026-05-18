@@ -61,19 +61,19 @@
 
 | Line | Class | MongoDB | Purpose |
 |------|-------|---------|---------|
-| 23 | `BulkOperationsTest` | ❌ No | Tests with mongomock |
+| 23 | `BulkOperationsTest` | ❌ No | Tests with mongomock_ng |
 | 196 | `BulkOperationsWithPymongoTest` | ✅ Yes | Same tests with real DB |
 | 204 | `CollectionComparisonTest` | ✅ Yes | Direct comparison |
 
 **Key Logic**: `test_with_pymongo` flag determines if tests run against:
-- `False` (default): mongomock only
+- `False` (default): mongomock_ng only
 - `True`: real MongoDB
 
 ---
 
 ### ❌ Files WITHOUT Real MongoDB Tests
 
-These only test mongomock in isolation (no real MongoDB required):
+These only test mongomock_ng in isolation (no real MongoDB required):
 
 | File | Classes | Purpose | Notes |
 |------|---------|---------|-------|
@@ -83,7 +83,7 @@ These only test mongomock in isolation (no real MongoDB required):
 | `test__diff.py` | `DiffTest` | Diff utility testing | Utility tests |
 | `test__helpers.py` | 4 classes | Helper functions | Utility tests |
 | `test__not_implemented.py` | 1 class | NotImplementedError cases | Error handling |
-| `test__patch.py` | `PatchTest` | mongomock.patch() decorator | Mocking framework |
+| `test__patch.py` | `PatchTest` | mongomock_ng.patch() decorator | Mocking framework |
 | `test__readme_doctest.py` | `ReadMeDocTest` | README code examples | Documentation |
 | `test__thread.py` | 2 classes | Thread safety | Internal behavior |
 
@@ -123,7 +123,7 @@ TEST_MONGO_HOST=my-mongo-server:27017 pytest tests/test__mongomock.py -v
 
 ```
 Test setUp():
-  1. Create mongomock.MongoClient()  ← In-memory, instant
+  1. Create mongomock_ng.MongoClient()  ← In-memory, instant
   2. Call _connect_to_local_mongodb()
        ├─ Retry loop: 60 attempts (30 sec total)
        ├─ Delay: 0.5s between attempts
@@ -168,7 +168,7 @@ def _connect_to_local_mongodb(self, num_retries=60):
 
 ### Matrix Notable Cases
 
-- `pymongo=none`: Tests run with mongomock only (no real DB comparison)
+- `pymongo=none`: Tests run with mongomock_ng only (no real DB comparison)
 - `pypy3`: Python implementation differences tested
 - `pymongo=3` vs `pymongo=4+`: API compatibility validation
 
@@ -205,14 +205,14 @@ class BulkOperationsTest(TestCase):
                 host=os.environ.get('TEST_MONGO_HOST', 'localhost')
             )
         else:
-            self.client = mongomock.MongoClient()
+            self.client = mongomock_ng.MongoClient()
 
 class BulkOperationsWithPymongoTest(BulkOperationsTest):
     test_with_pymongo = True  # Inherit all tests, run against MongoDB
 ```
 
 **Same test methods run twice**:
-- `BulkOperationsTest`: With mongomock
+- `BulkOperationsTest`: With mongomock_ng
 - `BulkOperationsWithPymongoTest`: With real MongoDB
 
 ### Pattern 3: GridFS Dual Validation
@@ -367,4 +367,4 @@ pytest tests/test__mongomock.py -vv --tb=short
 
 **Document Version**: 1.0
 **Last Updated**: May 2026
-**Purpose**: Quick reference for Copilot understanding mongomock's real MongoDB validation strategy
+**Purpose**: Quick reference for Copilot understanding mongomock_ng's real MongoDB validation strategy

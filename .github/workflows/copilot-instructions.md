@@ -1,7 +1,7 @@
-# Copilot Instructions for mongomock-fork
+# Copilot Instructions for mongomock-ng-fork
 
 ## Project Overview
-This is a maintained fork of the abandoned `mongomock` library, which provides a lightweight in-memory MongoDB mock for testing Python applications. The codebase simulates MongoDB's query language (filters, projections, aggregations) and operations on collections. All writen code, docs and tests is in english, even if the original codebase, tests, issues or promts is in other languages.
+This is a mongomock-ng library (fork of mongomock), which provides a lightweight in-memory MongoDB mock for testing Python applications. The codebase simulates MongoDB's query language (filters, projections, aggregations) and operations on collections. All writen code, docs and tests is in english, even if the original codebase, tests, issues or promts is in other languages.
 
 ## Code Style
 - Follow PEP 8, with a maximum line length of 88 characters (Black-compatible).
@@ -32,7 +32,7 @@ This is a maintained fork of the abandoned `mongomock` library, which provides a
 
 ## Copilot Behavior
 - When asked to "add support for MongoDB operator X", generate:
-  1. The implementation in the appropriate handler (e.g., `mongomock/collection.py`).
+  1. The implementation in the appropriate handler (e.g., mongomock-ng/collection.py).
   2. A unit test in `tests/test__collection.py` or a new test file.
   3. Update any relevant documentation strings.
 - If a user asks for a bug fix, first output a failing test, then the fix.

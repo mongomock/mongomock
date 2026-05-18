@@ -9,7 +9,7 @@ test: env
 	.env/bin/pytest tests/
 
 coverage-test: env
-	.env/bin/pytest --cov=mongomock --cov-report=html tests/
+	.env/bin/pytest --cov=mongomock_ng --cov-report=html tests/
 
 env: .env/.up-to-date
 
@@ -19,6 +19,27 @@ env: .env/.up-to-date
 	.env/bin/pip install pytest pytest-cov PyExecJS pymongo
 	touch .env/.up-to-date
 
+.PHONY: doc fmt hatch-test docker-build docker-run docker-hatch-test
+
+# Run the Hatch formatter (README: `hatch fmt`)
+fmt:
+	hatch fmt
+
+# Run tests with Hatch (README: `hatch test`)
+hatch-test:
+	hatch test
+
+# Docker helpers (README: docker compose build / run)
+docker-build:
+	docker compose build
+
+docker-run:
+	docker compose run --rm mongomock_ng
+
+# Run tests inside the docker service (customizable: PYTHON, PYMONGO, TEST)
+# Usage: make docker-hatch-test PYTHON=3.12 PYMONGO=4 TEST="tests/..."
+docker-hatch-test:
+	docker compose run --rm mongomock_ng hatch test -py=${PYTHON} -i pymongo=${PYMONGO} ${TEST}
 
 
 .PHONY: doc

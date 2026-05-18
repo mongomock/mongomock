@@ -1,8 +1,8 @@
 services:
-  mongomock:
+  mongomock_ng:
     build:
       context: .
-    image: mongomock:latest
+    image: mongomock_ng:latest
     working_dir: /project
     command: hatch test
     environment:
@@ -15,7 +15,7 @@ services:
 
   mongo:
     # The image chosen here should be kept in sync with the .travis.yml mongo version and with
-    # the value in mongomock/__init__.py
+    # the value in mongomock_ng/__init__.py
     image: mongo:7.0.34
     ports:
       - 127.0.0.1:27017:27017

@@ -44,9 +44,9 @@ except ImportError:
 ### Implementation in Mongomock
 
 **Fixed files:**
-1. `mongomock/results.py` - 5 refactored classes
-2. `mongomock/__init__.py` - 10 refactored error classes
-3. `mongomock/collection.py` - 2 refactored classes
+1. `mongomock_ng/results.py` - 5 refactored classes
+2. `mongomock_ng/__init__.py` - 10 refactored error classes
+3. `mongomock_ng/collection.py` - 2 refactored classes
 
 **Example result:**
 - Before: 36 errors including 17× "already defined"
@@ -76,7 +76,7 @@ _KwargOption = collections.namedtuple('_KwargOption', [...])  # Name = '_KwargOp
 ```
 
 **Fixed files:**
-- `mongomock/collection.py` - line 80
+- `mongomock_ng/collection.py` - line 80
 - `tests/test__database_api.py` - line 292
 
 ---
@@ -90,7 +90,7 @@ import pytz
 
 **Error:**
 ```
-mongomock/aggregate.py:17: error: Library stubs not installed for "pytz" [import-untyped]
+mongomock_ng/aggregate.py:17: error: Library stubs not installed for "pytz" [import-untyped]
 Hint: "python3 -m pip install types-pytz"
 ```
 
@@ -133,7 +133,7 @@ def func(items: Iterable[Any]):  # ✅ Specify type
 ```
 
 **Example in mongomock:**
-- `mongomock/helpers.py:98` - `Iterable` without type argument
+- `mongomock_ng/helpers.py:98` - `Iterable` without type argument
 
 ---
 
@@ -218,7 +218,7 @@ def func(p: PatternType[str]):
     rev: v1.13.0
     hooks:
     -   id: mypy
-        exclude: ^mongomock/__init__.pyi$  # Avoids duplicate module conflict
+        exclude: ^mongomock_ng/__init__.pyi$  # Avoids duplicate module conflict
 ```
 
 ---

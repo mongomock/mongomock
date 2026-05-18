@@ -2,7 +2,7 @@
 
 ## What Gets Validated Against Real MongoDB?
 
-**345+ test methods** in mongomock are executed against a real MongoDB instance to ensure API compatibility. This is done using a pattern called **MultiCollection comparison testing**.
+**345+ test methods** in mongomock_ng are executed against a real MongoDB instance to ensure API compatibility. This is done using a pattern called **MultiCollection comparison testing**.
 
 ## How It Works
 
@@ -11,7 +11,7 @@
 # From tests/test__mongomock.py
 class _CollectionComparisonTest(TestCase):
     def setUp(self):
-        self.fake_conn = mongomock.MongoClient()  # In-memory mock
+        self.fake_conn = mongomock_ng.MongoClient()  # In-memory mock
         self.mongo_conn = self._connect_to_local_mongodb()  # Real MongoDB
         self.cmp = MultiCollection({'fake': ..., 'real': ...})
     
@@ -34,10 +34,10 @@ class _CollectionComparisonTest(TestCase):
 | `test__mongomock.py` | 9 comparison classes | 345+ | ✅ Yes |
 | `test__gridfs.py` | GridFsTest | 15+ | ✅ Yes |
 | `test__bulk_operations.py` | 3 classes | 20+ | ✅ Yes (for comparison) |
-| All Others | 20+ classes | 1,000+ | ❌ No (mongomock only) |
+| All Others | 20+ classes | 1,000+ | ❌ No (mongomock_ng only) |
 
 ### Why This Matters
-- Ensures mongomock behaves **identically** to real PyMongo for common operations
+- Ensures mongomock_ng behaves **identically** to real PyMongo for common operations
 - Catches incompatibilities before users hit production bugs
 - Validates across PyMongo 3.x through 7.0
 
@@ -109,7 +109,7 @@ Tests are **skipped** (not failed) when:
 ## Key Utilities
 
 ### MultiCollection (tests/multicollection.py)
-Wraps mongomock + PyMongo clients to execute operations in parallel:
+Wraps mongomock_ng + PyMongo clients to execute operations in parallel:
 
 ```python
 # Execute on both, no comparison (setup)
@@ -200,7 +200,7 @@ This directory stores Copilot reference documentation in English:
 
 ## Quick Facts
 
-- **Test Strategy**: Comparison testing (mongomock vs. PyMongo)
+- **Test Strategy**: Comparison testing (mongomock_ng vs. PyMongo)
 - **Coverage**: 345+ operations validated against real MongoDB
 - **Compatibility**: PyMongo 3.x, 4.x, 7.0+
 - **CI Matrix**: 36 version combinations

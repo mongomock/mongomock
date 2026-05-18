@@ -113,7 +113,7 @@ except ImportError:
 
 
 from .helpers import ObjectId, utcnow  # noqa
-from mongomock.__version__ import __version__
+from .__version__ import __version__
 
 
 __all__ = [
@@ -134,13 +134,13 @@ __all__ = [
     'warn_on_feature',
 ]
 
-from mongomock.collection import Collection
-from mongomock.database import Database
-from mongomock.mongo_client import MongoClient
-from mongomock.not_implemented import ignore_feature
-from mongomock.not_implemented import warn_on_feature
-from mongomock.patch import patch
-from mongomock.write_concern import WriteConcern
+from .collection import Collection
+from .database import Database
+from .mongo_client import MongoClient
+from .not_implemented import ignore_feature
+from .not_implemented import warn_on_feature
+from .patch import patch
+from .write_concern import WriteConcern
 
 
 # The version of the server faked by mongomock. Callers may patch it before creating connections to

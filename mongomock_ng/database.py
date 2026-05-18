@@ -2,10 +2,10 @@ import warnings
 
 from packaging import version
 
-from mongomock import codec_options as mongomock_codec_options
-from mongomock import helpers
-from mongomock import read_preferences
-from mongomock import store
+from mongomock_ng import codec_options as mongomock_codec_options
+from mongomock_ng import helpers
+from mongomock_ng import read_preferences
+from mongomock_ng import store
 
 from . import CollectionInvalid
 from . import InvalidName
@@ -32,7 +32,7 @@ _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
 def _verify_list_collection_supported_op(keys):
     if set(keys) - _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS:
         raise NotImplementedError(
-            f'list collection names filter operator {keys} is not implemented yet in mongomock '
+            f'list collection names filter operator {keys} is not implemented yet in mongomock-ng '
             f'allowed operators are {_LIST_COLLECTION_FILTER_ALLOWED_OPERATORS}'
         )
 
@@ -108,7 +108,7 @@ class Database:
     def list_collections(self, filter=None, session=None, nameOnly=False):  # noqa: N803
         raise NotImplementedError(
             'list_collections is a valid method of Database but has not been implemented in '
-            'mongomock yet.'
+            'mongomock-ng yet.'
         )
 
     def list_collection_names(self, filter=None, session=None):
@@ -120,13 +120,13 @@ class Database:
         field_name = 'name'
 
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
 
         if filter:
             if not filter.get('name'):
                 raise NotImplementedError(
                     f'list collection {filter} might be valid but is not '
-                    'implemented yet in mongomock'
+                    'implemented yet in mongomock-ng'
                 )
 
             filter = (
@@ -173,7 +173,7 @@ class Database:
 
     def drop_collection(self, name_or_collection, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
         if isinstance(name_or_collection, Collection):
             name_or_collection._store.drop()
         else:
@@ -221,7 +221,7 @@ class Database:
 
     def dereference(self, dbref, session=None):
         if session:
-            raise NotImplementedError('Mongomock does not handle sessions yet')
+            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
 
         if not hasattr(dbref, 'collection') or not hasattr(dbref, 'id'):
             raise TypeError(f'cannot dereference a {type(dbref)}')
@@ -240,7 +240,7 @@ class Database:
         # TODO(pascal): Differentiate NotImplementedError for valid commands
         # and OperationFailure if the command is not valid.
         raise NotImplementedError(
-            'command is a valid Database method but is not implemented in Mongomock yet'
+            'command is a valid Database method but is not implemented in Mongomock-ng yet'
         )
 
     def with_options(
@@ -251,7 +251,7 @@ class Database:
         if write_concern:
             raise NotImplementedError(
                 'write_concern is a valid parameter for with_options but is not implemented yet in '
-                'mongomock'
+                'mongomock-ng'
             )
 
         if read_preference is None or read_preference == self._read_preference:

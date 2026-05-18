@@ -28,7 +28,7 @@ def _parse_any_host(host, default_port=27017):
 def patch(servers='localhost', on_new='error'):
     """Patch pymongo.MongoClient.
 
-    This will patch the class MongoClient and use mongomock to mock MongoDB
+    This will patch the class MongoClient and use mongomock-ng to mock MongoDB
     servers. It keeps a consistant state of servers across multiple clients so
     you can do:
 

@@ -113,7 +113,9 @@ class _Filterer:
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
-                raise NotImplementedError(f'The {key} operator is not implemented in mongomock yet')
+                raise NotImplementedError(
+                    f'The {key} operator is not implemented in mongomock-ng yet'
+                )
             if key.startswith('$'):
                 raise OperationFailure('unknown top level operator: ' + key)
 
@@ -153,7 +155,7 @@ class _Filterer:
                         if not_implemented_operators:
                             raise NotImplementedError(
                                 f"'{next(iter(not_implemented_operators))}' is a valid operation "
-                                'but it is not supported by Mongomock yet.'
+                                'but it is not supported by Mongomock-ng yet.'
                             )
                         raise OperationFailure(f'unknown operator: {next(iter(unknown_operators))}')
                     is_match = (
@@ -413,7 +415,9 @@ def _get_compare_type(val):
         # According to the C++ code, this should be 55 but apparently sending a DBRef through
         # pymongo is stored as a dict.
         return 20
-    raise NotImplementedError(f"Mongomock does not know how to sort '{val}' of type '{type(val)}'")
+    raise NotImplementedError(
+        f"Mongomock-ng does not know how to sort '{val}' of type '{type(val)}'"
+    )
 
 
 def _regex(doc_val, regex):

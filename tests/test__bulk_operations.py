@@ -3,8 +3,8 @@ from unittest import mock
 
 from packaging import version
 
-import mongomock
-from mongomock import helpers
+import mongomock_ng
+from mongomock_ng import helpers
 
 
 try:
@@ -28,7 +28,7 @@ class BulkOperationsTest(TestCase):
         if self.test_with_pymongo:
             self.client = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         else:
-            self.client = mongomock.MongoClient()
+            self.client = mongomock_ng.MongoClient()
         self.db = self.client['somedb']
         self.db.collection.drop()
         for _i in 'abx':
@@ -97,7 +97,7 @@ class BulkOperationsTest(TestCase):
         self.assertRaises(ValueError, self.bulk_op.find({'a': 1}).update, {'b': 20})
 
     def test__bulk_execute_must_raise_error_if_bulk_empty(self):
-        self.assertRaises(mongomock.InvalidOperation, self.bulk_op.execute)
+        self.assertRaises(mongomock_ng.InvalidOperation, self.bulk_op.execute)
 
     def test_update(self):
         self.bulk_op.find({'a': 1}).update({'$set': {'b': 20}})
@@ -204,10 +204,10 @@ class BulkOperationsWithPymongoTest(BulkOperationsTest):
 class CollectionComparisonTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock.MongoClient()
+        self.fake_conn = mongomock_ng.MongoClient()
         self.mongo_conn = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
-        self.db_name = 'mongomock___testing_db'
-        self.collection_name = 'mongomock___testing_collection'
+        self.db_name = 'mongomock_ng___testing_db'
+        self.collection_name = 'mongomock_ng___testing_collection'
         self.mongo_conn[self.db_name][self.collection_name].remove()
         self.cmp = MultiCollection(
             {
@@ -224,7 +224,7 @@ class CollectionComparisonTest(TestCase):
 
         # hacky! Depending on mongo server version 'nModified' is returned or not..
         # so let make simple bulk operation to know what's the server behaviour...
-        coll = self.mongo_conn[self.db_name]['mongomock_testing_prepare_test']
+        coll = self.mongo_conn[self.db_name]['mongomock_ng_testing_prepare_test']
         bulk = coll.initialize_ordered_bulk_op()
         bulk.insert({'a': 1})
         insert_returns_nmodified = 'nModified' in bulk.execute()

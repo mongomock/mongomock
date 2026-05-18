@@ -2,7 +2,7 @@ import copy
 import functools
 from collections import OrderedDict
 
-from mongomock.helpers import RE_TYPE
+from mongomock_ng.helpers import RE_TYPE
 
 from .diff import diff
 

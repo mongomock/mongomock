@@ -6,7 +6,7 @@ from typing import cast
 
 from packaging import version
 
-from mongomock import helpers
+from mongomock_ng import helpers
 
 
 try:
@@ -63,7 +63,7 @@ class CodecOptions(_CodecOptions):
     ):
         if document_class is not dict:
             raise NotImplementedError(
-                f'Mongomock does not implement custom document_class yet: {document_class!r}'
+                f'Mongomock-ng does not implement custom document_class yet: {document_class!r}'
             )
 
         if not isinstance(tz_aware, bool):
@@ -74,11 +74,11 @@ class CodecOptions(_CodecOptions):
 
         if unicode_decode_error_handler not in ('strict', None):
             raise NotImplementedError(
-                'Mongomock does not handle custom unicode_decode_error_handler yet'
+                'Mongomock-ng does not handle custom unicode_decode_error_handler yet'
             )
 
         if tzinfo is not None:
-            raise NotImplementedError('Mongomock does not handle custom tzinfo yet')
+            raise NotImplementedError('Mongomock-ng does not handle custom tzinfo yet')
 
         values = (
             document_class,
@@ -92,7 +92,7 @@ class CodecOptions(_CodecOptions):
             type_registry = type_registry or _DEFAULT_TYPE_REGISTRY
             if type_registry != _DEFAULT_TYPE_REGISTRY:
                 raise NotImplementedError(
-                    f'Mongomock does not handle custom type_registry yet {type_registry!r}'
+                    f'Mongomock-ng does not handle custom type_registry yet {type_registry!r}'
                 )
             values += (type_registry,)
 
@@ -100,7 +100,7 @@ class CodecOptions(_CodecOptions):
             datetime_conversion = datetime_conversion or _DEFAULT_DATETIME_CONVERSION
             if datetime_conversion != _DEFAULT_DATETIME_CONVERSION:
                 raise NotImplementedError(
-                    f'Mongomock does not handle custom datetime_conversion '
+                    f'Mongomock-ng does not handle custom datetime_conversion '
                     f'yet {datetime_conversion}'
                 )
             values += (datetime_conversion,)

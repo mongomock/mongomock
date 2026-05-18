@@ -12,7 +12,7 @@ def _ensure_ignorable_feature(feature):
     if feature not in _IGNORED_FEATURES:
         raise KeyError(
             f'{feature} is not an error that can be ignored: maybe it has been implemented in '
-            f'Mongomock. Here is the list of features that can be ignored: '
+            f'Mongomock-ng. Here is the list of features that can be ignored: '
             f'{_IGNORED_FEATURES.keys()}'
         )
 

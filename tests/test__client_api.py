@@ -6,8 +6,8 @@ from unittest import skipUnless
 
 from packaging import version
 
-import mongomock
-from mongomock import helpers
+import mongomock_ng
+from mongomock_ng import helpers
 
 
 try:
@@ -19,72 +19,74 @@ except ImportError:
 
 class MongoClientApiTest(unittest.TestCase):
     def test__read_preference(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         self.assertEqual('Primary', client.read_preference.name)
         self.assertEqual(client.read_preference, client.db.read_preference)
         self.assertEqual(client.read_preference, client.db.coll.read_preference)
 
-        client2 = mongomock.MongoClient(read_preference=client.read_preference)
+        client2 = mongomock_ng.MongoClient(read_preference=client.read_preference)
         self.assertEqual(client2.read_preference, client.read_preference)
 
         with self.assertRaises(TypeError):
-            mongomock.MongoClient(read_preference=0)
+            mongomock_ng.MongoClient(read_preference=0)
 
     @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__different_read_preference(self):
-        client = mongomock.MongoClient(read_preference=ReadPreference.NEAREST)
+        client = mongomock_ng.MongoClient(read_preference=ReadPreference.NEAREST)
         self.assertEqual(ReadPreference.NEAREST, client.db.read_preference)
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
 
     @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options_with_pymongo(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         self.assertEqual(codec_options.CodecOptions(), client.codec_options)
         self.assertFalse(client.codec_options.tz_aware)
 
     def test__codec_options(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         self.assertFalse(client.codec_options.tz_aware)
 
-        client = mongomock.MongoClient(tz_aware=True)
+        client = mongomock_ng.MongoClient(tz_aware=True)
         self.assertTrue(client.codec_options.tz_aware)
         self.assertTrue(client.db.collection.codec_options.tz_aware)
 
         with self.assertRaises(TypeError):
-            mongomock.MongoClient(tz_aware='True')
+            mongomock_ng.MongoClient(tz_aware='True')
 
     def test__parse_url(self):
-        client = mongomock.MongoClient('mongodb://localhost:27017/')
+        client = mongomock_ng.MongoClient('mongodb://localhost:27017/')
         self.assertEqual(('localhost', 27017), client.address)
 
-        client = mongomock.MongoClient('mongodb://localhost:1234,example.com/')
+        client = mongomock_ng.MongoClient('mongodb://localhost:1234,example.com/')
         self.assertEqual(('localhost', 1234), client.address)
 
-        client = mongomock.MongoClient('mongodb://example.com,localhost:1234/')
+        client = mongomock_ng.MongoClient('mongodb://example.com,localhost:1234/')
         self.assertEqual(('example.com', 27017), client.address)
 
-        client = mongomock.MongoClient('mongodb://[::1]:1234/')
+        client = mongomock_ng.MongoClient('mongodb://[::1]:1234/')
         self.assertEqual(('::1', 1234), client.address)
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('mongodb://localhost:1234:456/')
+            mongomock_ng.MongoClient('mongodb://localhost:1234:456/')
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('mongodb://localhost:123456/')
+            mongomock_ng.MongoClient('mongodb://localhost:123456/')
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('mongodb://localhost:mongoport/')
+            mongomock_ng.MongoClient('mongodb://localhost:mongoport/')
 
     def test__equality(self):
         self.assertEqual(
-            mongomock.MongoClient('mongodb://localhost:27017/'),
-            mongomock.MongoClient('mongodb://localhost:27017/'),
+            mongomock_ng.MongoClient('mongodb://localhost:27017/'),
+            mongomock_ng.MongoClient('mongodb://localhost:27017/'),
         )
         self.assertEqual(
-            mongomock.MongoClient('mongodb://localhost:27017/'), mongomock.MongoClient('localhost')
+            mongomock_ng.MongoClient('mongodb://localhost:27017/'),
+            mongomock_ng.MongoClient('localhost'),
         )
         self.assertNotEqual(
-            mongomock.MongoClient('/var/socket/mongo.sock'), mongomock.MongoClient('localhost')
+            mongomock_ng.MongoClient('/var/socket/mongo.sock'),
+            mongomock_ng.MongoClient('localhost'),
         )
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
@@ -94,7 +96,7 @@ class MongoClientApiTest(unittest.TestCase):
     )
     def test__not_hashable(self):
         with self.assertRaises(TypeError):
-            {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
+            {mongomock_ng.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
@@ -102,35 +104,35 @@ class MongoClientApiTest(unittest.TestCase):
         "older versions of pymongo didn't have proper hashing",
     )
     def test__hashable(self):
-        {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
+        {mongomock_ng.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
     def test__parse_hosts(self):
-        client = mongomock.MongoClient('localhost')
+        client = mongomock_ng.MongoClient('localhost')
         self.assertEqual(('localhost', 27017), client.address)
 
-        client = mongomock.MongoClient('localhost:1234,example.com')
+        client = mongomock_ng.MongoClient('localhost:1234,example.com')
         self.assertEqual(('localhost', 1234), client.address)
 
-        client = mongomock.MongoClient('example.com,localhost:1234')
+        client = mongomock_ng.MongoClient('example.com,localhost:1234')
         self.assertEqual(('example.com', 27017), client.address)
 
-        client = mongomock.MongoClient('[::1]:1234')
+        client = mongomock_ng.MongoClient('[::1]:1234')
         self.assertEqual(('::1', 1234), client.address)
 
-        client = mongomock.MongoClient('/var/socket/mongo.sock')
+        client = mongomock_ng.MongoClient('/var/socket/mongo.sock')
         self.assertEqual(('/var/socket/mongo.sock', None), client.address)
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('localhost:1234:456')
+            mongomock_ng.MongoClient('localhost:1234:456')
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('localhost:123456')
+            mongomock_ng.MongoClient('localhost:123456')
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('localhost:mongoport')
+            mongomock_ng.MongoClient('localhost:mongoport')
 
     def test_database_names(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         client.one_db.my_collec.insert_one({})
 
         if version.parse('4.0') <= helpers.PYMONGO_VERSION:
@@ -145,7 +147,7 @@ class MongoClientApiTest(unittest.TestCase):
         self.assertIn('deprecated', mock_warn.call_args[0][0])
 
     def test_list_database_names(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         self.assertEqual([], client.list_database_names())
 
         # Query a non existant collection.
@@ -156,25 +158,25 @@ class MongoClientApiTest(unittest.TestCase):
         self.assertEqual(['one_db'], client.list_database_names())
 
     def test_client_implements_context_managers(self):
-        with mongomock.MongoClient() as client:
+        with mongomock_ng.MongoClient() as client:
             client.one_db.my_collec.insert_one({})
             result = client.one_db.my_collec.find_one({})
             self.assertTrue(result)
 
     def test_start_session(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         with self.assertRaises(NotImplementedError):
             client.start_session()
 
-    @mock.patch('mongomock.SERVER_VERSION', '3.6')
+    @mock.patch('mongomock_ng.SERVER_VERSION', '3.6')
     def test_server_version(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         server_info = client.server_info()
         self.assertEqual('3.6', server_info['version'])
         self.assertEqual([3, 6, 0, 0], server_info['versionArray'])
 
     def test_consistent_server_version(self):
-        client = mongomock.MongoClient()
+        client = mongomock_ng.MongoClient()
         server_info = client.server_info()
-        with mock.patch('mongomock.SERVER_VERSION', '3.6'):
+        with mock.patch('mongomock_ng.SERVER_VERSION', '3.6'):
             self.assertEqual(server_info, client.server_info())

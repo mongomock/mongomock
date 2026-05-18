@@ -1,8 +1,8 @@
-# Mongomock Unit Tests Against Real MongoDB
+# Mongomock-ng Unit Tests Against Real MongoDB
 
 ## Executive Summary
 
-This document provides a comprehensive reference for understanding how mongomock validates its implementation against a real MongoDB instance. The project uses an elegant comparison testing strategy to ensure compatibility with PyMongo.
+This document provides a comprehensive reference for understanding how mongomock-ng validates its implementation against a real MongoDB instance. The project uses an elegant comparison testing strategy to ensure compatibility with PyMongo.
 
 - **Total Tests**: 1,700+
 - **Tests Against Real MongoDB**: 345+ (in classes inheriting from `_CollectionComparisonTest`)
@@ -29,7 +29,7 @@ class _CollectionComparisonTest(TestCase):
     
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock.MongoClient()
+        self.fake_conn = mongomock_ng.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = 'mongomock___testing_db'
         self.collection_name = 'mongomock___testing_collection'
@@ -43,7 +43,7 @@ class _CollectionComparisonTest(TestCase):
 #### How It Works
 
 1. **Dual Client Setup**: Creates two MongoDB clients:
-   - `mongomock.MongoClient()` - In-memory mock
+   - `mongomock_ng.MongoClient()` - In-memory mock
    - `pymongo.MongoClient()` - Real MongoDB instance
 
 2. **MultiCollection Wrapper**: Wraps both collections to enable synchronized operation execution
@@ -127,7 +127,7 @@ Dual-mode test classes:
 
 ```python
 class BulkOperationsTest(TestCase):
-    test_with_pymongo = False  # Runs with mongomock
+    test_with_pymongo = False  # Runs with mongomock-ng
     
     def setUp(self):
         if self.test_with_pymongo:
@@ -135,13 +135,13 @@ class BulkOperationsTest(TestCase):
                 host=os.environ.get('TEST_MONGO_HOST', 'localhost')
             )
         else:
-            self.client = mongomock.MongoClient()
+            self.client = mongomock_ng.MongoClient()
 
 class BulkOperationsWithPymongoTest(BulkOperationsTest):
     test_with_pymongo = True  # Runs with real MongoDB
 ```
 
-- `BulkOperationsTest`: Tests against mongomock (no DB required)
+- `BulkOperationsTest`: Tests against mongomock-ng (no DB required)
 - `BulkOperationsWithPymongoTest`: Same tests against real MongoDB
 - `CollectionComparisonTest`: Direct comparison of bulk operations
 
@@ -169,13 +169,13 @@ hatch test
 pytest tests/test__mongomock.py
 
 # With docker-compose (includes MongoDB service)
-docker-compose run --rm mongomock hatch test
+docker compose run --rm mongomock_ng hatch test
 
 # Custom MongoDB host
 TEST_MONGO_HOST=my-server:27017 pytest tests/
 ```
 
-#### Without Real MongoDB (Mongomock Only)
+#### Without Real MongoDB (Mongomock-ng Only)
 
 ```bash
 # Skip all tests requiring real MongoDB
@@ -229,11 +229,11 @@ matrix:
 
 ### Comparison Strategy
 
-Tests use the following logic to validate mongomock:
+Tests use the following logic to validate mongomock-ng:
 
 ```
 FOR EACH test_case IN test_class:
-    1. Execute operation on mongomock
+    1. Execute operation on mongomock-ng
     2. Execute SAME operation on real MongoDB (with same arguments)
     3. Compare results:
        - Value equality
@@ -305,7 +305,7 @@ Examples:
 
 | File | Purpose |
 |------|---------|
-| [`mongomock/helpers.py`](../../../mongomock/helpers.py) | Utility functions, version detection |
+| [`mongomock_ng/helpers.py`](../../../mongomock_ng/helpers.py) | Utility functions, version detection |
 | [`tests/multicollection.py`](../../../tests/multicollection.py) | MultiCollection comparison tool |
 | [`tests/utils.py`](../../../tests/utils.py) | Test utilities and helpers |
 | [`tests/diff.py`](../../../tests/diff.py) | Diff tool for comparison output |
@@ -327,10 +327,10 @@ Examples:
            self.cmp.compare.find_one()
    ```
 
-2. **For pure mongomock features**: Use standard `TestCase`
+2. **For pure mongomock-ng features**: Use standard `TestCase`
    ```python
-   class MongomockSpecificTest(TestCase):
-       def test__mongomock_only_feature(self):
+   class Mongomock-ngSpecificTest(TestCase):
+        def test__mongomock_ng_only_feature(self):
            # No need for real MongoDB
    ```
 
@@ -368,7 +368,7 @@ When comparison tests fail:
 - [Contributing Guide](../../../README.rst)
 - [MongoDB Compatibility Notes](../../../Missing_Features.rst)
 - [PyMongo Migration Guide](https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html)
-- [Mongomock GitHub Issues](https://github.com/mongomock/mongomock/issues)
+- [Mongomock-ng GitHub Issues](https://github.com/engFelipeMonteiro/mongomock-ng/issues)
 
 ---
 
