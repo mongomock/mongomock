@@ -25,6 +25,9 @@ env: .env/.up-to-date
 fmt:
 	hatch fmt
 
+fix:
+	hatch fmt
+
 # Run tests with Hatch (README: `hatch test`)
 hatch-test:
 	hatch test
