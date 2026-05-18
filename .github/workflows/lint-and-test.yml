@@ -104,4 +104,3 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: hynek/build-and-inspect-python-package@v2
-
