@@ -13,7 +13,6 @@ matrix.pymongo.extra-dependencies = [
   { value = "pymongo<4.0", if = ["3"]},
   { value = "pymongo<5.0", if = ["4"]},
   { value = "pymongo==4.11.0", if = ["4.11.0"]},
-  { value = "pymongo==7.0", if = ["7.0"]},
   { value = "pymongo", if = ["latest"]},
 ]
 
