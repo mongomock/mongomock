@@ -369,8 +369,7 @@ class BulkOperationBuilder:
                 agg_val.append(value)
         else:
             raise AssertionError(
-                f'Fixme: missed aggreation rule for type: {type(agg_val)} '
-                f'for key {key}={agg_val}'
+                f'Fixme: missed aggreation rule for type: {type(agg_val)} for key {key}={agg_val}'
             )
 
     def _set_nModified_policy(self, insert, update):  # noqa: N802
@@ -556,14 +555,17 @@ class Collection:
 
         def insert(self, data, manipulate=True, check_keys=True, continue_on_error=False, **kwargs):
             warnings.warn(
-                'insert is deprecated. Use insert_one or insert_many ' 'instead.',
+                'insert is deprecated. Use insert_one or insert_many instead.',
                 DeprecationWarning,
                 stacklevel=2,
             )
             validate_write_concern_params(**kwargs)
             return self._insert(data)
 
-    def insert_one(self, document, bypass_document_validation=False, session=None):
+    def insert_one(self, document, bypass_document_validation=False, session=None, comment=None):
+        if comment:
+            raise_not_implemented('comment', 'comment not implemented, but accepts')
+
         if not bypass_document_validation:
             validate_is_mutable_mapping('document', document)
         return InsertOneResult(self._insert(document, session), acknowledged=True)
@@ -695,6 +697,7 @@ class Collection:
         session=None,
         let=None,
         sort=None,
+        comment=None,
     ):
         if not bypass_document_validation:
             validate_ok_for_update(update)
@@ -772,7 +775,7 @@ class Collection:
             **kwargs,
         ):
             warnings.warn(
-                'update is deprecated. Use replace_one, update_one or ' 'update_many instead.',
+                'update is deprecated. Use replace_one, update_one or update_many instead.',
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1280,6 +1283,8 @@ class Collection:
         session=None,
         max_time_ms=None,
         allow_disk_use=False,
+        comment=None,
+        hint=None,
         **kwargs,
     ):
         spec = filter
@@ -1657,7 +1662,7 @@ class Collection:
 
         def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
             warnings.warn(
-                'save is deprecated. Use insert_one or replace_one ' 'instead',
+                'save is deprecated. Use insert_one or replace_one instead',
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1671,7 +1676,7 @@ class Collection:
             )
             return to_save.get('_id', None)
 
-    def delete_one(self, filter, collation=None, hint=None, session=None):
+    def delete_one(self, filter, collation=None, hint=None, session=None, comment=None, let=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(
             self._delete(filter, collation=collation, hint=hint, session=session), True
@@ -1724,7 +1729,7 @@ class Collection:
 
         def remove(self, spec_or_id=None, multi=True, **kwargs):
             warnings.warn(
-                'remove is deprecated. Use delete_one or delete_many ' 'instead.',
+                'remove is deprecated. Use delete_one or delete_many instead.',
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1747,7 +1752,13 @@ class Collection:
             spec = helpers.patch_datetime_awareness_in_document(filter)
             return len(list(self._iter_documents(spec)))
 
-    def count_documents(self, filter, **kwargs):
+    def count_documents(self, filter, comment=None, **kwargs):
+        if comment:
+            raise_not_implemented('comment', 'comment not implemented, but accepts')
+
+        if kwargs.pop('hint', None):
+            raise_not_implemented('hint', 'hint not implemented, but accepts')
+
         if kwargs.pop('collation', None):
             raise_not_implemented(
                 'collation',
@@ -1775,10 +1786,13 @@ class Collection:
         count = max(doc_num - skip, 0)
         return count if limit is None else min(count, limit)
 
-    def estimated_document_count(self, **kwargs):
+    def estimated_document_count(self, comment=None, **kwargs):
+        if comment:
+            raise_not_implemented('comment', 'comment not implemented, but accepts')
+
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
-        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
+        unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint', 'comment'}
 
         if self.database.client.server_info()['versionArray'] < [5]:
             unknown_kwargs -= {'skip'}
@@ -2024,10 +2038,10 @@ class Collection:
                 map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session
             )
 
-    def distinct(self, key, filter=None, session=None):
+    def distinct(self, key, filter=None, session=None, comment=None, hint=None):
         if session:
             raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
-        return self.find(filter).distinct(key)
+        return self.find(filter, comment=comment, hint=hint).distinct(key)
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
 
@@ -2130,7 +2144,12 @@ class Collection:
             raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
         return self.database.rename_collection(self.name, new_name, **kwargs)
 
-    def bulk_write(self, requests, ordered=True, bypass_document_validation=False, session=None):
+    def bulk_write(
+        self, requests, ordered=True, bypass_document_validation=False, session=None, comment=None
+    ):
+        if comment:
+            warnings.warn('comment is ignored on mongomock-ng.', stacklevel=2)
+
         if bypass_document_validation:
             raise NotImplementedError(
                 'Skipping document validation is a valid MongoDB operation;'
@@ -2323,7 +2342,7 @@ class Cursor:
             skip = 0
             if index.start is not None:
                 if index.start < 0:
-                    raise IndexError('Cursor instances do not support' 'negative indices')
+                    raise IndexError('Cursor instances do not supportnegative indices')
                 skip = index.start
 
             if index.stop is not None:
