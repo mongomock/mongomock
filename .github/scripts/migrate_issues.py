@@ -133,14 +133,14 @@ def migrate_issues(
     created = 0
     skipped = 0
     errors = 0
-    for count, item in enumerate(issues + prs):
-        if max_issues and count >= max_issues:
-            break
-
+    for item in issues + prs:
         num = item['number']
         if num in migrated_ids:
             skipped += 1
             continue
+
+        if max_issues and created >= max_issues:
+            break
 
         is_pr = 'pull_request' in item
         prefix = '[PR] ' if is_pr else ''
