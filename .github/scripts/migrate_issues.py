@@ -69,7 +69,11 @@ def ensure_labels(
     labels: dict[str, str],
     dry_run: bool,
 ) -> None:
-    for name, color in labels.items():
+    labels_to_create = {
+        **labels,
+        'migrated-pr': 'bfd4f2',
+    }
+    for name, color in labels_to_create.items():
         if dry_run:
             print(f'  [dry-run] label: {name}')
             continue
@@ -108,6 +112,8 @@ def migrate_issues(
 
     print(f'Found {len(issues)} open issues and {len(prs)} open PRs')
 
+    created = 0
+    errors = 0
     for count, item in enumerate(issues + prs):
         if max_issues and count >= max_issues:
             break
@@ -128,14 +134,22 @@ def migrate_issues(
 
         if dry_run:
             print(f"  [dry-run] #{item['number']}: {title[:60]}")
-        else:
+            continue
+
+        try:
             result = api_post(
                 f'https://api.github.com/repos/{target_full}/issues',
                 headers,
                 {'title': title, 'body': body, 'labels': label_names},
             )
             print(f"  #{result['number']}: {title[:60]}")
-            time.sleep(0.5)
+            created += 1
+        except HTTPError as e:
+            print(f"  ERROR #{item['number']} ({e.code}): {title[:60]}")
+            errors += 1
+        time.sleep(0.5)
+
+    print(f'\nDone! {created} created, {errors} errors')
 
 
 def main() -> None:
@@ -152,7 +166,6 @@ def main() -> None:
     if args.dry_run:
         print('DRY RUN — no changes will be made')
     migrate_issues(source, target, headers, args.dry_run, args.max)
-    print('Done!')
 
 
 if __name__ == '__main__':
