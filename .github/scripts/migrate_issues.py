@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from typing import Any
@@ -94,6 +95,17 @@ def ensure_labels(
         time.sleep(0.1)
 
 
+def fetch_migrated_ids(target_full: str, headers: Headers) -> set[int]:
+    url = f'https://api.github.com/repos/{target_full}/issues?state=all&per_page=100'
+    migrated: set[int] = set()
+    for issue in paginate(url, headers):
+        body = issue.get('body') or ''
+        for match in re.finditer(r'(\w+/[-\w.]+)#(\d+)', body):
+            if match.group(1) == f'{SOURCE_OWNER}/{SOURCE_REPO}':
+                migrated.add(int(match.group(2)))
+    return migrated
+
+
 def migrate_issues(
     source_full: str,
     target_full: str,
@@ -114,18 +126,28 @@ def migrate_issues(
 
     print(f'Found {len(issues)} open issues and {len(prs)} open PRs')
 
+    migrated_ids = fetch_migrated_ids(target_full, headers)
+    if migrated_ids:
+        print(f'Already migrated: {len(migrated_ids)} issues/PRs')
+
     created = 0
+    skipped = 0
     errors = 0
     for count, item in enumerate(issues + prs):
         if max_issues and count >= max_issues:
             break
 
+        num = item['number']
+        if num in migrated_ids:
+            skipped += 1
+            continue
+
         is_pr = 'pull_request' in item
         prefix = '[PR] ' if is_pr else ''
         attach = (
-            f"\n\n---\n*Originally submitted as PR at {source_full}#{item['number']}*"
+            f'\n\n---\n*Originally submitted as PR at {source_full}#{num}*'
             if is_pr
-            else f"\n\n---\n*Originally reported at {source_full}#{item['number']}*"
+            else f'\n\n---\n*Originally reported at {source_full}#{num}*'
         )
         body = (item['body'] or '') + attach
         label_names = [lab['name'] for lab in item['labels']]
@@ -135,7 +157,7 @@ def migrate_issues(
         title = f"{prefix}{item['title']}"
 
         if dry_run:
-            print(f"  [dry-run] #{item['number']}: {title[:60]}")
+            print(f'  [dry-run] #{num}: {title[:60]}')
             continue
 
         try:
@@ -147,11 +169,11 @@ def migrate_issues(
             print(f"  #{result['number']}: {title[:60]}")
             created += 1
         except HTTPError as e:
-            print(f"  ERROR #{item['number']} ({e.code}): {title[:60]}")
+            print(f'  ERROR #{num} ({e.code}): {title[:60]}')
             errors += 1
         time.sleep(0.5)
 
-    print(f'\nDone! {created} created, {errors} errors')
+    print(f'\nDone! {created} created, {skipped} skipped, {errors} errors')
 
 
 def main() -> None:
