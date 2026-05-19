@@ -13,6 +13,8 @@ SOURCE_OWNER = 'mongomock'
 SOURCE_REPO = 'mongomock'
 TARGET_OWNER = 'engFelipeMonteiro'
 TARGET_REPO = 'mongomock-ng'
+MIGRATED_PR_LABEL = 'migrated-pr'
+MIGRATED_PR_COLOR = 'bfd4f2'
 
 Headers = dict[str, str]
 
@@ -69,10 +71,10 @@ def ensure_labels(
     labels: dict[str, str],
     dry_run: bool,
 ) -> None:
-    labels_to_create = {
-        **labels,
-        'migrated-pr': 'bfd4f2',
-    }
+    extra_labels = {}
+    if MIGRATED_PR_LABEL not in labels:
+        extra_labels[MIGRATED_PR_LABEL] = MIGRATED_PR_COLOR
+    labels_to_create = {**labels, **extra_labels}
     for name, color in labels_to_create.items():
         if dry_run:
             print(f'  [dry-run] label: {name}')
@@ -128,7 +130,7 @@ def migrate_issues(
         body = (item['body'] or '') + attach
         label_names = [lab['name'] for lab in item['labels']]
         if is_pr:
-            label_names.append('migrated-pr')
+            label_names.append(MIGRATED_PR_LABEL)
 
         title = f"{prefix}{item['title']}"
 
