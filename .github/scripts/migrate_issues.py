@@ -95,7 +95,7 @@ def ensure_labels(
         time.sleep(0.1)
 
 
-def fetch_migrated_ids(target_full: str, headers: Headers) -> set[int]:
+def fetch_migrated_ids(source_full: str, target_full: str, headers: Headers) -> set[int]:
     url = f'https://api.github.com/repos/{target_full}/issues?state=all&per_page=100'
     migrated: set[int] = set()
     for issue in paginate(url, headers):
@@ -103,6 +103,11 @@ def fetch_migrated_ids(target_full: str, headers: Headers) -> set[int]:
         match = re.match(r'(?:\[PR\]\s*)?#(\d+):', title)
         if match:
             migrated.add(int(match.group(1)))
+            continue
+        body = issue.get('body') or ''
+        for body_match in re.finditer(r'(\w+/[-\w.]+)#(\d+)', body):
+            if body_match.group(1) == source_full:
+                migrated.add(int(body_match.group(2)))
     return migrated
 
 
@@ -126,7 +131,7 @@ def migrate_issues(
 
     print(f'Found {len(issues)} open issues and {len(prs)} open PRs')
 
-    migrated_ids = fetch_migrated_ids(target_full, headers)
+    migrated_ids = fetch_migrated_ids(source_full, target_full, headers)
     if migrated_ids:
         print(f'Already migrated: {len(migrated_ids)} issues/PRs')
 
