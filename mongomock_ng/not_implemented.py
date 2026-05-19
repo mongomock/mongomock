@@ -5,6 +5,8 @@ _IGNORED_FEATURES = {
     'collation': False,
     'let': False,
     'session': False,
+    'comment': True,
+    'hint': True,
 }
 
 
