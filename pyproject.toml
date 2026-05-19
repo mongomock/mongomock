@@ -3,17 +3,18 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mongomock"
+name = "mongomock-ng"
 dynamic = ["version"]
-description = "Fake pymongo stub for testing simple MongoDB-dependent code"
+description = "Replacement fake pymongo stub for testing simple MongoDB-dependent code"
 readme = "README.rst"
 license = { file = "LICENSE" }
 authors = [
+    { name = "Felipe Monteiro jácome", email = "engfelipe.jacome@gmail.com"},
     { name = "Rotem Yaari", email = "vmalloc@gmail.com" },
     { name = "Martin Domke", email = "mail@martindomke.net" },
     { name = "Pascal Corpet", email = "pascal@corpet.net" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "License :: OSI Approved :: ISC License (ISCL)",
     "Topic :: Database",
@@ -25,7 +26,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -42,18 +42,21 @@ pyexecjs = ["pyexecjs"]
 pymongo = ["pymongo"]
 
 [project.urls]
-Homepage = "https://github.com/mongomock/mongomock"
-Changelog = "https://github.com/mongomock/mongomock/blob/develop/CHANGELOG.md"
+Homepage = "https://github.com/engFelipeMonteiro/mongomock-ng"
+Changelog = "https://github.com/engFelipeMonteiro/mongomock-ng/blob/develop/CHANGELOG.md"
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mongomock"]
+packages = ["mongomock_ng"]
 
 [tool.ruff]
 target-version = "py39"
 line-length = 100
+exclude = [
+    ".agents/",
+]
 
 [tool.ruff.format]
 quote-style = "single"
@@ -110,7 +113,8 @@ extend-ignore = [
     "PLR2004", # Allow magic values in comparison
 ]
 exclude = [
-    "mongomock/__init__.pyi",
+    ".agents/",
+    "mongomock_ng/__init__.pyi",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -135,3 +139,6 @@ inline-quotes = "single"
 
 [tool.doc8]
 max-line-length = 100
+
+[tool.mypy]
+exclude = [".agents/"]

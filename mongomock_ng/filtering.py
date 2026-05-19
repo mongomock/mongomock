@@ -4,9 +4,11 @@ import operator
 import re
 import uuid
 from datetime import datetime
+from typing import Any
 from typing import ClassVar
+from typing import Optional
 
-from sentinels import NOTHING
+from sentinels import NOTHING  # type: ignore[import-untyped]
 
 from . import OperationFailure
 from .helpers import ObjectId
@@ -16,21 +18,26 @@ from .helpers import RE_TYPE
 try:
     from types import NoneType
 except ImportError:
-    NoneType = type(None)
+    NoneType = type(None)  # type: ignore[misc]
+
+
+# bson types - available only if bson is installed
+DBRef: Optional[type[Any]] = None
+Regex: Optional[type[Any]] = None
+Decimal128: Optional[type[Any]] = None
 
 try:
-    from bson import DBRef
-    from bson import Regex
+    from bson import DBRef as _DBRef
+    from bson import Regex as _Regex
+    from bson.decimal128 import Decimal128 as _Decimal128
 
-    _RE_TYPES = (RE_TYPE, Regex)
+    DBRef = _DBRef  # type: ignore[misc]
+    Regex = _Regex  # type: ignore[misc]
+    Decimal128 = _Decimal128  # type: ignore[misc]
 except ImportError:
-    DBRef = None
-    _RE_TYPES = (RE_TYPE,)
+    pass
 
-try:
-    from bson.decimal128 import Decimal128
-except ImportError:
-    Decimal128 = None
+_RE_TYPES: tuple[type[Any], ...] = (RE_TYPE, Regex) if Regex is not None else (RE_TYPE,)  # type: ignore[assignment, has-type]
 
 _TOP_LEVEL_OPERATORS = {'$expr', '$text', '$where', '$jsonSchema'}
 
@@ -106,7 +113,9 @@ class _Filterer:
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
-                raise NotImplementedError(f'The {key} operator is not implemented in mongomock yet')
+                raise NotImplementedError(
+                    f'The {key} operator is not implemented in mongomock-ng yet'
+                )
             if key.startswith('$'):
                 raise OperationFailure('unknown top level operator: ' + key)
 
@@ -146,15 +155,19 @@ class _Filterer:
                         if not_implemented_operators:
                             raise NotImplementedError(
                                 f"'{next(iter(not_implemented_operators))}' is a valid operation "
-                                'but it is not supported by Mongomock yet.'
+                                'but it is not supported by Mongomock-ng yet.'
                             )
                         raise OperationFailure(f'unknown operator: {next(iter(unknown_operators))}')
                     is_match = (
                         all(
-                            operator_string in self._operator_map
-                            and self._operator_map[operator_string](doc_val, search_val)
-                            or operator_string == '$not'
-                            and self._not_op(document, key, search_val)
+                            (
+                                operator_string in self._operator_map
+                                and self._operator_map[operator_string](doc_val, search_val)
+                            )
+                            or (
+                                operator_string == '$not'
+                                and self._not_op(document, key, search_val)
+                            )
                             for operator_string, search_val in search.items()
                         )
                         and search
@@ -402,7 +415,9 @@ def _get_compare_type(val):
         # According to the C++ code, this should be 55 but apparently sending a DBRef through
         # pymongo is stored as a dict.
         return 20
-    raise NotImplementedError(f"Mongomock does not know how to sort '{val}' of type '{type(val)}'")
+    raise NotImplementedError(
+        f"Mongomock-ng does not know how to sort '{val}' of type '{type(val)}'"
+    )
 
 
 def _regex(doc_val, regex):
@@ -520,10 +535,10 @@ TYPE_MAP = {
     'int': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32),
     'timestamp': None,
     'long': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32),
-    'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,
+    'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,  # type: ignore[arg-type]
     'number': lambda v: (
         # pylint: disable-next=isinstance-second-argument-not-valid-type
-        isinstance(v, (int, float) + ((Decimal128,) if Decimal128 else ()))
+        isinstance(v, (int, float) + ((Decimal128,) if Decimal128 else ()))  # type: ignore[arg-type]
         and not isinstance(v, bool)
     ),
     'minKey': None,

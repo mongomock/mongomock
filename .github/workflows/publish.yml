@@ -7,11 +7,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: publish-pypi
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
       - name: Install dependencies
@@ -22,8 +23,8 @@ jobs:
           pip install hatch-fancy-pypi-readme
       - name: Build and publish
         env:
-          HATCH_INDEX_USER: ${{ secrets.PYPI_USERNAME }}
-          HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}
+          HATCH_INDEX_USER: "__token__"
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
         run: |
           hatch build
           hatch publish

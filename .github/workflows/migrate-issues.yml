@@ -1,0 +1,34 @@
+name: migrate-issues
+
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: Max issues to migrate (0 = all)
+        required: false
+        default: "0"
+      dry-run:
+        description: Dry run (no changes)
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: general
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run migration
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_MIGRATE_ISSUES }}
+        run: |
+          python .github/scripts/migrate_issues.py \
+            ${{ inputs.dry-run == true && '--dry-run' || '' }} \
+            ${{ inputs.max != '0' && format('--max {0}', inputs.max) || '' }}

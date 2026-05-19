@@ -17,8 +17,8 @@ from unittest import TestCase
 
 from packaging import version
 
-import mongomock
-from mongomock import helpers
+import mongomock_ng
+from mongomock_ng import helpers
 from tests.diff import diff
 
 
@@ -38,16 +38,16 @@ try:
     from pymongo.read_preferences import ReadPreference
     from pymongo.write_concern import WriteConcern
 except ImportError:
-    from mongomock import ObjectId
-    from mongomock.collection import ReturnDocument
-    from mongomock.read_concern import ReadConcern
-    from mongomock.write_concern import WriteConcern
+    from mongomock_ng import ObjectId
+    from mongomock_ng.collection import ReturnDocument
+    from mongomock_ng.read_concern import ReadConcern
+    from mongomock_ng.write_concern import WriteConcern
     from tests.utils import DBRef
 
 
 warnings.simplefilter('ignore', DeprecationWarning)
 IS_PYPY = platform.python_implementation() != 'CPython'
-SERVER_VERSION = version.parse(mongomock.SERVER_VERSION)
+SERVER_VERSION = version.parse(mongomock_ng.SERVER_VERSION)
 
 
 class UTCPlus2(tzinfo):
@@ -67,7 +67,7 @@ class UTCPlus2(tzinfo):
 class CollectionAPITest(TestCase):
     def setUp(self):
         super().setUp()
-        self.client = mongomock.MongoClient()
+        self.client = mongomock_ng.MongoClient()
         self.db = self.client['somedb']
 
     def test__get_subcollections(self):
@@ -180,7 +180,7 @@ class CollectionAPITest(TestCase):
         cursor.hint('unknownIndex')
         self.assertEqual([{'f2': 'v'}], [d['f1'] for d in cursor])
 
-        with self.assertRaises(mongomock.InvalidOperation):
+        with self.assertRaises(mongomock_ng.InvalidOperation):
             cursor.hint(None)
 
     def test__distinct_nested_field(self):
@@ -309,10 +309,10 @@ class CollectionAPITest(TestCase):
         col2 = self.db.some_collection_here
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db['some_collection_here'])
-        self.assertIsInstance(col1, mongomock.Collection)
+        self.assertIsInstance(col1, mongomock_ng.Collection)
 
     def test__save_class_deriving_from_dict(self):
-        # See https://github.com/vmalloc/mongomock/issues/52
+        # See https://github.com/vmalloc/mongomock_ng/issues/52
         class Document(dict):
             def __init__(self, collection):
                 self.collection = collection
@@ -331,7 +331,7 @@ class CollectionAPITest(TestCase):
         col2 = self.db['some_collection_here']
         self.assertIs(col1, col2)
         self.assertIs(col1, self.db.some_collection_here)
-        self.assertIsInstance(col1, mongomock.Collection)
+        self.assertIsInstance(col1, mongomock_ng.Collection)
 
     def test__cannot_insert_non_string_keys(self):
         for key in [2, 2.0, True, object()]:
@@ -428,7 +428,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 'a'})
 
         # Insert many, but the first one is a duplicate.
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             self.db.collection.insert_many([{'_id': 'a', 'culprit': True}, {'_id': 'b'}])
         error_details = err_context.exception.details
         self.assertEqual({'nInserted', 'writeErrors'}, set(error_details.keys()))
@@ -438,7 +438,7 @@ class CollectionAPITest(TestCase):
         )
 
         # Insert many, and only the second one is a duplicate.
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             self.db.collection.insert_many([{'_id': 'c'}, {'_id': 'a', 'culprit': True}])
         error_details = err_context.exception.details
         self.assertEqual({'nInserted', 'writeErrors'}, set(error_details.keys()))
@@ -448,7 +448,7 @@ class CollectionAPITest(TestCase):
         )
 
         # Insert many, with ordered=False.
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             self.db.collection.insert_many(
                 [
                     {'_id': 'a', 'culprit': True},
@@ -488,13 +488,13 @@ class CollectionAPITest(TestCase):
             {'limit': 0},
         ]
         for error_kwarg in error_kwargs:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 self.db.collection.count_documents({}, **error_kwarg)
 
         with self.assertRaises(NotImplementedError):
             self.db.collection.count_documents({}, collation='fr')
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.count_documents('unique')
 
     def test__find_returns_cursors(self):
@@ -528,7 +528,7 @@ class CollectionAPITest(TestCase):
         ]
 
         for option in options:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 self.db.collection.find({}, **option)
 
     @skipIf(
@@ -536,7 +536,7 @@ class CollectionAPITest(TestCase):
         'find_and_modify was removed in pymongo v4',
     )
     def test__find_and_modify_cannot_remove_and_new(self):
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_and_modify({}, remove=True, new=True)
 
     @skipIf(
@@ -676,13 +676,13 @@ class CollectionAPITest(TestCase):
         self.db.collection.find_one({'a.b': 3})
 
         # Invalid filter.
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'$or': []})
 
         # Do not raise when creating the cursor.
         cursor = self.db.collection.find({'$or': []})
         # Only raise when using it.
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             next(cursor)
 
     def test__regex_options(self):
@@ -731,7 +731,7 @@ class CollectionAPITest(TestCase):
         )
 
         # Bad type for $options.
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'a': {'$regex': 'tada', '$options': re.I}})
 
         # Bug https://jira.mongodb.org/browse/SERVER-38621
@@ -774,7 +774,7 @@ class CollectionAPITest(TestCase):
 
     def test__update_cannot_change__id(self):
         self.db.collection.insert_one({'_id': 1, 'a': 1})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.replace_one({'_id': 1}, {'_id': 2, 'b': 2})
 
     def test__update_empty_id(self):
@@ -795,7 +795,7 @@ class CollectionAPITest(TestCase):
 
     def test__update_id(self):
         self.db.collection.insert_one({'a': 1})
-        with self.assertRaises(mongomock.WriteError):
+        with self.assertRaises(mongomock_ng.WriteError):
             self.db.collection.update_one({'a': 1}, {'$set': {'a': 2, '_id': 42}})
         self.assertEqual(1, self.db.collection.find_one({})['a'])
 
@@ -891,7 +891,7 @@ class CollectionAPITest(TestCase):
         self.assertRaises(NotImplementedError, self.db.collection.update_one, query, update=update)
 
     def test__update_one_upsert_invalid_filter(self):
-        with self.assertRaises(mongomock.WriteError):
+        with self.assertRaises(mongomock_ng.WriteError):
             self.db.collection.update_one(
                 filter={'a.b': 1, 'a': 3}, update={'$set': {'c': 2}}, upsert=True
             )
@@ -917,8 +917,8 @@ class CollectionAPITest(TestCase):
         )
         # TODO(guludo): add test cases for other stages when they become
         # supported in Mongomock:
-        # - $unset: https://github.com/mongomock/mongomock/issues/740
-        # - $replaceWith: https://github.com/mongomock/mongomock/issues/741
+        # - $unset: https://github.com/mongomock_ng/mongomock_ng/issues/740
+        # - $replaceWith: https://github.com/mongomock_ng/mongomock_ng/issues/741
         data = (
             (
                 1,
@@ -970,7 +970,7 @@ class CollectionAPITest(TestCase):
     def test__update_pipeline_upsert__invalid_stage_name(self):
         collection = self.db.collection
         collection.insert_one({'_id': 1, 'a': 1, 'b': 2})
-        with self.assertRaises(mongomock.OperationFailure) as cm:
+        with self.assertRaises(mongomock_ng.OperationFailure) as cm:
             collection.update_one(
                 filter={'a': 99, 'b': 100},
                 update=[{'$set': {'a': {'$invalidStageName': ['$a', 10]}}}],
@@ -991,7 +991,7 @@ class CollectionAPITest(TestCase):
             ),
         )
         for pipeline, msg in data:
-            with self.assertRaises(mongomock.OperationFailure) as cm:
+            with self.assertRaises(mongomock_ng.OperationFailure) as cm:
                 collection.update_one(
                     filter={},
                     update=pipeline,
@@ -1243,7 +1243,7 @@ class CollectionAPITest(TestCase):
 
     def test__update_push_other_clauses(self):
         self.db.collection.insert_one({'games': [{'scores': [0, 1]}, {'scores': [2, 3]}]})
-        with self.assertRaises(mongomock.WriteError):
+        with self.assertRaises(mongomock_ng.WriteError):
             self.db.collection.update_one(
                 {'games': {'$elemMatch': {'scores.0': 2}}},
                 {
@@ -1557,7 +1557,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1567,7 +1567,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1576,7 +1576,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', 1)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1584,7 +1584,7 @@ class CollectionAPITest(TestCase):
     def test__create_index_duplicate(self):
         self.db.collection.create_index([('value', 1)])
         self.db.collection.create_index([('value', 1)])
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.create_index([('value', 1)], unique=True)
 
     def test__create_index_wrong_type(self):
@@ -1660,8 +1660,8 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': now + timedelta(seconds=100)})
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-        with mock.patch('mongomock.utcnow') as mongomock_utcnow:
-            mongomock_utcnow.return_value = now + timedelta(100)
+        with mock.patch('mongomock_ng.utcnow') as mongomock_ng_utcnow:
+            mongomock_ng_utcnow.return_value = now + timedelta(100)
             self.assertEqual(self.db.collection.count_documents({}), 0)
 
     def test__ttl_index_is_removed_if_collection_dropped(self):
@@ -1716,9 +1716,9 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert_one({'value': 1, 'name': 'bob'})
         # Ensure both uniq indexes have been created
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1, 'name': 'different'})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 0, 'name': 'bob'})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1737,7 +1737,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1747,7 +1747,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1757,7 +1757,7 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert_one({'a': 1})
         self.db.collection.insert_one({'a': {'b': 1}})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'a': {'b': 1}})
 
         self.assertEqual(self.db.collection.count_documents({}), 2)
@@ -1771,9 +1771,9 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'c': 1})
         self.db.collection.insert_one({'a': 1})
         self.db.collection.insert_one({'a': {'b': 1}})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'a': {'b': 1}})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'c': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 5)
@@ -1798,7 +1798,7 @@ class CollectionAPITest(TestCase):
 
         # We should not be able to add documents with duplicated `partialFilterExpression_value` and
         # `value` values if `partialFilterExpression_value` is 1.
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
 
         self.assertEqual(self.db.collection.count_documents({}), 4)
@@ -1807,7 +1807,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', 1)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1824,7 +1824,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('value', 1)], unique=True)
 
         self.db.collection.insert_one({})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1847,13 +1847,13 @@ class CollectionAPITest(TestCase):
         self.db.collection.replace_one({'_id': 1}, {'value': 1})
         self.db.collection.replace_one({'value': 1}, {'value': 1}, upsert=True)
         # Creating new documents with same value should
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.replace_one({'bad': 'condition'}, {'value': 1}, upsert=True)
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'_id': 2, 'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.update_one({'_id': 2}, {'$set': {'value': 1}}, upsert=True)
 
     def test_unique_index_with_update(self):
@@ -1862,7 +1862,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'value': 1})
         self.db.collection.insert_one({'_id': 2, 'value': 2})
 
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.replace_one({'value': 1}, {'value': 2})
 
     def test_unique_index_with_update_on_nested_field(self):
@@ -1871,7 +1871,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': {'b': 1}})
         self.db.collection.insert_one({'_id': 2, 'a': {'b': 2}})
 
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.update_one({'_id': 1}, {'$set': {'a.b': 2}})
 
     def test_unique_index_on_dict(self):
@@ -1881,14 +1881,14 @@ class CollectionAPITest(TestCase):
         self.db.collection.create_index([('a', 1)], unique=True)
 
         self.db.collection.insert_one({'_id': 3, 'a': {'b': 3}})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'_id': 4, 'a': {'b': 2}})
 
     def test_sparse_unique_index_dup(self):
         self.db.collection.create_index([('value', 1)], unique=True, sparse=True)
 
         self.db.collection.insert_one({'value': 'a'})
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.insert_one({'value': 'a'})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
@@ -1897,7 +1897,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'value': 1})
         self.db.collection.insert_one({'value': 1})
 
-        with self.assertRaises(mongomock.DuplicateKeyError):
+        with self.assertRaises(mongomock_ng.DuplicateKeyError):
             self.db.collection.create_index([('value', 1)], unique=True)
 
         self.db.collection.insert_one({'value': 1})
@@ -1954,7 +1954,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual({'_id_'}, set(self.db.collection.index_information().keys()))
 
     def test__drop_index_not_found(self):
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.drop_index('unknownIndex')
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
@@ -2203,12 +2203,12 @@ class CollectionAPITest(TestCase):
         self.assertEqual([1, 4, 5], [d['_id'] for d in data_in_db])
 
     def test__filter_unknown_top_level(self):
-        with self.assertRaises(mongomock.OperationFailure) as error:
+        with self.assertRaises(mongomock_ng.OperationFailure) as error:
             self.db.collection.find_one({'$and': [{'$ne': False}]})
         self.assertEqual('unknown top level operator: $ne', str(error.exception))
 
     def test__filter_unknown_op(self):
-        with self.assertRaises(mongomock.OperationFailure) as error:
+        with self.assertRaises(mongomock_ng.OperationFailure) as error:
             self.db.collection.find_one({'a': {'$foo': 3}})
         self.assertEqual('unknown operator: $foo', str(error.exception))
 
@@ -2268,17 +2268,17 @@ class CollectionAPITest(TestCase):
         doc = {'a': 1, 'b': [{'c': 2, 'd': 3, 'e': 4}, {'c': 5, 'd': 6, 'e': 7}]}
         self.db.collection.insert_one(doc)
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one(
                 {'a': 1}, collections.OrderedDict([('a', 1), ('b.c', 1), ('b', 1)])
             )
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one(
                 {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 1), ('b', 1), ('b.c', 1)])
             )
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one(
                 {'a': 1}, collections.OrderedDict([('_id', 0), ('a', 0), ('b', 0), ('b.c', 0)])
             )
@@ -2318,7 +2318,7 @@ class CollectionAPITest(TestCase):
     def test__find_and_project_positional(self):
         self.db.collection.insert_one({'_id': 1, 'a': [{'b': 1}, {'b': 2}]})
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 0})
 
         with self.assertRaises(NotImplementedError):
@@ -2330,7 +2330,7 @@ class CollectionAPITest(TestCase):
 
     def test__find_in_not_a_list(self):
         self.db.collection.insert_one({'a': 'a'})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'a': {'$in': 'not a list'}})
 
     def test__with_options(self):
@@ -2460,7 +2460,7 @@ class CollectionAPITest(TestCase):
 
     def test__configure_client_tz_aware(self):
         for tz_awarness in (True, False):
-            client = mongomock.MongoClient(tz_aware=tz_awarness)
+            client = mongomock_ng.MongoClient(tz_aware=tz_awarness)
             db = client['somedb']
 
             utc2tz = UTCPlus2()
@@ -2517,7 +2517,7 @@ class CollectionAPITest(TestCase):
             self.assertFalse(objs, msg=tz_awarness)
 
     def test__list_of_dates(self):
-        client = mongomock.MongoClient(tz_aware=True)
+        client = mongomock_ng.MongoClient(tz_aware=True)
         client.db.collection.insert_one({'dates': [datetime.now(), datetime.now()]})
         dates = client.db.collection.find_one()['dates']
         self.assertTrue(dates[0].tzinfo)
@@ -2587,13 +2587,13 @@ class CollectionAPITest(TestCase):
     def test__rename_collection_to_bad_names(self):
         coll = self.db.create_collection('a')
         self.assertRaises(TypeError, coll.rename, ['a'])
-        self.assertRaises(mongomock.InvalidName, coll.rename, '.a')
-        self.assertRaises(mongomock.InvalidName, coll.rename, '$a')
+        self.assertRaises(mongomock_ng.InvalidName, coll.rename, '.a')
+        self.assertRaises(mongomock_ng.InvalidName, coll.rename, '$a')
 
     def test__rename_collection_already_exists(self):
         coll = self.db.create_collection('a')
         self.db.create_collection('c')
-        self.assertRaises(mongomock.OperationFailure, coll.rename, 'c')
+        self.assertRaises(mongomock_ng.OperationFailure, coll.rename, 'c')
 
     def test__rename_collection_drop_target(self):
         coll = self.db.create_collection('a')
@@ -2682,7 +2682,7 @@ class CollectionAPITest(TestCase):
         self.assert_document_count(1)
         doc = next(self.db.collection.find({}))
         self.assert_document_stored(doc['_id'], {'a': 1, 'b': 2})
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2706,7 +2706,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 2}))
         self.assertEqual(len(docs), 1)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2727,7 +2727,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2752,7 +2752,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'b': 2}))
         self.assertEqual(len(docs), 2)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2773,7 +2773,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2820,7 +2820,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({'a': 3}))
         self.assertEqual(len(docs), 1)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2840,7 +2840,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'a': 1})
         bulk = self.db.collection.initialize_unordered_bulk_op()
         bulk.add_update({'a': 1}, {'$set': {'a': 2, '_id': 42}})
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             bulk.execute()
         self.assertEqual({'_id': 1, 'a': 1}, self.db.collection.find_one())
         self.assertEqual(
@@ -2859,7 +2859,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({}))
         self.assertEqual(len(docs), 0)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2883,7 +2883,7 @@ class CollectionAPITest(TestCase):
 
         docs = list(self.db.collection.find({}))
         self.assertEqual(len(docs), 0)
-        self.assertIsInstance(result, mongomock.results.BulkWriteResult)
+        self.assertIsInstance(result, mongomock_ng.results.BulkWriteResult)
         self.assertEqual(
             result.bulk_api_result,
             {
@@ -2938,7 +2938,7 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
         self.assertEqual([{'_id': 1, 'a': [5]}], actual)
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.insert_one({'_id': 4})
             list(self.db.collection.find({'$expr': {'$eq': [{'$size': ['$a']}, 1]}}))
 
@@ -2984,7 +2984,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
             ]
         )
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate([{'$replaceRoot': {'newRoot': '$not_here'}}])
         self.assertIn('expression', str(err.exception))
 
@@ -3081,7 +3081,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
             ]
         )
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.a.aggregate([{'$replaceRoot': {'new_root': '$pets'}}])
 
     def test__aggregate_lookup(self):
@@ -3123,14 +3123,14 @@ class CollectionAPITest(TestCase):
         )
 
     def test__aggregate_lookup_missing_operator(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [{'$lookup': {'localField': '_id', 'foreignField': 'arr', 'as': 'b'}}]
             )
         self.assertEqual("Must specify 'from' field for a $lookup", str(err.exception))
 
     def test__aggregate_lookup_operator_not_string(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [{'$lookup': {'from': 'b', 'localField': 1, 'foreignField': 'arr', 'as': 'b'}}]
             )
@@ -3685,7 +3685,7 @@ class CollectionAPITest(TestCase):
           above.
 
         * The expected output is formatted to match the pprint'ed output
-          produced by mongomock.
+          produced by mongomock_ng.
 
         * The elements are:
 
@@ -3871,7 +3871,7 @@ class CollectionAPITest(TestCase):
         * The input is modified wrap a dictionary around the list of cities in
         * And query is modified accordingly.
         * The expected output is formatted to match the pprint'ed output
-          produced by mongomock.
+          produced by mongomock_ng.
 
         * The elements are:
 
@@ -4097,7 +4097,7 @@ class CollectionAPITest(TestCase):
           above (with some cleanup)
 
         * The expected output is formatted to match the pprint'ed output
-          produced by mongomock.
+          produced by mongomock_ng.
 
         * The elements are:
 
@@ -4258,7 +4258,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(res, [])
 
     def test__aggregate_graph_lookup_missing_operator(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [
                     {
@@ -4276,7 +4276,7 @@ class CollectionAPITest(TestCase):
         )
 
     def test__aggregate_graphlookup_operator_not_string(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [
                     {
@@ -4295,7 +4295,7 @@ class CollectionAPITest(TestCase):
         )
 
     def test__aggregate_graph_lookup_restrict_not_dict(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [
                     {
@@ -4316,7 +4316,7 @@ class CollectionAPITest(TestCase):
         )
 
     def test__aggregate_graph_lookup_max_depth_not_number(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [
                     {
@@ -4334,7 +4334,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual("Argument 'maxDepth' to $graphLookup must be a number", str(err.exception))
 
     def test__aggregate_graph_lookup_depth_filed_not_string(self):
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.a.aggregate(
                 [
                     {
@@ -4394,7 +4394,7 @@ class CollectionAPITest(TestCase):
         # Many cases for '$sample' options that should raise an operation failure.
         cases = (None, 3, {}, {'size': 2, 'otherUnknownOption': 3})
         for case in cases:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 self.db.a.aggregate([{'$sample': case}])
 
     def test__aggregate_count(self):
@@ -4408,7 +4408,7 @@ class CollectionAPITest(TestCase):
         # Many cases for '$count' options that should raise an operation failure.
         cases = (None, 3, {}, [], '', '$one_count', 'one.count')
         for case in cases:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 self.db.a.aggregate([{'$count': case}])
 
     def test__aggregate_facet(self):
@@ -4473,7 +4473,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_array_size_missing(self):
         self.db.collection.insert_one({'_id': 1})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             list(
                 self.db.collection.aggregate(
                     [
@@ -4560,7 +4560,7 @@ class CollectionAPITest(TestCase):
     )
     def test__aggregate_project_if_null_multi_field_not_supported(self):
         self.db.collection.insert_one({'_id': 1, 'elem_a': '<present_a>'})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(
                 [
                     {'$match': {'_id': 1}},
@@ -4746,7 +4746,7 @@ class CollectionAPITest(TestCase):
                 {'$match': {'_id': 1}},
                 {'$project': {'result_field': switch_operator}},
             ]
-            with self.assertRaises(mongomock.OperationFailure) as err:
+            with self.assertRaises(mongomock_ng.OperationFailure) as err:
                 self.db.collection.aggregate(pipeline)
             self.assertEqual(expected_exception, str(err.exception))
 
@@ -4921,7 +4921,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_include_in_exclusion(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate(
                 [{'$project': collections.OrderedDict([('a', False), ('b', True)])}]
             )
@@ -4929,7 +4929,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_exclude_in_inclusion(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate(
                 [{'$project': collections.OrderedDict([('a', True), ('b', False)])}]
             )
@@ -4937,7 +4937,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_project_computed_field_in_exclusion(self):
         self.db.collection.insert_one({'_id': 1, 'a': 2, 'b': 3})
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate(
                 [
                     {'$project': {'a': 0, 'b': '$a'}},
@@ -5023,7 +5023,7 @@ class CollectionAPITest(TestCase):
                 {'_id': 3, 'b': {'c': 3}},
             ]
         )
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             list(
                 self.db.collection.aggregate(
                     [
@@ -5031,7 +5031,7 @@ class CollectionAPITest(TestCase):
                     ]
                 )
             )
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             list(
                 self.db.collection.aggregate(
                     [
@@ -5039,7 +5039,7 @@ class CollectionAPITest(TestCase):
                     ]
                 )
             )
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             list(
                 self.db.collection.aggregate(
                     [
@@ -5133,11 +5133,11 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_string_operation_split_exceptions(self):
         self.db.collection.insert_one({'a': 'Hello', 'b': 'World', 'c': 3})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$project': {'split': {'$split': []}}}])
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$project': {'split': {'$split': ['$a']}}}])
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$project': {'split': {'$split': ['$a', '$b', '$c']}}}])
         with self.assertRaises(TypeError):
             self.db.collection.aggregate([{'$project': {'split': {'$split': ['$a', 1]}}}])
@@ -5283,7 +5283,7 @@ class CollectionAPITest(TestCase):
                 'c': 2,
             }
         )
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$set': {}}])
 
     def test__aggregate_set_override(self):
@@ -5364,7 +5364,7 @@ class CollectionAPITest(TestCase):
                 'a': 'Hello',
             }
         )
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate([{'$project': {'cmp': {'$strcasecmp': ['s']}}}])
         self.assertEqual('strcasecmp must have 2 items', str(err.exception))
 
@@ -5374,7 +5374,7 @@ class CollectionAPITest(TestCase):
                 'a': 'Hello',
             }
         )
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate([{'$project': {'sub': {'$substr': ['$a', 1]}}}])
         self.assertEqual('substr must have 3 items', str(err.exception))
 
@@ -5397,7 +5397,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_unrecognized(self):
         self.db.collection.insert_one({})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$project': {'a': {'$notAValidOperation': True}}}])
 
     def test__aggregate_not_implemented(self):
@@ -5453,7 +5453,7 @@ class CollectionAPITest(TestCase):
 
     def test__aggregate_mixed_expression(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [2, 3]})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(
                 [
                     {'$project': {'a': {'$literal': False, 'hint': False}}},
@@ -5494,7 +5494,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(expect, list(actual))
 
     def test__find_unknown_type(self):
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'arr': {'$type': 'unknown-type'}})
 
     def test__find_unimplemented_type(self):
@@ -5527,7 +5527,7 @@ class CollectionAPITest(TestCase):
 
     def test__find_elemmatch_none(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [0, 1]})
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'arr': {'$elemMatch': None}})
 
     def test__find_where(self):
@@ -5664,7 +5664,7 @@ class CollectionAPITest(TestCase):
 
     def test__array_size_non_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr0': [], 'arr3': [1, 2, 3]})
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate([{'$project': {'size': {'$size': 'arr'}}}])
         self.assertEqual(
             f'The argument to $size must be an array, but was of type: {str}', str(err.exception)
@@ -5672,7 +5672,7 @@ class CollectionAPITest(TestCase):
 
     def test__array_size_argument_array(self):
         self.db.collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
-        with self.assertRaises(mongomock.OperationFailure) as err:
+        with self.assertRaises(mongomock_ng.OperationFailure) as err:
             self.db.collection.aggregate([{'$project': {'size': {'$size': [1, 2, 3]}}}])
         self.assertEqual(
             'Expression $size takes exactly 1 arguments. 3 were passed in.', str(err.exception)
@@ -5911,7 +5911,7 @@ class CollectionAPITest(TestCase):
                 # Document dropped: None is less than numbers.
                 {'_id': 10, 'counts': {'circles': None}},
                 # Document kept: ObjectIds are more than numbers.
-                {'_id': 11, 'counts': {'circles': mongomock.ObjectId()}},
+                {'_id': 11, 'counts': {'circles': mongomock_ng.ObjectId()}},
                 # Document kept: datetimes are more than numbers.
                 {'_id': 12, 'counts': {'circles': datetime.now()}},
                 # Document kept: BinData are more than numbers.
@@ -6001,10 +6001,10 @@ class CollectionAPITest(TestCase):
         self.assertEqual({1, 2, 5}, {doc['_id'] for doc in results})
 
     def test_filter_not_bad_value(self):
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'a': {'$not': 3}})
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.find_one({'a': {'$not': {'b': 3}}})
 
     def test_filter_not_regex(self):
@@ -6022,14 +6022,14 @@ class CollectionAPITest(TestCase):
 
     def test_insert_many_bulk_write_error(self):
         collection = self.db.collection
-        with self.assertRaises(mongomock.BulkWriteError) as cm:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as cm:
             collection.insert_many([{'_id': 1}, {'_id': 1}])
         self.assertIn('batch op errors occurred', str(cm.exception))
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_many_bulk_write_error_details(self):
         collection = self.db.collection
-        with self.assertRaises(mongomock.BulkWriteError) as cm:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as cm:
             collection.insert_many([{'_id': 1}, {'_id': 1}])
         self.assertEqual(65, cm.exception.code)
         write_errors = cm.exception.details['writeErrors']
@@ -6497,7 +6497,7 @@ class CollectionAPITest(TestCase):
         ]
         self.assertEqual(expect, list(actual))
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             collection.aggregate(
                 [
                     {
@@ -6520,7 +6520,7 @@ class CollectionAPITest(TestCase):
             {'groupBy': '$price', 'boundaries': [1, 0]},
         ]
         for option in options:
-            with self.assertRaises(mongomock.OperationFailure, msg=option):
+            with self.assertRaises(mongomock_ng.OperationFailure, msg=option):
                 self.db.collection.aggregate([{'$bucket': option}])
 
     def test__aggregate_subtract_dates(self):
@@ -6666,13 +6666,13 @@ class CollectionAPITest(TestCase):
         pipeline_parameter_not_array = [
             {'$project': {'concat_parameter_not_array': {'$concatArrays': 42}}}
         ]
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(pipeline_parameter_not_array)
 
         pipeline_item_not_array = [
             {'$project': {'concat_item_not_array': {'$concatArrays': [[1, 2], '$a']}}}
         ]
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(pipeline_item_not_array)
 
     def test__aggregate_filter(self):
@@ -6748,7 +6748,7 @@ class CollectionAPITest(TestCase):
         ]
         self.db.collection.insert_one({})
         for option in options:
-            with self.assertRaises(mongomock.OperationFailure, msg=option):
+            with self.assertRaises(mongomock_ng.OperationFailure, msg=option):
                 self.db.collection.aggregate(
                     [{'$project': {'filtered_items': {'$filter': option}}}]
                 )
@@ -6844,7 +6844,7 @@ class CollectionAPITest(TestCase):
             ),
         )
         for op, msg in data:
-            with self.assertRaises(mongomock.OperationFailure) as cm:
+            with self.assertRaises(mongomock_ng.OperationFailure) as cm:
                 collection.aggregate([{'$project': {'x': {'$map': op}}}])
             self.assertIn(msg, str(cm.exception))
 
@@ -6961,7 +6961,7 @@ class CollectionAPITest(TestCase):
             '$items',
         ]
         for option in options:
-            with self.assertRaises(mongomock.OperationFailure, msg=option):
+            with self.assertRaises(mongomock_ng.OperationFailure, msg=option):
                 self.db.collection.aggregate([{'$project': {'slice': {'$slice': option}}}])
 
     def test__write_concern(self):
@@ -7022,7 +7022,7 @@ class CollectionAPITest(TestCase):
         bulk.insert({'_id': 3})
         bulk.insert({'_id': 1})
 
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             bulk.execute()
 
         self.assertCountEqual([1, 2, 3], [d['_id'] for d in self.db.collection.find()])
@@ -7031,7 +7031,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_unordered_with_bulk_write(self):
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             self.db.collection.bulk_write(
                 [
                     pymongo.InsertOne({'_id': 1}),
@@ -7055,7 +7055,7 @@ class CollectionAPITest(TestCase):
         bulk.insert({'_id': 1})
         bulk.insert({'_id': 3})
         bulk.insert({'_id': 1})
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             bulk.execute()
 
         self.assertCountEqual([1, 2], [d['_id'] for d in self.db.collection.find()])
@@ -7064,7 +7064,7 @@ class CollectionAPITest(TestCase):
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_ordered_with_bulk_write(self):
-        with self.assertRaises(mongomock.BulkWriteError) as err_context:
+        with self.assertRaises(mongomock_ng.BulkWriteError) as err_context:
             self.db.collection.bulk_write(
                 [
                     pymongo.InsertOne({'_id': 1}),
@@ -7352,7 +7352,7 @@ class CollectionAPITest(TestCase):
         ]
         self.assertEqual(expect, list(actual))
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             collection.aggregate(
                 [
                     {'$addFields': {'str_not_numeric': {'$toDecimal': '$str_not_numeric'}}},
@@ -7559,7 +7559,7 @@ class CollectionAPITest(TestCase):
                 ]
             )
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(
                 [
                     {
@@ -7574,7 +7574,7 @@ class CollectionAPITest(TestCase):
                 ]
             )
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(
                 [
                     {
@@ -7589,7 +7589,7 @@ class CollectionAPITest(TestCase):
                 ]
             )
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate([{'$project': {'a': {'$dateToString': '10'}}}])
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
@@ -7626,7 +7626,7 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(expect, list(actual))
 
-        with self.assertRaises(mongomock.OperationFailure):
+        with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.collection.aggregate(
                 [
                     {
@@ -7801,7 +7801,7 @@ class CollectionAPITest(TestCase):
         ]
 
         for item in items:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 collection.aggregate(item)
 
     def test_aggregate_object_to_array(self):
@@ -7865,7 +7865,7 @@ class CollectionAPITest(TestCase):
         ]
 
         for item in items:
-            with self.assertRaises(mongomock.OperationFailure):
+            with self.assertRaises(mongomock_ng.OperationFailure):
                 collection.aggregate(item)
 
     def test_aggregate_object_to_array_with_example(self):
@@ -8173,10 +8173,10 @@ class CollectionAPITest(TestCase):
             collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
             return
 
-        with self.assertRaises(mongomock.WriteError):
+        with self.assertRaises(mongomock_ng.WriteError):
             collection.update_one({}, {'$set': {}})
 
-        with self.assertRaises(mongomock.WriteError):
+        with self.assertRaises(mongomock_ng.WriteError):
             collection.update_one({'b': 'will-never-exist'}, {'$set': {}})
 
     def test_snapshot_arg(self):
@@ -8240,10 +8240,10 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.a, self.db.b)
         self.assertEqual(self.db.a, self.db.get_collection('a'))
         self.assertNotEqual(self.db.a, self.client.other_db.a)
-        client = mongomock.MongoClient('localhost')
-        self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
+        client = mongomock_ng.MongoClient('localhost')
+        self.assertEqual(client.db.collection, mongomock_ng.MongoClient('localhost').db.collection)
         self.assertNotEqual(
-            client.db.collection, mongomock.MongoClient('example.com').db.collection
+            client.db.collection, mongomock_ng.MongoClient('example.com').db.collection
         )
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
@@ -8267,7 +8267,7 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
-            mongomock.collection.Collection(self.db, 'foo', None, read_concern='bar')
+            mongomock_ng.collection.Collection(self.db, 'foo', None, read_concern='bar')
 
     def test__cursor_allow_disk_use(self):
         col = self.db.col

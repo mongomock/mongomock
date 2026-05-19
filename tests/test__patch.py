@@ -3,7 +3,7 @@ import time
 import unittest
 from unittest import mock
 
-import mongomock
+import mongomock_ng
 
 
 try:
@@ -26,7 +26,7 @@ class PatchTest(unittest.TestCase):
     patch decorator are only called at testing time.
     """
 
-    @mongomock.patch()
+    @mongomock_ng.patch()
     def test__decorator(self):
         client1 = pymongo.MongoClient()
         client1.db.coll.insert_one({'name': 'Pascal'})
@@ -38,7 +38,7 @@ class PatchTest(unittest.TestCase):
 
         self.assertEqual(None, client1.db.coll.find_one())
 
-    @mongomock.patch(on_new='create')
+    @mongomock_ng.patch(on_new='create')
     def test__create_new(self):
         client1 = pymongo.MongoClient('myserver.example.com', port=12345)
         client1.db.coll.insert_one({'name': 'Pascal'})
@@ -46,7 +46,7 @@ class PatchTest(unittest.TestCase):
         client2 = pymongo.MongoClient(host='myserver.example.com', port=12345)
         self.assertEqual('Pascal', client2.db.coll.find_one()['name'])
 
-    @mongomock.patch()
+    @mongomock_ng.patch()
     def test__error_new(self):
         # Valid because using the default server which was whitelisted by default.
         pymongo.MongoClient()
@@ -54,7 +54,7 @@ class PatchTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pymongo.MongoClient('myserver.example.com', port=12345)
 
-    @mongomock.patch(
+    @mongomock_ng.patch(
         (
             'mongodb://myserver.example.com:12345',
             'mongodb://otherserver.example.com:27017/default-db',
@@ -76,7 +76,7 @@ class PatchTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pymongo.MongoClient()
 
-    @mongomock.patch(on_new='timeout')
+    @mongomock_ng.patch(on_new='timeout')
     @mock.patch(time.__name__ + '.sleep')
     def test__create_timeout(self, mock_sleep):
         pymongo.MongoClient()
@@ -89,7 +89,7 @@ class PatchTest(unittest.TestCase):
 
         mock_sleep.assert_called_once_with(30000)
 
-    @mongomock.patch('example.com')
+    @mongomock_ng.patch('example.com')
     def test__different_default_db(self):
         client_1 = pymongo.MongoClient('mongodb://example.com/db1')
         client_2 = pymongo.MongoClient('mongodb://example.com/db2')
@@ -106,7 +106,7 @@ class PatchTest(unittest.TestCase):
         client_2.get_default_database().collection.insert_one({'name': 'Caribou'})
         self.assertEqual(['Caribou'], [d['name'] for d in client_1.db2.collection.find()])
 
-    @mongomock.patch(('my-db_client-url',))
+    @mongomock_ng.patch(('my-db_client-url',))
     def test__rename_through_another_client(self):
         client1 = pymongo.MongoClient('mongodb://my-db_client-url/test')
         client1.test.my_collec.insert_one({'_id': 'Previous data'})
@@ -118,7 +118,7 @@ class PatchTest(unittest.TestCase):
 
         self.assertEqual(['New data'], [d['_id'] for d in client1.test.my_collec.find()])
 
-    @mongomock.patch(servers=(('server.example.com', 27017),))
+    @mongomock_ng.patch(servers=(('server.example.com', 27017),))
     def test__tuple_server_host_and_port(self):
         objects = [{'votes': 1}, {'votes': 2}]
         client = pymongo.MongoClient('server.example.com')

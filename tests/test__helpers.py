@@ -2,11 +2,11 @@ import json
 import os
 from unittest import TestCase
 
-from mongomock.helpers import get_value_by_dot
-from mongomock.helpers import hashdict
-from mongomock.helpers import parse_uri
-from mongomock.helpers import print_deprecation_warning
-from mongomock.helpers import set_value_by_dot
+from mongomock_ng.helpers import get_value_by_dot
+from mongomock_ng.helpers import hashdict
+from mongomock_ng.helpers import parse_uri
+from mongomock_ng.helpers import print_deprecation_warning
+from mongomock_ng.helpers import set_value_by_dot
 
 
 class HashdictTest(TestCase):

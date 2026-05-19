@@ -12,12 +12,12 @@ from unittest import TestCase
 
 from packaging import version
 
-import mongomock
-from mongomock import ConfigurationError
-from mongomock import Database
-from mongomock import helpers
-from mongomock import InvalidURI
-from mongomock import OperationFailure
+import mongomock_ng
+from mongomock_ng import ConfigurationError
+from mongomock_ng import Database
+from mongomock_ng import helpers
+from mongomock_ng import InvalidURI
+from mongomock_ng import OperationFailure
 
 
 try:
@@ -32,8 +32,8 @@ try:
     from pymongo import read_concern
     from pymongo.read_preferences import ReadPreference
 except ImportError:
-    from mongomock import read_concern
-    from mongomock.object_id import ObjectId
+    from mongomock_ng import read_concern
+    from mongomock_ng.object_id import ObjectId
     from tests.utils import DBRef
 
 try:
@@ -46,52 +46,54 @@ except ImportError:
 from tests.multicollection import MultiCollection
 
 
-SERVER_VERSION = version.parse(mongomock.SERVER_VERSION)
+SERVER_VERSION = version.parse(mongomock_ng.SERVER_VERSION)
 
 
 class InterfaceTest(TestCase):
     def test__can_create_db_without_path(self):
-        self.assertIsNotNone(mongomock.MongoClient())
+        self.assertIsNotNone(mongomock_ng.MongoClient())
 
     def test__can_create_db_with_path(self):
-        self.assertIsNotNone(mongomock.MongoClient('mongodb://localhost'))
+        self.assertIsNotNone(mongomock_ng.MongoClient('mongodb://localhost'))
 
     def test__can_create_db_with_multiple_pathes(self):
         hostnames = ['mongodb://localhost:27017', 'mongodb://localhost:27018']
-        self.assertIsNotNone(mongomock.MongoClient(hostnames))
+        self.assertIsNotNone(mongomock_ng.MongoClient(hostnames))
 
     def test__repr(self):
-        self.assertEqual(repr(mongomock.MongoClient()), "mongomock.MongoClient('localhost', 27017)")
+        self.assertEqual(
+            repr(mongomock_ng.MongoClient()), "mongomock_ng.MongoClient('localhost', 27017)"
+        )
 
     def test__bad_uri_raises(self):
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient('http://host1')
+            mongomock_ng.MongoClient('http://host1')
 
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient('://host1')
+            mongomock_ng.MongoClient('://host1')
 
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient('mongodb://')
+            mongomock_ng.MongoClient('mongodb://')
 
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient('mongodb://localhost/path/mongodb.sock')
+            mongomock_ng.MongoClient('mongodb://localhost/path/mongodb.sock')
 
         with self.assertRaises(InvalidURI):
-            mongomock.MongoClient('mongodb://localhost?option')
+            mongomock_ng.MongoClient('mongodb://localhost?option')
 
         with self.assertRaises(ValueError):
-            mongomock.MongoClient('mongodb:host2')
+            mongomock_ng.MongoClient('mongodb:host2')
 
     def test__none_uri_host(self):
-        self.assertIsNotNone(mongomock.MongoClient('host1'))
-        self.assertIsNotNone(mongomock.MongoClient('//host2'))
-        self.assertIsNotNone(mongomock.MongoClient('mongodb:12'))
+        self.assertIsNotNone(mongomock_ng.MongoClient('host1'))
+        self.assertIsNotNone(mongomock_ng.MongoClient('//host2'))
+        self.assertIsNotNone(mongomock_ng.MongoClient('mongodb:12'))
 
 
 class DatabaseGettingTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.client = mongomock.MongoClient()
+        self.client = mongomock_ng.MongoClient()
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_database_read_concern(self):
@@ -181,7 +183,7 @@ class DatabaseGettingTest(TestCase):
 
     def test__getting_default_database_valid(self):
         def gddb(uri):
-            client = mongomock.MongoClient(uri)
+            client = mongomock_ng.MongoClient(uri)
             return client, client.get_default_database()
 
         c, db = gddb('mongodb://host1/foo')
@@ -206,12 +208,12 @@ class DatabaseGettingTest(TestCase):
 
         # As of pymongo 3.5, get_database() is equivalent to
         # the old behavior of get_default_database()
-        client = mongomock.MongoClient('mongodb://host1/foo')
+        client = mongomock_ng.MongoClient('mongodb://host1/foo')
         self.assertIs(client.get_database(), client['foo'])
 
     def test__getting_default_database_invalid(self):
         def client(uri):
-            return mongomock.MongoClient(uri)
+            return mongomock_ng.MongoClient(uri)
 
         c = client('mongodb://host1')
         with self.assertRaises(ConfigurationError):
@@ -230,18 +232,18 @@ class DatabaseGettingTest(TestCase):
             c.get_default_database()
 
     def test__getting_default_database_with_default_parameter(self):
-        c = mongomock.MongoClient('mongodb://host1/')
+        c = mongomock_ng.MongoClient('mongodb://host1/')
         self.assertIs(c.get_default_database('foo'), c['foo'])
         self.assertIs(c.get_default_database(default='foo'), c['foo'])
 
     def test__getting_default_database_ignoring_default_parameter(self):
-        c = mongomock.MongoClient('mongodb://host1/bar')
+        c = mongomock_ng.MongoClient('mongodb://host1/bar')
         self.assertIs(c.get_default_database('foo'), c['bar'])
         self.assertIs(c.get_default_database(default='foo'), c['bar'])
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__getting_default_database_preserves_options(self):
-        client = mongomock.MongoClient('mongodb://host1/foo')
+        client = mongomock_ng.MongoClient('mongodb://host1/foo')
         db = client.get_database(read_preference=ReadPreference.NEAREST)
 
         self.assertEqual(db.name, 'foo')
@@ -273,10 +275,10 @@ class _CollectionComparisonTest(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock.MongoClient()
+        self.fake_conn = mongomock_ng.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
-        self.db_name = 'mongomock___testing_db'
-        self.collection_name = 'mongomock___testing_collection'
+        self.db_name = 'mongomock_ng___testing_db'
+        self.collection_name = 'mongomock_ng___testing_collection'
         self.mongo_conn.drop_database(self.db_name)
         self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
         self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
@@ -2289,7 +2291,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 @skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 dropped map reduce')
 class CollectionMapReduceTest(TestCase):
     def setUp(self):
-        self.db = mongomock.MongoClient().map_reduce_test
+        self.db = mongomock_ng.MongoClient().map_reduce_test
         self.data = [
             {'x': 1, 'tags': ['dog', 'cat']},
             {'x': 2, 'tags': ['cat']},
@@ -2339,7 +2341,7 @@ class CollectionMapReduceTest(TestCase):
 
     def _check_map_reduce(self, colc, expected_results):
         result = colc.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertIsInstance(result, mongomock.Collection)
+        self.assertIsInstance(result, mongomock_ng.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count_documents({}), len(expected_results))
         for doc in result.find():
@@ -2351,7 +2353,7 @@ class CollectionMapReduceTest(TestCase):
             self.reduce_func,
             out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]),
         )
-        self.assertIsInstance(result, mongomock.Collection)
+        self.assertIsInstance(result, mongomock_ng.Collection)
         self.assertEqual(result.name, 'results')
         self.assertEqual(result.database.name, 'map_reduce_son_test')
         self.assertEqual(result.count_documents({}), 3)
@@ -2383,7 +2385,7 @@ class CollectionMapReduceTest(TestCase):
         result = self.db.things.map_reduce(
             self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'}
         )
-        self.assertIsInstance(result, mongomock.Collection)
+        self.assertIsInstance(result, mongomock_ng.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count_documents({}), 3)
         for doc in result.find():
@@ -2391,7 +2393,7 @@ class CollectionMapReduceTest(TestCase):
 
     def test__map_reduce_with_limit(self):
         result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
-        self.assertIsInstance(result, mongomock.Collection)
+        self.assertIsInstance(result, mongomock_ng.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count_documents({}), 2)
 
@@ -2429,15 +2431,15 @@ class CollectionMapReduceTest(TestCase):
             self.db.things_with_obj.insert_one(item)
         expected_results = [{'_id': obj1, 'value': 2}, {'_id': obj2, 'value': 1}]
         result = self.db.things_with_obj.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertIsInstance(result, mongomock.Collection)
+        self.assertIsInstance(result, mongomock_ng.Collection)
         self.assertEqual(result.name, 'myresults')
         self.assertEqual(result.count_documents({}), 2)
         for doc in result.find():
             self.assertIn(doc, expected_results)
 
-    def test_mongomock_map_reduce(self):
+    def test_mongomock_ng_map_reduce(self):
         # Arrange
-        fake_etap = mongomock.MongoClient().db
+        fake_etap = mongomock_ng.MongoClient().db
         fake_statuses_collection = fake_etap.create_collection('statuses')
         fake_config_id = 'this_is_config_id'
         test_name = 'this_is_test_name'
@@ -3846,7 +3848,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         )
 
     def test__aggregate_bug_473(self):
-        """Regression test for bug https://github.com/mongomock/mongomock/issues/473."""
+        """Regression test for bug https://github.com/mongomock_ng/mongomock_ng/issues/473."""
         self.cmp.do.drop()
         self.cmp.do.insert_one(
             {
@@ -3896,7 +3898,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         )
 
     def test_aggregate_bug_607(self):
-        """Regression test for bug https://github.com/mongomock/mongomock/issues/607."""
+        """Regression test for bug https://github.com/mongomock_ng/mongomock_ng/issues/607."""
         self.cmp.do.drop()
         self.cmp.do.insert_one({'index': 2, 'values': [0, 1, 5]})
         self.cmp.compare.aggregate(
@@ -3921,7 +3923,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         )
 
     def test__aggregate_cond_mongodb_to_bool(self):
-        """Regression test for bug https://github.com/mongomock/mongomock/issues/650"""
+        """Regression test for bug https://github.com/mongomock_ng/mongomock_ng/issues/650"""
         self.cmp.compare_ignore_order.aggregate(
             [
                 {
@@ -5199,7 +5201,7 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
 class InsertedDocumentTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.collection = mongomock.MongoClient().db.collection
+        self.collection = mongomock_ng.MongoClient().db.collection
         self.data = {'a': 1, 'b': [1, 2, 3], 'c': {'d': 4}}
         self.orig_data = copy.deepcopy(self.data)
         self.object_id = self.collection.insert_one(self.data).inserted_id

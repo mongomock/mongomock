@@ -1,6 +1,6 @@
 What is this?
 -------------
-This document lists down the features missing in mongomock library. PRs for these features are highly appreciated.
+This document lists down the features missing in mongomock-ng library. PRs for these features are highly appreciated.
 
 If I miss to include a feature in the below list, Please feel free to add to the below list and raise a PR.
 

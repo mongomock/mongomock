@@ -13,29 +13,40 @@ import numbers
 import random
 import re
 import warnings
+from typing import Any
+from typing import Optional
 
 import pytz
 from packaging import version
-from sentinels import NOTHING
+from sentinels import NOTHING  # type: ignore[import-untyped]
 
-import mongomock
-from mongomock import command_cursor
-from mongomock import filtering
-from mongomock import helpers
-from mongomock import OperationFailure
+import mongomock_ng
 
+from . import command_cursor
+from . import filtering
+from . import helpers
+from . import OperationFailure
+
+
+# bson types - available only if bson is installed
+Regex: Optional[type[Any]] = None
+InvalidDocument: type[Exception] = OperationFailure
+decimal_support: bool = False
 
 try:
     from bson import decimal128
-    from bson import Regex
-    from bson.errors import InvalidDocument
+    from bson import Regex as _Regex
+    from bson.errors import InvalidDocument as _InvalidDocument
 
+    Regex = _Regex  # type: ignore[misc]
+    InvalidDocument = _InvalidDocument  # type: ignore[misc]
     decimal_support = True
-    _RE_TYPES = (helpers.RE_TYPE, Regex)
 except ImportError:
-    InvalidDocument = OperationFailure
-    decimal_support = False
-    _RE_TYPES = (helpers.RE_TYPE,)
+    pass
+
+_RE_TYPES: tuple[type[Any], ...] = (
+    (helpers.RE_TYPE, Regex) if Regex is not None else (helpers.RE_TYPE,)
+)  # type: ignore[assignment]
 
 _random = random.Random()  # noqa: S311
 
@@ -279,7 +290,7 @@ class _Parser:
                 return self._handle_object_operator(k, v)
             if k in text_search_operators + projection_operators + object_operators:
                 raise NotImplementedError(
-                    f"'{k}' is a valid operation but it is not supported by Mongomock yet."
+                    f"'{k}' is a valid operation but it is not supported by Mongomock-ng yet."
                 )
             if k.startswith('$'):
                 raise OperationFailure(f"Unrecognized expression '{k}'")
@@ -345,7 +356,7 @@ class _Parser:
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid boolean operator for the "
             f'aggregation pipeline, it is currently not implemented'
-            f' in Mongomock.'
+            f' in Mongomock-ng.'
         )
 
     def _handle_arithmetic_operator(self, operator, values):
@@ -423,7 +434,7 @@ class _Parser:
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid aritmetic operator for the aggregation "
-            f'pipeline, it is currently not implemented  in Mongomock.'
+            f'pipeline, it is currently not implemented  in Mongomock-ng.'
         )
 
     def _handle_project_operator(self, operator, values):
@@ -442,7 +453,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock.'
+            f'in Mongomock-ng.'
         )
 
     def _handle_projection_operator(self, operator, value):
@@ -467,7 +478,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock.'
+            f'in Mongomock-ng.'
         )
 
     def _handle_comparison_operator(self, operator, values):
@@ -483,7 +494,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid comparison operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f' in Mongomock.'
+            f' in Mongomock-ng.'
         )
 
     def _handle_string_operator(self, operator, values):
@@ -605,7 +616,7 @@ class _Parser:
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid string operator for the aggregation "
-            f'pipeline, it is currently not implemented  in Mongomock.'
+            f'pipeline, it is currently not implemented  in Mongomock-ng.'
         )
 
     def _handle_date_operator(self, operator, values):
@@ -651,19 +662,19 @@ class _Parser:
                 raise NotImplementedError(
                     'Although %L is a valid date format for the '
                     '$dateToString operator, it is currently not implemented '
-                    ' in Mongomock.'
+                    ' in Mongomock-ng.'
                 )
             if 'onNull' in values:
                 raise NotImplementedError(
                     'Although onNull is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
-                    ' in Mongomock.'
+                    ' in Mongomock-ng.'
                 )
             if 'timezone' in values:
                 raise NotImplementedError(
                     'Although timezone is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
-                    ' in Mongomock.'
+                    ' in Mongomock-ng.'
                 )
             return out_value['date'].strftime(out_value['format'])
         if operator == '$dateFromParts':
@@ -682,7 +693,7 @@ class _Parser:
                     raise NotImplementedError(
                         f'Although {field} is a valid field for the '
                         f'{operator} operator, it is currently not implemented '
-                        'in Mongomock.'
+                        'in Mongomock-ng.'
                     )
 
             year = out_value['year']
@@ -706,7 +717,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid date operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f' in Mongomock.'
+            f' in Mongomock-ng.'
         )
 
     def _handle_array_operator(self, operator, value):
@@ -835,7 +846,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid array operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock.'
+            f'in Mongomock-ng.'
         )
 
     def _handle_type_convertion_operator(self, operator, values):
@@ -959,7 +970,7 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid type conversion operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock.'
+            f'in Mongomock-ng.'
         )
 
     def _handle_type_operator(self, operator, values):
@@ -981,13 +992,15 @@ class _Parser:
 
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid type operator for the aggregation pipeline, "
-            f'it is currently not implemented in Mongomock.'
+            f'it is currently not implemented in Mongomock-ng.'
         )
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
             fields = values[:-1]
-            if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
+            if len(fields) > 1 and version.parse(mongomock_ng.SERVER_VERSION) <= version.parse(
+                '4.4'
+            ):
                 raise OperationFailure(
                     '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
                 )
@@ -1014,7 +1027,7 @@ class _Parser:
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid conditional operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f' in Mongomock.'
+            f' in Mongomock-ng.'
         )
 
     def _handle_control_flow_operator(self, operator, values):
@@ -1057,7 +1070,7 @@ class _Parser:
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid control flow operator for the "
             f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock.'
+            f'in Mongomock-ng.'
         )
 
     def _handle_set_operator(self, operator, values):
@@ -1076,7 +1089,7 @@ class _Parser:
             return all(set1 == set2 for set1, set2 in itertools.combinations(set_values, 2))
         raise NotImplementedError(
             f"Although '{operator}' is a valid set operator for the aggregation "
-            f'pipeline, it is currently not implemented in Mongomock.'
+            f'pipeline, it is currently not implemented in Mongomock-ng.'
         )
 
     def _handle_object_operator(self, operator, values):
@@ -1087,7 +1100,7 @@ class _Parser:
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(
             f"Although '{operator}' is a valid object operator for the aggregation pipeline, "
-            'it is currently not implemented in Mongomock.'
+            'it is currently not implemented in Mongomock-ng.'
         )
 
 
@@ -1140,7 +1153,7 @@ def _accumulate_group(output_fields, group_list, user_vars):
                 raise NotImplementedError(
                     f'Although {operator} is a valid group operator for the '
                     f'aggregation pipeline, it is currently not implemented '
-                    f'in Mongomock.'
+                    f'in Mongomock-ng.'
                 )
             else:
                 raise NotImplementedError(
@@ -1179,7 +1192,7 @@ def _handle_lookup_stage(in_collection, database, options, user_vars):
             raise NotImplementedError(
                 "Although '.' is valid in the 'as' "
                 'parameters for the lookup stage of the aggregation '
-                'pipeline, it is currently not implemented in Mongomock.'
+                'pipeline, it is currently not implemented in Mongomock-ng.'
             )
 
     foreign_name = options['from']
@@ -1263,7 +1276,7 @@ def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
             raise NotImplementedError(
                 f"Although '.' is valid in the '{operator}' "
                 f'parameter for the $graphLookup stage of the aggregation '
-                f'pipeline, it is currently not implemented in Mongomock.'
+                f'pipeline, it is currently not implemented in Mongomock-ng.'
             )
 
     foreign_name = options['from']
@@ -1714,7 +1727,7 @@ _PIPELINE_HANDLERS = {
 
 def process_pipeline(collection, database, pipeline, session, user_vars=None):
     if session:
-        raise NotImplementedError('Mongomock does not handle sessions yet')
+        raise NotImplementedError('Mongomock-ng does not handle sessions yet')
 
     for stage in pipeline:
         for operator, options in stage.items():
@@ -1729,7 +1742,7 @@ def process_pipeline(collection, database, pipeline, session, user_vars=None):
             if not handler:
                 raise NotImplementedError(
                     f"Although '{operator}' is a valid operator for the aggregation pipeline, "
-                    f'it is currently not implemented in Mongomock.'
+                    f'it is currently not implemented in Mongomock-ng.'
                 )
             collection = handler(collection, database, options, user_vars)
 

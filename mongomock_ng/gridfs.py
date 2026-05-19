@@ -1,8 +1,8 @@
 from unittest import mock
 
-from mongomock import Collection as MongoMockCollection
-from mongomock import Database as MongoMockDatabase
-from mongomock.collection import Cursor as MongoMockCursor
+from mongomock_ng import Collection as MongoMockCollection
+from mongomock_ng import Database as MongoMockDatabase
+from mongomock_ng.collection import Cursor as MongoMockCursor
 
 
 try:
@@ -17,7 +17,7 @@ except ImportError:
 
 
 # This is a copy of GridOutCursor but with a different base. Note that we
-# need both classes as one might want to access both mongomock and real
+# need both classes as one might want to access both mongomock-ng and real
 # MongoDb.
 class _MongoMockGridOutCursor(MongoMockCursor):
     def __init__(self, collection, *args, **kwargs):
@@ -47,7 +47,7 @@ def _create_grid_out_cursor(collection, *args, **kwargs):
 
 
 def enable_gridfs_integration():
-    """This function enables the use of mongomock Database's and Collection's inside gridfs
+    """This function enables the use of mongomock-ng Database's and Collection's inside gridfs
 
     Gridfs library use `isinstance` to make sure the passed elements
     are valid `pymongo.Database/Collection` so we monkey patch those types in the gridfs modules

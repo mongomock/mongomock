@@ -550,7 +550,7 @@ select = [
 ban-relative-imports = "all"
 
 [lint.isort]
-known-first-party = ["mongomock"]
+known-first-party = ["mongomock_ng"]
 
 [lint.flake8-pytest-style]
 fixture-parentheses = false

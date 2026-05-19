@@ -7,9 +7,9 @@ from unittest import TestCase
 
 from packaging import version
 
-import mongomock
-import mongomock.gridfs
-from mongomock import helpers
+import mongomock_ng
+import mongomock_ng.gridfs
+from mongomock_ng import helpers
 
 
 try:
@@ -35,13 +35,13 @@ except ImportError:
 class GridFsTest(TestCase):
     @classmethod
     def setUpClass(cls):
-        mongomock.gridfs.enable_gridfs_integration()
+        mongomock_ng.gridfs.enable_gridfs_integration()
 
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock.MongoClient()
+        self.fake_conn = mongomock_ng.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
-        self.db_name = 'mongomock___testing_db'
+        self.db_name = 'mongomock_ng___testing_db'
 
         self.mongo_conn[self.db_name]['fs']['files'].drop()
         self.mongo_conn[self.db_name]['fs']['chunks'].drop()

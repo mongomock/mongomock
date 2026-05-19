@@ -1,23 +1,23 @@
-.. image:: https://img.shields.io/pypi/v/mongomock.svg?style=flat-square
-    :target: https://pypi.python.org/pypi/mongomock
-.. image:: https://img.shields.io/github/actions/workflow/status/mongomock/mongomock/lint-and-test.yml?branch=develop&style=flat-square
-    :target: https://github.com/mongomock/mongomock/actions?query=workflow%3Alint-and-test
-.. image:: https://img.shields.io/pypi/l/mongomock.svg?style=flat-square
-    :target: https://pypi.python.org/pypi/mongomock
-.. image:: https://img.shields.io/codecov/c/github/mongomock/mongomock.svg?style=flat-square
-    :target: https://codecov.io/gh/mongomock/mongomock
+.. image:: https://img.shields.io/pypi/v/mongomock-ng.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/mongomock-ng
+.. image:: https://img.shields.io/github/actions/workflow/status/engFelipeMonteiro/mongomock-ng/lint-and-test.yml?branch=develop&style=flat-square
+    :target: https://github.com/engFelipeMonteiro/mongomock-ng/actions?query=workflow%3Alint-and-test
+.. image:: https://img.shields.io/pypi/l/mongomock-ng.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/mongomock-ng
+.. image:: https://img.shields.io/codecov/c/github/engFelipeMonteiro/mongomock-ng.svg?style=flat-square
+    :target: https://codecov.io/gh/engFelipeMonteiro/mongomock-ng
 
 
 Seeking maintainers
 -------------------
 
-This project is seeking maintainers, see `here <https://github.com/mongomock/mongomock/issues/914>`_
+This project is seeking maintainers, see `here <https://github.com/engFelipeMonteiro/mongomock-ng/issues/914>`_
 for more information.
 
 
 What is this?
 -------------
-Mongomock is a small library to help testing Python code that interacts with MongoDB via Pymongo.
+Mongomock-ng is a small library to help testing Python code that interacts with MongoDB via Pymongo.
 
 To understand what it's useful for, we can take the following code:
 
@@ -67,13 +67,13 @@ This breaks the test, although the end result being tested is just the same. The
 large portions of the code we already wrote.
 
 We are left, therefore, with option #3 -- you want something to behave like a mongodb database
-collection, without being one. This is exactly what this library aims to provide. With mongomock,
+collection, without being one. This is exactly what this library aims to provide. With mongomock-ng,
 the test simply becomes:
 
 .. code-block:: python
 
  def test_increase_votes():
-     collection = mongomock.MongoClient().db.collection
+     collection = mongomock_ng.MongoClient().db.collection
      objects = [dict(votes=1), dict(votes=2), ...]
      for obj in objects:
          obj['_id'] = collection.insert_one(obj).inserted_id
@@ -87,12 +87,12 @@ This code checks *increase_votes* with respect to its functionality, not syntax 
 therefore is much more robust as a test.
 
 If the code to be tested is creating the connection itself with pymongo, you can use
-mongomock.patch (NOTE: you should use :code:`pymongo.MongoClient(...)` rather than
+mongomock_ng.patch (NOTE: you should use :code:`pymongo.MongoClient(...)` rather than
 :code:`from pymongo import MongoClient`, as shown below):
 
 .. code-block:: python
 
-  @mongomock.patch(servers=(('server.example.com', 27017),))
+  @mongomock_ng.patch(servers=(('server.example.com', 27017),))
   def test_increate_votes_endpoint():
     objects = [dict(votes=1), dict(votes=2), ...]
     client = pymongo.MongoClient('server.example.com')
@@ -120,12 +120,12 @@ version of the original behavior.
 Upgrading to Pymongo v4
 -----------------------
 
-The major version 4 of Pymongo changed the API quite a bit. The Mongomock library has evolved to
+The major version 4 of Pymongo changed the API quite a bit. The Mongomock-ng library has evolved to
 help you ease the migration:
 
-1. Upgrade to Mongomock v4 or above: if your tests are running with Pymongo installed, Mongomock
+1. Upgrade to Mongomock-ng v4 or above: if your tests are running with Pymongo installed, Mongomock-ng
    will adapt its own API to the version of Pymongo installed.
-2. Upgrade to Pymongo v4 or above: your tests using Mongomock will fail exactly where your code
+2. Upgrade to Pymongo v4 or above: your tests using Mongomock-ng will fail exactly where your code
    would fail in production, so that you can fix it before releasing.
 
 Contributing
@@ -143,7 +143,7 @@ To download, setup and perfom tests, run the following commands on Mac / Linux:
 
 .. code-block:: console
 
- $ git clone git@github.com:mongomock/mongomock.git
+ $ git clone git@github.com:engFelipeMonteiro/mongomock-ng.git
  $ pipx install hatch
  $ cd mongomock
  $ hatch test
@@ -153,22 +153,22 @@ development:
 
 .. code-block:: console
 
- $ git clone git@github.com:mongomock/mongomock.git
+ $ git clone git@github.com:engFelipeMonteiro/mongomock-ng.git
  $ cd mongomock
  $ docker compose build
- $ docker compose run --rm mongomock
+ $ docker compose run --rm mongomock_ng
 
 If you want to run ``hatch`` against a specific environment in the container:
 
 .. code-block:: console
 
- $ docker compose run --rm mongomock hatch test -py=3.11 -i pymongo=4
+ $ docker compose run --rm mongomock_ng hatch test -py=3.11 -i pymongo=4
 
 If you'd like to run only one test, you can also add the test name at the end of your command:
 
 .. code-block:: console
 
- $ docker compose run --rm mongomock hatch test -py=3.12 -i pymongo=4 tests/test__mongomock.py::MongoClientCollectionTest::test__insert
+ $ docker compose run --rm mongomock_ng hatch test -py=3.12 -i pymongo=4 tests/test__mongomock.py::MongoClientCollectionTest::test__insert
 
 NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in
 ``docker-compose``, you'll have to issue a ``docker compose down`` before you do anything else to
@@ -194,12 +194,12 @@ helper method in the following way:
 
 .. code-block:: python
 
-   import mongomock
+   import mongomock_ng
    # Awesome code!
-   now_reference = mongomock.utcnow()
+   now_reference = mongomock_ng.utcnow()
 
-This provides users a consistent way to mock the notion of "now" in mongomock if they so choose.
-Please see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
+This provides users a consistent way to mock the notion of "now" in mongomock-ng if they so choose.
+Please see `utcnow docstring for more details <mongomock_ng/helpers.py#L52>`_.
 
 Branching model
 ~~~~~~~~~~~~~~~
@@ -215,7 +215,7 @@ Releasing
 When ready for a release, tag the `develop` branch with a new tag (please keep semver names) and
 push your tags to GitHub. The CI should do the rest.
 
-To add release notes, create a release in GitHub's `Releases Page <https://github.com/mongomock/mongomock/releases>`_
+To add release notes, create a release in GitHub's `Releases Page <https://github.com/engFelipeMonteiro/mongomock-ng/releases>`_
 then generate the release notes locally with:
 
 .. code-block:: bash
@@ -291,5 +291,5 @@ bugs:
 * lidongyong
 * `Juan Gutierrez <https://github.com/juannyg/>`_
 
-.. _examples in tests: https://github.com/mongomock/mongomock/blob/develop/tests/test__mongomock.py
+.. _examples in tests: https://github.com/engFelipeMonteiro/mongomock-ng/blob/develop/tests/test__mongomock.py
 .. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow

@@ -1,6 +1,6 @@
 import unittest
 
-from mongomock.store import RWLock
+from mongomock_ng.store import RWLock
 
 
 class LockTestCase(unittest.TestCase):

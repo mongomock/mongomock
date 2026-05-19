@@ -1,9 +1,9 @@
-import mongomock
+import mongomock_ng
 
 
-@mongomock.patch(servers=(('server.example.com', 27017),))
+@mongomock_ng.patch(servers=(('server.example.com', 27017),))
 class MyTestA: ...
 
 
-@mongomock.patch(('mydata.com', 'myprivatedata.com'))
+@mongomock_ng.patch(('mydata.com', 'myprivatedata.com'))
 class MyTestB: ...

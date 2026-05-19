@@ -3,13 +3,13 @@ import warnings
 
 from packaging import version
 
-import mongomock
-from mongomock import codec_options as mongomock_codec_options
-from mongomock import ConfigurationError
-from mongomock import helpers
-from mongomock import read_preferences
-from mongomock.database import Database
-from mongomock.store import ServerStore
+import mongomock_ng
+from mongomock_ng import codec_options as mongomock_codec_options
+from mongomock_ng import ConfigurationError
+from mongomock_ng import helpers
+from mongomock_ng import read_preferences
+from mongomock_ng.database import Database
+from mongomock_ng.store import ServerStore
 
 
 try:
@@ -79,7 +79,7 @@ class MongoClient:
 
         self.__default_database_name = dbase
 
-        self._server_version = mongomock.SERVER_VERSION
+        self._server_version = mongomock_ng.SERVER_VERSION
 
     def __getitem__(self, db_name):
         return self.get_database(db_name)
@@ -94,7 +94,7 @@ class MongoClient:
         self.close()
 
     def __repr__(self):
-        return f"mongomock.MongoClient('{self.host}', {self.port})"
+        return f"mongomock_ng.MongoClient('{self.host}', {self.port})"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -212,4 +212,4 @@ class MongoClient:
 
     def start_session(self, causal_consistency=True, default_transaction_options=None):
         """Start a logical session."""
-        raise NotImplementedError('Mongomock does not support sessions yet')
+        raise NotImplementedError('Mongomock-ng does not support sessions yet')
