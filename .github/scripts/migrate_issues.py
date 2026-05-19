@@ -99,10 +99,10 @@ def fetch_migrated_ids(target_full: str, headers: Headers) -> set[int]:
     url = f'https://api.github.com/repos/{target_full}/issues?state=all&per_page=100'
     migrated: set[int] = set()
     for issue in paginate(url, headers):
-        body = issue.get('body') or ''
-        for match in re.finditer(r'(\w+/[-\w.]+)#(\d+)', body):
-            if match.group(1) == f'{SOURCE_OWNER}/{SOURCE_REPO}':
-                migrated.add(int(match.group(2)))
+        title = issue.get('title') or ''
+        match = re.match(r'(?:\[PR\]\s*)?#(\d+):', title)
+        if match:
+            migrated.add(int(match.group(1)))
     return migrated
 
 
@@ -154,7 +154,7 @@ def migrate_issues(
         if is_pr:
             label_names.append(MIGRATED_PR_LABEL)
 
-        title = f"{prefix}{item['title']}"
+        title = f'{prefix}#{num}: {item["title"]}'
 
         if dry_run:
             print(f'  [dry-run] #{num}: {title[:60]}')
