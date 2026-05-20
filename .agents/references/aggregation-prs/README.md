@@ -40,3 +40,17 @@ Individual `.diff` files for each PR are in this directory named `<pr-number>.di
 |----|-------------|
 | #195 | Aggregation consolidation (base PR) |
 | #196 | v7.1.1: typo fix + MDB7 compat ref + ref structure |
+
+## Issues list
+- #195
+- #196
+- #177
+- #176
+- #175
+- #167
+- #160
+- #157
+- #151
+- #150
+- #149
+- #146
