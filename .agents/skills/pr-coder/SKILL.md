@@ -99,7 +99,7 @@ POST /repos/engFelipeMonteiro/mongomock-ng/pulls
 {
   "title": "Replicate #N: <original PR title>",
   "head": "pr/N-original",
-  "base": "main",
+  "base": "develop",
   "body": "Original PR: mongomock/mongomock#N\n\n<original description>\n\n---\n*Replicated from mongomock/mongomock#N*"
 }
 ```
