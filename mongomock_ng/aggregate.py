@@ -453,9 +453,9 @@ class _Parser:
                     return round(res.total_seconds() * 1000)
                 return res
 
-        assert isinstance(values, (tuple, list)), (
-            f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
-        )
+        assert isinstance(
+            values, (tuple, list)
+        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'

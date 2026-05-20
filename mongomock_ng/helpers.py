@@ -266,7 +266,7 @@ def parse_uri(uri, default_port=27017, warn=False):
 
     if not path_part and '?' in host_part:
         raise InvalidURI(  # pragma: no cover
-            "A '/' is required between " 'the host list and any options.'
+            "A '/' is required between the host list and any options."
         )
 
     nodelist = []

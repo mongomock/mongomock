@@ -532,9 +532,9 @@ TYPE_MAP = {
     'javascript': None,
     'symbol': None,
     'javascriptWithScope': None,
-    'int': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32),
+    'int': lambda v: isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32,
     'timestamp': None,
-    'long': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32),
+    'long': lambda v: isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32,
     'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,  # type: ignore[arg-type]
     'number': lambda v: (
         # pylint: disable-next=isinstance-second-argument-not-valid-type

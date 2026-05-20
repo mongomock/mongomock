@@ -166,7 +166,7 @@ def migrate_issues(
                 headers,
                 {'title': title, 'body': body, 'labels': label_names},
             )
-            print(f"  #{result['number']}: {title[:60]}")
+            print(f'  #{result["number"]}: {title[:60]}')
             created += 1
         except HTTPError as e:
             print(f'  ERROR #{num} ({e.code}): {title[:60]}')
