@@ -76,13 +76,21 @@ POST /repos/engFelipeMonteiro/mongomock-ng/git/refs
 3. Commit each with original message + `Co-authored-by: @original_author`
 4. Preserves original authorship attribution
 
-### 5. Push branch
+### 5. Update CHANGELOG.md
+
+Before pushing, update `CHANGELOG.md` with a new entry for the upcoming version:
+- Increment the version appropriately (patch for bugfixes, minor for features)
+- Add the current date in `YYYY-MM-DD` format
+- List all changes under `### Added`, `### Changed`, `### Fixed` sections
+- Reference the source PR number (e.g., `mongomock#N`)
+
+### 6. Push branch
 
 ```
 git push origin pr/N-original
 ```
 
-### 6. Open PR in target repo
+### 7. Open PR in target repo
 
 Create a new PR:
 
@@ -96,7 +104,7 @@ POST /repos/engFelipeMonteiro/mongomock-ng/pulls
 }
 ```
 
-### 7. Label and link
+### 8. Label and link
 
 Add the `replicated` label to both the source issue and the new PR.
 
