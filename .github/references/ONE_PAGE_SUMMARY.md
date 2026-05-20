@@ -84,7 +84,7 @@ pytest tests/test__mongomock.py -v
 ## CI/CD Test Matrix
 
 **GitHub Actions** tests this combination:
-- **Python**: 3.10, 3.11, 3.12, 3.13, PyPy3 (6 versions)
+- **Python**: 3.10, 3.11, 3.12, 3.13, 3.14, PyPy3 (6 versions)
 - **PyMongo**: 3.x, 4.x, 4.11.0, 7.0, latest, none (6 versions)
 - **MongoDB**: 7.0.34 (via mongodb-github-action)
 - **Total**: 36 combinations tested
