@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.1.0] - 2026-05-20
 ### Added
+- `CLAUDE.md` with token-efficiency techniques for opencode (opencode instructions)
+- `.github/copilot-instructions.md` moved to correct location
+
+### Fixed
+- `$type` now returns `"double"` for `float` values (mongomock#929)
+- `$setWindowFields` no longer produces duplicate documents with multiple `output` fields (mongomock#821)
+
+### Added
 - `$sortByCount` aggregation stage (mongomock#896 — closes #157)
 - `$fill` aggregation stage (mongomock#892 — closes #160)
 - `$convert` aggregation operator with type dispatch (mongomock#864 — closes #167)
