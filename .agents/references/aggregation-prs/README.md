@@ -34,3 +34,9 @@ Replicated from mongomock/mongomock. Target: mongomock-ng compliance with MongoD
 
 ## Diff files
 Individual `.diff` files for each PR are in this directory named `<pr-number>.diff`.
+
+## Related mongomock-ng PRs
+| PR | Description |
+|----|-------------|
+| #195 | Aggregation consolidation (base PR) |
+| #196 | v7.1.1: typo fix + MDB7 compat ref + ref structure |
