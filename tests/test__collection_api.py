@@ -2927,6 +2927,75 @@ class CollectionAPITest(TestCase):
         actual = list(self.db.collection.find({'_id': 1, '$comment': 'test'}))
         self.assertEqual([{'_id': 1}], actual)
 
+    def test__find_comment_param(self):
+        col = self.db.col
+        col.find({}, comment='this_query')
+
+    def test__find_hint_param(self):
+        col = self.db.col
+        col.find({}, hint='this_index')
+
+    def test__find_one_comment_param(self):
+        col = self.db.col
+        col.find_one({}, comment='this_query')
+
+    def test__find_one_hint_param(self):
+        col = self.db.col
+        col.find_one({}, hint='this_index')
+
+    def test__find_one_and_update_comment_param(self):
+        col = self.db.col
+        col.find_one_and_update({}, {'$set': {'final': True}}, comment='this_query')
+
+    def test__find_one_and_update_hint_param(self):
+        col = self.db.col
+        col.find_one_and_update({}, {'$set': {'final': True}}, hint='this_index')
+
+    def test__count_documents_comment_param(self):
+        col = self.db.col
+        col.count_documents({}, comment='this_query')
+
+    def test__count_documents_hint_param(self):
+        col = self.db.col
+        col.count_documents({}, hint='this_index')
+
+    def test__estimated_document_count_comment_param(self):
+        col = self.db.col
+        col.estimated_document_count(comment='this_query')
+
+    def test__distinct_comment_param(self):
+        col = self.db.col
+        col.distinct('a', comment='this_query')
+
+    def test__distinct_hint_param(self):
+        col = self.db.col
+        col.distinct('a', hint='this_index')
+
+    def test__find_one_and_replace_comment_param(self):
+        col = self.db.col
+        col.find_one_and_replace({}, {'a': 'b'}, comment='this_query')
+
+    def test__find_one_and_replace_hint_param(self):
+        col = self.db.col
+        col.find_one_and_replace({}, {'a': 'b'}, hint='this_index')
+
+    def test__insert_one_comment_param(self):
+        col = self.db.col
+        col.insert_one({'a': 1}, comment='this_query')
+
+    def test__delete_one_comment_param(self):
+        col = self.db.col
+        col.delete_one({'a': 1}, comment='this_query')
+
+    def test__update_one_comment_param(self):
+        col = self.db.col
+        col.update_one({'a': 1}, {'$set': {'b': 1}}, comment='this_query')
+
+    def test__bulk_write_comment_param(self):
+        col = self.db.col
+        requests = [pymongo.InsertOne({'a': 1})]
+        col.bulk_write(requests, comment='this_query')
+
     def test__find_with_expr(self):
         self.db.collection.insert_many(
             [
@@ -6051,7 +6120,7 @@ class CollectionAPITest(TestCase):
             collection.insert_one({'$foo': 'bar'})
         self.assertEqual(
             str(cm.exception),
-            'Top-level field names cannot start with the "$"' ' sign (found: $foo)',
+            'Top-level field names cannot start with the "$" sign (found: $foo)',
         )
         with self.assertRaises(InvalidDocument):
             collection.insert_one({'foo': {'foo\0bar': 'bar'}})
@@ -7235,8 +7304,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             datetime(2000, 1, 1, 10, 30, 30, 12000),
             stored_document['date'],
-            msg='The stored document holds a date as timezone naive UTC and without '
-            'microseconds',
+            msg='The stored document holds a date as timezone naive UTC and without microseconds',
         )
 
         # The objects are not linked: modifying the inserted document or the fetched one will

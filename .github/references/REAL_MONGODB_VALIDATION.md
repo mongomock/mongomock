@@ -196,8 +196,8 @@ NO_LOCAL_MONGO=1 pytest tests/
 
 ```yaml
 matrix:
-  python: ['3.10', '3.11', '3.12', '3.13', 'pypy3']
-  pymongo: ['3', '4', '4.11.0', '7.0', 'latest', 'none']
+  python: ['3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3']
+  pymongo: ['4.11.0', 'latest']
 ```
 
 - **Total Matrix Combinations**: 36+ (6 Python versions × 6 PyMongo versions)

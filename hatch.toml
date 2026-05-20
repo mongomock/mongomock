@@ -17,7 +17,7 @@ matrix.pymongo.extra-dependencies = [
 ]
 
 [[envs.hatch-test.matrix]]
-python = [ "3.10", "3.11", "3.12", "3.13", "pypy3"]
+python = [ "3.10", "3.11", "3.12", "3.13","3.14", "pypy3"]
 pymongo = ["4.11.0", "latest"]
 
 [envs.coverage]

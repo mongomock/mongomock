@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.1] - 2026-05-19
+### Added
+- `comment` parameter support for `find()`, `find_one()`, `count_documents()`,
+  `estimated_document_count()`, `distinct()`, `bulk_write()`, `insert_one()`,
+  `delete_one()`, `update_one()`, `find_one_and_update()`, `find_one_and_replace()`
+- `hint` parameter support for `find()`, `find_one()`, `count_documents()`, `distinct()`
+- `let` parameter support for `delete_one()`
+- Accepts `comment` and `hint` via `_IGNORED_FEATURES` in `not_implemented.py`
+
+### Changed
+- Updated `find()` signature to accept `comment` and `hint` before `**kwargs`
+
 ## [7.0.0] - 2026-05-18
 ### Changed
 - **Rebranded from `mongomock` to `mongomock_ng`** — all imports must use the new package name
