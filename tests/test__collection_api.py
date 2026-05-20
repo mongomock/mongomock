@@ -913,11 +913,12 @@ class CollectionAPITest(TestCase):
                 {'_id': 2, 'a': 1, 'b': 2},
                 {'_id': 3, 'a': 1, 'b': 2},
                 {'_id': 4, 'a': 1, 'b': 2},
+                {'_id': 5, 'a': 1, 'b': 2, 'c': {'d': 3}},
+                {'_id': 6, 'a': 1, 'b': 2, 'c': {'d': 3}},
             ]
         )
         # TODO(guludo): add test cases for other stages when they become
         # supported in Mongomock:
-        # - $unset: https://github.com/mongomock_ng/mongomock_ng/issues/740
         # - $replaceWith: https://github.com/mongomock_ng/mongomock_ng/issues/741
         data = (
             (
@@ -939,6 +940,16 @@ class CollectionAPITest(TestCase):
                 4,
                 [{'$replaceRoot': {'newRoot': {'_id': '$_id', 'x': {'$add': ['$a', '$b']}}}}],
                 {'_id': 4, 'x': 3},
+            ),
+            (
+                5,
+                [{'$unset': 'b'}],
+                {'_id': 5, 'a': 1, 'c': {'d': 3}},
+            ),
+            (
+                6,
+                [{'$unset': ['a', 'c.d']}],
+                {'_id': 6, 'b': 2, 'c': {}},
             ),
         )
         for doc_id, update, expected in data:
@@ -3025,6 +3036,24 @@ class CollectionAPITest(TestCase):
             ]
         )
         self.assertEqual([2], [d['x'] for d in self.db.collection.find(search_filter)])
+
+    def test__aggregate_fill(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, 'in_farm': False},
+                {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}, 'in_farm': True},
+                {'_id': 3, 'pets': {'cats': 4}},
+            ]
+        )
+        actual = self.db.a.aggregate([{'$fill': {'output': {'in_farm': {'value': False}}}}])
+        self.assertListEqual(
+            [
+                {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, 'in_farm': False},
+                {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}, 'in_farm': True},
+                {'_id': 3, 'pets': {'cats': 4}, 'in_farm': False},
+            ],
+            list(actual),
+        )
 
     def test__aggregate_replace_root(self):
         self.db.a.insert_many(
@@ -6268,6 +6297,84 @@ class CollectionAPITest(TestCase):
         self.assertCountEqual([{'_id': 1}, {'_id': 2}], list(actual))
 
     @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_basic(self):
+        collection = self.db.collection
+        collection.insert_one({'a': 1, 'b': 2})
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate([{'$setWindowFields': {}}])
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate([{'$setWindowFields': {'output': {'out': {'$doesnt_exist': {}}}}}])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate([{'$setWindowFields': {'output': {'field': {'$sum': 1}}}}])
+
+        with self.assertRaises(NotImplementedError):
+            collection.aggregate(
+                [
+                    {
+                        '$setWindowFields': {
+                            'sortBy': {'a': 1},
+                            'output': {
+                                'field': {'$shift': {'output': '$b', 'by': 1}, 'window': {}}
+                            },
+                        }
+                    }
+                ]
+            )
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_shift(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'value': 15},
+            {'type': 1, 'value': 10},
+            {'type': 2, 'value': 20},
+            {'type': 2, 'value': 25},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'value': -1},
+                        'output': {'out': {'$shift': {'output': '$value', 'by': 1, 'default': 0}}},
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'out': 10, 'type': 1, 'value': 15},
+            {'out': 0, 'type': 1, 'value': 10},
+            {'out': 20, 'type': 2, 'value': 25},
+            {'out': 0, 'type': 2, 'value': 20},
+        ]
+        self.assertEqual(expected, list(actual))
+
+        # Test no sortBy field
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [
+                    {
+                        '$setWindowFields': {
+                            'partitionBy': '$type',
+                            'output': {
+                                'out': {'$shift': {'output': '$value', 'by': 1, 'default': 0}}
+                            },
+                        }
+                    }
+                ]
+            )
+
+    @skipIf(
         version.parse('4.0') <= helpers.PYMONGO_VERSION,
         'pymongo v4 or above do not specify uuid encoding',
     )
@@ -6879,6 +6986,109 @@ class CollectionAPITest(TestCase):
             }
         ]
         self.assertEqual(expect, list(actual))
+
+    def test__aggregate_reduce(self):
+        collection = self.db.collection
+        collection.insert_one({'array': [1, 2, 3, 4], 'val': 5})
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'array': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': '$array',
+                                'in': {'$add': ['$$value', '$$this']},
+                            }
+                        },
+                        'using_doc_val': {
+                            '$reduce': {
+                                'initialValue': '$val',
+                                'input': '$array',
+                                'in': {'$add': ['$$value', '$$this', '$val']},
+                            }
+                        },
+                        'empty_list': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': [],
+                                'in': {'$add': ['$$value', 1]},
+                            }
+                        },
+                        'none': {'$reduce': {'initialValue': 0, 'input': None, 'in': 0}},
+                        'nested_reduce': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': {
+                                    '$reduce': {
+                                        'initialValue': [],
+                                        'input': '$array',
+                                        'in': {'$concatArrays': ['$$value', ['$$this']]},
+                                    }
+                                },
+                                'in': {'$add': ['$$this', '$$value']},
+                            }
+                        },
+                        'missing_key': {
+                            '$reduce': {
+                                'input': '$missing.key',
+                                'initialValue': 0,
+                                'in': '$$this',
+                            }
+                        },
+                    }
+                }
+            ]
+        )
+        expected = [
+            {
+                'array': 10,
+                'empty_list': 0,
+                'missing_key': None,
+                'nested_reduce': 10,
+                'none': None,
+                'using_doc_val': 35,
+            }
+        ]
+        self.assertEqual(expected, list(actual))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [{'$project': {'field': {'$reduce': {'initialValue': 0, 'in': 0}}}}]
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [{'$project': {'field': {'$reduce': {'input': [1, 2, 3, 4, 5], 'in': 0}}}}]
+            )
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [
+                    {
+                        '$project': {
+                            'field': {'$reduce': {'input': [1, 2, 3, 4, 5], 'initialValue': 12}}
+                        }
+                    }
+                ]
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [
+                    {
+                        '$project': {
+                            'field': {
+                                '$reduce': {
+                                    'input': 'string',
+                                    'in': {'$add': ['$$this', '$$value']},
+                                    'initialValue': 0,
+                                }
+                            }
+                        }
+                    }
+                ]
+            )
 
     def test__aggregate_map_errors(self):
         collection = self.db.collection
@@ -7555,6 +7765,85 @@ class CollectionAPITest(TestCase):
                 )
             )
 
+    def test__aggregate_to_object_id(self):
+        collection = self.db.collection
+        object_id_str = '507f1f77bcf86cd799439011'
+        object_id = ObjectId(object_id_str)
+
+        collection.insert_one(
+            {
+                '_id': 1,
+                'string_id': object_id_str,
+                'object_id': object_id,
+                'null_value': None,
+            }
+        )
+
+        # Test basic conversion from string to ObjectId
+        actual = collection.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'converted_from_string': {'$toObjectId': '$string_id'},
+                        'converted_from_object_id': {'$toObjectId': '$object_id'},
+                        'converted_from_null': {'$toObjectId': '$null_value'},
+                        'converted_from_missing': {'$toObjectId': '$missing_field'},
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        result = list(actual)
+
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0]['converted_from_string'], ObjectId)
+        self.assertEqual(str(result[0]['converted_from_string']), object_id_str)
+        self.assertIsInstance(result[0]['converted_from_object_id'], ObjectId)
+        self.assertEqual(result[0]['converted_from_object_id'], object_id)
+        self.assertIsNone(result[0]['converted_from_null'])
+        self.assertIsNone(result[0]['converted_from_missing'])
+
+        # Test the user's specific use case
+        collection.drop()
+        collection.insert_one(
+            {
+                '_id': 'assignments',
+                'entity': 'entity',
+                'entity_id': object_id_str,
+            }
+        )
+
+        actual = collection.aggregate(
+            [
+                {'$match': {'_id': {'$in': ['assignments']}, 'entity': 'entity'}},
+                {'$addFields': {'entity_id': {'$toObjectId': '$entity_id'}}},
+            ]
+        )
+        result = list(actual)
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0]['entity_id'], ObjectId)
+        self.assertEqual(str(result[0]['entity_id']), object_id_str)
+
+        # Test error cases
+        collection.drop()
+        collection.insert_one({'_id': 1, 'invalid_string': 'not_a_valid_objectid'})
+
+        with self.assertRaises(mongomock_ng.OperationFailure) as context:
+            list(
+                collection.aggregate(
+                    [{'$addFields': {'converted': {'$toObjectId': '$invalid_string'}}}]
+                )
+            )
+        self.assertIn('Failed to parse objectId', str(context.exception))
+
+        # Test with integer (should raise error)
+        collection.drop()
+        collection.insert_one({'_id': 1, 'number': 123})
+
+        with self.assertRaises(mongomock_ng.OperationFailure) as context:
+            list(collection.aggregate([{'$addFields': {'converted': {'$toObjectId': '$number'}}}]))
+        self.assertIn('requires a string, ObjectId, or null input', str(context.exception))
+
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_to_string(self):
         collection = self.db.collection
@@ -8122,6 +8411,61 @@ class CollectionAPITest(TestCase):
         )
 
         self.assertEqual(expect, list(actual))
+
+    def test_aggregate_type(self):
+        collection = self.db.collection
+
+        collection.insert_one(
+            {
+                '_id': 1,
+                'list': [1, 2, 3],
+                'tuple': (1, 2, 3),
+                'string': 'lol',
+                'int': 10,
+                'long': 2**32,
+                'bool': True,
+                'object': {},
+                'null': None,
+                'date': datetime(1999, 12, 19, 1, 2, 3),
+            }
+        )
+
+        expected = [
+            {
+                'list': 'array',
+                'tuple': 'array',
+                'string': 'string',
+                'int': 'int',
+                'long': 'long',
+                'bool': 'bool',
+                'object': 'object',
+                'null': 'null',
+                'date': 'date',
+                'missing': 'missing',
+            }
+        ]
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': False,
+                        'list': {'$type': '$list'},
+                        'tuple': {'$type': '$tuple'},
+                        'string': {'$type': '$string'},
+                        'int': {'$type': '$int'},
+                        'long': {'$type': '$long'},
+                        'bool': {'$type': '$bool'},
+                        'object': {'$type': '$object'},
+                        'null': {'$type': '$null'},
+                        'date': {'$type': '$date'},
+                        'missing': {'$type': '$object.doesnt_exist'},
+                    }
+                }
+            ]
+        )
+
+        self.assertListEqual(expected, list(actual))
 
     def test_aggregate_project_with_boolean(self):
         collection = self.db.collection
