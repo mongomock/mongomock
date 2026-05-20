@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.0] - 2026-05-20
+### Added
+- `$sortByCount` aggregation stage (mongomock#896 — closes #157)
+- `$fill` aggregation stage (mongomock#892 — closes #160)
+- `$convert` aggregation operator with type dispatch (mongomock#864 — closes #167)
+- `$reduce` array aggregation operator (mongomock#820 — closes #177)
+- `$setWindowFields` aggregation stage with `$shift` operator (mongomock#821 — closes #176)
+- `$unset` aggregation stage with nested field support (mongomock#925 — closes #151)
+- `$type` aggregation operator with date support (mongomock#929 — closes #150)
+- `$round` aggregation operator with `<place>` parameter (mongomock#930 — closes #149)
+- `$toObjectId` type conversion operator (mongomock#935 — closes #146)
+- `$timezone` expression support in date operators (mongomock#822 — closes #175)
+
 ## [7.0.2] - 2026-05-19
 ### Added
 - `comment` parameter support for `find()`, `find_one()`, `count_documents()`,

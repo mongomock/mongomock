@@ -201,7 +201,7 @@ class DatabaseGettingTest(TestCase):
         c, db = gddb('mongodb://bob:bar@[::1]:27018/admin')
         self.assertIs(db, c['admin'])
 
-        c, db = gddb('mongodb://%24am:f%3Azzb%40zz@127.0.0.1/' 'admin%3F?authMechanism=MONGODB-CR')
+        c, db = gddb('mongodb://%24am:f%3Azzb%40zz@127.0.0.1/admin%3F?authMechanism=MONGODB-CR')
         self.assertIs(db, c['admin?'])
         c, db = gddb(['mongodb://localhost:27017/foo', 'mongodb://localhost:27018/foo'])
         self.assertIs(db, c['foo'])
@@ -2858,6 +2858,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'pow': {'$pow': [4, 2]},
                     'sqrt': {'$sqrt': 100},
                     'trunc': {'$trunc': 8.35},
+                    'round': {'$round': [9.51, 1]},
                 }
             }
         ]
@@ -3678,6 +3679,41 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             ]
         )
 
+    def test__aggregate_type(self):
+        self.cmp.do.insert_one(
+            {
+                '_id': 1,
+                'list': [1, 2, 3],
+                'tuple': (1, 2, 3),
+                'empty_list': [],
+                'empty_tuple': (),
+                'date': datetime.datetime(1999, 12, 19, 1, 2, 3),
+                'int': 3,
+                'str': '123',
+                'bool': True,
+                'none': None,
+            }
+        )
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': False,
+                        'list': {'$type': '$list'},
+                        'tuple': {'$type': '$tuple'},
+                        'string': {'$type': '$string'},
+                        'date': {'$type': '$date'},
+                        'int': {'$type': '$int'},
+                        'long': {'$type': '$long'},
+                        'bool': {'$type': '$bool'},
+                        'object': {'$type': '$object'},
+                        'null': {'$type': '$null'},
+                        'missing': {'$type': '$object.doesnt_exist'},
+                    }
+                }
+            ]
+        )
+
     def test__aggregate_facet(self):
         self.cmp.do.insert_many([{'_id': i} for i in range(5)])
         self.cmp.compare.aggregate(
@@ -4082,6 +4118,89 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             ]
         )
 
+    def test__aggregate_reduce(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({'array': [1, 2, 3, 4], 'val': 5})
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'array': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': '$array',
+                                'in': {'$add': ['$$value', '$$this']},
+                            }
+                        },
+                        'using_doc_val': {
+                            '$reduce': {
+                                'initialValue': '$val',
+                                'input': '$array',
+                                'in': {'$add': ['$$value', '$$this', '$val']},
+                            }
+                        },
+                        'empty_list': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': [],
+                                'in': {'$add': ['$$value', 1]},
+                            }
+                        },
+                        'none': {'$reduce': {'initialValue': 0, 'input': None, 'in': 0}},
+                        'nested_reduce': {
+                            '$reduce': {
+                                'initialValue': 0,
+                                'input': {
+                                    '$reduce': {
+                                        'initialValue': [],
+                                        'input': '$array',
+                                        'in': {'$concatArrays': ['$$value', ['$$this']]},
+                                    }
+                                },
+                                'in': {'$add': ['$$this', '$$value']},
+                            }
+                        },
+                        'missing_key': {
+                            '$reduce': {
+                                'input': '$missing.key',
+                                'initialValue': 0,
+                                'in': '$$this',
+                            }
+                        },
+                    }
+                }
+            ]
+        )
+
+        self.cmp.compare_exceptions.aggregate(
+            [{'$project': {'field': {'$reduce': {'initialValue': 0, 'in': 0}}}}]
+        )
+
+        self.cmp.compare_exceptions.aggregate(
+            [{'$project': {'field': {'$reduce': {'input': [1, 2, 3, 4, 5], 'in': 0}}}}]
+        )
+
+        self.cmp.compare_exceptions.aggregate(
+            [{'$project': {'field': {'$reduce': {'input': [1, 2, 3, 4, 5], 'initialValue': 12}}}}]
+        )
+
+        self.cmp.compare_exceptions.aggregate(
+            [
+                {
+                    '$project': {
+                        'field': {
+                            '$reduce': {
+                                'input': 'string',
+                                'in': {'$add': ['$$this', '$$value']},
+                                'initialValue': 0,
+                            }
+                        }
+                    }
+                }
+            ]
+        )
+
     def test__aggregate_filter_in_arrayElemAt(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many(
@@ -4226,6 +4345,26 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    def test_aggregate_date_with_timezone_expression(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one(
+            {
+                'start_date': datetime.datetime(2011, 11, 4, 0, 5, 23),
+                'info': {'tmz': 'America/New_York'},
+            }
+        )
+        pipeline = [
+            {
+                '$addFields': {
+                    'year': {'$year': {'date': '$start_date', 'timezone': '$info.tmz'}},
+                    'week': {'$week': {'date': '$start_date', 'timezone': '$info.tmz'}},
+                    'dayOfWeek': {'$dayOfWeek': {'date': '$start_date', 'timezone': '$info.tmz'}},
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test__aggregate_add_fields(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many(
@@ -4294,6 +4433,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$mod': [5, 3, 1]}}}])
         self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$sum': []}}}])
         self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$multiply': []}}}])
+        self.cmp.compare_exceptions.aggregate([{'$project': {'c': {'$round': '12'}}}])
         self.cmp.compare_exceptions.aggregate([{'$project': {'n': {'$add': '$a'}}}])
         self.cmp.compare_exceptions.aggregate(
             [{'$project': {'q': {'$multiply': [1, '$non_existent_key']}}}]
@@ -4433,6 +4573,30 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'start_date': {
                         '$dateToString': {'format': '%Y/%m/%d %H:%M', 'date': '$start_date'}
                     }
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test_aggregate_convert(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one(
+            {
+                'boolean_true': True,
+            }
+        )
+        pipeline = [
+            {
+                '$addFields': {
+                    'test_string': {'$convert': {'input': '$boolean_true', 'to': 'string'}},
+                    'test_int': {'$convert': {'input': '$boolean_true', 'to': 'int'}},
+                    'test_long': {'$convert': {'input': '$boolean_true', 'to': 'long'}},
+                    'test_decimal': {'$convert': {'input': '$boolean_true', 'to': 'decimal'}},
+                    'test_number_2': {'$convert': {'input': '$boolean_true', 'to': 2}},
+                    'test_number_16': {'$convert': {'input': '$boolean_true', 'to': 16}},
+                    'test_number_18': {'$convert': {'input': '$boolean_true', 'to': 18}},
+                    'test_number_19': {'$convert': {'input': '$boolean_true', 'to': 19}},
                 }
             },
             {'$project': {'_id': 0}},
@@ -4817,6 +4981,110 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         )
         pipeline = [{'$replaceRoot': {'newRoot': {'$mergeObjects': ['$a', '$b']}}}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_sort_by_count(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': 2},
+                {'a': 1, 'b': 4},
+                {'a': 2, 'b': 2},
+            ]
+        )
+        pipeline = [
+            {
+                '$facet': {
+                    'pipeline_a': [{'$sortByCount': '$a'}],
+                }
+            }
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__set_window_fields_no_output(self):
+        self.cmp.do.drop()
+        self.cmp.compare_exceptions.aggregate([{'$setWindowFields': {}}])
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__set_window_fields_shift(self):
+        self.cmp.do.drop()
+        data = [
+            {'type': 1, 'value': 15},
+            {'type': 1, 'value': 10},
+            {'type': 2, 'value': 20},
+            {'type': 2, 'value': 25},
+        ]
+        self.cmp.do.insert_many(data)
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'value': -1},
+                        'output': {'out': {'$shift': {'output': '$value', 'by': 1, 'default': 0}}},
+                    }
+                }
+            ]
+        )
+
+        # Test no sortBy field
+        self.cmp.compare_exceptions.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'output': {'out': {'$shift': {'output': '$value', 'by': 1, 'default': 0}}},
+                    }
+                }
+            ]
+        )
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__set_window_fields_partition_none(self):
+        self.cmp.do.drop()
+        data = [
+            {'type': 1, 'value': 15},
+            {'type': 1, 'value': 10},
+            {'type': 2, 'value': 20},
+            {'type': 2, 'value': 25},
+        ]
+        self.cmp.do.insert_many(data)
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'sortBy': {'value': -1},
+                        'output': {
+                            'out': {
+                                '$shift': {
+                                    'output': '$value',
+                                    'by': 1,
+                                }
+                            }
+                        },
+                    }
+                }
+            ]
+        )
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__set_window_fields_invalid_operator(self):
+        self.cmp.do.drop()
+        self.cmp.compare_exceptions.aggregate(
+            [{'$setWindowFields': {'output': {'out': {'$doesnt_exist': {}}}}}]
+        )
 
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')

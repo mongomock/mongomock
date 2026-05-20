@@ -14,6 +14,7 @@ import random
 import re
 import warnings
 from typing import Any
+from typing import ClassVar
 from typing import Optional
 
 import pytz
@@ -31,15 +32,18 @@ from . import OperationFailure
 # bson types - available only if bson is installed
 Regex: Optional[type[Any]] = None
 InvalidDocument: type[Exception] = OperationFailure
+InvalidId: type[Exception] = OperationFailure
 decimal_support: bool = False
 
 try:
     from bson import decimal128
     from bson import Regex as _Regex
     from bson.errors import InvalidDocument as _InvalidDocument
+    from bson.errors import InvalidId as _InvalidId
 
     Regex = _Regex  # type: ignore[misc]
     InvalidDocument = _InvalidDocument  # type: ignore[misc]
+    InvalidId = _InvalidId  # type: ignore[misc]
     decimal_support = True
 except ImportError:
     pass
@@ -64,6 +68,28 @@ group_operators = [
     '$stdDevSamp',
     '$sum',
 ]
+set_window_fields_operators = [
+    '$addToSet',
+    '$avg',
+    '$count',
+    '$covariancePop',
+    '$covarianceSamp',
+    '$derivative',
+    '$expMovingAvg',
+    '$integral',
+    '$max',
+    '$min',
+    '$push',
+    '$stdDevSamp',
+    '$stdDevPop',
+    '$sum',
+    '$first',
+    '$last',
+    '$shift',
+    '$denseRank',
+    '$documentNumber',
+    '$rank',
+]
 unary_arithmetic_operators = {
     '$abs',
     '$ceil',
@@ -74,13 +100,14 @@ unary_arithmetic_operators = {
     '$sqrt',
     '$trunc',
 }
+binary_arithmetic_operators_with_optional_second_number = {'$round'}
 binary_arithmetic_operators = {
     '$divide',
     '$log',
     '$mod',
     '$pow',
     '$subtract',
-}
+} | binary_arithmetic_operators_with_optional_second_number
 arithmetic_operators = (
     unary_arithmetic_operators
     | binary_arithmetic_operators
@@ -182,13 +209,11 @@ type_convertion_operators = [
     '$toInt',
     '$toDecimal',
     '$toLong',
+    '$toObjectId',
     '$arrayToObject',
     '$objectToArray',
 ]
-type_operators = [
-    '$isNumber',
-    '$isArray',
-]
+type_operators = ['$isNumber', '$isArray', '$type']
 
 
 def _avg_operation(values):
@@ -248,6 +273,8 @@ class _Parser:
 
     def parse(self, expression):
         """Parse a MongoDB expression."""
+        if isinstance(expression, list):
+            return list(self.parse_many(expression))
         if not isinstance(expression, dict):
             # May raise a KeyError despite the ignore missing key.
             return self._parse_basic_expression(expression)
@@ -394,10 +421,18 @@ class _Parser:
                     f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
                 )
 
-            if len(values) != 2:
-                raise OperationFailure(f'{operator} must have only 2 parameters')
-            number_0, number_1 = self.parse_many(values)
-            if number_0 is None or number_1 is None:
+            supports_optional_number_2 = (
+                operator in binary_arithmetic_operators_with_optional_second_number
+            )
+            if supports_optional_number_2:
+                if len(values) not in [1, 2]:
+                    raise OperationFailure(f'{operator} must have 1 or 2 parameters')
+            else:
+                if len(values) != 2:
+                    raise OperationFailure(f'{operator} must have only 2 parameters')
+
+            number_0, number_1, *_ = list(self.parse_many(values)) + [None] * 2
+            if number_0 is None or (number_1 is None and not supports_optional_number_2):
                 return None
 
             if operator == '$divide':
@@ -408,6 +443,8 @@ class _Parser:
                 return math.fmod(number_0, number_1)
             if operator == '$pow':
                 return math.pow(number_0, number_1)
+            if operator == '$round':
+                return round(number_0, number_1)
             if operator == '$subtract':
                 if isinstance(number_0, datetime.datetime) and isinstance(number_1, (int, float)):
                     number_1 = datetime.timedelta(milliseconds=number_1)
@@ -622,7 +659,8 @@ class _Parser:
     def _handle_date_operator(self, operator, values):
         if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
             value = self.parse(values['date'])
-            target_tz = pytz.timezone(values['timezone'])
+            tz = self.parse(values['timezone'])
+            target_tz = pytz.timezone(tz)
             out_value = value.replace(tzinfo=pytz.utc).astimezone(target_tz)
         else:
             out_value = self.parse(values)
@@ -771,6 +809,28 @@ class _Parser:
                 for item in input_array
             ]
 
+        if operator == '$reduce':
+            for k in ('input', 'initialValue', 'in'):
+                if k not in value:
+                    raise OperationFailure(f"Missing '{k}' parameter to $reduce")
+
+            input_array = self._parse_or_nothing(value['input'])
+            if input_array is None or input_array is NOTHING:
+                return None
+
+            if not isinstance(input_array, (list, tuple)):
+                raise OperationFailure(f'input to $reduce must be an array not {type(input_array)}')
+
+            current = self.parse(value['initialValue'])
+            in_expr = value['in']
+            for item in input_array:
+                current = _Parser(
+                    self._doc_dict,
+                    dict(self._user_vars, this=item, value=current),
+                    ignore_missing_keys=self._ignore_missing_keys,
+                ).parse(in_expr)
+            return current
+
         if operator == '$size':
             if isinstance(value, list):
                 if len(value) != 1:
@@ -850,128 +910,208 @@ class _Parser:
         )
 
     def _handle_type_convertion_operator(self, operator, values):
-        if operator == '$toString':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if isinstance(parsed, bool):
-                return str(parsed).lower()
-            if isinstance(parsed, datetime.datetime):
-                return parsed.isoformat()[:-3] + 'Z'
-            return str(parsed)
+        handler = self._TYPE_CONVERTION_HANDLERS[operator]
+        return handler(self, values)
 
-        if operator == '$toInt':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if decimal_support:
-                if isinstance(parsed, decimal128.Decimal128):
-                    return int(parsed.to_decimal())
-                return int(parsed)
-            raise NotImplementedError(
-                'You need to import the pymongo library to support decimal128 type.'
-            )
+    def _handle_type_convertion_to_string(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if isinstance(parsed, bool):
+            return str(parsed).lower()
+        if isinstance(parsed, datetime.datetime):
+            return parsed.isoformat()[:-3] + 'Z'
+        return str(parsed)
 
-        if operator == '$toLong':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if decimal_support:
-                if isinstance(parsed, decimal128.Decimal128):
-                    return int(parsed.to_decimal())
-                return int(parsed)
-            raise NotImplementedError(
-                'You need to import the pymongo library to support decimal128 type.'
-            )
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
-        if operator == '$toDecimal':
-            if not decimal_support:
-                raise NotImplementedError(
-                    'You need to import the pymongo library to support decimal128 type.'
-                )
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-            if isinstance(parsed, bool):
-                parsed = '1' if parsed is True else '0'
-                decimal_value = decimal128.Decimal128(parsed)
-            elif isinstance(parsed, int):
-                decimal_value = decimal128.Decimal128(str(parsed))
-            elif isinstance(parsed, float):
-                exp = decimal.Decimal('.00000000000000')
-                decimal_value = decimal.Decimal(str(parsed)).quantize(exp)
-                decimal_value = decimal128.Decimal128(decimal_value)
-            elif isinstance(parsed, decimal128.Decimal128):
-                decimal_value = parsed
-            elif isinstance(parsed, str):
-                try:
-                    decimal_value = decimal128.Decimal128(parsed)
-                except decimal.InvalidOperation as err:
-                    raise OperationFailure(
-                        f"Failed to parse number '{parsed}' in $convert with no onError value:"
-                        f'Failed to parse string to decimal'
-                    ) from err
-            elif isinstance(parsed, datetime.datetime):
-                epoch = datetime.datetime.utcfromtimestamp(0)
-                string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
-                decimal_value = decimal128.Decimal128(string_micro_seconds)
-            else:
-                raise TypeError(f"'{type(parsed)}' type is not supported")
-            return decimal_value
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
-        if operator == '$arrayToObject':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
-                return None
-
-            if not isinstance(parsed, (list, tuple)):
-                raise OperationFailure(
-                    f'$arrayToObject requires an array input, found: {type(parsed)}'
-                )
-
-            if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
-                return {d['k']: d['v'] for d in parsed}
-
-            if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in parsed):
-                return dict(parsed)
-
-            raise OperationFailure(
-                'arrays used with $arrayToObject must contain documents '
-                'with k and v fields or two-element arrays'
-            )
-
-        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
-        if operator == '$objectToArray':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
-                return None
-
-            if parsed is None:
-                return None
-
-            if not isinstance(parsed, (dict, collections.OrderedDict)):
-                raise OperationFailure(
-                    f'$objectToArray requires an object input, found: {type(parsed)}'
-                )
-
-            return [{'k': k, 'v': v} for k, v in parsed.items()]
-
+    def _handle_type_convertion_to_int(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if decimal_support:
+            if isinstance(parsed, decimal128.Decimal128):
+                return int(parsed.to_decimal())
+            return int(parsed)
         raise NotImplementedError(
-            f"Although '{operator}' is a valid type conversion operator for the "
-            f'aggregation pipeline, it is currently not implemented '
-            f'in Mongomock-ng.'
+            'You need to import the pymongo library to support decimal128 type.'
         )
+
+    def _handle_type_convertion_to_long(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if decimal_support:
+            if isinstance(parsed, decimal128.Decimal128):
+                return int(parsed.to_decimal())
+            return int(parsed)
+        raise NotImplementedError(
+            'You need to import the pymongo library to support decimal128 type.'
+        )
+
+    def _handle_type_convertion_to_decimal(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
+        if not decimal_support:
+            raise NotImplementedError(
+                'You need to import the pymongo library to support decimal128 type.'
+            )
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if isinstance(parsed, bool):
+            parsed = '1' if parsed is True else '0'
+            decimal_value = decimal128.Decimal128(parsed)
+        elif isinstance(parsed, int):
+            decimal_value = decimal128.Decimal128(str(parsed))
+        elif isinstance(parsed, float):
+            exp = decimal.Decimal('.00000000000000')
+            decimal_value = decimal.Decimal(str(parsed)).quantize(exp)
+            decimal_value = decimal128.Decimal128(decimal_value)
+        elif isinstance(parsed, decimal128.Decimal128):
+            decimal_value = parsed
+        elif isinstance(parsed, str):
+            try:
+                decimal_value = decimal128.Decimal128(parsed)
+            except decimal.InvalidOperation as err:
+                raise OperationFailure(
+                    f"Failed to parse number '{parsed}' in $convert with no onError value:"
+                    f'Failed to parse string to decimal'
+                ) from err
+        elif isinstance(parsed, datetime.datetime):
+            epoch = datetime.datetime.utcfromtimestamp(0)
+            string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
+            decimal_value = decimal128.Decimal128(string_micro_seconds)
+        else:
+            raise TypeError(f"'{type(parsed)}' type is not supported")
+        return decimal_value
+
+    def _handle_type_convertion_array_to_object(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+
+        if parsed is None:
+            return None
+
+        if not isinstance(parsed, (list, tuple)):
+            raise OperationFailure(f'$arrayToObject requires an array input, found: {type(parsed)}')
+
+        if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
+            return {d['k']: d['v'] for d in parsed}
+
+        if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in parsed):
+            return dict(parsed)
+
+        raise OperationFailure(
+            'arrays used with $arrayToObject must contain documents '
+            'with k and v fields or two-element arrays'
+        )
+
+    def _handle_type_convertion_object_to_array(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+
+        if parsed is None:
+            return None
+
+        if not isinstance(parsed, (dict, collections.OrderedDict)):
+            raise OperationFailure(
+                f'$objectToArray requires an object input, found: {type(parsed)}'
+            )
+
+        return [{'k': k, 'v': v} for k, v in parsed.items()]
+
+    def _handle_type_convertion_to_object_id(self, values):
+        # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toObjectId/
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if parsed is None:
+            return None
+        if isinstance(parsed, helpers.ObjectId):
+            return parsed
+        if isinstance(parsed, str):
+            try:
+                return helpers.ObjectId(parsed)
+            except (ValueError, TypeError, InvalidId) as err:
+                raise OperationFailure(
+                    f"Failed to parse objectId '{parsed}' in $convert with no onError value"
+                ) from err
+        raise OperationFailure(
+            '$toObjectId requires a string, ObjectId, or null input,'
+            f' found: {type(parsed).__name__}'
+        )
+
+    def _handle_convert(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        input_ = parsed['input']
+        to_ = parsed['to']
+        on_error = parsed.get('onError', None)
+        on_null = parsed.get('onNull', None)
+        if (on_error is not None) or (on_null is not None):
+            raise NotImplementedError(
+                'Although onError and onNull are valid fields for the '
+                "'$convert' operator, they are currently not implemented "
+                'in Mongomock-ng.'
+            )
+        try:
+            handler = self._CONVERT_TO_HANDLERS[to_]
+        except KeyError as err:
+            raise OperationFailure(f"'{input_}' is not a valid Input Type for '$convert'.") from err
+
+        return handler(self, input_)
+
+    @staticmethod
+    def _raise_convert_not_implemented(to_):
+        def handler(_self, _values):
+            raise NotImplementedError(
+                f"Although {to_} is a valid identifier for the '$convert' operator's 'to' field, "
+                'it is currently not implemented in Mongomock-ng.'
+            )
+
+        return handler
+
+    _TYPE_CONVERTION_HANDLERS: ClassVar[dict[str, Any]] = {
+        '$toString': _handle_type_convertion_to_string,
+        '$toInt': _handle_type_convertion_to_int,
+        '$toLong': _handle_type_convertion_to_long,
+        '$toDecimal': _handle_type_convertion_to_decimal,
+        '$toObjectId': _handle_type_convertion_to_object_id,
+        '$arrayToObject': _handle_type_convertion_array_to_object,
+        '$objectToArray': _handle_type_convertion_object_to_array,
+        '$convert': _handle_convert,
+    }
+
+    # Document: https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/#syntax
+    _CONVERT_TO_HANDLERS: ClassVar[dict[str | int, Any]] = {
+        'double': _raise_convert_not_implemented('double'),
+        'string': _handle_type_convertion_to_string,
+        'objectId': _raise_convert_not_implemented('objectId'),
+        'bool': _raise_convert_not_implemented('bool'),
+        'date': _raise_convert_not_implemented('date'),
+        'int': _handle_type_convertion_to_int,
+        'long': _handle_type_convertion_to_long,
+        'decimal': _handle_type_convertion_to_decimal,
+        1: _raise_convert_not_implemented(1),
+        2: _handle_type_convertion_to_string,
+        7: _raise_convert_not_implemented(7),
+        8: _raise_convert_not_implemented(8),
+        9: _raise_convert_not_implemented(9),
+        16: _handle_type_convertion_to_int,
+        18: _handle_type_convertion_to_long,
+        19: _handle_type_convertion_to_decimal,
+    }
 
     def _handle_type_operator(self, operator, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
@@ -990,6 +1130,31 @@ class _Parser:
                 return False
             return isinstance(parsed, (tuple, list))
 
+        if operator == '$type':
+            try:
+                parsed = self.parse(values)
+                if isinstance(parsed, bool):
+                    return 'bool'
+                if isinstance(parsed, str):
+                    return 'string'
+                if isinstance(parsed, dict):
+                    return 'object'
+                if isinstance(parsed, (list, tuple)):
+                    return 'array'
+                if parsed is None:
+                    return 'null'
+                if isinstance(parsed, float):
+                    return 'double'
+                if isinstance(parsed, int) and parsed > 2**31 - 1:
+                    return 'long'
+                if isinstance(parsed, int):
+                    return 'int'
+                if isinstance(parsed, datetime.datetime):
+                    return 'date'
+            except KeyError:
+                return 'missing'
+            raise NotImplementedError(f"Type '{type(parsed)}' is not supported yet")
+
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid type operator for the aggregation pipeline, "
             f'it is currently not implemented in Mongomock-ng.'
@@ -1002,7 +1167,7 @@ class _Parser:
                 '4.4'
             ):
                 raise OperationFailure(
-                    '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
+                    '$ifNull supports only one input expression  in MongoDB v4.4 and lower'
                 )
             fallback = values[-1]
             for field in fields:
@@ -1163,6 +1328,43 @@ def _accumulate_group(output_fields, group_list, user_vars):
                     f'valid operators.'
                 )
     return doc_dict
+
+
+def _accumulate_set_window_fields(output_fields, partition, options):
+    processed_partition = [dict(item) for item in partition]
+    for field, field_value in output_fields.items():
+        window_operator = next((x for x in field_value if x.startswith('$')), None)
+        if window_operator not in set_window_fields_operators:
+            raise OperationFailure(
+                f'{window_operator} is not a valid window operator for the aggregation '
+                'pipeline. See https://www.mongodb.com/docs/manual/reference/'
+                'operator/aggregation/setWindowFields/#std-label-setWindowFields-window-operators'
+                'for a complete list of valid operators.'
+            )
+        if 'window' in field_value:
+            raise NotImplementedError(
+                'Although "window" is a valid field for $setWindowFields aggregator '
+                'it is currently not implemented in Mongomock-ng'
+            )
+        operator_value = field_value[window_operator]
+        if window_operator == '$shift':
+            if 'sortBy' not in options:
+                raise OperationFailure(f'The {window_operator} operator requires a "sortBy" field')
+            expr = operator_value['output']
+            by = operator_value['by']
+            default = operator_value.get('default')
+            values = [_parse_expression(expr, doc) for doc in partition]
+            for index, _item in enumerate(partition):
+                by_index = index + by
+                value = default if by_index < 0 or by_index >= len(values) else values[by_index]
+                processed_partition[index][field] = value
+        else:
+            raise NotImplementedError(
+                f'Although {window_operator} is a valid window operator for the '
+                'aggregation pipeline, it is currently not implemented '
+                'in Mongomock-ng.'
+            )
+    return processed_partition
 
 
 def _fix_sort_key(key_getter):
@@ -1356,6 +1558,40 @@ def _handle_group_stage(in_collection, unused_database, options, user_vars):
     return grouped_collection
 
 
+def _handle_set_window_fields_stage(in_collection, unused_database, options, unused_user_vars):
+    partition_key = options.get('partitionBy')
+    processed_partitions = []
+    if partition_key is not None:
+
+        def _key_getter(doc):
+            try:
+                return _parse_expression(partition_key, doc, ignore_missing_keys=True)
+            except KeyError:
+                return None
+
+        def _sort_key_getter(doc):
+            return filtering.BsonComparable(_key_getter(doc))
+
+        sorted_collection = sorted(in_collection, key=_sort_key_getter)
+        partitions = itertools.groupby(sorted_collection, _key_getter)
+        partitions = [list(partition[1]) for partition in partitions]
+    else:
+        partitions = [in_collection]
+    sort = options.get('sortBy')
+    if sort is not None:
+        partitions = [
+            _handle_sort_stage(partition, unused_database, sort, unused_user_vars)
+            for partition in partitions
+        ]
+    output_fields = options.get('output')
+    if output_fields is None:
+        raise OperationFailure('The "output" field is required for $setWindowsFields')
+    for partition in partitions:
+        processed_partition = _accumulate_set_window_fields(output_fields, partition, options)
+        processed_partitions.append(processed_partition)
+    return list(itertools.chain(*processed_partitions))
+
+
 def _handle_bucket_stage(in_collection, unused_database, options, user_vars):
     unknown_options = set(options) - {'groupBy', 'boundaries', 'output', 'default'}
     if unknown_options:
@@ -1435,6 +1671,23 @@ def _handle_sample_stage(in_collection, unused_database, options, unused_user_va
     return shuffled[:size]
 
 
+def _handle_sort_by_count_stage(in_collection, unused_database, options, unused_user_vars):
+    if isinstance(options, dict):
+        raise NotImplementedError(
+            'Although a dictionary is a valid option for the $sortByCount stage, '
+            'it is currently not implemented in Mongomock-ng.'
+        )
+    field_to_count = options.lstrip('$')
+
+    counter = collections.Counter(
+        [doc[field_to_count] for doc in in_collection if field_to_count in doc]
+    )
+    return [
+        {'_id': key, 'count': count}
+        for key, count in sorted(counter.items(), key=lambda x: (-x[1], str(x[0])))
+    ]
+
+
 def _handle_sort_stage(in_collection, unused_database, options, unused_user_vars):
     sort_array = reversed([{x: y} for x, y in options.items()])
     sorted_collection = in_collection
@@ -1448,14 +1701,23 @@ def _handle_sort_stage(in_collection, unused_database, options, unused_user_vars
     return sorted_collection
 
 
+def _handle_fill(in_collection, unused_database, options, unused_user_vars):
+    key_to_fill = next(iter(options['output']))
+    value_to_fill = options['output'][key_to_fill]['value']
+    out_collection = [dict(doc) for doc in in_collection]
+    for out_doc in out_collection:
+        if key_to_fill not in out_doc:
+            out_doc[key_to_fill] = value_to_fill
+    return out_collection
+
+
 def _handle_unwind_stage(in_collection, unused_database, options, unused_user_vars):
     if not isinstance(options, dict):
         options = {'path': options}
     path = options['path']
     if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
-            f'$unwind failed: exception: field path references must be prefixed '
-            f"with a '$' '{path}'"
+            f"$unwind failed: exception: field path references must be prefixed with a '$' '{path}'"
         )
     path = path[1:]
     should_preserve_null_and_empty = options.get('preserveNullAndEmptyArrays')
@@ -1691,6 +1953,29 @@ def _handle_match_stage(in_collection, database, options, user_vars):
     ]
 
 
+def _handle_unset_stage(in_collection, database, options, user_vars=None):
+    out_collection = [dict(doc) for doc in in_collection]
+
+    if isinstance(options, str):
+        fields = [options]
+    elif isinstance(options, list):
+        fields = options
+    else:
+        raise OperationFailure('$unset options must be a string or list of strings')
+
+    for out_doc in out_collection:
+        for field in fields:
+            parts = field.split('.')
+            sub_doc = out_doc
+            for subfield in parts[:-1]:
+                sub_doc = sub_doc.get(subfield, {})
+                if not isinstance(sub_doc, dict):
+                    break
+            else:
+                sub_doc.pop(parts[-1], None)
+    return out_collection
+
+
 _PIPELINE_HANDLERS = {
     '$addFields': _handle_add_fields_stage,
     '$bucket': _handle_bucket_stage,
@@ -1702,6 +1987,7 @@ _PIPELINE_HANDLERS = {
     '$geoNear': None,
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
+    '$setWindowFields': _handle_set_window_fields_stage,
     '$indexStats': None,
     '$limit': lambda c, d, o, v: c[:o],
     '$listLocalSessions': None,
@@ -1719,9 +2005,10 @@ _PIPELINE_HANDLERS = {
     '$set': _handle_add_fields_stage,
     '$skip': lambda c, d, o, v: c[o:],
     '$sort': _handle_sort_stage,
-    '$sortByCount': None,
-    '$unset': None,
+    '$sortByCount': _handle_sort_by_count_stage,
+    '$unset': _handle_unset_stage,
     '$unwind': _handle_unwind_stage,
+    '$fill': _handle_fill,
 }
 
 
