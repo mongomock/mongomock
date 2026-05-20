@@ -3055,6 +3055,135 @@ class CollectionAPITest(TestCase):
             list(actual),
         )
 
+    def test__aggregate_fill_locf(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'x': 1, 'y': None},
+                {'_id': 2, 'x': 2, 'y': 5},
+                {'_id': 3, 'x': 3, 'y': None},
+                {'_id': 4, 'x': 4, 'y': 10},
+            ]
+        )
+        actual = self.db.a.aggregate(
+            [
+                {
+                    '$fill': {
+                        'sortBy': {'x': 1},
+                        'output': {'y': {'method': 'locf'}},
+                    }
+                },
+            ]
+        )
+        self.assertListEqual(
+            [None, 5, 5, 10],
+            [d['y'] for d in actual],
+        )
+
+    def test__aggregate_fill_linear(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'x': 1, 'y': None},
+                {'_id': 2, 'x': 2, 'y': 10},
+                {'_id': 3, 'x': 3, 'y': None},
+                {'_id': 4, 'x': 4, 'y': 20},
+            ]
+        )
+        actual = self.db.a.aggregate(
+            [
+                {
+                    '$fill': {
+                        'sortBy': {'x': 1},
+                        'output': {'y': {'method': 'linear'}},
+                    }
+                },
+            ]
+        )
+        self.assertListEqual(
+            [None, 10, 15, 20],
+            [d['y'] for d in actual],
+        )
+
+    def test__aggregate_fill_partition_by_fields(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'g': 1, 'o': None},
+                {'_id': 2, 'g': 1, 'o': 5},
+                {'_id': 3, 'g': 1, 'o': None},
+                {'_id': 4, 'g': 2, 'o': None},
+                {'_id': 5, 'g': 2, 'o': None},
+            ]
+        )
+        actual = self.db.a.aggregate(
+            [
+                {
+                    '$fill': {
+                        'sortBy': {'_id': 1},
+                        'output': {'o': {'method': 'locf'}},
+                        'partitionByFields': ['g'],
+                    }
+                },
+            ]
+        )
+        self.assertListEqual(
+            [None, 5, 5, None, None],
+            [d['o'] for d in actual],
+        )
+
+    def test__aggregate_fill_multiple_fields(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'a': None, 'b': None},
+                {'_id': 2, 'a': 10, 'b': 100},
+            ]
+        )
+        actual = self.db.a.aggregate(
+            [
+                {
+                    '$fill': {
+                        'output': {
+                            'a': {'method': 'locf'},
+                            'b': {'value': 0},
+                        },
+                    }
+                },
+            ]
+        )
+        self.assertListEqual(
+            [{'_id': 1, 'a': None, 'b': 0}, {'_id': 2, 'a': 10, 'b': 100}],
+            list(actual),
+        )
+
+    def test__aggregate_fill_value_and_missing(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, 'in_farm': False, 'owner': 'alice'},
+                {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}, 'in_farm': True},
+                {'_id': 3, 'pets': {'cats': 4}},
+                {'_id': 4, 'pets': {'dogs': 1}},
+            ]
+        )
+        actual = self.db.a.aggregate(
+            [
+                {
+                    '$fill': {
+                        'output': {
+                            'in_farm': {'value': False},
+                            'owner': {'value': 'unknown'},
+                        },
+                    }
+                },
+            ]
+        )
+        self.assertListEqual(
+            [
+                {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}, 'in_farm': False, 'owner': 'alice'},
+                {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}, 'in_farm': True, 'owner': 'unknown'},
+                {'_id': 3, 'pets': {'cats': 4}, 'in_farm': False, 'owner': 'unknown'},
+                {'_id': 4, 'pets': {'dogs': 1}, 'in_farm': False, 'owner': 'unknown'},
+            ],
+            list(actual),
+        )
+
     def test__aggregate_replace_root(self):
         self.db.a.insert_many(
             [
@@ -6309,10 +6438,12 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock_ng.OperationFailure):
             collection.aggregate([{'$setWindowFields': {'output': {'out': {'$doesnt_exist': {}}}}}])
 
-        with self.assertRaises(NotImplementedError):
+        actual = list(
             collection.aggregate([{'$setWindowFields': {'output': {'field': {'$sum': 1}}}}])
+        )
+        self.assertEqual([{'_id': actual[0]['_id'], 'a': 1, 'b': 2, 'field': 1}], actual)
 
-        with self.assertRaises(NotImplementedError):
+        actual = list(
             collection.aggregate(
                 [
                     {
@@ -6325,6 +6456,8 @@ class CollectionAPITest(TestCase):
                     }
                 ]
             )
+        )
+        self.assertEqual([{'_id': actual[0]['_id'], 'a': 1, 'b': 2, 'field': None}], actual)
 
     @skipIf(
         version.parse('5.0') > SERVER_VERSION,
@@ -6373,6 +6506,358 @@ class CollectionAPITest(TestCase):
                     }
                 ]
             )
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_sum_avg(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 2, 'val': 5},
+            {'type': 2, 'val': 15},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'sum': {
+                                '$sum': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                            'avg': {
+                                '$avg': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'sum': 10, 'avg': 10.0},
+            {'type': 1, 'val': 20, 'sum': 30, 'avg': 15.0},
+            {'type': 2, 'val': 5, 'sum': 5, 'avg': 5.0},
+            {'type': 2, 'val': 15, 'sum': 20, 'avg': 10.0},
+        ]
+        self.assertEqual(expected, list(actual))
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_min_max_first_last(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 2, 'val': 5},
+            {'type': 2, 'val': 15},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'min_val': {
+                                '$min': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                            'max_val': {
+                                '$max': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                            'first_val': {
+                                '$first': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                            'last_val': {
+                                '$last': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'min_val': 10, 'max_val': 10, 'first_val': 10, 'last_val': 10},
+            {'type': 1, 'val': 20, 'min_val': 10, 'max_val': 20, 'first_val': 10, 'last_val': 20},
+            {'type': 2, 'val': 5, 'min_val': 5, 'max_val': 5, 'first_val': 5, 'last_val': 5},
+            {'type': 2, 'val': 15, 'min_val': 5, 'max_val': 15, 'first_val': 5, 'last_val': 15},
+        ]
+        self.assertEqual(expected, list(actual))
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_push_add_to_set(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 1, 'val': 10},
+            {'type': 2, 'val': 30},
+            {'type': 2, 'val': 30},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'pushed': {
+                                '$push': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                            'set': {
+                                '$addToSet': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                        },
+                    },
+                },
+                {'$sort': {'type': 1, 'val': 1}},
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'pushed': [10], 'set': [10]},
+            {'type': 1, 'val': 10, 'pushed': [10, 10], 'set': [10]},
+            {'type': 1, 'val': 20, 'pushed': [10, 10, 20], 'set': [10, 20]},
+            {'type': 2, 'val': 30, 'pushed': [30], 'set': [30]},
+            {'type': 2, 'val': 30, 'pushed': [30, 30], 'set': [30]},
+        ]
+        result = list(actual)
+        for doc in result:
+            doc['set'] = sorted(doc['set'])
+        for doc in expected:
+            doc['set'] = sorted(doc['set'])
+        self.assertEqual(expected, result)
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_count(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 2, 'val': 5},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'cnt': {
+                                '$count': {},
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'cnt': 1},
+            {'type': 1, 'val': 20, 'cnt': 2},
+            {'type': 2, 'val': 5, 'cnt': 1},
+        ]
+        self.assertEqual(expected, list(actual))
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_document_number(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 2, 'val': 5},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'doc_num': {'$documentNumber': {}},
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'doc_num': 1},
+            {'type': 1, 'val': 20, 'doc_num': 2},
+            {'type': 2, 'val': 5, 'doc_num': 1},
+        ]
+        self.assertEqual(expected, list(actual))
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_rank_dense_rank(self):
+        collection = self.db.collection
+        data = [
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 10},
+            {'type': 1, 'val': 20},
+            {'type': 2, 'val': 5},
+        ]
+        collection.insert_many(data)
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'partitionBy': '$type',
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'rank': {'$rank': {}},
+                            'dense_rank': {'$denseRank': {}},
+                        },
+                    },
+                },
+                {'$sort': {'type': 1, 'val': 1}},
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'type': 1, 'val': 10, 'rank': 1, 'dense_rank': 1},
+            {'type': 1, 'val': 10, 'rank': 1, 'dense_rank': 1},
+            {'type': 1, 'val': 20, 'rank': 3, 'dense_rank': 2},
+            {'type': 2, 'val': 5, 'rank': 1, 'dense_rank': 1},
+        ]
+        self.assertEqual(expected, list(actual))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            collection.aggregate(
+                [
+                    {
+                        '$setWindowFields': {
+                            'partitionBy': '$type',
+                            'output': {
+                                'rank': {'$rank': {}},
+                            },
+                        },
+                    },
+                ]
+            )
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$setWindowFields is not supported before MongoDB 5.0',
+    )
+    def test__aggregate_set_window_fields_window_bounds(self):
+        collection = self.db.collection
+        data = [
+            {'val': 10},
+            {'val': 20},
+            {'val': 30},
+            {'val': 40},
+            {'val': 50},
+        ]
+        collection.insert_many(data)
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'cumulative_sum': {
+                                '$sum': '$val',
+                                'window': {'documents': ['unbounded', 'current']},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'val': 10, 'cumulative_sum': 10},
+            {'val': 20, 'cumulative_sum': 30},
+            {'val': 30, 'cumulative_sum': 60},
+            {'val': 40, 'cumulative_sum': 100},
+            {'val': 50, 'cumulative_sum': 150},
+        ]
+        self.assertEqual(expected, list(actual))
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'reverse_sum': {
+                                '$sum': '$val',
+                                'window': {'documents': ['current', 'unbounded']},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'val': 10, 'reverse_sum': 150},
+            {'val': 20, 'reverse_sum': 140},
+            {'val': 30, 'reverse_sum': 120},
+            {'val': 40, 'reverse_sum': 90},
+            {'val': 50, 'reverse_sum': 50},
+        ]
+        self.assertEqual(expected, list(actual))
+
+        actual = collection.aggregate(
+            [
+                {
+                    '$setWindowFields': {
+                        'sortBy': {'val': 1},
+                        'output': {
+                            'sliding_sum': {
+                                '$sum': '$val',
+                                'window': {'documents': [-1, 0]},
+                            },
+                        },
+                    },
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+        expected = [
+            {'val': 10, 'sliding_sum': 10},
+            {'val': 20, 'sliding_sum': 30},
+            {'val': 30, 'sliding_sum': 50},
+            {'val': 40, 'sliding_sum': 70},
+            {'val': 50, 'sliding_sum': 90},
+        ]
+        self.assertEqual(expected, list(actual))
 
     @skipIf(
         version.parse('4.0') <= helpers.PYMONGO_VERSION,

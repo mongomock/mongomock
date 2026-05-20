@@ -36,3 +36,6 @@ Scan before implementing features. Update after significant changes.
 ## Conventional Commits
 Subject ≤50 chars. Type: feat/fix/refactor/style/docs/chore.
 Body only when "why" isn't obvious from subject.
+
+## Personal enviroment
+- local python bin at .env/bin/python
