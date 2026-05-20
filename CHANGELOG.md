@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.1] - 2026-05-20
+### Fixed
+- `$setWindowFields` error message typo `$setWindowsFields` → `$setWindowFields`
+
+### Added
+- `.agents/references/MDB7_COMPAT.md` — MongoDB 7+ compatibility gap tracker
+
 ## [7.2.0] - 2026-05-20
 ### Added
 - `$convert`: support `onError`/`onNull` + `to: double`/`bool`/`date`/`objectId` (mongomock#864 — closes #167)

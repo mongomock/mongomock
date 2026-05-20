@@ -1754,7 +1754,7 @@ def _handle_set_window_fields_stage(in_collection, unused_database, options, unu
         ]
     output_fields = options.get('output')
     if output_fields is None:
-        raise OperationFailure('The "output" field is required for $setWindowsFields')
+        raise OperationFailure('The "output" field is required for $setWindowFields')
     for partition in partitions:
         processed_partition = _accumulate_set_window_fields(output_fields, partition, options)
         processed_partitions.append(processed_partition)
