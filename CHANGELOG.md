@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [7.0.1] - 2026-05-19
+## [7.0.2] - 2026-05-19
 ### Added
 - `comment` parameter support for `find()`, `find_one()`, `count_documents()`,
   `estimated_document_count()`, `distinct()`, `bulk_write()`, `insert_one()`,
   `delete_one()`, `update_one()`, `find_one_and_update()`, `find_one_and_replace()`
+  (mongomock#921, mongomock#922, mongomock#915, mongomock#831)
 - `hint` parameter support for `find()`, `find_one()`, `count_documents()`, `distinct()`
-- `let` parameter support for `delete_one()`
+  (mongomock#922)
+- `let` parameter support for `delete_one()` (mongomock#831)
 - Accepts `comment` and `hint` via `_IGNORED_FEATURES` in `not_implemented.py`
 
 ### Changed
