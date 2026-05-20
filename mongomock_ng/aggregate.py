@@ -1143,6 +1143,8 @@ class _Parser:
                     return 'array'
                 if parsed is None:
                     return 'null'
+                if isinstance(parsed, float):
+                    return 'double'
                 if isinstance(parsed, int) and parsed > 2**31 - 1:
                     return 'long'
                 if isinstance(parsed, int):
@@ -1329,7 +1331,7 @@ def _accumulate_group(output_fields, group_list, user_vars):
 
 
 def _accumulate_set_window_fields(output_fields, partition, options):
-    processed_partition = []
+    processed_partition = [dict(item) for item in partition]
     for field, field_value in output_fields.items():
         window_operator = next((x for x in field_value if x.startswith('$')), None)
         if window_operator not in set_window_fields_operators:
@@ -1352,12 +1354,10 @@ def _accumulate_set_window_fields(output_fields, partition, options):
             by = operator_value['by']
             default = operator_value.get('default')
             values = [_parse_expression(expr, doc) for doc in partition]
-            for index, item in enumerate(partition):
-                doc_dict = dict(item)
+            for index, _item in enumerate(partition):
                 by_index = index + by
                 value = default if by_index < 0 or by_index >= len(values) else values[by_index]
-                doc_dict[field] = value
-                processed_partition.append(doc_dict)
+                processed_partition[index][field] = value
         else:
             raise NotImplementedError(
                 f'Although {window_operator} is a valid window operator for the '
