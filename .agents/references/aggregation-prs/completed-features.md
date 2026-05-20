@@ -1,5 +1,11 @@
 # Completed Features — Post PR #195
 
+**Purpose**: Implementation details for 3 completed features ($convert, $setWindowFields, $fill)
+**Type**: feature-detail
+**Covers**: handler locations, operator lists, edge cases, test locations
+**Refresh**: after changing any of these 3 features
+**Last-updated**: 2026-05-20
+
 3 features completed after PR #195 consolidation (commit `3d2342b`).
 
 ---

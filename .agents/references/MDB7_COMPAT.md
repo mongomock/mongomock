@@ -1,6 +1,10 @@
 # MDB 7+ Compatibility Gap
 
-Tracking gap between mongomock-ng and MongoDB 7.7 capabilities.
+**Purpose**: Track MongoDB 7+ compatibility gaps vs mongomock-ng
+**Type**: compat-gap
+**Covers**: missing stages, missing window operators, not-tracked features, known bugs
+**Refresh**: after every new feature impl or code review finding
+**Last-updated**: 2026-05-20
 
 ## Legend
 - ❌ not implemented
