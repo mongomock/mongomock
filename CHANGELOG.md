@@ -11,11 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `.agents/references/MDB7_COMPAT.md` — MongoDB 7+ compatibility gap tracker
 
+## [7.2.1] - 2026-05-20
+### Added
+- Repository reference files (`CHANGELOG.md`, `README.md`, `CLAUDE.md`, etc.) migrated into `.agents/references/` for persistent agent context
+
 ## [7.2.0] - 2026-05-20
 ### Added
 - `$convert`: support `onError`/`onNull` + `to: double`/`bool`/`date`/`objectId` (mongomock#864 — closes #167)
 - `$setWindowFields`: `$sum`/`$avg`/`$min`/`$max`/`$first`/`$last`/`$push`/`$addToSet`/`$count`/`$documentNumber`/`$rank`/`$denseRank` + `window` bounds (mongomock#821 — closes #176)
 - `$fill`: `method` (locf/linear), `sortBy`, `partitionByFields` support (mongomock#892 — closes #160)
+
+### Changed
+- Version now defined statically in `mongomock_ng/__version__.py` (single source of truth), replacing dynamic `hatch-vcs` — closes #197
+- Tag creation automated via `tag-on-merge` workflow on PR merge to `develop`, replacing manual `make release`
 
 ## [7.1.0] - 2026-05-20
 ### Added

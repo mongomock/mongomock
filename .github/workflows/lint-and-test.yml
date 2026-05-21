@@ -98,6 +98,26 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  check-version:
+    name: Check version tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(python3 -c "exec(open('mongomock_ng/__version__.py').read()); print(__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Check if tag v${{ steps.version.outputs.version }} exists
+        run: |
+          if git tag -l "v${{ steps.version.outputs.version }}" | grep -q .; then
+            echo "::warning title=Version already released::v${{ steps.version.outputs.version }} already exists. Bump the version in mongomock_ng/__version__.py before merging."
+          else
+            echo "Tag v${{ steps.version.outputs.version }} does not exist yet."
+          fi
+
   package:
     name: Build & verify package
     runs-on: ubuntu-latest

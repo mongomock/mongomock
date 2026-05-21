@@ -1,4 +1,1 @@
-from importlib.metadata import version
-
-
-__version__ = version('mongomock_ng')
+__version__ = '7.2.1'

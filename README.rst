@@ -212,17 +212,26 @@ branch.
 Releasing
 ~~~~~~~~~
 
-When ready for a release, tag the `develop` branch with a new tag (please keep semver names) and
-push your tags to GitHub. The CI should do the rest.
+The version is defined in `mongomock_ng/__version__.py` as the single source of truth.
 
-To add release notes, create a release in GitHub's `Releases Page <https://github.com/engFelipeMonteiro/mongomock-ng/releases>`_
-then generate the release notes locally with:
+The release flow is fully automated via CI:
+
+1. Update `__version__` in `mongomock_ng/__version__.py` (e.g. `'7.0.4'`)
+2. Update `CHANGELOG.md` with the same version
+3. Open a PR against `develop` — on merge, a tag `v<version>` is created automatically
+4. The tag push triggers a build and publish to PyPI
+
+To build locally for testing:
 
 .. code-block:: bash
 
-  python -c "from pbr import git; git.write_git_changelog()"
+  make build
 
-Then you can get the relevant section in the generated `Changelog` file.
+To undo a mistaken tag:
+
+.. code-block:: bash
+
+  make delete-tag VERSION=7.0.0
 
 Acknowledgements
 ----------------
