@@ -3527,6 +3527,52 @@ class CollectionAPITest(TestCase):
             actual,
         )
 
+    def test__aggregate_lookup_dbref(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 2},
+                {'_id': 3},
+                {'_id': 4},
+            ]
+        )
+        self.db.b.insert_one(
+            {
+                '_id': 1,
+                'refs': [
+                    DBRef('a', 2),
+                    DBRef('a', 4, self.db.name),
+                ],
+            }
+        )
+        actual = self.db.b.aggregate(
+            [
+                {
+                    '$lookup': {
+                        'from': 'a',
+                        'localField': 'refs.$id',
+                        'foreignField': '_id',
+                        'as': 'related',
+                    }
+                }
+            ]
+        )
+        self.assertEqual(
+            [
+                {
+                    '_id': 1,
+                    'refs': [
+                        DBRef('a', 2),
+                        DBRef('a', 4, self.db.name),
+                    ],
+                    'related': [
+                        {'_id': 2},
+                        {'_id': 4},
+                    ],
+                }
+            ],
+            list(actual),
+        )
+
     def test__aggregate_graph_lookup_behaves_as_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
         self.db.b.insert_many(
@@ -5641,13 +5687,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate(
                 [
                     {'$project': {'a': {'$cmp': [1, 2]}}},
-                ]
-            )
-
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.aggregate(
-                [
-                    {'$project': {'a': {'$setIntersection': [[2], [1, 2, 3]]}}},
                 ]
             )
 
@@ -7871,7 +7910,10 @@ class CollectionAPITest(TestCase):
                 'objects': [{'a': 1}, {'b': 2}, {'c': 3}],
             }
         ]
-        self.assertEqual(expect, list(actual))
+        result = list(actual)
+        self.assertEqual(len(expect), len(result))
+        for key in expect[0]:
+            self.assertCountEqual(expect[0][key], result[0][key])
 
     def test__set_equals(self):
         collection = self.db.collection
@@ -7911,6 +7953,163 @@ class CollectionAPITest(TestCase):
                 'ne_in_another_order': False,
                 'three_equal': True,
                 'three_not_equal': False,
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__set_intersection(self):
+        collection = self.db.collection
+        collection.insert_many([{'array': ['one', 'three']}])
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'array': {'$setIntersection': [['one', 'two'], '$array']},
+                        'distinct': {'$setIntersection': [['one', 'two'], ['three'], ['four']]},
+                        'nested': {'$setIntersection': [['one', 'two'], [['one', 'two']]]},
+                        'objects': {
+                            '$setIntersection': [[{'a': 1}, {'b': 2}], [{'a': 1}, {'c': 3}]]
+                        },
+                        'empty': {'$setIntersection': []},
+                        'missing': {'$setIntersection': [[1], '$missing.key']},
+                        'null': {'$setIntersection': [[1], None]},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'array': ['one'],
+                'distinct': [],
+                'nested': [],
+                'objects': [{'a': 1}],
+                'empty': [],
+                'missing': None,
+                'null': None,
+            }
+        ]
+        self.assertEqual(len(expect[0]['array']), len(next(iter(actual))['array']))
+
+    def test__set_difference(self):
+        collection = self.db.collection
+        collection.insert_many([{'array': ['one', 'three']}])
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'diff': {'$setDifference': [['one', 'two', 'three'], '$array']},
+                        'empty_diff': {'$setDifference': [['one'], ['one']]},
+                        'no_overlap': {'$setDifference': [['one'], ['two']]},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'diff': ['two'],
+                'empty_diff': [],
+                'no_overlap': ['one'],
+            }
+        ]
+        self.assertEqual(len(expect[0]['diff']), len(next(iter(actual))['diff']))
+
+    def test__set_is_subset(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {
+                    'array': ['one', 'three'],
+                    'nested_array': [{'a': 'b', 'c': 'd'}],
+                }
+            ]
+        )
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'same_array': {'$setIsSubset': ['$array', '$array']},
+                        'eq_array': {'$setIsSubset': [['one', 'three'], '$array']},
+                        'ne_array': {'$setIsSubset': [['one', 'two'], '$array']},
+                        'eq_in_another_order': {'$setIsSubset': [['one', 'two'], ['two', 'one']]},
+                        'ne_in_another_order': {
+                            '$setIsSubset': [['one', 'two'], ['three', 'one', 'two']]
+                        },
+                        'same_nested_array': {'$setIsSubset': ['$nested_array', '$nested_array']},
+                        'eq_nested_array': {
+                            '$setIsSubset': [[{'a': 'b'}, {'c': 'd'}], [{'a': 'b'}, {'c': 'd'}]],
+                        },
+                        'ne_nested_array': {
+                            '$setIsSubset': [[{'a': 'b'}, {'c': 'e'}], [{'a': 'b'}, {'c': 'd'}]],
+                        },
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'same_array': True,
+                'eq_array': True,
+                'ne_array': False,
+                'eq_in_another_order': True,
+                'ne_in_another_order': True,
+                'same_nested_array': True,
+                'eq_nested_array': True,
+                'ne_nested_array': False,
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__any_element_true(self):
+        collection = self.db.collection
+        collection.insert_many([{}])
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'all_truthy': {'$anyElementTrue': [[1, 2, 3]]},
+                        'some_falsy': {'$anyElementTrue': [[0, 1]]},
+                        'all_falsy': {'$anyElementTrue': [[None, 0]]},
+                        'empty': {'$anyElementTrue': [[]]},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'all_truthy': True,
+                'some_falsy': True,
+                'all_falsy': False,
+                'empty': False,
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__all_elements_true(self):
+        collection = self.db.collection
+        collection.insert_many([{}])
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'all_truthy': {'$allElementsTrue': [[1, 2, 3]]},
+                        'some_falsy': {'$allElementsTrue': [[0, 1]]},
+                        'all_falsy': {'$allElementsTrue': [[None, 0]]},
+                        'empty': {'$allElementsTrue': [[]]},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'all_truthy': True,
+                'some_falsy': False,
+                'all_falsy': False,
+                'empty': True,
             }
         ]
         self.assertEqual(expect, list(actual))

@@ -9,7 +9,35 @@ Replicated from mongomock/mongomock. Target: mongomock-ng compliance with MongoD
 - `_PIPELINE_HANDLERS` dict at aggregate.py:1694-1725
 - Version: 7.0.3
 
-## Selected PRs (10 total)
+Note: PR #865 (let + pipeline in $lookup) was already implemented in the base codebase. PRs #878 and #884 were replicated from mongomock.
+
+## Selected PRs (13 total)
+
+| # | Source PR | Issue | Feature | File impact | Complexity |
+|---|---|---|---|---|---|
+| 11 | mongomock#865 | #166 | `let` + `pipeline` in `$lookup` | aggregate.py _handle_lookup_stage | medium |
+| 12 | mongomock#878 | #164 | DBRef support in `$lookup` | aggregate.py + helpers.py | low |
+| 13 | mongomock#884 | #162 | DBRef `$id` filtering | filtering.py | low |
+
+## Related mongomock-ng PRs
+| PR | Description |
+|----|-------------|
+| #193 | $lookup enhancements (PRs #865, #878, #884)
+
+## Issues list
+- #162
+- #164
+- #166
+- #177
+- #176
+- #175
+- #167
+- #160
+- #157
+- #151
+- #150
+- #149
+- #146
 
 | # | Source PR | Issue | Feature | File impact | Complexity |
 |---|---|---|---|---|---|

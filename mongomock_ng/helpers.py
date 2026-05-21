@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import time
 import warnings
 from collections import OrderedDict
@@ -30,23 +31,31 @@ except ImportError:
 # in this module but is made available for callers of this module.
 # Type declarations
 ObjectId: Any
+SON: Any
 Timestamp: Optional[type[Any]]
+DBRef: Any
 PYMONGO_VERSION: version.Version
 HAVE_PYMONGO: bool
 
 try:
+    from bson import DBRef as BsonDBRef
     from bson import ObjectId as BsonObjectId  # pylint: disable=unused-import
+    from bson import SON as BsonSON  # noqa: N811
     from bson import Timestamp as BsonTimestamp
     from pymongo import version as pymongo_version
 
     ObjectId = BsonObjectId
+    SON = BsonSON
     Timestamp = BsonTimestamp
+    DBRef = BsonDBRef
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
     from .object_id import ObjectId  # noqa
 
+    SON = None  # type: ignore[assignment]
     Timestamp = None
+    DBRef = None  # type: ignore[assignment]
     # Default Pymongo version if not present.
     PYMONGO_VERSION = version.parse('4.0')
     HAVE_PYMONGO = False
@@ -412,6 +421,9 @@ def get_value_by_dot(doc, key, can_generate_array=False):
             except (ValueError, IndexError) as err:
                 raise KeyError(key_index) from err
 
+        elif DBRef and isinstance(result, DBRef):
+            result = result.as_doc()[key_item]
+
         else:
             raise KeyError(key_index)
 
@@ -461,3 +473,66 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
+
+
+class _ToHashableParser:
+    ORDERED_TYPES = (OrderedDict, SON) if SON else (OrderedDict,)
+
+    def __init__(self, value):
+        self._visiting = set()
+        self._root_value = value
+
+    def parse(self):
+        return self._parse(self._root_value)
+
+    def _parse(self, value):
+        if id(value) in self._visiting:
+            raise RuntimeError('unexpected error: recursive structure detected')
+        self._visiting.add(id(value))
+
+        if isinstance(value, (list, tuple)):
+            hashable = (
+                'list',
+                tuple(self._parse(v) for v in value),
+            )
+        elif isinstance(value, dict):
+            if sys.version_info < (3, 7) and not isinstance(value, self.ORDERED_TYPES):
+                warnings.warn(
+                    'not using collections.OrderedDict or bson.son.SON for '
+                    '(sub)documents used in operations that compare them with '
+                    'others might yield unexpected results in Python<3.7',
+                    stacklevel=2,
+                )
+            hashable = (
+                'dict',
+                tuple((k, self._parse(v)) for k, v in value.items()),
+            )
+        else:
+            hashable = ('other', value)
+
+        self._visiting.remove(id(value))
+
+        if value is self._root_value:
+            return ToHashableResult(hashable, value)
+        return hashable
+
+
+class ToHashableResult:
+    def __init__(self, hashable, original):
+        self.hashable = hashable
+        self.original = original
+
+    def __hash__(self):
+        return hash(self.hashable)
+
+    def __repr__(self):
+        return repr(self.original)
+
+    def __eq__(self, other):
+        if not isinstance(other, ToHashableResult):
+            other = to_hashable(other)
+        return self.hashable == other.hashable
+
+
+def to_hashable(value):
+    return _ToHashableParser(value).parse()
