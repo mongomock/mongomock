@@ -168,6 +168,12 @@ class CollectionStore:
     def _value_meets_expiry(self, val, expiry, ttl_now):
         val_to_compare = _get_min_datetime_from_value(val)
         try:
+            if (
+                isinstance(val_to_compare, datetime.datetime)
+                and val_to_compare.tzinfo is None
+                and ttl_now.tzinfo is not None
+            ):
+                val_to_compare = val_to_compare.replace(tzinfo=ttl_now.tzinfo)
             return (ttl_now - val_to_compare).total_seconds() >= expiry
         except TypeError:
             return False

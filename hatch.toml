@@ -10,15 +10,15 @@ EXECJS_RUNTIME = "node"
 
 [envs.hatch-test.overrides]
 matrix.pymongo.extra-dependencies = [
-  { value = "pymongo<4.0", if = ["3"]},
-  { value = "pymongo<5.0", if = ["4"]},
-  { value = "pymongo==4.11.0", if = ["4.11.0"]},
+  { value = "pymongo==4.11.0", if = ["4"]},
+  { value = "pymongo==4.12.0", if = ["4.12"]},
+  { value = "pymongo==4.14.0", if = ["4.14"]},
   { value = "pymongo", if = ["latest"]},
 ]
 
 [[envs.hatch-test.matrix]]
-python = [ "3.10", "3.11", "3.12", "3.13","3.14", "pypy3"]
-pymongo = ["4.11.0", "latest"]
+python = [ "3.10", "3.11", "3.12", "3.13", "pypy3"]
+pymongo = ["4", "4.12", "4.14", "latest"]
 
 [envs.coverage]
 detached = true

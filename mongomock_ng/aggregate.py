@@ -510,7 +510,6 @@ class _Parser:
             return _Parser(
                 self._doc_dict,
                 dict(self._user_vars, **user_vars),
-                ignore_missing_keys=self._ignore_missing_keys,
             ).parse(value['in'])
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
@@ -877,27 +876,28 @@ class _Parser:
                     f'Expression $slice takes at least 2 arguments, and at most '
                     f'3, but {len(value)} were passed in'
                 )
-            array_value = self.parse(value[0])
+            out_value = list(self.parse_many(value))
+            array_value = out_value[0]
             if not isinstance(array_value, list):
                 raise OperationFailure(
                     f'First argument to $slice must be an array, but is of '
                     f'type: {type(array_value)}'
                 )
-            for num, v in zip(('Second', 'Third'), value[1:]):
+            for num, v in zip(('Second', 'Third'), out_value[1:]):
                 if not isinstance(v, int):
                     raise OperationFailure(
                         f'{num} argument to $slice must be numeric, but is of type: {type(v)}'
                     )
-            if len(value) > 2 and value[2] <= 0:
-                raise OperationFailure(f'Third argument to $slice must be positive: {value[2]}')
+            if len(out_value) > 2 and out_value[2] <= 0:
+                raise OperationFailure(f'Third argument to $slice must be positive: {out_value[2]}')
 
-            start = value[1]
+            start = out_value[1]
             stop = None
             if start < 0:
-                if len(value) > 2:
-                    stop = len(array_value) + start + value[2]
-            elif len(value) > 2:
-                stop = start + value[2]
+                if len(out_value) > 2:
+                    stop = len(array_value) + start + out_value[2]
+            elif len(out_value) > 2:
+                stop = start + out_value[2]
             else:
                 stop = start
                 start = 0
@@ -980,7 +980,7 @@ class _Parser:
                     f'Failed to parse string to decimal'
                 ) from err
         elif isinstance(parsed, datetime.datetime):
-            epoch = datetime.datetime.utcfromtimestamp(0)
+            epoch = datetime.datetime(1970, 1, 1)
             string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
             decimal_value = decimal128.Decimal128(string_micro_seconds)
         else:
@@ -1106,7 +1106,9 @@ class _Parser:
         if isinstance(parsed, datetime.datetime):
             return parsed
         if isinstance(parsed, (int, float)):
-            return datetime.datetime.utcfromtimestamp(parsed / 1000.0)
+            return datetime.datetime.fromtimestamp(
+                parsed / 1000.0, tz=datetime.timezone.utc
+            ).replace(tzinfo=None)
         if isinstance(parsed, str):
             s = parsed.replace('Z', '+00:00') if parsed.endswith('Z') else parsed
             try:
@@ -2218,6 +2220,49 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
     return out_collection
 
 
+def _handle_redact_stage(in_collection, unused_database, options, user_vars):
+    if not options:
+        raise OperationFailure(
+            'Invalid $redact :: caused by :: specification must have at least one field'
+        )
+
+    out_collection = []
+    for doc in in_collection:
+        out_doc = _handle_redact_stage_expression(options, doc)
+        if out_doc is not None:
+            out_collection.append(out_doc)
+    return out_collection
+
+
+def _handle_redact_stage_expression(expression, doc):
+    redact_vars = {i: i for i in ['PRUNE', 'KEEP', 'DESCEND']}
+    try:
+        expr_result = _parse_expression(expression, doc, user_vars=redact_vars)
+    except KeyError as ex:
+        raise OperationFailure(f'Invalid $redact :: caused by :: {ex}') from ex
+
+    if expr_result == 'PRUNE':
+        return None
+    elif expr_result == 'KEEP':
+        return doc
+    elif expr_result == 'DESCEND':
+        return {k: _handle_redact_descend_values(expression, v) for k, v in doc.items()}
+
+
+def _handle_redact_descend_values(expression, value):
+    if isinstance(value, dict):
+        return _handle_redact_stage_expression(expression, value)
+    elif isinstance(value, list):
+        out_value = []
+        for item in value:
+            new_item = _handle_redact_descend_values(expression, item)
+            if new_item is not None:
+                out_value.append(new_item)
+        return out_value
+
+    return value
+
+
 def _handle_add_fields_stage(in_collection, unused_database, options, user_vars):
     if not options:
         raise OperationFailure(
@@ -2327,7 +2372,7 @@ _PIPELINE_HANDLERS = {
     '$out': _handle_out_stage,
     '$planCacheStats': None,
     '$project': _handle_project_stage,
-    '$redact': None,
+    '$redact': _handle_redact_stage,
     '$replaceRoot': _handle_replace_root_stage,
     '$replaceWith': None,
     '$sample': _handle_sample_stage,

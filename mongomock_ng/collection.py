@@ -10,6 +10,8 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from collections.abc import Mapping
 from collections.abc import MutableMapping
+from typing import Any
+from typing import Union
 
 from packaging import version
 
@@ -31,6 +33,8 @@ except ImportError:
 try:
     from pymongo import ReadPreference
     from pymongo import ReturnDocument
+    from pymongo.collation import Collation
+    from pymongo.collation import validate_collation_or_none
     from pymongo.operations import IndexModel
 
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
@@ -45,6 +49,14 @@ except ImportError:
 
     IndexModel = _FallbackIndexModel
     ReturnDocument = _FallbackReturnDocument
+
+    class Collation:  # type: ignore[no-redef]
+        pass
+
+    def validate_collation_or_none(  # type: ignore[no-redef]
+        value: Union[Mapping[str, Any], 'Collation', None],
+    ) -> Union[Mapping[str, Any], 'Collation', None]:
+        return value
 
     from .read_preferences import PRIMARY as _READ_PREFERENCE_PRIMARY
 
@@ -794,6 +806,7 @@ class Collection:
         collation=None,
         let=None,
         array_filters=None,
+        sort=None,
         **kwargs,
     ):
         if session:
@@ -839,7 +852,13 @@ class Collection:
         upserted_id = None
         num_updated = 0
         num_matched = 0
-        for existing_document in itertools.chain(self._iter_documents(spec), [None]):
+
+        if sort:
+            documents = list(self._get_dataset(spec, sort, None, dict))
+        else:
+            documents = list(self._iter_documents(spec))
+
+        for existing_document in itertools.chain(documents, [None]):
             # we need was_insert for the setOnInsert update operation
             was_insert = False
             # the sentinel document means we should do an upsert
@@ -888,6 +907,7 @@ class Collection:
                 # revert modifications
                 try:
                     self._ensure_uniques(existing_document)
+                    self._store[existing_document['_id']] = existing_document
                     num_updated += 1
                 except DuplicateKeyError:
                     # Rollback.
@@ -964,12 +984,10 @@ class Collection:
                             existing_document[field] = []
                         # document should be a list append to it
                         if isinstance(value, dict) and '$each' in value:
-                            # append the list to the field
-                            existing_document[field] += [
-                                obj
-                                for obj in list(value['$each'])
-                                if obj not in existing_document[field]
-                            ]
+                            # append the objects to the field
+                            for obj in list(value['$each']):
+                                if obj not in existing_document[field]:
+                                    existing_document[field].append(obj)
                             continue
                         if value not in existing_document[field]:
                             existing_document[field].append(value)
@@ -1305,12 +1323,22 @@ class Collection:
         if sort:
             if isinstance(sort, dict):
                 sort = sort.items()
-            for sort_key, sort_direction in reversed(sort):
+
+            normalized_sort = []
+            for item in sort:
+                if isinstance(item, str):
+                    sort_key = item
+                    sort_direction = 1
+                else:
+                    sort_key, sort_direction = item
+                normalized_sort.append((sort_key, sort_direction))
+
+            for sort_key, sort_direction in reversed(normalized_sort):
                 if sort_key == '$natural':
                     if sort_direction < 0:
                         dataset = iter(reversed(list(dataset)))
                     continue
-                if sort_key.startswith('$'):
+                if isinstance(sort_key, str) and sort_key.startswith('$'):
                     raise NotImplementedError(
                         f'Sorting by {sort_key} is not implemented in mongomock-ng yet'
                     )
@@ -2375,9 +2403,18 @@ class Cursor:
     def alive(self):
         return self._emitted != len(self._compute_results(with_limit_and_skip=False))
 
-    @property
-    def collation(self):
-        return self._collation
+    def collation(self, collation: Union['Collation', Mapping[str, Any]]) -> 'Cursor':
+        """Adds a :class:`~pymongo.collation.Collation` to this query.
+
+        Raises :exc:`TypeError` if `collation` is not an instance of
+        :class:`~pymongo.collation.Collation` or a ``dict``. Raises
+        :exc:`~pymongo.errors.InvalidOperation` if this :class:`Cursor` has
+        already been used. Only the last collation applied to this cursor has
+        any effect.
+        :param collation: An instance of :class:`~pymongo.collation.Collation`.
+        """
+        self._collation = validate_collation_or_none(collation)
+        return self
 
     def max_time_ms(self, max_time_ms):
         if max_time_ms is not None and not isinstance(max_time_ms, int):

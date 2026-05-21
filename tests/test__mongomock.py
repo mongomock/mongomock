@@ -646,6 +646,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find({'array_field': [['abc']]})
         self.cmp.compare.find({'array_field': 'def'})
         self.cmp.compare.find({'array_field': ['def']})
+        self.cmp.compare.find({'array_field': {'$in': [['def'], [['abc']]]}})
 
     def test__find_by_objectid_in_list(self):
         # See #79
@@ -1709,6 +1710,17 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         for _ in range(3):
             self.cmp.do.update_many(
                 {'name': 'bob'}, {'$addToSet': {'shirt.color': {'$each': ['green', 'yellow']}}}
+            )
+            self.cmp.compare.find({'name': 'bob'})
+        for _ in range(3):
+            self.cmp.do.update_many(
+                {'name': 'bob'}, {'$addToSet': {'tie': {'$each': ['blue', 'blue', 'blue', 'red']}}}
+            )
+            self.cmp.compare.find({'name': 'bob'})
+        for _ in range(3):
+            self.cmp.do.update_many(
+                {'name': 'bob'},
+                {'$addToSet': {'buttons': {'$each': [[1, 2, 3], [1, 2, 3], [1, 2, 3], [3, 2, 1]]}}},
             )
             self.cmp.compare.find({'name': 'bob'})
 
@@ -4270,6 +4282,51 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -10]}}}])
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -5, 5]}}}])
         self.cmp.compare.aggregate([{'$project': {'slice': {'$slice': ['$items', -10, 5]}}}])
+        self.cmp.compare.aggregate(
+            [{'$project': {'slice': {'$slice': ['$items', {'$add': [2, 3]}, {'$add': [1, 4]}]}}}]
+        )
+
+    def test__redact_simple_condition(self):
+        self.cmp.do.delete_many({})
+        data = [
+            {'_id': 1, 'a': 1, 'b': 2},
+            {'_id': 2, 'a': 3, 'b': 4},
+            {'_id': 3, 'a': 5, 'b': 6},
+            {'_id': 4, 'a': 7, 'b': 8},
+            {'_id': 5, 'a': 9, 'b': 10},
+        ]
+        self.cmp.do.insert_many(data)
+        self.cmp.compare_ignore_order.aggregate(
+            [{'$redact': {'$cond': {'if': {'$lt': ['a', 5]}, 'then': '$$KEEP', 'else': '$$PRUNE'}}}]
+        )
+
+    def test__redact_missing_expression(self):
+        self.cmp.compare_exceptions.aggregate([{'$redact': {}}])
+
+    def test__redact_descend_nested_document(self):
+        self.cmp.do.delete_many({})
+        data = {'_id': 1, 'a': 1}
+        self.cmp.do.insert_one(data)
+        self.cmp.compare_ignore_order.aggregate(
+            [
+                {
+                    '$redact': {
+                        '$cond': {'if': {'$lt': ['$a', 5]}, 'then': '$$KEEP', 'else': '$$PRUNE'}
+                    }
+                }
+            ]
+        )
+
+    def test__redact_invalid_value(self):
+        self.cmp.compare_exceptions.aggregate(
+            [
+                {
+                    '$redact': {
+                        '$cond': {'if': {'$lt': ['$a', 5]}, 'then': '$$INVALID', 'else': '$$PRUNE'}
+                    }
+                }
+            ]
+        )
 
     def test__aggregate_no_entries(self):
         pipeline = [
@@ -4493,7 +4550,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 'str_negative_number': '-23',
                 'str_decimal_number': '1.99',
                 'str_not_numeric': '123a123',
-                'datetime': datetime.datetime.utcfromtimestamp(0),
+                'datetime': datetime.datetime(1970, 1, 1),
             }
         )
         pipeline = [

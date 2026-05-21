@@ -16,3 +16,4 @@ coverage.xml
 .cache/
 .pytest_cache/
 .env/
+.agents/references/pr-prompts/

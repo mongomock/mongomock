@@ -30,7 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
+
 ]
 dependencies = [
     "packaging",
@@ -105,8 +105,6 @@ extend-ignore = [
     "ARG001",  # Allow unused function argument
     "ARG002",  # Allow unused method argument
     "DTZ001",  # Allow datetime.datetime() without tzinfo
-    "DTZ003",  # Allow datetime.utcnow() 
-    "DTZ004",  # Allow datetime.utcfromtimestamp() 
     "DTZ005",  # Allow datetime.now() without timezone
     "EM101",   # Allow raw string in exception
     "EM102",   # Allow f-string in exception

@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from collections.abc import Mapping
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 from datetime import tzinfo
 from typing import Any
 from typing import Optional
@@ -107,12 +108,16 @@ def utcnow():
 
     ```python
     def test_x(self):
-        with mock.patch("mongomock_ng.utcnow") as mm_utc:
-            mm_utc = datetime.utcnow() + timedelta(hours=100)
+        with mock.patch("mongomock.utcnow") as mm_utc:
+            mm_utc = datetime.now(UTC) + timedelta(hours=100)
             # Test some things "100 hours" in the future
     ```
     """
-    return datetime.utcnow()
+    if sys.version_info >= (3, 11):
+        from datetime import UTC
+
+        return datetime.now(UTC)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def print_deprecation_warning(old_param_name, new_param_name):

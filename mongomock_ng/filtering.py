@@ -1,4 +1,5 @@
 import itertools
+import math
 import numbers
 import operator
 import re
@@ -304,7 +305,7 @@ def _iter_key_candidates_sublist(key, doc):
 
 
 def _force_list(v):
-    return v if isinstance(v, (list, tuple)) else [v]
+    return v if v and isinstance(v, (list, tuple)) else [v]
 
 
 def _in_op(doc_val, search_val):
@@ -315,7 +316,7 @@ def _in_op(doc_val, search_val):
     doc_val = _force_list(doc_val)
     is_regex_list = [isinstance(x, _RE_TYPES) for x in search_val]
     if not any(is_regex_list):
-        return any(x in search_val for x in doc_val)
+        return any(x in search_val for x in doc_val) or doc_val in search_val
     for x, is_regex in zip(search_val, is_regex_list):
         if (is_regex and _regex(doc_val, x)) or (x in doc_val):
             return True
@@ -501,8 +502,14 @@ def _combine_regex_options(search):
     return search_copy
 
 
+def _is_nan(value):
+    return isinstance(value, float) and math.isnan(value)
+
+
 def operator_eq(doc_val, search_val):
     if doc_val is NOTHING and search_val is None:
+        return True
+    if _is_nan(doc_val) and _is_nan(search_val):
         return True
     return operator.eq(doc_val, search_val)
 
