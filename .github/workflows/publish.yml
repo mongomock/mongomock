@@ -2,28 +2,69 @@ name: publish
 
 on:
   push:
-    tags: ["*"]
+    branches: [develop]
 
 jobs:
-  deploy:
+  release:
+    if: github.event.head_commit.message != ''
     runs-on: ubuntu-latest
     environment: publish-pypi
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install hatch
-          pip install hatch-fancy-pypi-readme
+          pip install hatch hatch-fancy-pypi-readme
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(python3 -c "exec(open('mongomock_ng/__version__.py').read()); print(__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag exists
+        id: check
+        run: |
+          if git tag -l "${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and publish
+        if: steps.check.outputs.exists == 'false'
         env:
           HATCH_INDEX_USER: "__token__"
           HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
         run: |
           hatch build
           hatch publish
+
+      - name: Configure git user
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Create and push tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          PAT_TAG: ${{ secrets.PAT_TAG }}
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          if [ -n "$PAT_TAG" ]; then
+            git remote set-url origin "https://x-access-token:${PAT_TAG}@github.com/${{ github.repository }}"
+          fi
+          git push origin "${{ steps.version.outputs.tag }}"
