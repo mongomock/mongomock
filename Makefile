@@ -51,6 +51,16 @@ build:
 
 .PHONY: doc
 
+# Create and push a release tag from __version__.py or VERSION override.
+# Usage: `make create-tag` (reads version from __version__.py)
+#        `make create-tag VERSION=7.3.0` (explicit override)
+create-tag:
+	@V=$$(python3 -c "exec(open('mongomock_ng/__version__.py').read()); print(__version__)"); \
+	VERSION=$${VERSION:-$$V}; \
+	echo "Creating tag v$${VERSION}..."; \
+	git tag -a "v$${VERSION}" -m "Release v$${VERSION}" && \
+	git push origin "v$${VERSION}"
+
 # Delete a tag locally and from origin (undo a mistaken release).
 # Usage: `make delete-tag VERSION=7.0.0`
 delete-tag:
