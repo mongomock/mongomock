@@ -834,8 +834,7 @@ class _Parser:
             if isinstance(value, list):
                 if len(value) != 1:
                     raise OperationFailure(
-                        'Expression $size takes exactly 1 arguments. '
-                        '%d were passed in.' % len(value)
+                        f'Expression $size takes exactly 1 arguments. {len(value)} were passed in.'
                     )
                 value = value[0]
             array_value = self._parse_or_nothing(value)
@@ -2153,12 +2152,16 @@ def _project_by_spec(doc, proj_spec, is_include):
 def _handle_replace_root_stage(in_collection, unused_database, options, user_vars):
     if 'newRoot' not in options:
         raise OperationFailure("Parameter 'newRoot' is missing for $replaceRoot operation.")
-    new_root = options['newRoot']
+
+    return _replace_root_documents(in_collection, options['newRoot'], user_vars)
+
+
+def _replace_root_documents(in_collection, expression, user_vars):
     out_collection = []
     for doc in in_collection:
         try:
             new_doc = _parse_expression(
-                new_root, doc, ignore_missing_keys=True, user_vars=user_vars
+                expression, doc, ignore_missing_keys=True, user_vars=user_vars
             )
         except KeyError:
             new_doc = NOTHING
@@ -2169,6 +2172,10 @@ def _handle_replace_root_stage(in_collection, unused_database, options, user_var
             )
         out_collection.append(new_doc)
     return out_collection
+
+
+def _handle_replace_with_stage(in_collection, unused_database, options, user_vars):
+    return _replace_root_documents(in_collection, options, user_vars)
 
 
 def _handle_project_stage(in_collection, unused_database, options, user_vars):
@@ -2297,6 +2304,112 @@ def _handle_out_stage(in_collection, database, options, unused_user_vars):
     return in_collection
 
 
+def _get_merge_collection(database, into):
+    if isinstance(into, str):
+        return database.get_collection(into)
+    if not isinstance(into, dict):
+        raise OperationFailure("$merge 'into' field must be a string or object")
+
+    collection_name = into.get('coll')
+    if not isinstance(collection_name, str):
+        raise OperationFailure("$merge 'into.coll' field must be a string")
+
+    database_name = into.get('db')
+    if database_name is None:
+        target_database = database
+    elif isinstance(database_name, str):
+        target_database = database.client[database_name]
+    else:
+        raise OperationFailure("$merge 'into.db' field must be a string")
+
+    return target_database.get_collection(collection_name)
+
+
+def _normalize_merge_on(on):
+    if isinstance(on, str):
+        return [on]
+    if isinstance(on, list) and on and all(isinstance(field, str) for field in on):
+        return on
+    raise OperationFailure("$merge 'on' field must be a string or non-empty list of strings")
+
+
+def _build_merge_query(doc, on_fields):
+    query = {}
+    for field in on_fields:
+        try:
+            value = helpers.get_value_by_dot(doc, field)
+        except KeyError as err:
+            raise OperationFailure(
+                f"$merge requires the field '{field}' to be present in each input document"
+            ) from err
+        helpers.set_value_by_dot(query, field, value)
+    return query
+
+
+def _merge_with_existing_document(existing_doc, new_doc, on_fields):
+    merged_doc = copy.deepcopy(existing_doc)
+    merged_doc.update(copy.deepcopy(new_doc))
+    if '_id' not in on_fields and '_id' in existing_doc:
+        merged_doc['_id'] = existing_doc['_id']
+    return merged_doc
+
+
+def _get_merge_replacement_document(existing_doc, new_doc, on_fields):
+    replacement_doc = copy.deepcopy(new_doc)
+    if '_id' not in on_fields and '_id' in existing_doc:
+        replacement_doc['_id'] = existing_doc['_id']
+    return replacement_doc
+
+
+def _handle_merge_stage(in_collection, database, options, unused_user_vars):
+    if isinstance(options, str):
+        options = {'into': options}
+    elif not isinstance(options, dict):
+        raise OperationFailure('$merge stage specification must be a string or object')
+
+    if 'into' not in options:
+        raise OperationFailure("Must specify 'into' field for a $merge")
+
+    when_matched = options.get('whenMatched', 'merge')
+    when_not_matched = options.get('whenNotMatched', 'insert')
+    valid_when_matched = {'replace', 'keepExisting', 'merge', 'fail', 'pipeline'}
+    valid_when_not_matched = {'insert', 'discard', 'fail'}
+
+    if when_matched not in valid_when_matched:
+        raise OperationFailure(f"Invalid $merge 'whenMatched' mode: {when_matched}")
+    if when_not_matched not in valid_when_not_matched:
+        raise OperationFailure(f"Invalid $merge 'whenNotMatched' mode: {when_not_matched}")
+    if when_matched == 'pipeline':
+        raise NotImplementedError("$merge with 'whenMatched: pipeline' is not implemented")
+
+    target_collection = _get_merge_collection(database, options['into'])
+    on_fields = _normalize_merge_on(options.get('on', '_id'))
+
+    for doc in in_collection:
+        query = _build_merge_query(doc, on_fields)
+        existing_doc = target_collection.find_one(query)
+
+        if existing_doc is None:
+            if when_not_matched == 'insert':
+                target_collection.insert_one(copy.deepcopy(doc))
+            elif when_not_matched == 'fail':
+                raise OperationFailure('$merge failed because no matching document was found')
+            continue
+
+        if when_matched == 'replace':
+            replacement_doc = _get_merge_replacement_document(existing_doc, doc, on_fields)
+            target_collection.replace_one({'_id': existing_doc['_id']}, replacement_doc)
+        elif when_matched == 'merge':
+            merged_doc = _merge_with_existing_document(existing_doc, doc, on_fields)
+            target_collection.replace_one({'_id': existing_doc['_id']}, merged_doc)
+        elif when_matched == 'keepExisting':
+            continue
+        elif when_matched == 'fail':
+            raise OperationFailure('$merge failed because a matching document already exists')
+
+    return in_collection
+
+
 def _handle_count_stage(in_collection, database, options, unused_user_vars):
     if not isinstance(options, str) or options == '':
         raise OperationFailure('the count field must be a non-empty string')
@@ -2368,13 +2481,13 @@ _PIPELINE_HANDLERS = {
     '$listSessions': None,
     '$lookup': _handle_lookup_stage,
     '$match': _handle_match_stage,
-    '$merge': None,
+    '$merge': _handle_merge_stage,
     '$out': _handle_out_stage,
     '$planCacheStats': None,
     '$project': _handle_project_stage,
     '$redact': _handle_redact_stage,
     '$replaceRoot': _handle_replace_root_stage,
-    '$replaceWith': None,
+    '$replaceWith': _handle_replace_with_stage,
     '$sample': _handle_sample_stage,
     '$set': _handle_add_fields_stage,
     '$skip': lambda c, d, o, v: c[o:],

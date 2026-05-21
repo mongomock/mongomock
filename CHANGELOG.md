@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.0] - 2026-05-21
+### Added
+- `$replaceWith` aggregation stage and update-pipeline stage aliasing `$replaceRoot` semantics — closes #96, #37
+- `$merge` aggregation stage with `into`, `on`, `whenMatched` (`replace`/`merge`/`keepExisting`/`fail`) and `whenNotMatched` (`insert`/`discard`/`fail`) support; `whenMatched: pipeline` remains unimplemented — closes #89
+
+### Changed
+- Refactor `$replaceRoot` to share root-replacement expression handling with `$replaceWith`
+
 ## [7.4.1] - 2026-05-21
 ### Changed
 - Drop Python 3.14 from test matrix and classifiers — not yet stable, incompatible with runtime dependencies

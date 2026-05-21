@@ -925,9 +925,6 @@ class CollectionAPITest(TestCase):
                 {'_id': 6, 'a': 1, 'b': 2, 'c': {'d': 3}},
             ]
         )
-        # TODO(guludo): add test cases for other stages when they become
-        # supported in Mongomock:
-        # - $replaceWith: https://github.com/mongomock_ng/mongomock_ng/issues/741
         data = (
             (
                 1,
@@ -951,13 +948,18 @@ class CollectionAPITest(TestCase):
             ),
             (
                 5,
-                [{'$unset': 'b'}],
-                {'_id': 5, 'a': 1, 'c': {'d': 3}},
+                [{'$replaceWith': {'_id': '$_id', 'sum': {'$add': ['$a', '$b']}}}],
+                {'_id': 5, 'sum': 3},
             ),
             (
                 6,
+                [{'$unset': 'b'}],
+                {'_id': 6, 'a': 1, 'c': {'d': 3}},
+            ),
+            (
+                1,
                 [{'$unset': ['a', 'c.d']}],
-                {'_id': 6, 'b': 2, 'c': {}},
+                {'_id': 1, 'b': 2, 'c': 3},
             ),
         )
         for doc_id, update, expected in data:
@@ -3376,6 +3378,90 @@ class CollectionAPITest(TestCase):
         )
         with self.assertRaises(mongomock_ng.OperationFailure):
             self.db.a.aggregate([{'$replaceRoot': {'new_root': '$pets'}}])
+
+    def test__aggregate_replace_with(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'pets': {'dogs': 2, 'cats': 3}},
+                {'_id': 2, 'pets': {'hamsters': 3, 'cats': 4}},
+            ]
+        )
+        actual = self.db.a.aggregate([{'$replaceWith': '$pets'}])
+        self.assertListEqual([{'dogs': 2, 'cats': 3}, {'hamsters': 3, 'cats': 4}], list(actual))
+
+    def test__aggregate_merge(self):
+        self.db.source.insert_many(
+            [
+                {'_id': 1, 'sku': 'abc', 'qty': 5, 'color': 'red'},
+                {'_id': 2, 'sku': 'def', 'qty': 3, 'color': 'blue'},
+            ]
+        )
+        self.db.target.insert_one({'_id': 100, 'sku': 'abc', 'qty': 1, 'keep': True})
+
+        actual = self.db.source.aggregate(
+            [
+                {
+                    '$merge': {
+                        'into': {'coll': 'target'},
+                        'on': 'sku',
+                    }
+                }
+            ]
+        )
+
+        self.assertListEqual(
+            [
+                {'_id': 1, 'sku': 'abc', 'qty': 5, 'color': 'red'},
+                {'_id': 2, 'sku': 'def', 'qty': 3, 'color': 'blue'},
+            ],
+            list(actual),
+        )
+        self.assertListEqual(
+            [
+                {'_id': 100, 'sku': 'abc', 'qty': 5, 'keep': True, 'color': 'red'},
+                {'_id': 2, 'sku': 'def', 'qty': 3, 'color': 'blue'},
+            ],
+            list(self.db.target.find().sort('sku')),
+        )
+
+    def test__aggregate_merge_replace(self):
+        self.db.source.insert_one({'_id': 1, 'sku': 'abc', 'qty': 5})
+        self.db.target.insert_one({'_id': 100, 'sku': 'abc', 'qty': 1, 'keep': True})
+
+        list(
+            self.db.source.aggregate(
+                [
+                    {
+                        '$merge': {
+                            'into': 'target',
+                            'on': 'sku',
+                            'whenMatched': 'replace',
+                        }
+                    }
+                ]
+            )
+        )
+
+        self.assertEqual(
+            {'_id': 100, 'sku': 'abc', 'qty': 5}, self.db.target.find_one({'sku': 'abc'})
+        )
+
+    def test__aggregate_merge_pipeline_not_implemented(self):
+        self.db.source.insert_one({'_id': 1, 'sku': 'abc', 'qty': 5})
+        with self.assertRaises(NotImplementedError):
+            list(
+                self.db.source.aggregate(
+                    [
+                        {
+                            '$merge': {
+                                'into': 'target',
+                                'on': 'sku',
+                                'whenMatched': 'pipeline',
+                            }
+                        }
+                    ]
+                )
+            )
 
     def test__aggregate_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
