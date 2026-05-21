@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
@@ -47,7 +47,7 @@ Homepage = "https://github.com/engFelipeMonteiro/mongomock-ng"
 Changelog = "https://github.com/engFelipeMonteiro/mongomock-ng/blob/develop/CHANGELOG.md"
 
 [tool.hatch.version]
-source = "vcs"
+path = "mongomock_ng/__version__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mongomock_ng"]

@@ -76,13 +76,20 @@ POST /repos/engFelipeMonteiro/mongomock-ng/git/refs
 3. Commit each with original message + `Co-authored-by: @original_author`
 4. Preserves original authorship attribution
 
-### 5. Update CHANGELOG.md
+### 5. Update version and changelog
 
-Before pushing, update `CHANGELOG.md` with a new entry for the upcoming version:
-- Increment the version appropriately (patch for bugfixes, minor for features)
+Before pushing, update both version and changelog:
+
+**`mongomock_ng/__version__.py`** — increment the version (patch for bugfixes, minor for features):
+- Edit `__version__` to match the new version (e.g. `'7.0.4'`)
+
+**`CHANGELOG.md`** — add a new entry for the upcoming version:
+- Use the same version from `_version.py`
 - Add the current date in `YYYY-MM-DD` format
 - List all changes under `### Added`, `### Changed`, `### Fixed` sections
 - Reference the source PR number (e.g., `mongomock#N`)
+
+Both files must always have the same version string.
 
 ### 6. Push branch
 
