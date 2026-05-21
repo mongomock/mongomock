@@ -3573,6 +3573,40 @@ class CollectionAPITest(TestCase):
             list(actual),
         )
 
+    def test__filter_dbref_id_array_mixed(self):
+        self.db.a.insert_one(
+            {
+                '_id': 1,
+                'items': [DBRef('b', 10), 'string', 42],
+            }
+        )
+        docs = list(self.db.a.find({'items.$id': 10}))
+        self.assertEqual(1, len(docs))
+        self.assertEqual(1, docs[0]['_id'])
+
+    def test__filter_dbref_id_array(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'refs': [DBRef('b', 10), DBRef('b', 20)]},
+                {'_id': 2, 'refs': [DBRef('b', 20)]},
+                {'_id': 3, 'refs': []},
+            ]
+        )
+        docs = list(self.db.a.find({'refs.$id': 10}))
+        self.assertEqual(1, len(docs))
+        self.assertEqual(1, docs[0]['_id'])
+
+    def test__filter_dbref_id_single(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 1, 'ref': DBRef('b', 10)},
+                {'_id': 2, 'ref': DBRef('b', 20)},
+            ]
+        )
+        docs = list(self.db.a.find({'ref.$id': 10}))
+        self.assertEqual(1, len(docs))
+        self.assertEqual(1, docs[0]['_id'])
+
     def test__aggregate_graph_lookup_behaves_as_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
         self.db.b.insert_many(
