@@ -24,6 +24,7 @@ try:
     import pymongo
     from bson import DBRef
     from bson import decimal128
+    from bson import Int64
     from bson.code import Code
     from bson.objectid import ObjectId
     from bson.regex import Regex
@@ -3689,6 +3690,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 'empty_tuple': (),
                 'date': datetime.datetime(1999, 12, 19, 1, 2, 3),
                 'int': 3,
+                'double': 10.5,
                 'str': '123',
                 'bool': True,
                 'none': None,
@@ -3704,6 +3706,7 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                         'string': {'$type': '$string'},
                         'date': {'$type': '$date'},
                         'int': {'$type': '$int'},
+                        'double': {'$type': '$double'},
                         'long': {'$type': '$long'},
                         'bool': {'$type': '$bool'},
                         'object': {'$type': '$object'},
@@ -4602,6 +4605,67 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             {'$project': {'_id': 0}},
         ]
         self.cmp.compare.aggregate(pipeline)
+
+        self.cmp.do.drop()
+        self.cmp.do.insert_one(
+            {
+                'boolean_true': True,
+                'int_zero': 0,
+                'int_val': 42,
+                'str_num': '3.14',
+                'str_hello': 'hello',
+                'str_empty': '',
+                'str_oid': '507f1f77bcf86cd799439011',
+                'str_date': '2023-01-15T10:30:00',
+                'long_epoch': Int64(0),
+                'null_val': None,
+            }
+        )
+
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'to_double_str': {'$convert': {'input': '$str_num', 'to': 1}},
+                        'to_double_int': {'$convert': {'input': '$int_val', 'to': 'double'}},
+                        'to_double_bool': {'$convert': {'input': '$boolean_true', 'to': 'double'}},
+                        'to_bool_true': {'$convert': {'input': '$boolean_true', 'to': 8}},
+                        'to_bool_zero': {'$convert': {'input': '$int_zero', 'to': 'bool'}},
+                        'to_bool_one': {'$convert': {'input': '$int_val', 'to': 'bool'}},
+                        'to_bool_hello': {'$convert': {'input': '$str_hello', 'to': 'bool'}},
+                        'to_bool_empty': {'$convert': {'input': '$str_empty', 'to': 'bool'}},
+                        'to_date_long': {'$convert': {'input': '$long_epoch', 'to': 9}},
+                        'to_date_str': {'$convert': {'input': '$str_date', 'to': 'date'}},
+                        'to_oid_str': {'$convert': {'input': '$str_oid', 'to': 7}},
+                        'to_oid': {'$convert': {'input': '$str_oid', 'to': 'objectId'}},
+                        'on_error_double': {
+                            '$convert': {'input': '$str_hello', 'to': 'double', 'onError': -1}
+                        },
+                        'on_null_val': {
+                            '$convert': {'input': '$null_val', 'to': 'int', 'onNull': -1}
+                        },
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
+
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$addFields': {
+                        'on_error_literal': {
+                            '$convert': {
+                                'input': 'not_a_number',
+                                'to': 'double',
+                                'onError': 'fallback',
+                            }
+                        },
+                    }
+                },
+                {'$project': {'_id': 0}},
+            ]
+        )
 
     def test_aggregate_date_from_parts(self):
         self.cmp.do.drop()

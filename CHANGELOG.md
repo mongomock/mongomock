@@ -4,7 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.1] - 2026-05-20
+### Fixed
+- `$setWindowFields` error message typo `$setWindowsFields` → `$setWindowFields`
+
+### Added
+- `.agents/references/MDB7_COMPAT.md` — MongoDB 7+ compatibility gap tracker
+
+## [7.2.0] - 2026-05-20
+### Added
+- `$convert`: support `onError`/`onNull` + `to: double`/`bool`/`date`/`objectId` (mongomock#864 — closes #167)
+- `$setWindowFields`: `$sum`/`$avg`/`$min`/`$max`/`$first`/`$last`/`$push`/`$addToSet`/`$count`/`$documentNumber`/`$rank`/`$denseRank` + `window` bounds (mongomock#821 — closes #176)
+- `$fill`: `method` (locf/linear), `sortBy`, `partitionByFields` support (mongomock#892 — closes #160)
+
 ## [7.1.0] - 2026-05-20
+### Added
+- `CLAUDE.md` with token-efficiency techniques for opencode (opencode instructions)
+- `.github/copilot-instructions.md` moved to correct location
+
+### Fixed
+- `$type` now returns `"double"` for `float` values (mongomock#929)
+- `$setWindowFields` no longer produces duplicate documents with multiple `output` fields (mongomock#821)
+
 ### Added
 - `$sortByCount` aggregation stage (mongomock#896 — closes #157)
 - `$fill` aggregation stage (mongomock#892 — closes #160)

@@ -1050,6 +1050,78 @@ class _Parser:
             f' found: {type(parsed).__name__}'
         )
 
+    def _handle_type_convertion_to_double(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if parsed is None:
+            return None
+        if isinstance(parsed, bool):
+            return 1.0 if parsed else 0.0
+        if isinstance(parsed, int):
+            return float(parsed)
+        if isinstance(parsed, float):
+            return parsed
+        if isinstance(parsed, str):
+            try:
+                return float(parsed)
+            except ValueError as err:
+                raise OperationFailure(
+                    f"Failed to parse number '{parsed}' in $convert with no onError value: "
+                    f'Failed to parse string to double'
+                ) from err
+        if decimal_support and isinstance(parsed, decimal128.Decimal128):
+            return float(parsed.to_decimal())
+        raise OperationFailure(
+            f"Unsupported conversion to double from type '{type(parsed).__name__}' in $convert."
+        )
+
+    def _handle_type_convertion_to_bool(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if parsed is None:
+            return None
+        if isinstance(parsed, bool):
+            return parsed
+        if isinstance(parsed, (int, float)):
+            return parsed != 0
+        if isinstance(parsed, str):
+            return True
+        if isinstance(parsed, (dict, list, tuple)):
+            return True
+        if decimal_support and isinstance(parsed, decimal128.Decimal128):
+            return parsed.to_decimal() != 0
+        return True
+
+    def _handle_type_convertion_to_date(self, values):
+        try:
+            parsed = self.parse(values)
+        except KeyError:
+            return None
+        if parsed is None:
+            return None
+        if isinstance(parsed, datetime.datetime):
+            return parsed
+        if isinstance(parsed, (int, float)):
+            return datetime.datetime.utcfromtimestamp(parsed / 1000.0)
+        if isinstance(parsed, str):
+            s = parsed.replace('Z', '+00:00') if parsed.endswith('Z') else parsed
+            try:
+                return datetime.datetime.fromisoformat(s)
+            except ValueError as err:
+                raise OperationFailure(
+                    f"Failed to parse date '{parsed}' in $convert with no onError value: "
+                    f'Failed to parse string to date'
+                ) from err
+        if isinstance(parsed, helpers.ObjectId):
+            return parsed.generation_time
+        raise OperationFailure(
+            f"Unsupported conversion to date from type '{type(parsed).__name__}' in $convert."
+        )
+
     def _handle_convert(self, values):
         try:
             parsed = self.parse(values)
@@ -1057,20 +1129,25 @@ class _Parser:
             return None
         input_ = parsed['input']
         to_ = parsed['to']
-        on_error = parsed.get('onError', None)
-        on_null = parsed.get('onNull', None)
-        if (on_error is not None) or (on_null is not None):
-            raise NotImplementedError(
-                'Although onError and onNull are valid fields for the '
-                "'$convert' operator, they are currently not implemented "
-                'in Mongomock-ng.'
-            )
+        on_error = parsed.get('onError')
+        on_null = parsed.get('onNull')
+
+        if input_ is None:
+            if on_null is not None:
+                return on_null
+            return None
+
         try:
             handler = self._CONVERT_TO_HANDLERS[to_]
         except KeyError as err:
-            raise OperationFailure(f"'{input_}' is not a valid Input Type for '$convert'.") from err
+            raise OperationFailure(f"'{to_}' is not a valid type for '$convert'.") from err
 
-        return handler(self, input_)
+        try:
+            return handler(self, input_)
+        except Exception:
+            if on_error is not None:
+                return on_error
+            raise
 
     @staticmethod
     def _raise_convert_not_implemented(to_):
@@ -1095,19 +1172,19 @@ class _Parser:
 
     # Document: https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/#syntax
     _CONVERT_TO_HANDLERS: ClassVar[dict[str | int, Any]] = {
-        'double': _raise_convert_not_implemented('double'),
+        'double': _handle_type_convertion_to_double,
         'string': _handle_type_convertion_to_string,
-        'objectId': _raise_convert_not_implemented('objectId'),
-        'bool': _raise_convert_not_implemented('bool'),
-        'date': _raise_convert_not_implemented('date'),
+        'objectId': _handle_type_convertion_to_object_id,
+        'bool': _handle_type_convertion_to_bool,
+        'date': _handle_type_convertion_to_date,
         'int': _handle_type_convertion_to_int,
         'long': _handle_type_convertion_to_long,
         'decimal': _handle_type_convertion_to_decimal,
-        1: _raise_convert_not_implemented(1),
+        1: _handle_type_convertion_to_double,
         2: _handle_type_convertion_to_string,
-        7: _raise_convert_not_implemented(7),
-        8: _raise_convert_not_implemented(8),
-        9: _raise_convert_not_implemented(9),
+        7: _handle_type_convertion_to_object_id,
+        8: _handle_type_convertion_to_bool,
+        9: _handle_type_convertion_to_date,
         16: _handle_type_convertion_to_int,
         18: _handle_type_convertion_to_long,
         19: _handle_type_convertion_to_decimal,
@@ -1330,8 +1407,46 @@ def _accumulate_group(output_fields, group_list, user_vars):
     return doc_dict
 
 
+def _get_window_bounds(window_spec, total_len):
+    if not window_spec:
+        return [(0, total_len)] * total_len
+    documents = window_spec.get('documents')
+    if not documents:
+        return [(0, total_len)] * total_len
+    start_spec, end_spec = documents
+    bounds = []
+    for current_idx in range(total_len):
+        if start_spec == 'unbounded':
+            start = 0
+        elif start_spec == 'current':
+            start = current_idx
+        else:
+            start = max(0, current_idx + start_spec)
+
+        if end_spec == 'unbounded':
+            end = total_len
+        elif end_spec == 'current':
+            end = current_idx + 1
+        else:
+            end = min(total_len, current_idx + end_spec + 1)
+
+        bounds.append((start, end))
+    return bounds
+
+
+def _sort_keys_equal(doc1, doc2, sort_by):
+    for field in sort_by:
+        val1 = helpers.get_value_by_dot(doc1, field)
+        val2 = helpers.get_value_by_dot(doc2, field)
+        if val1 != val2:
+            return False
+    return True
+
+
 def _accumulate_set_window_fields(output_fields, partition, options):
     processed_partition = [dict(item) for item in partition]
+    sort_by = options.get('sortBy', {})
+
     for field, field_value in output_fields.items():
         window_operator = next((x for x in field_value if x.startswith('$')), None)
         if window_operator not in set_window_fields_operators:
@@ -1341,12 +1456,11 @@ def _accumulate_set_window_fields(output_fields, partition, options):
                 'operator/aggregation/setWindowFields/#std-label-setWindowFields-window-operators'
                 'for a complete list of valid operators.'
             )
-        if 'window' in field_value:
-            raise NotImplementedError(
-                'Although "window" is a valid field for $setWindowFields aggregator '
-                'it is currently not implemented in Mongomock-ng'
-            )
+
         operator_value = field_value[window_operator]
+        window_spec = field_value.get('window')
+        window_bounds = _get_window_bounds(window_spec, len(partition))
+
         if window_operator == '$shift':
             if 'sortBy' not in options:
                 raise OperationFailure(f'The {window_operator} operator requires a "sortBy" field')
@@ -1358,6 +1472,61 @@ def _accumulate_set_window_fields(output_fields, partition, options):
                 by_index = index + by
                 value = default if by_index < 0 or by_index >= len(values) else values[by_index]
                 processed_partition[index][field] = value
+        elif window_operator in ('$documentNumber',):
+            for i in range(len(partition)):
+                processed_partition[i][field] = i + 1
+        elif window_operator in ('$rank', '$denseRank'):
+            if not sort_by:
+                raise OperationFailure(f'The {window_operator} operator requires a "sortBy" field')
+            rank = 1
+            for i, _doc in enumerate(partition):
+                if i > 0 and not _sort_keys_equal(partition[i - 1], partition[i], sort_by):
+                    if window_operator == '$rank':
+                        rank = i + 1
+                    else:
+                        rank += 1
+                processed_partition[i][field] = rank
+        elif window_operator == '$count':
+            for i in range(len(partition)):
+                start, end = window_bounds[i]
+                processed_partition[i][field] = end - start
+        elif window_operator in (
+            '$sum',
+            '$avg',
+            '$min',
+            '$max',
+            '$first',
+            '$last',
+            '$push',
+            '$addToSet',
+        ):
+            values = [_parse_expression(operator_value, doc) for doc in partition]
+            for i in range(len(partition)):
+                start, end = window_bounds[i]
+                window_values = values[start:end]
+                window_non_null = [v for v in window_values if v is not None]
+                if not window_non_null and window_operator in ('$sum', '$avg', '$min', '$max'):
+                    processed_partition[i][field] = None
+                elif window_operator == '$sum':
+                    processed_partition[i][field] = sum(window_non_null)
+                elif window_operator == '$avg':
+                    processed_partition[i][field] = sum(window_non_null) / len(window_non_null)
+                elif window_operator == '$min':
+                    processed_partition[i][field] = min(window_non_null)
+                elif window_operator == '$max':
+                    processed_partition[i][field] = max(window_non_null)
+                elif window_operator == '$first':
+                    processed_partition[i][field] = window_values[0] if window_values else None
+                elif window_operator == '$last':
+                    processed_partition[i][field] = window_values[-1] if window_values else None
+                elif window_operator == '$push':
+                    processed_partition[i][field] = list(window_values)
+                elif window_operator == '$addToSet':
+                    seen = []
+                    for v in window_values:
+                        if v not in seen:
+                            seen.append(v)
+                    processed_partition[i][field] = seen
         else:
             raise NotImplementedError(
                 f'Although {window_operator} is a valid window operator for the '
@@ -1585,7 +1754,7 @@ def _handle_set_window_fields_stage(in_collection, unused_database, options, unu
         ]
     output_fields = options.get('output')
     if output_fields is None:
-        raise OperationFailure('The "output" field is required for $setWindowsFields')
+        raise OperationFailure('The "output" field is required for $setWindowFields')
     for partition in partitions:
         processed_partition = _accumulate_set_window_fields(output_fields, partition, options)
         processed_partitions.append(processed_partition)
@@ -1702,13 +1871,75 @@ def _handle_sort_stage(in_collection, unused_database, options, unused_user_vars
 
 
 def _handle_fill(in_collection, unused_database, options, unused_user_vars):
-    key_to_fill = next(iter(options['output']))
-    value_to_fill = options['output'][key_to_fill]['value']
-    out_collection = [dict(doc) for doc in in_collection]
-    for out_doc in out_collection:
-        if key_to_fill not in out_doc:
-            out_doc[key_to_fill] = value_to_fill
-    return out_collection
+    output_fields = options.get('output', {})
+    sort_by = options.get('sortBy')
+    partition_by_fields = options.get('partitionByFields')
+
+    if partition_by_fields:
+
+        def _key_getter(doc):
+            return tuple(doc.get(f) for f in partition_by_fields)
+
+        sorted_collection = sorted(
+            in_collection,
+            key=lambda doc: filtering.BsonComparable(_key_getter(doc)),
+        )
+        partitions = [list(g) for _, g in itertools.groupby(sorted_collection, _key_getter)]
+    else:
+        partitions = [list(in_collection)]
+
+    if sort_by:
+        partitions = [
+            _handle_sort_stage(p, unused_database, sort_by, unused_user_vars) for p in partitions
+        ]
+
+    result = []
+    for partition in partitions:
+        partition = [dict(doc) for doc in partition]
+        for field, field_spec in output_fields.items():
+            method = field_spec.get('method')
+            value = field_spec.get('value')
+
+            if method == 'locf':
+                last_value = None
+                for doc in partition:
+                    if field in doc and doc[field] is not None:
+                        last_value = doc[field]
+                    elif field not in doc or doc[field] is None:
+                        if last_value is not None:
+                            doc[field] = last_value
+                        elif value is not None:
+                            doc[field] = value
+            elif method == 'linear':
+                non_null = [
+                    i for i, doc in enumerate(partition) if field in doc and doc[field] is not None
+                ]
+                for i, doc in enumerate(partition):
+                    if field not in doc or doc[field] is None:
+                        left = None
+                        right = None
+                        for pos in non_null:
+                            if pos < i:
+                                left = pos
+                            elif pos > i and right is None:
+                                right = pos
+                        if left is not None and right is not None:
+                            y0 = partition[left][field]
+                            y1 = partition[right][field]
+                            if isinstance(y0, numbers.Number) and isinstance(y1, numbers.Number):
+                                ratio = (i - left) / (right - left)
+                                doc[field] = y0 + (y1 - y0) * ratio
+                        elif value is not None:
+                            doc[field] = value
+            else:
+                if value is not None:
+                    for doc in partition:
+                        if field not in doc or doc[field] is None:
+                            doc[field] = value
+
+        result.extend(partition)
+
+    return result
 
 
 def _handle_unwind_stage(in_collection, unused_database, options, unused_user_vars):
