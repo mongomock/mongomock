@@ -1319,16 +1319,114 @@ class _Parser:
         if operator == '$in':
             expression, array = values
             return self.parse(expression) in self.parse(array)
-        if operator == '$setUnion':
-            result = []
-            for set_value in values:
-                for value in self.parse(set_value):
-                    if value not in result:
-                        result.append(value)
+        if operator in ('$setUnion', '$setIntersection', '$setEquals'):
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+
+            min_args = {'$setEquals': 2}
+            if len(values) < min_args.get(operator, 0):
+                raise OperationFailure(
+                    f'{operator} needs at least two arguments had: {len(values)!r}'
+                )
+
+            accepted_special_values = {
+                '$setUnion': (None, NOTHING),
+                '$setIntersection': (None, NOTHING),
+            }
+            values = [self._parse_or_nothing(v) for v in values]
+            for v in values:
+                if not isinstance(v, list) and v not in accepted_special_values.get(operator, []):
+                    type_ = 'missing' if v is NOTHING else type(v)
+                    raise OperationFailure(
+                        f'All operands of {operator} must be arrays. '
+                        f'One argument is of type: {type_}'
+                    )
+            input_sets = []
+            for v in values:
+                if v is None or v is NOTHING:
+                    input_sets.append(None)
+                else:
+                    input_sets.append({helpers.to_hashable(elem) for elem in v})
+
+            default_result = {'$setEquals': True}
+            result = default_result.get(operator, set())
+            prev_set = None
+            for i, s in enumerate(input_sets):
+                if s is None:
+                    result = None
+                    break
+                if operator == '$setUnion':
+                    if i == 0:
+                        result = s
+                    else:
+                        result |= s
+                elif operator == '$setIntersection':
+                    if i == 0:
+                        result = s
+                    else:
+                        result &= s
+                elif operator == '$setEquals' and i > 0 and s != prev_set:
+                    result = False
+                    break
+                prev_set = s
+            if isinstance(result, set):
+                result = [v.original for v in result]
             return result
-        if operator == '$setEquals':
-            set_values = [set(self.parse(value)) for value in values]
-            return all(set1 == set2 for set1, set2 in itertools.combinations(set_values, 2))
+
+        if operator == '$setDifference':
+            values = [self._parse_or_nothing(v) for v in values]
+            values = [None if v is NOTHING else v for v in values]
+            for v in values:
+                if not isinstance(v, list) and v is not None:
+                    raise OperationFailure(
+                        f'All operands of $setDifference must be arrays. '
+                        f'One argument is of type: {type(v)}'
+                    )
+            input_sets = []
+            for v in values:
+                if v is None:
+                    input_sets.append(None)
+                else:
+                    input_sets.append({helpers.to_hashable(elem) for elem in v})
+            result = None
+            for i, s in enumerate(input_sets):
+                if s is None:
+                    result = None
+                    break
+                if i == 0:
+                    result = s
+                else:
+                    result -= s
+            if result is not None:
+                result = [v.original for v in result]
+            return result
+
+        if operator == '$setIsSubset':
+            set1, set2 = values
+
+            def parse_set(to_parse):
+                if isinstance(to_parse, list):
+                    return tuple(parse_set(v) for v in to_parse)
+                if isinstance(to_parse, dict):
+                    return helpers.hashdict({k: parse_set(v) for k, v in to_parse.items()})
+                return to_parse
+
+            return set(parse_set(self.parse(set1))).issubset(set(parse_set(self.parse(set2))))
+
+        if operator in ('$anyElementTrue', '$allElementsTrue'):
+            if not isinstance(values, (list, tuple)):
+                values = [values]
+            elements = []
+            for v in values:
+                parsed = self.parse(v)
+                if isinstance(parsed, list):
+                    elements.extend(parsed)
+                else:
+                    elements.append(parsed)
+            if operator == '$anyElementTrue':
+                return any(bool(v) for v in elements)
+            return all(bool(v) for v in elements)
+
         raise NotImplementedError(
             f"Although '{operator}' is a valid set operator for the aggregation "
             f'pipeline, it is currently not implemented in Mongomock-ng.'
