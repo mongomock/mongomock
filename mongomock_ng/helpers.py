@@ -33,10 +33,12 @@ except ImportError:
 ObjectId: Any
 SON: Any
 Timestamp: Optional[type[Any]]
+DBRef: Any
 PYMONGO_VERSION: version.Version
 HAVE_PYMONGO: bool
 
 try:
+    from bson import DBRef as BsonDBRef
     from bson import ObjectId as BsonObjectId  # pylint: disable=unused-import
     from bson import SON as BsonSON  # noqa: N811
     from bson import Timestamp as BsonTimestamp
@@ -45,6 +47,7 @@ try:
     ObjectId = BsonObjectId
     SON = BsonSON
     Timestamp = BsonTimestamp
+    DBRef = BsonDBRef
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
@@ -52,6 +55,7 @@ except ImportError:
 
     SON = None  # type: ignore[assignment]
     Timestamp = None
+    DBRef = None  # type: ignore[assignment]
     # Default Pymongo version if not present.
     PYMONGO_VERSION = version.parse('4.0')
     HAVE_PYMONGO = False
@@ -416,6 +420,9 @@ def get_value_by_dot(doc, key, can_generate_array=False):
                 result = result[int_key]
             except (ValueError, IndexError) as err:
                 raise KeyError(key_index) from err
+
+        elif DBRef and isinstance(result, DBRef):
+            result = result.as_doc()[key_item]
 
         else:
             raise KeyError(key_index)

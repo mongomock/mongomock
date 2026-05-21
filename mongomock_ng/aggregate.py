@@ -1675,7 +1675,7 @@ def _handle_lookup_stage(in_collection, database, options, user_vars):
     for doc in in_collection:
         if local_field and foreign_field:
             try:
-                query = helpers.get_value_by_dot(doc, local_field)
+                query = helpers.get_value_by_dot(doc, local_field, can_generate_array=True)
             except KeyError:
                 query = None
             if isinstance(query, list):

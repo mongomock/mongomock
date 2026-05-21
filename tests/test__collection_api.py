@@ -3527,6 +3527,52 @@ class CollectionAPITest(TestCase):
             actual,
         )
 
+    def test__aggregate_lookup_dbref(self):
+        self.db.a.insert_many(
+            [
+                {'_id': 2},
+                {'_id': 3},
+                {'_id': 4},
+            ]
+        )
+        self.db.b.insert_one(
+            {
+                '_id': 1,
+                'refs': [
+                    DBRef('a', 2),
+                    DBRef('a', 4, self.db.name),
+                ],
+            }
+        )
+        actual = self.db.b.aggregate(
+            [
+                {
+                    '$lookup': {
+                        'from': 'a',
+                        'localField': 'refs.$id',
+                        'foreignField': '_id',
+                        'as': 'related',
+                    }
+                }
+            ]
+        )
+        self.assertEqual(
+            [
+                {
+                    '_id': 1,
+                    'refs': [
+                        DBRef('a', 2),
+                        DBRef('a', 4, self.db.name),
+                    ],
+                    'related': [
+                        {'_id': 2},
+                        {'_id': 4},
+                    ],
+                }
+            ],
+            list(actual),
+        )
+
     def test__aggregate_graph_lookup_behaves_as_lookup(self):
         self.db.a.insert_one({'_id': 1, 'arr': [2, 4]})
         self.db.b.insert_many(

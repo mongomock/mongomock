@@ -5150,6 +5150,33 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             [{'$setWindowFields': {'output': {'out': {'$doesnt_exist': {}}}}}]
         )
 
+    def test__aggregate_lookup_with_dbref(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many(
+            [
+                {'_id': 2},
+                {'_id': 3},
+                {'_id': 4},
+            ]
+        )
+        self.cmp.do.insert_one(
+            {
+                '_id': 1,
+                'refs': [DBRef(self.collection_name, 2)],
+            }
+        )
+        pipeline = [
+            {
+                '$lookup': {
+                    'from': self.collection_name,
+                    'localField': 'refs.$id',
+                    'foreignField': '_id',
+                    'as': 'related',
+                }
+            }
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

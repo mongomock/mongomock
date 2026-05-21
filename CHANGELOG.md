@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.0] - 2026-05-21
+### Added
+- `$lookup`: DBRef `.$id` support in `localField` — resolves `refs.$id` through DBRef arrays (mongomock#878 — closes #164)
+- `$lookup`: DBRef `$id` filtering support in filter matching (mongomock#884 — closes #162)
+- DBRef dotted-field traversal in `helpers.get_value_by_dot` for `$lookup` join conditions
+
 ## [7.3.0] - 2026-05-20
 ### Added
 - `$setIntersection`, `$setDifference`, `$setIsSubset`, `$anyElementTrue`, `$allElementsTrue` set operators in aggregation (mongomock#737 — closes #189, mongomock#840 — closes #172, mongomock#842 — closes #171)
