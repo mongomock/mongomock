@@ -247,6 +247,9 @@ def iter_key_candidates(key, doc):
     if doc is None:
         return ()
 
+    if isinstance(doc, DBRef) and key == '$id':
+        return [doc.id]
+
     if isinstance(doc, list):
         return _iter_key_candidates_sublist(key, doc)
 
@@ -285,6 +288,10 @@ def _iter_key_candidates_sublist(key, doc):
                     ret.extend(iter_key_candidates(key_remainder, sub_doc[sub_key]))
                 else:
                     ret.append(NOTHING)
+            elif DBRef and isinstance(sub_doc, DBRef) and sub_key == '$id':
+                ret.append(sub_doc.id)
+            else:
+                ret.append(NOTHING)
         return ret
 
     # subkey is an index
