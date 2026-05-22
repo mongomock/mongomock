@@ -49,6 +49,16 @@
 ### `$shift` gaps
 - `unit` param not supported (MDB 7.0+ allows time-based offset)
 
+## Date Expression Operators
+
+| Operator | Status | Notes |
+|----------|--------|-------|
+| `$dateAdd` | ✅ | `timezone` not implemented |
+| `$dateSubtract` | ✅ | Mirrors `$dateAdd`; `timezone` not implemented |
+| `$dateDiff` | ⚠️ | `week`, `timezone`, `startOfWeek` not implemented |
+| `$dateTrunc` | ⚠️ | Core unit truncation implemented; `binSize`, `timezone`, `startOfWeek` not implemented |
+| `$dateFromString` | ⚠️ | ISO 8601 parsing implemented; `format` and `timezone` not implemented |
+
 ## Not Tracked (explicitly absent)
 - changeStreams
 - timeseries collections

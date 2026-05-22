@@ -8891,6 +8891,592 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([{'$project': {'a': {'$dateToString': '10'}}}])
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(version.parse('5.0') > SERVER_VERSION, '$dateAdd is not supported prior to MongoDB 5.0')
+    def test__aggregate_date_add_and_subtract(self):
+        collection = self.db.collection
+        start = datetime(2022, 11, 6, 20, 4, 1, 123000)
+        collection.insert_one({})
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'add_month': {
+                                '$dateAdd': {'startDate': start, 'unit': 'month', 'amount': 1}
+                            },
+                            'add_quarter': {
+                                '$dateAdd': {'startDate': start, 'unit': 'quarter', 'amount': 1}
+                            },
+                            'subtract_hour': {
+                                '$dateSubtract': {
+                                    'startDate': start,
+                                    'unit': 'hour',
+                                    'amount': 2,
+                                }
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'add_month': datetime(2022, 12, 6, 20, 4, 1, 123000),
+                    'add_quarter': datetime(2023, 2, 6, 20, 4, 1, 123000),
+                    'subtract_hour': datetime(2022, 11, 6, 18, 4, 1, 123000),
+                }
+            ],
+            actual,
+        )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateAdd': {
+                                        'startDate': start,
+                                        'unit': 'day',
+                                        'amount': 1.5,
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'add_millisecond': {
+                                '$dateAdd': {
+                                    'startDate': start,
+                                    'unit': 'millisecond',
+                                    'amount': 7,
+                                }
+                            },
+                            'add_second': {
+                                '$dateAdd': {'startDate': start, 'unit': 'second', 'amount': 8}
+                            },
+                            'add_minute': {
+                                '$dateAdd': {'startDate': start, 'unit': 'minute', 'amount': 9}
+                            },
+                            'add_day': {
+                                '$dateAdd': {'startDate': start, 'unit': 'day', 'amount': 10}
+                            },
+                            'add_week': {
+                                '$dateAdd': {'startDate': start, 'unit': 'week', 'amount': 2}
+                            },
+                            'add_year': {
+                                '$dateAdd': {'startDate': start, 'unit': 'year', 'amount': 1}
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'add_millisecond': datetime(2022, 11, 6, 20, 4, 1, 130000),
+                    'add_second': datetime(2022, 11, 6, 20, 4, 9, 123000),
+                    'add_minute': datetime(2022, 11, 6, 20, 13, 1, 123000),
+                    'add_day': datetime(2022, 11, 16, 20, 4, 1, 123000),
+                    'add_week': datetime(2022, 11, 20, 20, 4, 1, 123000),
+                    'add_year': datetime(2023, 11, 6, 20, 4, 1, 123000),
+                }
+            ],
+            actual,
+        )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateAdd': {
+                                        'startDate': start,
+                                        'unit': 'day',
+                                        'amount': 1,
+                                        'timezone': 'UTC',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(collection.aggregate([{'$addFields': {'bad': {'$dateAdd': 'bad'}}}]))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateAdd': {
+                                        'startDate': start,
+                                        'unit': 'nope',
+                                        'amount': 1,
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$dateDiff is not supported prior to MongoDB 5.0',
+    )
+    def test__aggregate_date_diff(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        start = datetime(2022, 11, 7, 12, 54, 32, 543000)
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'milliseconds': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': start + timedelta(milliseconds=123),
+                                    'unit': 'millisecond',
+                                }
+                            },
+                            'hours': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': start + timedelta(hours=56),
+                                    'unit': 'hour',
+                                }
+                            },
+                            'quarters': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': datetime(2023, 5, 7, 12, 54, 32, 543000),
+                                    'unit': 'quarter',
+                                }
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual([{'milliseconds': 123, 'hours': 56, 'quarters': 2}], actual)
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'weeks': {
+                                    '$dateDiff': {
+                                        'startDate': start,
+                                        'endDate': start + timedelta(days=14),
+                                        'unit': 'week',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'seconds': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': start + timedelta(seconds=22),
+                                    'unit': 'second',
+                                }
+                            },
+                            'minutes': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': start + timedelta(minutes=17),
+                                    'unit': 'minute',
+                                }
+                            },
+                            'days': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': start + timedelta(days=28),
+                                    'unit': 'day',
+                                }
+                            },
+                            'months': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': datetime(2023, 1, 7, 12, 54, 32, 543000),
+                                    'unit': 'month',
+                                }
+                            },
+                            'years': {
+                                '$dateDiff': {
+                                    'startDate': start,
+                                    'endDate': datetime(2025, 11, 7, 12, 54, 32, 543000),
+                                    'unit': 'year',
+                                }
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [{'seconds': 22, 'minutes': 17, 'days': 28, 'months': 2, 'years': 3}],
+            actual,
+        )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateDiff': {
+                                        'startDate': start,
+                                        'endDate': start + timedelta(days=1),
+                                        'unit': 'day',
+                                        'timezone': 'UTC',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateDiff': {
+                                        'startDate': start,
+                                        'endDate': start + timedelta(days=1),
+                                        'unit': 'day',
+                                        'startOfWeek': 'monday',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(collection.aggregate([{'$addFields': {'bad': {'$dateDiff': 'bad'}}}]))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateDiff': {
+                                        'startDate': start,
+                                        'endDate': start + timedelta(days=1),
+                                        'unit': 'nope',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$dateTrunc is not supported prior to MongoDB 5.0',
+    )
+    def test__aggregate_date_trunc(self):
+        collection = self.db.collection
+        collection.insert_one({'start_date': datetime(2011, 11, 4, 15, 6, 7, 890123)})
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'day': {'$dateTrunc': {'date': '$start_date', 'unit': 'day'}},
+                            'month': {'$dateTrunc': {'date': '$start_date', 'unit': 'month'}},
+                            'year': {'$dateTrunc': {'date': '$start_date', 'unit': 'year'}},
+                        }
+                    },
+                    {'$project': {'_id': 0, 'start_date': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'day': datetime(2011, 11, 4, 0, 0),
+                    'month': datetime(2011, 11, 1, 0, 0),
+                    'year': datetime(2011, 1, 1, 0, 0),
+                }
+            ],
+            actual,
+        )
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'millisecond': {
+                                '$dateTrunc': {'date': '$start_date', 'unit': 'millisecond'}
+                            },
+                            'second': {'$dateTrunc': {'date': '$start_date', 'unit': 'second'}},
+                            'minute': {'$dateTrunc': {'date': '$start_date', 'unit': 'minute'}},
+                            'hour': {'$dateTrunc': {'date': '$start_date', 'unit': 'hour'}},
+                            'week': {'$dateTrunc': {'date': '$start_date', 'unit': 'week'}},
+                            'quarter': {'$dateTrunc': {'date': '$start_date', 'unit': 'quarter'}},
+                        }
+                    },
+                    {'$project': {'_id': 0, 'start_date': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'millisecond': datetime(2011, 11, 4, 15, 6, 7, 890000),
+                    'second': datetime(2011, 11, 4, 15, 6, 7),
+                    'minute': datetime(2011, 11, 4, 15, 6),
+                    'hour': datetime(2011, 11, 4, 15, 0),
+                    'week': datetime(2011, 10, 30, 0, 0),
+                    'quarter': datetime(2011, 10, 1, 0, 0),
+                }
+            ],
+            actual,
+        )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateTrunc': {
+                                        'date': '$start_date',
+                                        'unit': 'day',
+                                        'timezone': 'UTC',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateTrunc': {
+                                        'date': '$start_date',
+                                        'unit': 'day',
+                                        'startOfWeek': 'monday',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateTrunc': {
+                                        'date': '$start_date',
+                                        'unit': 'day',
+                                        'binSize': 2,
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(collection.aggregate([{'$addFields': {'bad': {'$dateTrunc': 'bad'}}}]))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {'$dateTrunc': {'date': '$start_date', 'unit': 'nope'}}
+                            }
+                        }
+                    ]
+                )
+            )
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_date_from_string(self):
+        collection = self.db.collection
+        collection.insert_one({})
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'parsed': {'$dateFromString': {'dateString': '2023-01-15T10:30:00Z'}},
+                            'on_null': {
+                                '$dateFromString': {'dateString': None, 'onNull': 'missing'}
+                            },
+                            'on_error': {
+                                '$dateFromString': {'dateString': 'not-a-date', 'onError': 'bad'}
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'parsed': datetime(2023, 1, 15, 10, 30, 0),
+                    'on_null': 'missing',
+                    'on_error': 'bad',
+                }
+            ],
+            actual,
+        )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'parsed': {
+                                    '$dateFromString': {
+                                        'dateString': '2023-01-15',
+                                        'format': '%Y-%m-%d',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        actual = list(
+            collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'naive': {'$dateFromString': {'dateString': '2023-01-15T10:30:00'}},
+                            'offset': {
+                                '$dateFromString': {'dateString': '2023-01-15T10:30:00+02:00'}
+                            },
+                        }
+                    },
+                    {'$project': {'_id': 0}},
+                ]
+            )
+        )
+
+        self.assertEqual(
+            [
+                {
+                    'naive': datetime(2023, 1, 15, 10, 30, 0),
+                    'offset': datetime(2023, 1, 15, 8, 30, 0),
+                }
+            ],
+            actual,
+        )
+
+        with self.assertRaises(NotImplementedError):
+            list(
+                collection.aggregate(
+                    [
+                        {
+                            '$addFields': {
+                                'bad': {
+                                    '$dateFromString': {
+                                        'dateString': '2023-01-15',
+                                        'timezone': 'UTC',
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                )
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(collection.aggregate([{'$addFields': {'bad': {'$dateFromString': 'bad'}}}]))
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [{'$addFields': {'bad': {'$dateFromString': {'dateString': 123}}}}]
+                )
+            )
+
+        with self.assertRaises(mongomock_ng.OperationFailure):
+            list(
+                collection.aggregate(
+                    [{'$addFields': {'bad': {'$dateFromString': {'dateString': 'not-a-date'}}}}]
+                )
+            )
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_from_parts(self):
         collection = self.db.collection
         collection.insert_one(

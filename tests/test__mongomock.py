@@ -4639,6 +4639,99 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
+    @skipIf(version.parse('5.0') > SERVER_VERSION, '$dateAdd is not supported prior to MongoDB 5.0')
+    def test_aggregate_date_add_and_subtract(self):
+        self.cmp.do.drop()
+        start = datetime.datetime(2022, 11, 6, 20, 4, 1, 123000)
+        self.cmp.do.insert_one({})
+        pipeline = [
+            {
+                '$addFields': {
+                    'add_month': {'$dateAdd': {'startDate': start, 'unit': 'month', 'amount': 1}},
+                    'add_quarter': {
+                        '$dateAdd': {'startDate': start, 'unit': 'quarter', 'amount': 1}
+                    },
+                    'subtract_hour': {
+                        '$dateSubtract': {'startDate': start, 'unit': 'hour', 'amount': 2}
+                    },
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$dateDiff is not supported prior to MongoDB 5.0',
+    )
+    def test_aggregate_date_diff(self):
+        self.cmp.do.drop()
+        start = datetime.datetime(2022, 11, 7, 12, 54, 32, 543000)
+        self.cmp.do.insert_one({})
+        pipeline = [
+            {
+                '$addFields': {
+                    'milliseconds': {
+                        '$dateDiff': {
+                            'startDate': start,
+                            'endDate': start + datetime.timedelta(milliseconds=123),
+                            'unit': 'millisecond',
+                        }
+                    },
+                    'hours': {
+                        '$dateDiff': {
+                            'startDate': start,
+                            'endDate': start + datetime.timedelta(hours=56),
+                            'unit': 'hour',
+                        }
+                    },
+                    'quarters': {
+                        '$dateDiff': {
+                            'startDate': start,
+                            'endDate': datetime.datetime(2023, 5, 7, 12, 54, 32, 543000),
+                            'unit': 'quarter',
+                        }
+                    },
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    @skipIf(
+        version.parse('5.0') > SERVER_VERSION,
+        '$dateTrunc is not supported prior to MongoDB 5.0',
+    )
+    def test_aggregate_date_trunc(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({'start_date': datetime.datetime(2011, 11, 4, 15, 6, 7, 890123)})
+        pipeline = [
+            {
+                '$addFields': {
+                    'day': {'$dateTrunc': {'date': '$start_date', 'unit': 'day'}},
+                    'month': {'$dateTrunc': {'date': '$start_date', 'unit': 'month'}},
+                    'year': {'$dateTrunc': {'date': '$start_date', 'unit': 'year'}},
+                }
+            },
+            {'$project': {'_id': 0, 'start_date': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test_aggregate_date_from_string(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({})
+        pipeline = [
+            {
+                '$addFields': {
+                    'parsed': {'$dateFromString': {'dateString': '2023-01-15T10:30:00Z'}},
+                    'on_null': {'$dateFromString': {'dateString': None, 'onNull': 'missing'}},
+                    'on_error': {'$dateFromString': {'dateString': 'not-a-date', 'onError': 'bad'}},
+                }
+            },
+            {'$project': {'_id': 0}},
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
     def test_aggregate_convert(self):
         self.cmp.do.drop()
         self.cmp.do.insert_one(

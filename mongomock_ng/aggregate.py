@@ -1,6 +1,7 @@
 """Module to handle the operations within the aggregate pipeline."""
 
 import bisect
+import calendar
 import collections
 import contextlib
 import copy
@@ -135,8 +136,12 @@ projection_operators = [
     '$literal',
 ]
 date_operators = [
+    '$dateAdd',
+    '$dateDiff',
     '$dateFromString',
+    '$dateSubtract',
     '$dateToString',
+    '$dateTrunc',
     '$dateFromParts',
     '$dayOfMonth',
     '$dayOfWeek',
@@ -214,6 +219,191 @@ type_convertion_operators = [
     '$objectToArray',
 ]
 type_operators = ['$isNumber', '$isArray', '$type']
+
+
+def _parse_iso_datetime_string(value: str) -> datetime.datetime:
+    normalized = value.replace('Z', '+00:00') if value.endswith('Z') else value
+    try:
+        parsed = datetime.datetime.fromisoformat(normalized)
+    except ValueError as err:
+        raise OperationFailure(f"'{value}' is not a valid ISO date string") from err
+    if parsed.tzinfo is None:
+        return parsed
+    return parsed.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+
+
+def _add_months(value: datetime.datetime, months: int) -> datetime.datetime:
+    total_months = value.year * 12 + (value.month - 1) + months
+    year = total_months // 12
+    month = total_months % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def _add_to_date(value: datetime.datetime, unit: str, amount: int) -> datetime.datetime:
+    if unit == 'millisecond':
+        return value + datetime.timedelta(milliseconds=amount)
+    if unit == 'second':
+        return value + datetime.timedelta(seconds=amount)
+    if unit == 'minute':
+        return value + datetime.timedelta(minutes=amount)
+    if unit == 'hour':
+        return value + datetime.timedelta(hours=amount)
+    if unit == 'day':
+        return value + datetime.timedelta(days=amount)
+    if unit == 'week':
+        return value + datetime.timedelta(weeks=amount)
+    if unit == 'month':
+        return _add_months(value, amount)
+    if unit == 'quarter':
+        return _add_months(value, amount * 3)
+    if unit == 'year':
+        return _add_months(value, amount * 12)
+    raise OperationFailure(f'{unit} is not a valid value for the "unit" field')
+
+
+def _truncate_date(value: datetime.datetime, unit: str) -> datetime.datetime:
+    if unit == 'millisecond':
+        return value.replace(microsecond=(value.microsecond // 1000) * 1000)
+    if unit == 'second':
+        return value.replace(microsecond=0)
+    if unit == 'minute':
+        return value.replace(second=0, microsecond=0)
+    if unit == 'hour':
+        return value.replace(minute=0, second=0, microsecond=0)
+    if unit == 'day':
+        return value.replace(hour=0, minute=0, second=0, microsecond=0)
+    if unit == 'week':
+        day_start = value.replace(hour=0, minute=0, second=0, microsecond=0)
+        return day_start - datetime.timedelta(days=(value.weekday() + 1) % 7)
+    if unit == 'month':
+        return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if unit == 'quarter':
+        month = ((value.month - 1) // 3) * 3 + 1
+        return value.replace(month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+    if unit == 'year':
+        return value.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    raise OperationFailure(f'{unit} is not a valid value for the "unit" field in $dateTrunc')
+
+
+def _handle_date_add_operator(
+    operator: str, values: Any, out_value: dict[str, Any]
+) -> datetime.datetime:
+    if not isinstance(values, dict) or not {'startDate', 'amount', 'unit'} <= set(values):
+        raise OperationFailure(
+            f'{operator} operator must correspond a dict'
+            'that has "startDate", "amount" and "unit" fields.'
+        )
+    if 'timezone' in values:
+        raise NotImplementedError(
+            f'Although timezone is a valid field for the '
+            f'{operator} operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+
+    amount = out_value.get('amount')
+    if not isinstance(amount, int) or isinstance(amount, bool):
+        raise OperationFailure(
+            f'{out_value.get("amount")} is an invalid "amount" value. Must be an integer'
+        )
+
+    if operator == '$dateSubtract':
+        amount = -amount
+
+    return _add_to_date(out_value['startDate'], out_value['unit'], amount)
+
+
+def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> int:
+    if not isinstance(values, dict) or not {'startDate', 'endDate', 'unit'} <= set(values):
+        raise OperationFailure(
+            '$dateDiff operator must correspond a dict'
+            'that has "startDate", "endDate" and "unit" fields.'
+        )
+    if 'timezone' in values:
+        raise NotImplementedError(
+            'Although timezone is a valid field for the '
+            '$dateDiff operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+    if 'startOfWeek' in values:
+        raise NotImplementedError(
+            'Although startOfWeek is a valid field for the '
+            '$dateDiff operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+
+    start_date = out_value['startDate']
+    end_date = out_value['endDate']
+    unit = out_value['unit']
+    delta = end_date - start_date
+    if unit == 'millisecond':
+        result = delta.total_seconds() * 1000
+    elif unit == 'second':
+        result = delta.total_seconds()
+    elif unit == 'minute':
+        result = delta.total_seconds() / 60
+    elif unit == 'hour':
+        result = delta.total_seconds() / (60 * 60)
+    elif unit == 'day':
+        result = delta.days
+    elif unit == 'week':
+        raise NotImplementedError(
+            'Although {"unit": "week"} is a valid field for the '
+            '$dateDiff operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+    elif unit == 'month':
+        result = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+    elif unit == 'quarter':
+        result = ((end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)) / 3
+    elif unit == 'year':
+        result = end_date.year - start_date.year
+    else:
+        raise OperationFailure(f'{unit} is not a valid value for the "unit" field in $dateDiff')
+    return math.floor(result)
+
+
+def _handle_date_trunc_operator(values: Any, out_value: dict[str, Any]) -> datetime.datetime:
+    if not isinstance(values, dict) or not {'date', 'unit'} <= set(values):
+        raise OperationFailure(
+            '$dateTrunc operator must correspond a dictthat has "unit" and "date" fields.'
+        )
+    unsupported_fields = {'binSize', 'startOfWeek', 'timezone'} & set(values)
+    if unsupported_fields:
+        unsupported_field = next(iter(sorted(unsupported_fields)))
+        raise NotImplementedError(
+            f'Although {unsupported_field} is a valid field for the '
+            '$dateTrunc operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+    return _truncate_date(out_value['date'], out_value['unit'])
+
+
+def _handle_date_from_string_operator(values: Any, out_value: dict[str, Any]) -> Any:
+    if not isinstance(values, dict) or 'dateString' not in values:
+        raise OperationFailure(
+            '$dateFromString operator must correspond a dictthat has "dateString" field.'
+        )
+    unsupported_fields = {'format', 'timezone'} & set(values)
+    if unsupported_fields:
+        unsupported_field = next(iter(sorted(unsupported_fields)))
+        raise NotImplementedError(
+            f'Although {unsupported_field} is a valid field for the '
+            '$dateFromString operator, it is currently not implemented '
+            'in Mongomock-ng.'
+        )
+
+    date_string = out_value.get('dateString')
+    if date_string is None:
+        return out_value.get('onNull')
+    if not isinstance(date_string, str):
+        raise OperationFailure('$dateFromString requires that dateString be a string')
+    try:
+        return _parse_iso_datetime_string(date_string)
+    except OperationFailure:
+        if 'onError' in out_value:
+            return out_value['onError']
+        raise
 
 
 def _avg_operation(values):
@@ -750,6 +940,14 @@ class _Parser:
                 second=second,
                 microsecond=millisecond,
             )
+        if operator in {'$dateAdd', '$dateSubtract'}:
+            return _handle_date_add_operator(operator, values, out_value)
+        if operator == '$dateDiff':
+            return _handle_date_diff_operator(values, out_value)
+        if operator == '$dateTrunc':
+            return _handle_date_trunc_operator(values, out_value)
+        if operator == '$dateFromString':
+            return _handle_date_from_string_operator(values, out_value)
 
         raise NotImplementedError(
             f"Although '{operator}' is a valid date operator for the "

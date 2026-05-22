@@ -68,6 +68,7 @@ Individual `.diff` files for each PR are in this directory named `<pr-number>.di
 |----|-------------|
 | #195 | Aggregation consolidation (base PR) |
 | #196 | v7.1.1: typo fix + MDB7 compat ref + ref structure |
+| pending | Date operators consolidation (mongomock#815, #817, #772, #902 + `$dateSubtract`/`$dateFromString`) |
 
 ## Issues list
 - #195
@@ -82,3 +83,9 @@ Individual `.diff` files for each PR are in this directory named `<pr-number>.di
 - #150
 - #149
 - #146
+- #181
+- #179
+- #185
+- #156
+- #110
+- #24
