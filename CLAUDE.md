@@ -22,12 +22,26 @@ In-memory MongoDB mock for Python testing. Fork of mongomock. Simulates MongoDB 
 - New operator → handler in appropriate file + test + update `CHANGELOG.md`.
 
 ## Token Efficiency
-Use caveman/cavecrew skills to save context:
-- `/caveman` — ultra-compressed communication mode
-- `cavecrew-investigator` — locate code/symbols (returns ~60% smaller output than vanilla Explore)
-- `cavecrew-builder` — surgical 1-2 file edits (returns compressed confirmation)
-- `cavecrew-reviewer` — diff/branch review in one-line-per-finding format
-- Trigger: "delegate to subagent", "spawn investigator", "use cavecrew"
+Use caveman/cavecrew skills in always-on mode to save context.
+
+### Always-on defaults
+- `caveman` active by default in `full` mode for all normal responses.
+- Keep caveman mode persistent until user explicitly says `stop caveman` or `normal mode`.
+- Temporarily drop caveman compression when clarity matters: security warnings, irreversible actions, or multi-step instructions where terse phrasing could confuse order/meaning.
+- Resume caveman mode after the clear section.
+
+### Delegation defaults
+- Prefer `cavecrew` subagents over vanilla subagents when delegation helps and compressed output is enough.
+- Use `cavecrew-investigator` for code location, symbol usage, callers, and test discovery.
+- Use `cavecrew-builder` for surgical edits limited to 1-2 files when target files are already known.
+- Use `cavecrew-reviewer` for diff/branch/file review when findings-first output is desired.
+- Use vanilla exploration/review only when longer prose, architecture discussion, or broad cross-file reasoning is more important than token savings.
+
+### Skill auto-use rules
+- Use `caveman-commit` by default when generating commit messages.
+- Use `caveman-review` by default when user asks for code review or PR review.
+- Use `caveman-compress` when user asks to compress memory/docs files such as `CLAUDE.md`.
+- Use `caveman-help` and `caveman-stats` on explicit request.
 
 ## Reference Files (Persistent LLM Memory)
 `.agents/references/` — memory store across sessions. Prevents context loss, ensures precision.

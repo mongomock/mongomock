@@ -3023,6 +3023,18 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    def test__aggregate_add_to_set_falsey_values(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many(
+            [
+                {'a': {'c': '1'}, 'b': 0},
+                {'a': {'c': '1'}, 'b': ''},
+                {'a': {'c': '1'}, 'b': None},
+            ]
+        )
+        pipeline = [{'$group': {'_id': 'a.c', 'nb': {'$addToSet': 'b'}}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate32(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many(
@@ -4010,10 +4022,51 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'concat_missing_field': {'$concatArrays': '$foo'},
                     'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
                     'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']},
+                    'concat_with_variable_inside': {'$concatArrays': ['$a', ['$a']]},
                 }
             }
         ]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_index_of_array(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'_id': 0, 'items': list(range(10)), 'label': 'zero'},
+                {'_id': 1, 'items': list(range(10, 25)), 'label': 'one'},
+                {'_id': 2, 'items': list(range(20, 30))},
+            ]
+        )
+
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], 0]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], -5]}}}])
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[0, 1, 2, 3], '$_id']}}}]
+        )
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': [[-1, -2, -3], '$_id']}}}]
+        )
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        'index': {'$indexOfArray': [['zero', 'one', 'two', 'three'], '$label']}
+                    }
+                }
+            ]
+        )
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': ['$empty', '$label']}}}]
+        )
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 0]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 10]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 23]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 23, 5]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 23, 15]}}}])
+        self.cmp.compare.aggregate([{'$project': {'index': {'$indexOfArray': ['$items', 23, 1]}}}])
+        self.cmp.compare.aggregate(
+            [{'$project': {'index': {'$indexOfArray': ['$items', 23, 1, 5]}}}]
+        )
 
     def test__aggregate_concatArrays_exceptions(self):
         self.cmp.do.drop()

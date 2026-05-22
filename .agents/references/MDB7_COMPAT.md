@@ -59,6 +59,13 @@
 | `$dateTrunc` | ⚠️ | Core unit truncation implemented; `binSize`, `timezone`, `startOfWeek` not implemented |
 | `$dateFromString` | ⚠️ | ISO 8601 parsing implemented; `format` and `timezone` not implemented |
 
+## Array Expression Operators
+
+| Operator | Status | Notes |
+|----------|--------|-------|
+| `$concatArrays` | ✅ | Supports array expressions and nested array literals with parsed field references |
+| `$indexOfArray` | ✅ | Supports optional `start` / `end`; returns `null` for missing or `null` arrays |
+
 ## Not Tracked (explicitly absent)
 - changeStreams
 - timeseries collections

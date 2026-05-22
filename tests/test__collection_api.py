@@ -7528,6 +7528,7 @@ class CollectionAPITest(TestCase):
                         'concat_missing_field': {'$concatArrays': '$foo'},
                         'concat_none_item': {'$concatArrays': ['$a', None, '$b']},
                         'concat_missing_field_item': {'$concatArrays': [[1, 2, 3], '$c.arr2']},
+                        'concat_with_variable_inside': {'$concatArrays': ['$a', ['$a']]},
                     }
                 }
             ]
@@ -7542,6 +7543,7 @@ class CollectionAPITest(TestCase):
                     'concat_missing_field': None,
                     'concat_none_item': None,
                     'concat_missing_field_item': None,
+                    'concat_with_variable_inside': [1, 2, [1, 2]],
                 }
             ],
             [{k: v for k, v in doc.items() if k != '_id'} for doc in actual],
@@ -7696,6 +7698,95 @@ class CollectionAPITest(TestCase):
             }
         ]
         self.assertEqual(expect, list(actual))
+
+    def test__aggregate_index_of_array(self):
+        collection = self.db.collection
+        collection.insert_one({'array': ['one', 'two', 'three', 'four']})
+        actual = collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': 0,
+                        'two': {'$indexOfArray': ['$array', 'two']},
+                        'three': {'$indexOfArray': ['$array', 'three']},
+                        'repeated_value': {'$indexOfArray': [[0, 3, 2, 1, 2], 2]},
+                        'repeated_value_from_3': {'$indexOfArray': [[0, 3, 2, 1, 2], 2, 3]},
+                        'not_found': {'$indexOfArray': ['$array', 'foo']},
+                        'two_from_1': {'$indexOfArray': ['$array', 'two', 1]},
+                        'two_from_2': {'$indexOfArray': ['$array', 'two', 2]},
+                        'two_from_0_to_1': {'$indexOfArray': ['$array', 'two', 0, 1]},
+                        'two_from_0_to_2': {'$indexOfArray': ['$array', 'two', 0, 2]},
+                        'two_from_10': {'$indexOfArray': ['$array', 'two', 10]},
+                        'two_from_0_to_10': {'$indexOfArray': ['$array', 'two', 0, 10]},
+                        'array_literal': {'$indexOfArray': [[1, 2, 3], 3]},
+                        'missing': {'$indexOfArray': ['$missing.key', 'foo']},
+                        'null': {'$indexOfArray': [None, 'foo']},
+                        'element_is_missing_type': {'$indexOfArray': [['$missing.key'], None]},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                'two': 1,
+                'three': 2,
+                'repeated_value': 2,
+                'repeated_value_from_3': 4,
+                'not_found': -1,
+                'two_from_1': 1,
+                'two_from_2': -1,
+                'two_from_0_to_1': -1,
+                'two_from_0_to_2': 1,
+                'two_from_10': -1,
+                'two_from_0_to_10': 1,
+                'array_literal': 2,
+                'missing': None,
+                'null': None,
+                'element_is_missing_type': 0,
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__aggregate_index_of_array_errors(self):
+        collection = self.db.collection
+        collection.insert_one({})
+        data = (
+            (
+                [],
+                'Expression $indexOfArray takes at least 2 arguments, and at most '
+                '4, but 0 were passed in.',
+            ),
+            (
+                'foo',
+                'Expression $indexOfArray takes at least 2 arguments, and at most '
+                '4, but 1 were passed in.',
+            ),
+            (
+                [1],
+                'Expression $indexOfArray takes at least 2 arguments, and at most '
+                '4, but 1 were passed in.',
+            ),
+            (
+                ['foo', 'bar'],
+                '$indexOfArray requires an array as a first argument, found:',
+            ),
+            (
+                [[], 'foo', 'bar'],
+                '$indexOfArrayrequires an integral starting index, found a value of type:',
+            ),
+            (
+                [[], 'foo', -2],
+                '$indexOfArray requires a nonnegative starting index, found: -2',
+            ),
+            (
+                [[], 'foo', 1, -4],
+                '$indexOfArray requires a nonnegative ending index, found: -4',
+            ),
+        )
+        for operator, message in data:
+            with self.assertRaises(mongomock_ng.OperationFailure) as cm:
+                collection.aggregate([{'$project': {'foo': {'$indexOfArray': operator}}}])
+            self.assertIn(message, str(cm.exception))
 
     def test__aggregate_reduce(self):
         collection = self.db.collection
@@ -8393,6 +8484,33 @@ class CollectionAPITest(TestCase):
             {
                 '_id': {'key1': 'a'},
                 'my_keys': [1],
+            }
+        ]
+        self.assertEqual(expect, list(actual))
+
+    def test__add_to_set_falsey_values(self):
+        collection = self.db.collection
+        collection.insert_many(
+            [
+                {'key1': 'a', 'my_key': 0},
+                {'key1': 'a', 'my_key': ''},
+                {'key1': 'a', 'my_key': None},
+            ]
+        )
+        actual = collection.aggregate(
+            [
+                {
+                    '$group': {
+                        '_id': {'key1': '$key1'},
+                        'my_keys': {'$addToSet': '$my_key'},
+                    }
+                }
+            ]
+        )
+        expect = [
+            {
+                '_id': {'key1': 'a'},
+                'my_keys': [0, '', None],
             }
         ]
         self.assertEqual(expect, list(actual))

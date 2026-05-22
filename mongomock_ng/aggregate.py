@@ -545,6 +545,23 @@ class _Parser:
         except KeyError:
             return NOTHING
 
+    def _parse_or_none(self, expression):
+        value = self._parse_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
+    def _parse_array_or_nothing(self, expression):
+        if isinstance(expression, (list, tuple)):
+            return [self._parse_or_none(value) for value in expression]
+        return self._parse_or_nothing(expression)
+
+    def _parse_array_or_none(self, expression):
+        value = self._parse_array_or_nothing(expression)
+        if value is NOTHING:
+            return None
+        return value
+
     def _parse_basic_expression(self, expression):
         if isinstance(expression, str) and expression.startswith('$'):
             if expression.startswith('$$'):
@@ -955,12 +972,62 @@ class _Parser:
             f' in Mongomock-ng.'
         )
 
+    def _handle_index_of_array_operator(self, value):
+        if not isinstance(value, (list, tuple)):
+            value = [value]
+        if len(value) < 2 or len(value) > 4:
+            raise OperationFailure(
+                f'Expression $indexOfArray takes at least 2 arguments, and at most '
+                f'4, but {len(value)} were passed in.'
+            )
+
+        array_value = self._parse_array_or_nothing(value[0])
+        search_value = self._parse_or_nothing(value[1])
+        start = self.parse(value[2]) if len(value) > 2 else 0
+        end = self.parse(value[3]) if len(value) > 3 else None
+
+        if array_value is NOTHING or array_value is None:
+            return None
+        if search_value is NOTHING:
+            return -1
+        if not isinstance(array_value, list):
+            raise OperationFailure(
+                '$indexOfArray requires an array as a first argument, '
+                f'found: {type(type(array_value))}'
+            )
+        if len(value) > 2:
+            if not isinstance(start, int):
+                raise OperationFailure(
+                    '$indexOfArrayrequires an integral starting index, found a '
+                    f'value of type: {type(start)}, with value: "{start!r}"'
+                )
+            if start < 0:
+                raise OperationFailure(
+                    f'$indexOfArray requires a nonnegative starting index, found: {start!r}'
+                )
+        if len(value) > 3:
+            if not isinstance(end, int):
+                raise OperationFailure(
+                    '$indexOfArrayrequires an integral ending index, found a '
+                    f'value of type: {type(end)}, with value: "{end!r}"'
+                )
+            if end < 0:
+                raise OperationFailure(
+                    f'$indexOfArray requires a nonnegative ending index, found: {end!r}'
+                )
+
+        stop = len(array_value) if end is None else end
+        try:
+            return array_value.index(search_value, start, stop)
+        except ValueError:
+            return -1
+
     def _handle_array_operator(self, operator, value):
         if operator == '$concatArrays':
             if not isinstance(value, (list, tuple)):
                 value = [value]
 
-            parsed_list = list(self.parse_many(value))
+            parsed_list = [self._parse_array_or_none(item) for item in value]
             for parsed_item in parsed_list:
                 if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
@@ -968,6 +1035,9 @@ class _Parser:
                     )
 
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
+
+        if operator == '$indexOfArray':
+            return self._handle_index_of_array_operator(value)
 
         if operator == '$map':
             if not isinstance(value, dict):
@@ -1677,9 +1747,8 @@ def _accumulate_group(output_fields, group_list, user_vars):
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$addToSet':
                 value = []
-                val_it = (val or None for val in values)
                 # Don't use set in case elt in not hashable (like dicts).
-                for elt in val_it:
+                for elt in values:
                     if elt not in value:
                         value.append(elt)
                 doc_dict[field] = value
