@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `$unionWith` aggregation pipeline stage with string and `{coll, pipeline}` syntax — closes #87
 - `$trim`, `$ltrim`, `$rtrim` string expression operators — closes #112
-- `$toDate` type conversion expression operator (standalone, previously only via `$convert` `{to: 9}`) — closes #85
+- `$toDate` type conversion expression operator (standalone, previously only via `$convert` `{to: 9}`) — closes #85;
 - `$getField` field expression operator with string shorthand and `{field, input}` syntax — closes #25
 
 ### Security
