@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.3] - 2026-05-23
+### Added
+- `$unionWith` aggregation pipeline stage with string and `{coll, pipeline}` syntax — closes #87
+- `$trim`, `$ltrim`, `$rtrim` string expression operators — closes #112
+- `$toDate` type conversion expression operator (standalone, previously only via `$convert` `{to: 9}`) — closes #85
+- `$getField` field expression operator with string shorthand and `{field, input}` syntax — closes #25
+
+### Security
+- `$function` custom aggregation expression now raises `NotImplementedError` with security advisory instead of silently accepting
+
+
 ## [7.5.2] - 2026-05-21
 ### Added
 - `$indexOfArray` aggregation operator and `$concatArrays` array-literal parsing improvements — replicates mongomock#739 and #931; closes #188, #148, #107

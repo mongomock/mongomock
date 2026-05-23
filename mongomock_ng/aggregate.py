@@ -188,6 +188,8 @@ string_operators = [
     '$substrCP',
     '$toLower',
     '$toUpper',
+    '$ltrim',
+    '$rtrim',
     '$trim',
 ]
 comparison_operators = [
@@ -207,6 +209,12 @@ set_operators = [
     '$anyElementTrue',
     '$allElementsTrue',
 ]
+field_operators = [
+    '$getField',
+]
+custom_operators = [
+    '$function',
+]
 
 type_convertion_operators = [
     '$convert',
@@ -215,6 +223,7 @@ type_convertion_operators = [
     '$toDecimal',
     '$toLong',
     '$toObjectId',
+    '$toDate',
     '$arrayToObject',
     '$objectToArray',
 ]
@@ -434,6 +443,35 @@ def _sum_operation(values):
     return decimal128.Decimal128(sum_value) if isinstance(sum_value, decimal.Decimal) else sum_value
 
 
+def _parse_and_execute_trim(operator, values, parser):
+    if isinstance(values, str):
+        input_str = parser.parse(values)
+        chars = None
+    elif isinstance(values, dict):
+        input_str = parser.parse(values.get('input', ''))
+        chars = values.get('chars')
+        if chars is not None:
+            chars = parser.parse(chars)
+    else:
+        raise OperationFailure(f'${operator} expects a string or an object, got {type(values)}')
+    if input_str is None:
+        return None
+    if not isinstance(input_str, str):
+        raise OperationFailure(
+            f'${operator} requires input to be of type string, ' f'got {type(input_str).__name__}'
+        )
+    if chars is not None and not isinstance(chars, str):
+        raise OperationFailure(
+            f'${operator} requires chars to be of type string, ' f'got {type(chars).__name__}'
+        )
+    strip_chars = chars if chars else None
+    if operator == '$trim':
+        return input_str.strip(strip_chars)
+    if operator == '$ltrim':
+        return input_str.lstrip(strip_chars)
+    return input_str.rstrip(strip_chars)
+
+
 def _merge_objects_operation(values):
     merged_doc = {}
     for v in values:
@@ -505,6 +543,10 @@ class _Parser:
                 return self._handle_boolean_operator(k, v)
             if k in object_operators:
                 return self._handle_object_operator(k, v)
+            if k in field_operators:
+                return self._handle_field_operator(k, v)
+            if k in custom_operators:
+                return self._handle_custom_operator(k, v)
             if k in text_search_operators + projection_operators + object_operators:
                 raise NotImplementedError(
                     f"'{k}' is a valid operation but it is not supported by Mongomock-ng yet."
@@ -855,6 +897,9 @@ class _Parser:
                 raise OperationFailure("$regexMatch needs 'regex' to be of type string or regex")
 
             return bool(regex.search(input_value))
+
+        if operator in ('$trim', '$ltrim', '$rtrim'):
+            return _parse_and_execute_trim(operator, values, self)
 
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
@@ -1434,6 +1479,7 @@ class _Parser:
         '$toLong': _handle_type_convertion_to_long,
         '$toDecimal': _handle_type_convertion_to_decimal,
         '$toObjectId': _handle_type_convertion_to_object_id,
+        '$toDate': _handle_type_convertion_to_date,
         '$arrayToObject': _handle_type_convertion_array_to_object,
         '$objectToArray': _handle_type_convertion_object_to_array,
         '$convert': _handle_convert,
@@ -1710,6 +1756,49 @@ class _Parser:
         raise NotImplementedError(
             f"Although '{operator}' is a valid object operator for the aggregation pipeline, "
             'it is currently not implemented in Mongomock-ng.'
+        )
+
+    def _handle_field_operator(self, operator, values):
+        if operator == '$getField':
+            if isinstance(values, str):
+                field_name = values.lstrip('$')
+                doc = self._doc_dict
+            elif isinstance(values, dict):
+                field_name = self.parse(values.get('field', ''))
+                if not isinstance(field_name, str):
+                    raise OperationFailure(
+                        '$getField requires field to be a string, '
+                        f'got {type(field_name).__name__}'
+                    )
+                field_name = field_name.lstrip('$')
+                doc = (
+                    self.parse(values.get('input', self._doc_dict))
+                    if isinstance(values.get('input', self._doc_dict), str)
+                    else values.get('input', self._doc_dict)
+                )
+            else:
+                raise OperationFailure(
+                    f'$getField expects a string or an object, got {type(values)}'
+                )
+            if not isinstance(doc, dict):
+                return None
+            return doc.get(field_name)
+
+        raise NotImplementedError(
+            f"Although '{operator}' is a valid field operator for the aggregation "
+            f'pipeline, it is currently not implemented in Mongomock-ng.'
+        )
+
+    def _handle_custom_operator(self, operator, values):
+        if operator == '$function':
+            raise NotImplementedError(
+                'The $function operator is not supported in Mongomock-ng for security reasons. '
+                'Use a native aggregation expression instead.'
+            )
+
+        raise NotImplementedError(
+            f"Although '{operator}' is a valid custom operator for the aggregation "
+            f'pipeline, it is currently not implemented in Mongomock-ng.'
         )
 
 
@@ -2696,6 +2785,29 @@ def _handle_facet_stage(in_collection, database, options, user_vars):
     return [out_collection_by_pipeline]
 
 
+def _handle_union_with_stage(in_collection, database, options, user_vars):
+    if isinstance(options, str):
+        coll_name = options
+        pipeline = None
+    elif isinstance(options, dict):
+        coll_name = options.get('coll')
+        if coll_name is None:
+            raise OperationFailure("Must specify 'coll' field for a $unionWith")
+        if not isinstance(coll_name, str):
+            raise OperationFailure('Arguments to $unionWith must be strings')
+        pipeline = options.get('pipeline')
+    else:
+        raise OperationFailure('$unionWith stage specification must be a string or object')
+
+    foreign_collection = database.get_collection(coll_name)
+    foreign_docs = list(foreign_collection.find({}))
+    if pipeline:
+        foreign_docs = list(
+            process_pipeline(foreign_docs, database, pipeline, None, user_vars=user_vars)
+        )
+    return list(in_collection) + foreign_docs
+
+
 def _handle_match_stage(in_collection, database, options, user_vars):
     spec = helpers.patch_datetime_awareness_in_document(options)
     return [
@@ -2761,6 +2873,7 @@ _PIPELINE_HANDLERS = {
     '$sort': _handle_sort_stage,
     '$sortByCount': _handle_sort_by_count_stage,
     '$unset': _handle_unset_stage,
+    '$unionWith': _handle_union_with_stage,
     '$unwind': _handle_unwind_stage,
     '$fill': _handle_fill,
 }

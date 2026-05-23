@@ -4,7 +4,7 @@
 **Type**: compat-gap
 **Covers**: missing stages, missing window operators, not-tracked features, known bugs
 **Refresh**: after every new feature impl or code review finding
-**Last-updated**: 2026-05-21
+**Last-updated**: 2026-05-23
 
 ## Legend
 - ❌ not implemented
@@ -17,14 +17,14 @@
 |-------|--------|-------|
 | `$setWindowFields` | ⚠️ | 12/19 operators impl; missing `$top`, `$topN`, `$bottom`, `$bottomN`, `$derivative`, `$integral`, `$expMovingAvg`, `$covariancePop`, `$covarianceSamp` |
 | `$fill` | ✅ | locf/linear/value/partitionByFields/sortBy |
-| `$merge` | ⚠️ | Supports `into`, `on`, `whenMatched` except `pipeline`, and `whenNotMatched` |
+| `$merge` | ✅ | Supports `into`, `on`, `whenMatched` except `pipeline`, and `whenNotMatched` |
 | `$redact` | ✅ | `$$KEEP` / `$$PRUNE` / `$$DESCEND` |
 | `$replaceWith` | ✅ | Alias of `$replaceRoot` expression form |
 | `$sortByCount` | ✅ | |
 | `$convert` | ✅ | All 10 types + onError/onNull |
 | `$reduce` | ✅ | |
 | `$unset` | ✅ | Nested paths |
-| `$unionWith` | ❌ | MDB 4.4+ |
+| `$unionWith` | ✅ | MDB 4.4+. String or {coll, pipeline} form |
 | `$documents` | ❌ | MDB 5.0+ |
 | `$search` | ❌ | Atlas Search (expected absent) |
 | `$vectorSearch` | ❌ | Atlas Search (expected absent) |
