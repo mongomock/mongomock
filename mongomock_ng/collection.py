@@ -2513,6 +2513,16 @@ def _pop_from_list(list_instance, mongo_pop_value, codec_options=None):
         list_instance.pop(0)
 
 
+def _bit_updater(doc, field_name, value, codec_options=None):
+    doc_value = doc.get(field_name, 0)
+    if 'and' in value:
+        doc[field_name] = doc_value & value['and']
+    if 'or' in value:
+        doc[field_name] = doc_value | value['or']
+    if 'xor' in value:
+        doc[field_name] = doc_value ^ value['xor']
+
+
 def _current_date_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
@@ -2524,6 +2534,7 @@ def _current_date_updater(doc, field_name, value, codec_options=None):
 
 
 _updaters = {
+    '$bit': _bit_updater,
     '$set': _set_updater,
     '$unset': _unset_updater,
     '$inc': _inc_updater,

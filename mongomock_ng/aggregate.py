@@ -13,6 +13,7 @@ import math
 import numbers
 import random
 import re
+import statistics
 import warnings
 from typing import Any
 from typing import ClassVar
@@ -109,9 +110,19 @@ binary_arithmetic_operators = {
     '$pow',
     '$subtract',
 } | binary_arithmetic_operators_with_optional_second_number
+binary_bitwise_operators = {
+    '$bitAnd',
+    '$bitOr',
+    '$bitXor',
+}
+unary_bitwise_operators = {
+    '$bitNot',
+}
 arithmetic_operators = (
     unary_arithmetic_operators
     | binary_arithmetic_operators
+    | binary_bitwise_operators
+    | unary_bitwise_operators
     | {
         '$add',
         '$multiply',
@@ -458,11 +469,11 @@ def _parse_and_execute_trim(operator, values, parser):
         return None
     if not isinstance(input_str, str):
         raise OperationFailure(
-            f'${operator} requires input to be of type string, ' f'got {type(input_str).__name__}'
+            f'${operator} requires input to be of type string, got {type(input_str).__name__}'
         )
     if chars is not None and not isinstance(chars, str):
         raise OperationFailure(
-            f'${operator} requires chars to be of type string, ' f'got {type(chars).__name__}'
+            f'${operator} requires chars to be of type string, got {type(chars).__name__}'
         )
     strip_chars = chars if chars else None
     if operator == '$trim':
@@ -470,6 +481,20 @@ def _parse_and_execute_trim(operator, values, parser):
     if operator == '$ltrim':
         return input_str.lstrip(strip_chars)
     return input_str.rstrip(strip_chars)
+
+
+def _std_dev_pop_operation(values):
+    values_list = [v for v in values if isinstance(v, numbers.Number)]
+    if not values_list:
+        return None
+    return statistics.pstdev(values_list)
+
+
+def _std_dev_samp_operation(values):
+    values_list = [v for v in values if isinstance(v, numbers.Number)]
+    if len(values_list) < 2:
+        return None
+    return statistics.stdev(values_list)
 
 
 def _merge_objects_operation(values):
@@ -488,6 +513,8 @@ _GROUPING_OPERATOR_MAP = {
     '$max': lambda values: _group_operation(values, max),
     '$first': lambda values: values[0] if values else None,
     '$last': lambda values: values[-1] if values else None,
+    '$stdDevPop': _std_dev_pop_operation,
+    '$stdDevSamp': _std_dev_samp_operation,
 }
 
 
@@ -636,7 +663,7 @@ class _Parser:
         )
 
     def _handle_arithmetic_operator(self, operator, values):
-        if operator in unary_arithmetic_operators:
+        if operator in unary_arithmetic_operators | unary_bitwise_operators:
             try:
                 number = self.parse(values)
             except KeyError:
@@ -663,8 +690,15 @@ class _Parser:
                 return math.sqrt(number)
             if operator == '$trunc':
                 return math.trunc(number)
+            if operator == '$bitNot':
+                if not isinstance(number, int):
+                    raise OperationFailure(
+                        f'Parameter to {operator} must evaluate to an integer, '
+                        f"got '{type(number).__name__}'"
+                    )
+                return ~number
 
-        if operator in binary_arithmetic_operators:
+        if operator in binary_arithmetic_operators | binary_bitwise_operators:
             if not isinstance(values, (tuple, list)):
                 raise OperationFailure(
                     f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
@@ -673,7 +707,10 @@ class _Parser:
             supports_optional_number_2 = (
                 operator in binary_arithmetic_operators_with_optional_second_number
             )
-            if supports_optional_number_2:
+            if operator in binary_bitwise_operators:
+                if len(values) != 2:
+                    raise OperationFailure(f'{operator} must have only 2 parameters')
+            elif supports_optional_number_2:
                 if len(values) not in [1, 2]:
                     raise OperationFailure(f'{operator} must have 1 or 2 parameters')
             else:
@@ -701,6 +738,18 @@ class _Parser:
                 if isinstance(res, datetime.timedelta):
                     return round(res.total_seconds() * 1000)
                 return res
+            if operator in binary_bitwise_operators:
+                if not isinstance(number_0, int) or not isinstance(number_1, int):
+                    raise OperationFailure(
+                        f'Parameter to {operator} must evaluate to an integer, '
+                        f"got types '{type(number_0).__name__}' and '{type(number_1).__name__}'"
+                    )
+                if operator == '$bitAnd':
+                    return number_0 & number_1
+                if operator == '$bitOr':
+                    return number_0 | number_1
+                if operator == '$bitXor':
+                    return number_0 ^ number_1
 
         assert isinstance(
             values, (tuple, list)
@@ -1767,8 +1816,7 @@ class _Parser:
                 field_name = self.parse(values.get('field', ''))
                 if not isinstance(field_name, str):
                     raise OperationFailure(
-                        '$getField requires field to be a string, '
-                        f'got {type(field_name).__name__}'
+                        f'$getField requires field to be a string, got {type(field_name).__name__}'
                     )
                 field_name = field_name.lstrip('$')
                 doc = (

@@ -7,7 +7,7 @@ from unittest import TestCase
 
 from packaging import version
 
-import mongomock_ng
+import mongomock_ng as mongomock
 import mongomock_ng.gridfs
 from mongomock_ng import helpers
 
@@ -35,11 +35,11 @@ except ImportError:
 class GridFsTest(TestCase):
     @classmethod
     def setUpClass(cls):
-        mongomock_ng.gridfs.enable_gridfs_integration()
+        mongomock.gridfs.enable_gridfs_integration()
 
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock_ng.MongoClient()
+        self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = 'mongomock_ng___testing_db'
 

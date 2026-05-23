@@ -3,7 +3,7 @@ from unittest import mock
 
 from packaging import version
 
-import mongomock_ng
+import mongomock_ng as mongomock
 from mongomock_ng import helpers
 
 
@@ -28,7 +28,7 @@ class BulkOperationsTest(TestCase):
         if self.test_with_pymongo:
             self.client = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         else:
-            self.client = mongomock_ng.MongoClient()
+            self.client = mongomock.MongoClient()
         self.db = self.client['somedb']
         self.db.collection.drop()
         for _i in 'abx':
@@ -97,7 +97,7 @@ class BulkOperationsTest(TestCase):
         self.assertRaises(ValueError, self.bulk_op.find({'a': 1}).update, {'b': 20})
 
     def test__bulk_execute_must_raise_error_if_bulk_empty(self):
-        self.assertRaises(mongomock_ng.InvalidOperation, self.bulk_op.execute)
+        self.assertRaises(mongomock.InvalidOperation, self.bulk_op.execute)
 
     def test_update(self):
         self.bulk_op.find({'a': 1}).update({'$set': {'b': 20}})
@@ -204,7 +204,7 @@ class BulkOperationsWithPymongoTest(BulkOperationsTest):
 class CollectionComparisonTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock_ng.MongoClient()
+        self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         self.db_name = 'mongomock_ng___testing_db'
         self.collection_name = 'mongomock_ng___testing_collection'
@@ -271,7 +271,7 @@ class CollectionComparisonTest(TestCase):
 class BulkOperationsWithSortTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.client = mongomock_ng.MongoClient()
+        self.client = mongomock.MongoClient()
         self.db = self.client['test_db']
         self.collection = self.db['test_collection']
         self.collection.drop()

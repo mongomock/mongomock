@@ -94,7 +94,7 @@ class MongoClient:
         self.close()
 
     def __repr__(self):
-        return f"mongomock_ng.MongoClient('{self.host}', {self.port})"
+        return f"mongomock.MongoClient('{self.host}', {self.port})"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):

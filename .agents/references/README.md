@@ -10,9 +10,10 @@ LLM entry point for project knowledge. Scan this first to decide which refs to r
 | Review aggregation code | `aggregation-prs/completed-features.md` |
 | Check existing impl details | `aggregation-prs/completed-features.md` |
 | Code review PR | `aggregation-prs/REVIEW_PR195.md` (patterns) |
-| Before release/tag | `MDB7_COMPAT.md` (gaps worth fixing?) |
+| Before release/tag | `MDB7_COMPAT.md` (gaps worth fixing?) + `pr-prompts/16-close-resolved-issues.md` |
 | Diagnose test failure | `aggregation-prs/completed-features.md` |
 | Any unknown feature | `MDB7_COMPAT.md:Not Tracked` |
+| Close stale issues | `pr-prompts/16-close-resolved-issues.md` |
 
 ## Adding New Findings
 

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from packaging import version
 
-import mongomock_ng
+import mongomock_ng as mongomock
 from mongomock_ng import helpers
 from mongomock_ng import read_concern
 
@@ -36,7 +36,7 @@ class UTCPlus2(datetime.tzinfo):
 
 class DatabaseAPITest(TestCase):
     def setUp(self):
-        self.database = mongomock_ng.MongoClient().somedb
+        self.database = mongomock.MongoClient().somedb
 
     def test__get_collection_by_attribute_underscore(self):
         with self.assertRaises(AttributeError) as err_context:
@@ -74,11 +74,11 @@ class DatabaseAPITest(TestCase):
 
     def test__repr(self):
         self.assertEqual(
-            "Database(mongomock_ng.MongoClient('localhost', 27017), 'somedb')", repr(self.database)
+            "Database(mongomock.MongoClient('localhost', 27017), 'somedb')", repr(self.database)
         )
 
     def test__rename_unknown_collection(self):
-        with self.assertRaises(mongomock_ng.OperationFailure):
+        with self.assertRaises(mongomock.OperationFailure):
             self.database.rename_collection('a', 'b')
 
     def test__dereference(self):
@@ -104,7 +104,7 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_read_preference(self):
-        database = mongomock_ng.MongoClient().get_database(
+        database = mongomock.MongoClient().get_database(
             'somedb', read_preference=ReadPreference.NEAREST
         )
         self.assertEqual('Nearest', database.read_preference.name)
@@ -115,7 +115,7 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_codec_options(self):
-        database = mongomock_ng.MongoClient().somedb
+        database = mongomock.MongoClient().somedb
         a = database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
         self.assertTrue(a.codec_options.tz_aware)
 
@@ -144,7 +144,7 @@ class DatabaseAPITest(TestCase):
 
         self.database.with_options(codec_options=codec_options.CodecOptions(tz_aware=True))
 
-        tz_aware_db = mongomock_ng.MongoClient(tz_aware=True).somedb
+        tz_aware_db = mongomock.MongoClient(tz_aware=True).somedb
         self.assertIs(
             tz_aware_db,
             tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)),
@@ -227,7 +227,7 @@ class DatabaseAPITest(TestCase):
     def test__create_collection(self):
         coll = self.database.create_collection('c')
         self.assertIs(self.database.c, coll)
-        self.assertRaises(mongomock_ng.CollectionInvalid, self.database.create_collection, 'c')
+        self.assertRaises(mongomock.CollectionInvalid, self.database.create_collection, 'c')
 
     def test__create_collection_bad_names(self):
         with self.assertRaises(TypeError):
@@ -245,9 +245,9 @@ class DatabaseAPITest(TestCase):
             'foo\x00bar',
         )
         for name in bad_names:
-            with self.assertRaises(mongomock_ng.InvalidName, msg=name):
+            with self.assertRaises(mongomock.InvalidName, msg=name):
                 self.database.create_collection(name)
-            with self.assertRaises(mongomock_ng.InvalidName, msg=name):
+            with self.assertRaises(mongomock.InvalidName, msg=name):
                 self.database[name]  # pylint: disable=pointless-statement
 
     def test__lazy_create_collection(self):
@@ -258,11 +258,11 @@ class DatabaseAPITest(TestCase):
 
     def test__equality(self):
         self.assertEqual(self.database, self.database)
-        client = mongomock_ng.MongoClient('localhost')
+        client = mongomock.MongoClient('localhost')
         self.assertNotEqual(client.a, client.b)
         self.assertEqual(client.a, client.get_database('a'))
-        self.assertEqual(client.a, mongomock_ng.MongoClient('localhost').a)
-        self.assertNotEqual(client.a, mongomock_ng.MongoClient('example.com').a)
+        self.assertEqual(client.a, mongomock.MongoClient('localhost').a)
+        self.assertNotEqual(client.a, mongomock.MongoClient('example.com').a)
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
@@ -282,11 +282,11 @@ class DatabaseAPITest(TestCase):
         {self.database}  # noqa: B018
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
-        client = mongomock_ng.MongoClient()
+        client = mongomock.MongoClient()
         with self.assertRaises(
             TypeError, msg='read_concern must be an instance of pymongo.read_concern.ReadConcern'
         ):
-            mongomock_ng.database.Database(client, 'foo', None, read_concern='bar')
+            mongomock.database.Database(client, 'foo', None, read_concern='bar')
 
 
 _DBRef = collections.namedtuple('_DBRef', ['database', 'collection', 'id'])

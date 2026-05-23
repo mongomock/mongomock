@@ -21,6 +21,8 @@
 | `$redact` | ✅ | `$$KEEP` / `$$PRUNE` / `$$DESCEND` |
 | `$replaceWith` | ✅ | Alias of `$replaceRoot` expression form |
 | `$sortByCount` | ✅ | |
+| `$stdDevPop` | ✅ | Group/project accumulator (7.5.4). `$setWindowFields` variant still missing |
+| `$stdDevSamp` | ✅ | Group/project accumulator (7.5.4). `$setWindowFields` variant still missing |
 | `$convert` | ✅ | All 10 types + onError/onNull |
 | `$reduce` | ✅ | |
 | `$unset` | ✅ | Nested paths |
@@ -34,7 +36,8 @@
 ### Implemented operators (12/19)
 `$sum`, `$avg`, `$min`, `$max`, `$first`, `$last`, `$push`, `$addToSet`, `$count`, `$documentNumber`, `$rank`, `$denseRank`, `$shift`
 
-### Missing operators (7)
+### Missing operators (9)
+`$stdDevPop`, `$stdDevSamp` — MDB 5.0+; available as group/project accumulators but NOT in window context
 `$top`, `$topN`, `$bottom`, `$bottomN` — MDB 5.2+ window operators
 `$derivative`, `$integral`, `$expMovingAvg` — MDB 5.0+ window ops (stub only)
 `$covariancePop`, `$covarianceSamp` — MDB 5.0+ window ops (stub only)
@@ -80,3 +83,6 @@
 
 ## Known Bugs
 - `aggregate.py:1757` — "setWindowsFields" typo (fixed)
+- `collection.py:_bit_updater` — `$bit` on existing non-int field silently coerces instead of raising error. Should validate `doc_value` is int before bitwise op.
+- `collection.py:_bit_updater` — `$bit` on nonexistent field treats as `0` (matches MongoDB ✅)
+- `aggregate.py:745` — bitwise aggregation ops (`$bitAnd`/`$bitOr`/`$bitXor`) accept `bool` subtypes (`isinstance(True, int)` is `True` in Python). MongoDB would reject bool. Should add `type(x) is int` check.

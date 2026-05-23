@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.4] - 2026-05-23
+### Added
+- `$bit` update operator — bitwise AND/OR/XOR on document fields (mongomock#891)
+- `$bitAnd`, `$bitOr`, `$bitXor`, `$bitNot` aggregation expression operators for bitwise operations
+- `$stdDevPop` and `$stdDevSamp` group/project accumulator operators — closes #71
+
+### Changed
+- **Upstream compatibility**: tests now import `mongomock_ng as mongomock` via alias + `sys.modules` shim in conftest, enabling test reuse with upstream `mongomock` repo. `MongoClient.__repr__` outputs `mongomock.MongoClient(...)` to match.
+
+
 ## [7.5.3] - 2026-05-23
 ### Added
 - `$unionWith` aggregation pipeline stage with string and `{coll, pipeline}` syntax — closes #87
