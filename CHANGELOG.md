@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.5] - 2026-05-23
+### Fixed
+- `$in` operator now correctly handles NaN values in query matching — NaN matches NaN (closes #105)
+- `$in` operator no longer coerces across BSON types (e.g., `1` no longer matches `True`)
+- Aggregation `$in` expression operator uses NaN-aware comparison (closes #105)
+- `$[]` all-positional array update operator implemented for `$set`/`$unset`/`$inc`/`$pop`/`$bit`/`$max`/`$min` (closes #128)
+- `arrayFilters` parameter now supported for `update_one`/`update_many` with `$[<id>]` pattern (closes #126)
+- `$project` stage no longer falsely rejects `{_id: 1}` in exclusion projections (closes #122)
+- `$concatArrays` now raises `OperationFailure` on empty argument list (closes #107)
+- `$exp`/`$pow`/`$mod` aggregation operators wrap `OverflowError` as `OperationFailure` (closes #134)
+- `$toDouble` conversion wraps `OverflowError` for huge integers (closes #134)
+- `pandas.NaT` values in documents no longer crash comparison/sort — treated as datetime type (closes #135)
+- Test `DBRef` stub made immutable — `__setattr__` raises `AttributeError`, matching real `bson.DBRef` (closes #83)
+- `bool(collection)` now raises `NotImplementedError`, matching PyMongo behavior (closes #64)
+- `Database` and `Collection` no longer rely on truthiness (`or`) for optional parameter defaults, ensuring compatibility with objects that forbid `bool()` (closes #64)
+- `Database.write_concern` property added, matching PyMongo Database API
+
 ## [7.5.4] - 2026-05-23
 ### Added
 - `$bit` update operator — bitwise AND/OR/XOR on document fields (mongomock#891)

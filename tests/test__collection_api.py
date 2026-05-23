@@ -95,7 +95,7 @@ class CollectionAPITest(TestCase):
 
     def test__get_collection_read_concern_option(self):
         """Ensure read_concern option isn't rejected."""
-        self.assertTrue(self.db.get_collection('new_collection', read_concern=None))
+        self.assertIsNotNone(self.db.get_collection('new_collection', read_concern=None))
 
     def test__get_collection_full_name(self):
         self.assertEqual(self.db.coll.name, 'coll')
@@ -1062,15 +1062,13 @@ class CollectionAPITest(TestCase):
         )
         self.db.collection.update_many(
             filter={'a': 1},
-            update={'$set': {'a': 0}},
-            array_filters=None,
+            update={'$set': {'c.$[e]': 0}},
+            array_filters=[{'e': {'$lt': 5}}],
         )
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.update_many(
-                filter={'a': 1},
-                update={'$set': {'c.$[e]': 0}},
-                array_filters=[{'e': {'$lt': 5}}],
-            )
+        doc = self.db.collection.find_one({'a': 1, 'c': [0, 5, 6]})
+        self.assertIsNotNone(doc)
+        doc2 = self.db.collection.find_one({'a': 2})
+        self.assertEqual(doc2['c'], [12, 15])
 
     def test__update_many_let(self):
         self.db.collection.insert_many([{'a': 1, 'c': 2}, {'a': 1, 'c': 3}, {'a': 2, 'c': 4}])
@@ -10445,3 +10443,185 @@ class CollectionAPITest(TestCase):
         col.find()
         with self.assertRaises(TypeError):
             col.find(allow_disk_use=1)
+
+    def test__aggregate_immutable_output(self):
+        import types
+
+        collection = self.db.collection
+        frozen = types.MappingProxyType({'b': 1})
+        collection.insert_one({'_id': 1, 'a': frozen})
+        doc = collection.find_one({'_id': 1})
+        doc['a']['b'] = 999
+        doc_2 = collection.find_one({'_id': 1})
+        self.assertEqual(doc_2['a']['b'], 1)
+
+    def test__find_mappingproxytype_query(self):
+        import types
+
+        collection = self.db.collection
+        frozen = types.MappingProxyType({'b': 1})
+        collection.insert_one({'_id': 1, 'a': frozen})
+        docs = list(collection.find({'a.b': 1}))
+        self.assertEqual(len(docs), 1)
+
+    def test__find_dot_notation_nested_arrays(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [[1, 2], [3, 4]]})
+        collection.insert_one({'_id': 2, 'arr': [[5, 6], [7, 8]]})
+        actual = list(collection.find({'arr.0.0': 1}, projection=['_id']))
+        self.assertEqual([{'_id': 1}], actual)
+
+    def test__find_one_and_update_nested_projection(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': {'b': 1, 'c': 2}})
+        doc = collection.find_one_and_update(
+            {'_id': 1}, {'$set': {'a.b': 3}}, projection={'a.b': 1}
+        )
+        self.assertIn('a', doc)
+        self.assertEqual(doc['a']['b'], 1)
+
+    def test__find_one_and_replace_nested_projection(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': {'b': 1, 'c': 2}})
+        doc = collection.find_one_and_replace(
+            {'_id': 1}, {'a': {'b': 10, 'c': 20}}, projection={'a.b': 1}
+        )
+        self.assertIn('a', doc)
+        self.assertEqual(doc['a']['b'], 1)
+
+    def test__find_one_and_delete_nested_projection(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': {'b': 1, 'c': 2}})
+        doc = collection.find_one_and_delete({'_id': 1}, projection={'a.b': 1})
+        self.assertIn('a', doc)
+        self.assertEqual(doc['a']['b'], 1)
+
+    def test__collection_bool(self):
+        with self.assertRaises(NotImplementedError):
+            bool(self.db.collection)
+
+    def test__aggregate_exp_overflow(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$exp': 10000}}}])
+
+    def test__aggregate_pow_overflow(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$pow': [10000, 10000]}}}])
+
+    def test__aggregate_mod_overflow(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$mod': [10**1000, 3]}}}])
+
+    def test__aggregate_to_double_overflow(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$toDouble': 10**1000}}}])
+
+    def test__aggregate_concatArrays_empty(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$concatArrays': []}}}])
+
+    def test__aggregate_in_non_array(self):
+        self.db.collection.insert_one({'_id': 1, 'v': 5})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$in': ['$v', 5]}}}])
+
+    def test__update_all_positional_array(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[].x': 10}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 10}, {'x': 10}])
+
+    def test__update_all_positional_array_top_level(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 10}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [10, 10, 10])
+
+    def test__update_all_positional_remaining_path(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': {'y': 1}}, {'x': {'y': 2}}]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[].x.y': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': {'y': 99}}, {'x': {'y': 99}}])
+
+    def test__update_all_positional_mixed_keys(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'title': 'hello', 'arr': [1, 2]})
+        collection.update_one({'_id': 1}, {'$set': {'title': 'world', 'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['title'], 'world')
+        self.assertEqual(doc['arr'], [99, 99])
+
+    def test__update_array_filter_not_found(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        with self.assertRaises(mongomock.WriteError):
+            collection.update_one(
+                {'_id': 1},
+                {'$set': {'arr.$[bad].x': 10}},
+                array_filters=[{'good.x': {'$gte': 0}}],
+            )
+
+    def test__update_array_filter_non_dict_item(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[e]': 10}},
+            array_filters=[{'e': {'$gte': 2}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [1, 10, 10])
+
+    def test__update_array_filter_remaining_path(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'nested': {'v': 1}}, {'nested': {'v': 2}}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].nested.v': 99}},
+            array_filters=[{'elem': {'nested.v': {'$gte': 2}}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'nested': {'v': 1}}, {'nested': {'v': 99}}])
+
+    def test__update_array_index_error(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}]})
+        with self.assertRaises((ValueError, mongomock.WriteError)):
+            collection.update_one({'_id': 1}, {'$set': {'arr.5.x': 99}})
+
+    def test__aggregate_binary_operator_wrong_args(self):
+        self.db.collection.insert_one({'_id': 1})
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.aggregate([{'$project': {'x': {'$round': [1, 2, 3]}}}])
+
+    def test__find_nat_comparison(self):
+        import pandas as pd
+
+        collection = self.db.collection
+        oid1 = mongomock.ObjectId()
+        oid2 = mongomock.ObjectId()
+        collection._store[oid1] = {'_id': oid1, 'dt': pd.NaT}
+        collection._store[oid2] = {'_id': oid2, 'dt': pd.NaT}
+        docs = list(collection.find({'dt': pd.NaT}))
+        self.assertEqual(len(docs), 2)
+
+    def test__find_nat_sort(self):
+        import pandas as pd
+
+        collection = self.db.collection
+        oid1 = mongomock.ObjectId()
+        oid2 = mongomock.ObjectId()
+        oid3 = mongomock.ObjectId()
+        collection._store[oid1] = {'_id': oid1, 'dt': pd.NaT}
+        collection._store[oid2] = {'_id': oid2, 'dt': pd.NaT}
+        collection._store[oid3] = {'_id': oid3, 'dt': pd.Timestamp('2020-01-01')}
+        docs = list(collection.find().sort('dt', -1))
+        self.assertEqual(len(docs), 3)

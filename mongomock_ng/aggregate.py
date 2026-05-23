@@ -233,6 +233,7 @@ type_convertion_operators = [
     '$toInt',
     '$toDecimal',
     '$toLong',
+    '$toDouble',
     '$toObjectId',
     '$toDate',
     '$arrayToObject',
@@ -662,94 +663,111 @@ class _Parser:
             f' in Mongomock-ng.'
         )
 
+    def _handle_unary_arithmetic(self, operator, values):
+        try:
+            number = self.parse(values)
+        except KeyError:
+            return None
+        if number is None:
+            return None
+        if not isinstance(number, numbers.Number):
+            raise OperationFailure(
+                f"Parameter to {operator} must evaluate to a number, got '{type(number)}'"
+            )
+        if operator == '$abs':
+            return abs(number)
+        if operator == '$ceil':
+            return math.ceil(number)
+        if operator == '$exp':
+            try:
+                return math.exp(number)
+            except OverflowError as e:
+                raise OperationFailure(str(e)) from e
+        if operator == '$floor':
+            return math.floor(number)
+        if operator == '$ln':
+            return math.log(number)
+        if operator == '$log10':
+            return math.log10(number)
+        if operator == '$sqrt':
+            return math.sqrt(number)
+        if operator == '$trunc':
+            return math.trunc(number)
+        if operator == '$bitNot':
+            if not isinstance(number, int):
+                raise OperationFailure(
+                    f'Parameter to {operator} must evaluate to an integer, '
+                    f"got '{type(number).__name__}'"
+                )
+            return ~number
+        return None
+
+    def _handle_binary_arithmetic(self, operator, values):
+        if not isinstance(values, (tuple, list)):
+            raise OperationFailure(
+                f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+            )
+
+        supports_optional_number_2 = (
+            operator in binary_arithmetic_operators_with_optional_second_number
+        )
+        if operator in binary_bitwise_operators:
+            if len(values) != 2:
+                raise OperationFailure(f'{operator} must have only 2 parameters')
+        elif supports_optional_number_2:
+            if len(values) not in [1, 2]:
+                raise OperationFailure(f'{operator} must have 1 or 2 parameters')
+        else:
+            if len(values) != 2:
+                raise OperationFailure(f'{operator} must have only 2 parameters')
+
+        number_0, number_1, *_ = list(self.parse_many(values)) + [None] * 2
+        if number_0 is None or (number_1 is None and not supports_optional_number_2):
+            return None
+
+        if operator == '$divide':
+            return number_0 / number_1
+        if operator == '$log':
+            return math.log(number_0, number_1)
+        if operator == '$mod':
+            try:
+                return math.fmod(number_0, number_1)
+            except OverflowError as e:
+                raise OperationFailure(str(e)) from e
+        if operator == '$pow':
+            try:
+                return math.pow(number_0, number_1)
+            except OverflowError as e:
+                raise OperationFailure(str(e)) from e
+        if operator == '$round':
+            return round(number_0, number_1)
+        if operator == '$subtract':
+            if isinstance(number_0, datetime.datetime) and isinstance(number_1, (int, float)):
+                number_1 = datetime.timedelta(milliseconds=number_1)
+            res = number_0 - number_1
+            if isinstance(res, datetime.timedelta):
+                return round(res.total_seconds() * 1000)
+            return res
+        if operator in binary_bitwise_operators:
+            if not isinstance(number_0, int) or not isinstance(number_1, int):
+                raise OperationFailure(
+                    f'Parameter to {operator} must evaluate to an integer, '
+                    f"got types '{type(number_0).__name__}' and '{type(number_1).__name__}'"
+                )
+            if operator == '$bitAnd':
+                return number_0 & number_1
+            if operator == '$bitOr':
+                return number_0 | number_1
+            if operator == '$bitXor':
+                return number_0 ^ number_1
+        return None
+
     def _handle_arithmetic_operator(self, operator, values):
         if operator in unary_arithmetic_operators | unary_bitwise_operators:
-            try:
-                number = self.parse(values)
-            except KeyError:
-                return None
-            if number is None:
-                return None
-            if not isinstance(number, numbers.Number):
-                raise OperationFailure(
-                    f"Parameter to {operator} must evaluate to a number, got '{type(number)}'"
-                )
-            if operator == '$abs':
-                return abs(number)
-            if operator == '$ceil':
-                return math.ceil(number)
-            if operator == '$exp':
-                return math.exp(number)
-            if operator == '$floor':
-                return math.floor(number)
-            if operator == '$ln':
-                return math.log(number)
-            if operator == '$log10':
-                return math.log10(number)
-            if operator == '$sqrt':
-                return math.sqrt(number)
-            if operator == '$trunc':
-                return math.trunc(number)
-            if operator == '$bitNot':
-                if not isinstance(number, int):
-                    raise OperationFailure(
-                        f'Parameter to {operator} must evaluate to an integer, '
-                        f"got '{type(number).__name__}'"
-                    )
-                return ~number
+            return self._handle_unary_arithmetic(operator, values)
 
         if operator in binary_arithmetic_operators | binary_bitwise_operators:
-            if not isinstance(values, (tuple, list)):
-                raise OperationFailure(
-                    f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
-                )
-
-            supports_optional_number_2 = (
-                operator in binary_arithmetic_operators_with_optional_second_number
-            )
-            if operator in binary_bitwise_operators:
-                if len(values) != 2:
-                    raise OperationFailure(f'{operator} must have only 2 parameters')
-            elif supports_optional_number_2:
-                if len(values) not in [1, 2]:
-                    raise OperationFailure(f'{operator} must have 1 or 2 parameters')
-            else:
-                if len(values) != 2:
-                    raise OperationFailure(f'{operator} must have only 2 parameters')
-
-            number_0, number_1, *_ = list(self.parse_many(values)) + [None] * 2
-            if number_0 is None or (number_1 is None and not supports_optional_number_2):
-                return None
-
-            if operator == '$divide':
-                return number_0 / number_1
-            if operator == '$log':
-                return math.log(number_0, number_1)
-            if operator == '$mod':
-                return math.fmod(number_0, number_1)
-            if operator == '$pow':
-                return math.pow(number_0, number_1)
-            if operator == '$round':
-                return round(number_0, number_1)
-            if operator == '$subtract':
-                if isinstance(number_0, datetime.datetime) and isinstance(number_1, (int, float)):
-                    number_1 = datetime.timedelta(milliseconds=number_1)
-                res = number_0 - number_1
-                if isinstance(res, datetime.timedelta):
-                    return round(res.total_seconds() * 1000)
-                return res
-            if operator in binary_bitwise_operators:
-                if not isinstance(number_0, int) or not isinstance(number_1, int):
-                    raise OperationFailure(
-                        f'Parameter to {operator} must evaluate to an integer, '
-                        f"got types '{type(number_0).__name__}' and '{type(number_1).__name__}'"
-                    )
-                if operator == '$bitAnd':
-                    return number_0 & number_1
-                if operator == '$bitOr':
-                    return number_0 | number_1
-                if operator == '$bitXor':
-                    return number_0 ^ number_1
+            return self._handle_binary_arithmetic(operator, values)
 
         assert isinstance(
             values, (tuple, list)
@@ -766,7 +784,6 @@ class _Parser:
         if operator == '$multiply':
             return functools.reduce(lambda x, y: x * y, parsed_values)
 
-        # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
             f"Although '{operator}' is a valid aritmetic operator for the aggregation "
             f'pipeline, it is currently not implemented  in Mongomock-ng.'
@@ -1128,6 +1145,8 @@ class _Parser:
                         f'$concatArrays only supports arrays, not {type(parsed_item)}'
                     )
 
+            if not parsed_list:
+                raise OperationFailure('$concatArrays requires at least one operand')
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
 
         if operator == '$indexOfArray':
@@ -1421,7 +1440,10 @@ class _Parser:
         if isinstance(parsed, bool):
             return 1.0 if parsed else 0.0
         if isinstance(parsed, int):
-            return float(parsed)
+            try:
+                return float(parsed)
+            except OverflowError as e:
+                raise OperationFailure(str(e)) from e
         if isinstance(parsed, float):
             return parsed
         if isinstance(parsed, str):
@@ -1526,6 +1548,7 @@ class _Parser:
         '$toString': _handle_type_convertion_to_string,
         '$toInt': _handle_type_convertion_to_int,
         '$toLong': _handle_type_convertion_to_long,
+        '$toDouble': _handle_type_convertion_to_double,
         '$toDecimal': _handle_type_convertion_to_decimal,
         '$toObjectId': _handle_type_convertion_to_object_id,
         '$toDate': _handle_type_convertion_to_date,
@@ -1682,7 +1705,13 @@ class _Parser:
     def _handle_set_operator(self, operator, values):
         if operator == '$in':
             expression, array = values
-            return self.parse(expression) in self.parse(array)
+            parsed_expression = self.parse(expression)
+            parsed_array = self.parse(array)
+            if not isinstance(parsed_array, (list, tuple)):
+                raise OperationFailure('$in requires an array')
+            from mongomock_ng.filtering import operator_eq
+
+            return any(operator_eq(parsed_expression, item) for item in parsed_array)
         if operator in ('$setUnion', '$setIntersection', '$setEquals'):
             if not isinstance(values, (list, tuple)):
                 values = [values]
@@ -1877,7 +1906,9 @@ def _accumulate_group(output_fields, group_list, user_vars):
             values = []
             for doc in group_list:
                 try:
-                    values.append(_parse_expression(key, doc, user_vars=user_vars))
+                    values.append(
+                        _parse_expression(key, doc, ignore_missing_keys=True, user_vars=user_vars)
+                    )
                 except KeyError:
                     continue
             if operator in _GROUPING_OPERATOR_MAP:
@@ -2597,7 +2628,7 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
                 f'Bad projection specification, cannot exclude fields '
                 f"other than '_id' in an inclusion projection: {options}"
             )
-        elif method == 'exclude' and value:
+        elif method == 'exclude' and value and field != '_id':
             raise OperationFailure(
                 f'Bad projection specification, cannot include fields '
                 f'or add computed fields during an exclusion projection: {options}'

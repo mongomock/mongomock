@@ -4,6 +4,7 @@ import functools
 import itertools
 import json
 import math
+import re
 import time
 import warnings
 from collections import OrderedDict
@@ -312,7 +313,7 @@ def _copy_field(obj, container):
         for item in obj:
             new.append(_copy_field(item, container))
         return new
-    if isinstance(obj, dict):
+    if isinstance(obj, Mapping):
         new = container()
         for key, value in obj.items():
             new[key] = _copy_field(value, container)
@@ -478,6 +479,13 @@ class BulkOperationBuilder:
 
 
 class Collection:
+    def __bool__(self):
+        raise NotImplementedError(
+            f'{type(self).__name__} objects do not implement truth '
+            'value testing or bool(). Please compare '
+            'with None instead: collection is not None'
+        )
+
     def __init__(
         self,
         database,
@@ -491,12 +499,16 @@ class Collection:
         self.database = database
         self._name = name
         self._db_store = _db_store
-        self._write_concern = write_concern or WriteConcern()
-        if read_concern and not isinstance(read_concern, ReadConcern):
+        self._write_concern = write_concern if write_concern is not None else WriteConcern()
+        if read_concern is not None and not isinstance(read_concern, ReadConcern):
             raise TypeError('read_concern must be an instance of pymongo.read_concern.ReadConcern')
-        self._read_concern = read_concern or ReadConcern()
-        self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
-        self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
+        self._read_concern = read_concern if read_concern is not None else ReadConcern()
+        self._read_preference = (
+            read_preference if read_preference is not None else _READ_PREFERENCE_PRIMARY
+        )
+        self._codec_options = (
+            codec_options if codec_options is not None else mongomock_codec_options.CodecOptions()
+        )
 
     def __repr__(self):
         return f"Collection({self.database}, '{self.name}')"
@@ -822,10 +834,6 @@ class Collection:
                 'The collation argument of update is valid but has not been implemented in '
                 'mongomock-ng yet',
             )
-        if array_filters:
-            raise_not_implemented(
-                'array_filters', 'Array filters are not implemented in mongomock-ng yet.'
-            )
         if let:
             raise_not_implemented(
                 'let',
@@ -848,6 +856,13 @@ class Collection:
                         '{' + operator + ': {<field>: ...}}'
                     )
 
+        self._current_array_filters = array_filters or []
+        try:
+            return self._update_documents(spec, document, upsert, multi, sort, session)
+        finally:
+            self._current_array_filters = None
+
+    def _update_documents(self, spec, document, upsert, multi, sort, session=None):
         updated_existing = False
         upserted_id = None
         num_updated = 0
@@ -859,14 +874,10 @@ class Collection:
             documents = list(self._iter_documents(spec))
 
         for existing_document in itertools.chain(documents, [None]):
-            # we need was_insert for the setOnInsert update operation
             was_insert = False
-            # the sentinel document means we should do an upsert
             if existing_document is None:
                 if not upsert or num_matched:
                     continue
-                # For upsert operation we have first to create a fake existing_document,
-                # update it like a regular one, then finally insert it
                 if spec.get('_id') is not None:
                     _id = spec['_id']
                 elif not isinstance(document, list) and document.get('_id') is not None:
@@ -892,25 +903,17 @@ class Collection:
                 upserted_id = self._insert(existing_document)
                 num_updated += 1
             elif existing_document != original_document_snapshot:
-                # Document has been modified in-place.
-
-                # Make sure the ID was not change.
                 if original_document_snapshot.get('_id') != existing_document.get('_id'):
-                    # Rollback.
                     self._store[original_document_snapshot['_id']] = original_document_snapshot
                     raise WriteError(
                         "After applying the update, the (immutable) field '_id' was found to have "
                         'been altered to _id: {}'.format(existing_document.get('_id'))
                     )
-
-                # Make sure it still respect the unique indexes and, if not, to
-                # revert modifications
                 try:
                     self._ensure_uniques(existing_document)
                     self._store[existing_document['_id']] = existing_document
                     num_updated += 1
                 except DuplicateKeyError:
-                    # Rollback.
                     self._store[original_document_snapshot['_id']] = original_document_snapshot
                     raise
 
@@ -1487,45 +1490,93 @@ class Collection:
             self._update_document_single_field(doc, k, v, updater)
 
     def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
-        """Implements the $set behavior on an existing document"""
         for k, v in fields.items():
-            if '$' in k:
-                field_name_parts = k.split('.')
-                if not subdocument:
-                    current_doc = doc
-                    subspec = spec
-                    for part in field_name_parts[:-1]:
-                        if part == '$':
-                            subspec_dollar = subspec.get('$elemMatch', subspec)
-                            for item in current_doc:
-                                if filter_applies(subspec_dollar, item):
-                                    current_doc = item
-                                    break
-                            continue
+            if '$' not in k:
+                self._update_document_single_field(doc, k, v, updater)
+                continue
 
-                        new_spec = {}
-                        for el in subspec:
-                            if el.startswith(part):
-                                if len(el.split('.')) > 1:
-                                    new_spec['.'.join(el.split('.')[1:])] = subspec[el]
-                                else:
-                                    new_spec = subspec[el]
-                        subspec = new_spec
-                        current_doc = current_doc[part]
-
-                    subdocument = current_doc
-                    if field_name_parts[-1] == '$' and isinstance(subdocument, list):
-                        for i, doc in enumerate(subdocument):
-                            subspec_dollar = subspec.get('$elemMatch', subspec)
-                            if filter_applies(subspec_dollar, doc):
-                                subdocument[i] = v
-                                break
-                        continue
-
+            field_name_parts = k.split('.')
+            if subdocument:
                 updater(subdocument, field_name_parts[-1], v, codec_options=self.codec_options)
                 continue
-            # otherwise, we handle it the standard way
-            self._update_document_single_field(doc, k, v, updater)
+
+            current_doc = doc
+            subspec = spec
+            _handle_all_positional = False
+            for idx, part in enumerate(field_name_parts[:-1]):
+                if part == '$':
+                    subspec_dollar = subspec.get('$elemMatch', subspec)
+                    for item in current_doc:
+                        if filter_applies(subspec_dollar, item):
+                            current_doc = item
+                            break
+                    continue
+
+                if part == '$[]':
+                    remaining = field_name_parts[idx + 1 :]
+                    if not remaining:
+                        for i in range(len(current_doc)):
+                            updater(current_doc, str(i), v, codec_options=self.codec_options)
+                    else:
+                        sub_k = '.'.join(remaining)
+                        for item in current_doc:
+                            self._update_document_single_field(item, sub_k, v, updater)
+                    _handle_all_positional = True
+                    break
+
+                filter_id = _parse_array_filter_id(part)
+                if filter_id is not None:
+                    filter_spec = _lookup_array_filter(self._current_array_filters, filter_id, k)
+
+                    remaining = field_name_parts[idx + 1 :]
+                    if not remaining:
+                        for i, item in enumerate(current_doc):
+                            if _array_filter_applies(filter_spec, filter_id, item):
+                                updater(current_doc, str(i), v, codec_options=self.codec_options)
+                    else:
+                        sub_k = '.'.join(remaining)
+                        for item in current_doc:
+                            if _array_filter_applies(filter_spec, filter_id, item):
+                                self._update_document_single_field(item, sub_k, v, updater)
+                    _handle_all_positional = True
+                    break
+
+                new_spec = {}
+                for el in subspec:
+                    if el.startswith(part):
+                        if len(el.split('.')) > 1:
+                            new_spec['.'.join(el.split('.')[1:])] = subspec[el]
+                        else:
+                            new_spec = subspec[el]
+                subspec = new_spec
+                current_doc = current_doc[part]
+
+            if _handle_all_positional:
+                continue
+
+            subdocument = current_doc
+            if field_name_parts[-1] == '$' and isinstance(subdocument, list):
+                for i, doc in enumerate(subdocument):
+                    subspec_dollar = subspec.get('$elemMatch', subspec)
+                    if filter_applies(subspec_dollar, doc):
+                        subdocument[i] = v
+                        break
+                continue
+
+            if field_name_parts[-1] == '$[]' and isinstance(subdocument, list):
+                for i in range(len(subdocument)):
+                    updater(subdocument, str(i), v, codec_options=self.codec_options)
+                continue
+
+            filter_id = _parse_array_filter_id(field_name_parts[-1])
+            if filter_id is not None and isinstance(subdocument, list):
+                filter_spec = _lookup_array_filter(self._current_array_filters, filter_id, k)
+                for i, item in enumerate(subdocument):
+                    if _array_filter_applies(filter_spec, filter_id, item):
+                        updater(subdocument, str(i), v, codec_options=self.codec_options)
+                continue
+
+            updater(subdocument, field_name_parts[-1], v, codec_options=self.codec_options)
 
         return subdocument
 
@@ -1546,9 +1597,9 @@ class Collection:
         for part in field_name_parts[:-1]:
             if isinstance(doc, list):
                 try:
-                    doc = doc[0] if part == '$' else doc[int(part)]
+                    doc = doc[int(part)]
                     continue
-                except ValueError:
+                except (ValueError, IndexError):
                     pass
             elif isinstance(doc, dict):
                 if updater is _unset_updater and part not in doc:
@@ -2426,6 +2477,38 @@ class Cursor:
         if allow_disk_use is not None and not isinstance(allow_disk_use, bool):
             raise TypeError('allow_disk_use must be a bool')
         return self
+
+
+_ARRAY_FILTER_PATTERN = re.compile(r'^\$\[(\w+)\]$')
+
+
+def _parse_array_filter_id(part):
+    m = _ARRAY_FILTER_PATTERN.match(part)
+    return m.group(1) if m else None
+
+
+def _lookup_array_filter(array_filters, filter_id, path):
+    for af in array_filters:
+        if filter_id in af:
+            return af
+    raise WriteError(f"No array filter found for identifier '{filter_id}' in path '{path}'")
+
+
+def _array_filter_applies(filter_spec, filter_id, item):
+    if isinstance(item, dict):
+        stripped = {}
+        for k, v in filter_spec.items():
+            if k.startswith(f'{filter_id}.'):
+                stripped[k[len(filter_id) + 1 :]] = v
+            elif k == filter_id:
+                stripped.update(v if isinstance(v, dict) else {k: v})
+            else:
+                stripped[k] = v
+        return filter_applies(stripped, item) if stripped else True
+    try:
+        return filter_applies({filter_id: filter_spec[filter_id]}, {filter_id: item})
+    except (TypeError, OperationFailure):
+        return False
 
 
 def _set_updater(doc, field_name, value, codec_options=None):

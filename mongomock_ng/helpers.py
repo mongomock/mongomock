@@ -409,7 +409,7 @@ def get_value_by_dot(doc, key, can_generate_array=False):
     result = doc
     key_items = key.split('.')
     for key_index, key_item in enumerate(key_items):
-        if isinstance(result, dict):
+        if isinstance(result, Mapping):
             result = result[key_item]
 
         elif isinstance(result, (list, tuple)):

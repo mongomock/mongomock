@@ -26,6 +26,11 @@ try:
 except ImportError:
     from .read_concern import ReadConcern
 
+try:
+    from pymongo.write_concern import WriteConcern
+except ImportError:
+    from .write_concern import WriteConcern
+
 _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
 
 
@@ -39,18 +44,30 @@ def _verify_list_collection_supported_op(keys):
 
 class Database:
     def __init__(
-        self, client, name, _store, read_preference=None, codec_options=None, read_concern=None
+        self,
+        client,
+        name,
+        _store,
+        read_preference=None,
+        codec_options=None,
+        read_concern=None,
+        write_concern=None,
     ):
         self.name = name
         self._client = client
         self._collection_accesses = {}
         self._store = _store or store.DatabaseStore()
-        self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
+        self._read_preference = (
+            read_preference if read_preference is not None else _READ_PREFERENCE_PRIMARY
+        )
         mongomock_codec_options.is_supported(codec_options)
-        self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
-        if read_concern and not isinstance(read_concern, ReadConcern):
+        self._codec_options = (
+            codec_options if codec_options is not None else mongomock_codec_options.CodecOptions()
+        )
+        if read_concern is not None and not isinstance(read_concern, ReadConcern):
             raise TypeError('read_concern must be an instance of pymongo.read_concern.ReadConcern')
-        self._read_concern = read_concern or ReadConcern()
+        self._read_concern = read_concern if read_concern is not None else ReadConcern()
+        self._write_concern = write_concern if write_concern is not None else WriteConcern()
 
     def __getitem__(self, coll_name):
         return self.get_collection(coll_name)
@@ -91,6 +108,10 @@ class Database:
     @property
     def read_concern(self):
         return self._read_concern
+
+    @property
+    def write_concern(self):
+        return self._write_concern
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
@@ -261,7 +282,9 @@ class Database:
             self._client,
             self.name,
             self._store,
-            read_preference=read_preference or self._read_preference,
-            codec_options=codec_options or self._codec_options,
-            read_concern=read_concern or self._read_concern,
+            read_preference=read_preference
+            if read_preference is not None
+            else self._read_preference,
+            codec_options=codec_options if codec_options is not None else self._codec_options,
+            read_concern=read_concern if read_concern is not None else self._read_concern,
         )

@@ -36,6 +36,7 @@ dependencies = [
     "packaging",
     "pytz",
     "sentinels",
+    "pandas",
 ]
 
 [project.optional-dependencies]
