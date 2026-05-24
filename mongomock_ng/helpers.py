@@ -16,6 +16,7 @@ from typing import Optional
 from urllib.parse import unquote_plus
 
 from packaging import version
+from sentinels import NOTHING  # type: ignore[import-untyped]
 
 
 try:
@@ -410,27 +411,32 @@ def get_value_by_dot(doc, key, can_generate_array=False):
     key_items = key.split('.')
     for key_index, key_item in enumerate(key_items):
         if isinstance(result, Mapping):
-            result = result[key_item]
+            result = result.get(key_item, NOTHING)
+            if result is NOTHING:
+                return NOTHING
 
         elif isinstance(result, (list, tuple)):
             try:
                 int_key = int(key_item)
-            except ValueError as err:
+            except ValueError:
                 if not can_generate_array:
-                    raise KeyError(key_index) from err
+                    return NOTHING
                 remaining_key = '.'.join(key_items[key_index:])
-                return [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
+                values = [get_value_by_dot(subdoc, remaining_key) for subdoc in result]
+                return [v for v in values if v is not NOTHING]
 
             try:
                 result = result[int_key]
-            except (ValueError, IndexError) as err:
-                raise KeyError(key_index) from err
+            except (ValueError, IndexError):
+                return NOTHING
 
         elif DBRef and isinstance(result, DBRef):
-            result = result.as_doc()[key_item]
+            result = result.as_doc().get(key_item, NOTHING)
+            if result is NOTHING:
+                return NOTHING
 
         else:
-            raise KeyError(key_index)
+            return NOTHING
 
     return result
 
@@ -440,6 +446,8 @@ def set_value_by_dot(doc, key, value):
     try:
         parent_key, child_key = key.rsplit('.', 1)
         parent = get_value_by_dot(doc, parent_key)
+        if parent is NOTHING:
+            raise KeyError
     except ValueError:
         child_key = key
         parent = doc
@@ -465,6 +473,8 @@ def delete_value_by_dot(doc, key):
     try:
         parent_key, child_key = key.rsplit('.', 1)
         parent = get_value_by_dot(doc, parent_key)
+        if parent is NOTHING:
+            raise KeyError
     except ValueError:
         child_key = key
         parent = doc
@@ -477,7 +487,7 @@ def delete_value_by_dot(doc, key):
 def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
-    return value not in [False, None, 0]
+    return value not in [False, None, NOTHING, 0]
 
 
 class _ToHashableParser:

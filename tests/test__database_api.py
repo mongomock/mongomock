@@ -11,6 +11,7 @@ from packaging import version
 import mongomock_ng as mongomock
 from mongomock_ng import helpers
 from mongomock_ng import read_concern
+from mongomock_ng.command_cursor import CommandCursor
 
 
 try:
@@ -221,8 +222,38 @@ class DatabaseAPITest(TestCase):
     def test__list_collections(self):
         self.database.create_collection('a')
 
-        with self.assertRaises(NotImplementedError):
-            self.database.list_collections()
+        cursor = self.database.list_collections()
+        self.assertIsInstance(cursor, CommandCursor)
+        results = list(cursor)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['name'], 'a')
+        self.assertEqual(results[0]['type'], 'collection')
+        self.assertFalse(cursor.alive)
+
+    def test__list_collections_nameOnly(self):
+        self.database.create_collection('a')
+        self.database.create_collection('b')
+
+        cursor = self.database.list_collections(nameOnly=True)
+        results = list(cursor)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0], {'name': 'a'})
+        self.assertEqual(results[1], {'name': 'b'})
+
+    def test__list_collections_filter(self):
+        self.database.create_collection('aggregator')
+        self.database.create_collection('history_2025')
+
+        cursor = self.database.list_collections(filter={'name': {'$regex': r'^history'}})
+        results = list(cursor)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['name'], 'history_2025')
+
+    def test__command_ismaster(self):
+        result = self.database.command('ismaster')
+        self.assertTrue(result['ismaster'])
+        self.assertFalse(result['secondary'])
+        self.assertEqual(result['ok'], 1.0)
 
     def test__create_collection(self):
         coll = self.database.create_collection('c')

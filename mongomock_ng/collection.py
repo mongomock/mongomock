@@ -685,10 +685,8 @@ class Collection:
             partial_filter_expression = index.get('partialFilterExpression')
             find_kwargs = {}
             for key, _ in unique:
-                try:
-                    find_kwargs[key] = helpers.get_value_by_dot(new_data, key)
-                except KeyError:
-                    find_kwargs[key] = None
+                value = helpers.get_value_by_dot(new_data, key)
+                find_kwargs[key] = None if value is NOTHING else value
             if is_sparse and set(find_kwargs.values()) == {None}:
                 continue
             if partial_filter_expression is not None:
@@ -1897,12 +1895,13 @@ class Collection:
             for doc in documents_gen:
                 index = []
                 for key, _order in index_list:
-                    try:
-                        index.append(helpers.get_value_by_dot(doc, key))
-                    except KeyError:
+                    value = helpers.get_value_by_dot(doc, key)
+                    if value is NOTHING:
                         if is_sparse:
                             continue
                         index.append(None)
+                    else:
+                        index.append(value)
                 if is_sparse and not index:
                     continue
                 index = tuple(index)
@@ -2447,6 +2446,53 @@ class Cursor:
         if allow_disk_use is not None and not isinstance(allow_disk_use, bool):
             raise TypeError('allow_disk_use must be a bool')
         return self
+
+    def explain(self):
+        from mongomock_ng import SERVER_VERSION
+
+        results = self._compute_results(with_limit_and_skip=True)
+        namespace = f'{self.collection.database.name}.{self.collection.name}'
+        parsed = dict(self._spec or {})
+        return {
+            'queryPlanner': {
+                'plannerVersion': 1,
+                'namespace': namespace,
+                'indexFilterSet': False,
+                'parsedQuery': parsed,
+                'winningPlan': {
+                    'stage': 'COLLSCAN',
+                    'filter': parsed,
+                    'direction': 'forward',
+                },
+                'rejectedPlans': [],
+            },
+            'executionStats': {
+                'executionSuccess': True,
+                'nReturned': len(results),
+                'executionTimeMillis': 0,
+                'totalKeysExamined': 0,
+                'totalDocsExamined': len(self._compute_results(with_limit_and_skip=False)),
+                'executionStages': {
+                    'stage': 'COLLSCAN',
+                    'nReturned': len(results),
+                    'executionTimeMillisEstimate': 0,
+                    'works': max(len(results), 1),
+                    'advanced': len(results),
+                    'needTime': 0,
+                    'needFetch': 0,
+                    'isEOF': 1,
+                    'docsExamined': len(self._compute_results(with_limit_and_skip=False)),
+                    'keysExamined': 0,
+                },
+            },
+            'serverInfo': {
+                'host': self.collection.database.client.address[0],
+                'port': self.collection.database.client.address[1],
+                'version': SERVER_VERSION,
+                'gitVersion': 'mock',
+            },
+            'ok': 1.0,
+        }
 
 
 _ARRAY_FILTER_PATTERN = re.compile(r'^\$\[(\w+)\]$')

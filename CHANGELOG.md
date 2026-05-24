@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.10] - 2026-05-25
+### Added
+- `Database.list_collections()` returns `CommandCursor` with collection metadata (closes #729)
+- `Database.command()` now supports `ismaster`/`isMaster` admin command (closes #764)
+- `Cursor.explain()` returns mock query execution plan (closes #843)
+- `MongoClient` constructor accepts `_store` parameter (closes #841)
+
+### Fixed
+- `CommandCursor.alive` now tracks exhaustion; returns `False` after iteration complete (closes #901)
+- `list_database_names()` returns active databases including defaults (closes #802)
+- `list_collection_names()` filter behavior aligned with PyMongo (closes #872)
+
+## [7.5.9] - 2026-05-24
+### Fixed
+- Aggregation missing vs null distinction: `get_value_by_dot` returns `NOTHING` sentinel instead of raising `KeyError` for missing fields (mongomock#770)
+- `$group`, `$cond`, `$switch`, `$type` operators now distinguish missing fields from `None` values
+- `$ifNull` now correctly handles `NOTHING` (missing) as nullish
+- `$arrayElemAt` returns `NOTHING` for out-of-bounds indices instead of raising `KeyError`
+- `_parse_or_nothing` method removed; replaced by `parse()` which returns `NOTHING` directly
+- `ignore_missing_keys` parameter removed from `_Parser` and `_parse_expression`
+
 ## [7.5.8] - 2026-05-24
 ### Added
 - `Database.__iter__` returns `self`, `Database.__next__` raises `TypeError`, matching PyMongo behavior (closes #64)

@@ -109,9 +109,7 @@ class _Filterer:
                 continue
             if key == '$expr':
                 parse_expression = self.parse_expression[0]
-                if not parse_expression(
-                    search, document, ignore_missing_keys=True, user_vars=user_vars
-                ):
+                if not parse_expression(search, document, user_vars=user_vars):
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
@@ -384,7 +382,7 @@ def bson_compare(op, a, b, can_compare_types=True):
                 return bson_compare(op, item_a, item_b)
         return bson_compare(op, len(a), len(b))
 
-    if isinstance(a, NoneType):
+    if isinstance(a, NoneType) or a is NOTHING:
         return op(0, 0)
 
     # bson handles bytes as binary in python3+:
@@ -404,7 +402,7 @@ def _get_compare_type(val):
     also https://github.com/mongodb/mongo/blob/46b28bb/src/mongo/bson/bsontypes.h#L175
     for canonical values.
     """
-    if isinstance(val, NoneType):
+    if isinstance(val, NoneType) or val is NOTHING:
         return 5
     if isinstance(val, bool):
         return 40

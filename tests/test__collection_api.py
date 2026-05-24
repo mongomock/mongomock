@@ -111,6 +111,17 @@ class CollectionAPITest(TestCase):
         next(cursor)
         self.assertFalse(cursor.alive)
 
+    def test__cursor_explain(self):
+        self.db.collection.insert_one({'x': 1})
+        self.db.collection.insert_one({'x': 2})
+        cursor = self.db.collection.find({'x': {'$gt': 1}})
+        result = cursor.explain()
+        self.assertIn('queryPlanner', result)
+        self.assertIn('executionStats', result)
+        self.assertIn('serverInfo', result)
+        self.assertEqual(result['ok'], 1.0)
+        self.assertEqual(result['executionStats']['nReturned'], 1)
+
     def test__cursor_collation_directly_in_find(self):
         self.db.collection.insert_one({'foo': 'bar'})
         cursor = self.db.collection.find(collation={'locale': 'fr'})

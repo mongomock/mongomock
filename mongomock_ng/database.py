@@ -11,6 +11,7 @@ from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
+from .command_cursor import CommandCursor
 from .filtering import filter_applies
 
 
@@ -140,9 +141,22 @@ class Database:
             return self.list_collection_names(session=session)
 
     def list_collections(self, filter=None, session=None, nameOnly=False):  # noqa: N803
-        raise NotImplementedError(
-            'list_collections is a valid method of Database but has not been implemented in '
-            'mongomock-ng yet.'
+        if session:
+            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
+
+        names = self.list_collection_names(filter=filter)
+        if nameOnly:
+            return CommandCursor([{'name': n} for n in names])
+        return CommandCursor(
+            [
+                {
+                    'name': n,
+                    'type': 'collection',
+                    'options': {},
+                    'info': {'readOnly': False},
+                }
+                for n in names
+            ]
         )
 
     def list_collection_names(self, filter=None, session=None):
@@ -271,6 +285,21 @@ class Database:
             command = {command: 1}
         if 'ping' in command:
             return {'ok': 1.0}
+        if 'ismaster' in command or 'isMaster' in command:
+            host, port = self.client.address
+            return {
+                'ismaster': True,
+                'secondary': False,
+                'hosts': [f'{host}:{port}'],
+                'passives': [],
+                'arbiters': [],
+                'setName': None,
+                'setVersion': None,
+                'electionId': None,
+                'primary': None,
+                'me': f'{host}:{port}',
+                'ok': 1.0,
+            }
         # TODO(pascal): Differentiate NotImplementedError for valid commands
         # and OperationFailure if the command is not valid.
         raise NotImplementedError(
