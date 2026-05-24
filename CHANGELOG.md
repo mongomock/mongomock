@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.7] - 2026-05-24
+### Fixed
+- `Database.__bool__` raises `NotImplementedError`, matching PyMongo behavior (closes #64)
+- `MongoClient.drop_database` uses `is not None` instead of truth check on Database object (closes #64)
+
 ## [7.5.5] - 2026-05-23
 ### Fixed
 - `$in` operator now correctly handles NaN values in query matching — NaN matches NaN (closes #105)
@@ -18,8 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$toDouble` conversion wraps `OverflowError` for huge integers (closes #134)
 - `pandas.NaT` values in documents no longer crash comparison/sort — treated as datetime type (closes #135)
 - Test `DBRef` stub made immutable — `__setattr__` raises `AttributeError`, matching real `bson.DBRef` (closes #83)
-- `bool(collection)` now raises `NotImplementedError`, matching PyMongo behavior (closes #64)
-- `Database` and `Collection` no longer rely on truthiness (`or`) for optional parameter defaults, ensuring compatibility with objects that forbid `bool()` (closes #64)
+- `bool(collection)` now raises `NotImplementedError`, matching PyMongo behavior
+- `Database` and `Collection` no longer rely on truthiness (`or`) for optional parameter defaults, ensuring compatibility with objects that forbid `bool()`
 - `Database.write_concern` property added, matching PyMongo Database API
 
 ## [7.5.4] - 2026-05-23
