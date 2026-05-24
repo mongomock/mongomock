@@ -685,10 +685,8 @@ class Collection:
             partial_filter_expression = index.get('partialFilterExpression')
             find_kwargs = {}
             for key, _ in unique:
-                try:
-                    find_kwargs[key] = helpers.get_value_by_dot(new_data, key)
-                except KeyError:
-                    find_kwargs[key] = None
+                value = helpers.get_value_by_dot(new_data, key)
+                find_kwargs[key] = None if value is NOTHING else value
             if is_sparse and set(find_kwargs.values()) == {None}:
                 continue
             if partial_filter_expression is not None:
@@ -1897,12 +1895,13 @@ class Collection:
             for doc in documents_gen:
                 index = []
                 for key, _order in index_list:
-                    try:
-                        index.append(helpers.get_value_by_dot(doc, key))
-                    except KeyError:
+                    value = helpers.get_value_by_dot(doc, key)
+                    if value is NOTHING:
                         if is_sparse:
                             continue
                         index.append(None)
+                    else:
+                        index.append(value)
                 if is_sparse and not index:
                     continue
                 index = tuple(index)

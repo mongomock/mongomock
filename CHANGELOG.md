@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.9] - 2026-05-24
+### Fixed
+- Aggregation missing vs null distinction: `get_value_by_dot` returns `NOTHING` sentinel instead of raising `KeyError` for missing fields (mongomock#770)
+- `$group`, `$cond`, `$switch`, `$type` operators now distinguish missing fields from `None` values
+- `$ifNull` now correctly handles `NOTHING` (missing) as nullish
+- `$arrayElemAt` returns `NOTHING` for out-of-bounds indices instead of raising `KeyError`
+- `_parse_or_nothing` method removed; replaced by `parse()` which returns `NOTHING` directly
+- `ignore_missing_keys` parameter removed from `_Parser` and `_parse_expression`
+
 ## [7.5.8] - 2026-05-24
 ### Added
 - `Database.__iter__` returns `self`, `Database.__next__` raises `TypeError`, matching PyMongo behavior (closes #64)

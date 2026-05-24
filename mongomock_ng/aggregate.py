@@ -3,7 +3,6 @@
 import bisect
 import calendar
 import collections
-import contextlib
 import copy
 import datetime
 import decimal
@@ -534,6 +533,10 @@ def _merge_objects_operation(values):
     return merged_doc
 
 
+def _is_nullish(value):
+    return value is None or value is NOTHING
+
+
 _GROUPING_OPERATOR_MAP = {
     '$sum': _sum_operation,
     '$avg': _avg_operation,
@@ -550,9 +553,8 @@ _GROUPING_OPERATOR_MAP = {
 class _Parser:
     """Helper to parse expressions within the aggregate pipeline."""
 
-    def __init__(self, doc_dict, user_vars=None, ignore_missing_keys=False):
+    def __init__(self, doc_dict, *, user_vars=None):
         self._doc_dict = doc_dict
-        self._ignore_missing_keys = ignore_missing_keys
         self._user_vars = user_vars or {}
 
     def parse(self, expression):
@@ -609,56 +611,32 @@ class _Parser:
                 )
             if k.startswith('$'):
                 raise OperationFailure(f"Unrecognized expression '{k}'")
-            try:
-                value = self.parse(v)
-            except KeyError:
-                if self._ignore_missing_keys:
-                    continue
-                raise
-            value_dict[k] = value
+            value = self.parse(v)
+            if value is not NOTHING:
+                value_dict[k] = value
 
         return value_dict
 
     def parse_many(self, values):
         for value in values:
-            try:
-                yield self.parse(value)
-            except KeyError:
-                if self._ignore_missing_keys:
-                    yield None
-                else:
-                    raise
+            yield self.parse(value)
 
     def _parse_to_bool(self, expression):
         """Parse a MongoDB expression and then convert it to bool"""
-        # handles converting `undefined` (in form of KeyError) to False
-        try:
-            return helpers.mongodb_to_bool(self.parse(expression))
-        except KeyError:
-            return False
-
-    def _parse_or_nothing(self, expression):
-        try:
-            return self.parse(expression)
-        except KeyError:
-            return NOTHING
+        return helpers.mongodb_to_bool(self.parse(expression))
 
     def _parse_or_none(self, expression):
-        value = self._parse_or_nothing(expression)
-        if value is NOTHING:
-            return None
-        return value
+        value = self.parse(expression)
+        return None if value is NOTHING else value
 
     def _parse_array_or_nothing(self, expression):
         if isinstance(expression, (list, tuple)):
             return [self._parse_or_none(value) for value in expression]
-        return self._parse_or_nothing(expression)
+        return self.parse(expression)
 
     def _parse_array_or_none(self, expression):
         value = self._parse_array_or_nothing(expression)
-        if value is NOTHING:
-            return None
-        return value
+        return None if value is NOTHING else value
 
     def _parse_basic_expression(self, expression):
         if isinstance(expression, str) and expression.startswith('$'):
@@ -710,7 +688,7 @@ class _Parser:
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
         for value in parsed_values:
-            if value is None:
+            if value is None or value is NOTHING:
                 return None
             assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
         if operator == '$add':
@@ -724,9 +702,8 @@ class _Parser:
         )
 
     def _eval_unary_arithmetic_operator(self, operator, values):
-        try:
-            number = self.parse(values)
-        except KeyError:
+        number = self.parse(values)
+        if number is NOTHING:
             return None
         if number is None:
             return None
@@ -778,6 +755,8 @@ class _Parser:
                 raise OperationFailure(f'{operator} must have only 2 parameters')
 
         number_0, number_1, *_ = list(self.parse_many(values)) + [None] * 2
+        if number_0 is NOTHING or number_1 is NOTHING:
+            return None
         if operator in binary_bitwise_operators:
             if number_0 is None or number_1 is None:
                 return None
@@ -823,15 +802,17 @@ class _Parser:
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
             values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
-            return _GROUPING_OPERATOR_MAP[operator](values)
+            return _GROUPING_OPERATOR_MAP[operator](values) if values is not NOTHING else None
         if operator == '$arrayElemAt':
             key, value = values
             array = self.parse(key)
             index = self.parse(value)
+            if array is NOTHING or index is NOTHING:
+                return None
             try:
                 return array[index]
-            except IndexError as error:
-                raise KeyError('Array have length less than index value') from error
+            except IndexError:
+                return NOTHING
 
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
@@ -855,7 +836,7 @@ class _Parser:
             }
             return _Parser(
                 self._doc_dict,
-                dict(self._user_vars, **user_vars),
+                user_vars=dict(self._user_vars, **user_vars),
             ).parse(value['in'])
         raise NotImplementedError(
             f"Although '{operator}' is a valid project operator for the "
@@ -868,9 +849,11 @@ class _Parser:
         a = self.parse(values[0])
         b = self.parse(values[1])
         if operator == '$eq':
-            return a == b
+            return (a is NOTHING and b is None) or (a is None and b is NOTHING) or a == b
         if operator == '$ne':
-            return a != b
+            return not ((a is NOTHING and b is None) or (a is None and b is NOTHING) or a == b)
+        if a is NOTHING or b is NOTHING:
+            return False
         if operator in filtering.SORTING_OPERATOR_MAP:
             return filtering.bson_compare(filtering.SORTING_OPERATOR_MAP[operator], a, b)
         raise NotImplementedError(
@@ -892,13 +875,9 @@ class _Parser:
         if operator == '$split':
             if len(values) != 2:
                 raise OperationFailure('split must have 2 items')
-            try:
-                string = self.parse(values[0])
-                delimiter = self.parse(values[1])
-            except KeyError:
-                return None
-
-            if string is None or delimiter is None:
+            string = self.parse(values[0])
+            delimiter = self.parse(values[1])
+            if _is_nullish(string) or _is_nullish(delimiter):
                 return None
             if not isinstance(string, str):
                 raise TypeError('split first argument must evaluate to string')
@@ -947,16 +926,14 @@ class _Parser:
                     f'$regexMatch found an unknown argument: {next(iter(unknown_args))}'
                 )
 
-            try:
-                input_value = self.parse(values['input'])
-            except KeyError:
+            input_value = self.parse(values['input'])
+            if input_value is NOTHING:
                 return False
             if not isinstance(input_value, str):
                 raise OperationFailure("$regexMatch needs 'input' to be of type string")
 
-            try:
-                regex_val = self.parse(values['regex'])
-            except KeyError:
+            regex_val = self.parse(values['regex'])
+            if regex_val is NOTHING:
                 return False
             options = None
             raw_options = values.get('options', '').lower()
@@ -1129,7 +1106,7 @@ class _Parser:
             )
 
         array_value = self._parse_array_or_nothing(value[0])
-        search_value = self._parse_or_nothing(value[1])
+        search_value = self.parse(value[1])
         start = self.parse(value[2]) if len(value) > 2 else 0
         end = self.parse(value[3]) if len(value) > 3 else None
 
@@ -1206,9 +1183,9 @@ class _Parser:
                 if k not in {'input', 'as', 'in'}:
                     raise OperationFailure(f'Unrecognized parameter to $map: {k}')
 
-            input_array = self._parse_or_nothing(value['input'])
+            input_array = self.parse(value['input'])
 
-            if input_array is None or input_array is NOTHING:
+            if input_array is NOTHING or input_array is None:
                 return None
 
             if not isinstance(input_array, (list, tuple)):
@@ -1219,8 +1196,7 @@ class _Parser:
             return [
                 _Parser(
                     self._doc_dict,
-                    dict(self._user_vars, **{fieldname: item}),
-                    ignore_missing_keys=self._ignore_missing_keys,
+                    user_vars=dict(self._user_vars, **{fieldname: item}),
                 ).parse(in_expr)
                 for item in input_array
             ]
@@ -1230,8 +1206,8 @@ class _Parser:
                 if k not in value:
                     raise OperationFailure(f"Missing '{k}' parameter to $reduce")
 
-            input_array = self._parse_or_nothing(value['input'])
-            if input_array is None or input_array is NOTHING:
+            input_array = self.parse(value['input'])
+            if input_array is NOTHING or input_array is None:
                 return None
 
             if not isinstance(input_array, (list, tuple)):
@@ -1242,8 +1218,7 @@ class _Parser:
             for item in input_array:
                 current = _Parser(
                     self._doc_dict,
-                    dict(self._user_vars, this=item, value=current),
-                    ignore_missing_keys=self._ignore_missing_keys,
+                    user_vars=dict(self._user_vars, this=item, value=current),
                 ).parse(in_expr)
             return current
 
@@ -1254,11 +1229,14 @@ class _Parser:
                         f'Expression $size takes exactly 1 arguments. {len(value)} were passed in.'
                     )
                 value = value[0]
-            array_value = self._parse_or_nothing(value)
+            array_value = self.parse(value)
+            if array_value is NOTHING:
+                raise OperationFailure(
+                    'The argument to $size must be an array, but was of type: missing'
+                )
             if not isinstance(array_value, (list, tuple)):
                 raise OperationFailure(
-                    'The argument to $size must be an array, but was of type: %s'
-                    % ('missing' if array_value is NOTHING else type(array_value))
+                    f'The argument to $size must be an array, but was of type: {type(array_value)}'
                 )
             return len(array_value)
 
@@ -1280,8 +1258,7 @@ class _Parser:
                 for item in input_array
                 if _Parser(
                     self._doc_dict,
-                    dict(self._user_vars, **{fieldname: item}),
-                    ignore_missing_keys=self._ignore_missing_keys,
+                    user_vars=dict(self._user_vars, **{fieldname: item}),
                 ).parse(cond)
             ]
         if operator == '$slice':
@@ -1330,9 +1307,8 @@ class _Parser:
         return handler(self, values)
 
     def _handle_type_convertion_to_string(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if isinstance(parsed, bool):
             return str(parsed).lower()
@@ -1343,9 +1319,8 @@ class _Parser:
         return str(parsed)
 
     def _handle_type_convertion_to_int(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if decimal_support:
             if isinstance(parsed, decimal128.Decimal128):
@@ -1356,9 +1331,8 @@ class _Parser:
         )
 
     def _handle_type_convertion_to_long(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if decimal_support:
             if isinstance(parsed, decimal128.Decimal128):
@@ -1374,9 +1348,8 @@ class _Parser:
             raise NotImplementedError(
                 'You need to import the pymongo library to support decimal128 type.'
             )
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if isinstance(parsed, bool):
             parsed = '1' if parsed is True else '0'
@@ -1407,9 +1380,8 @@ class _Parser:
 
     def _handle_type_convertion_array_to_object(self, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
 
         if parsed is None:
@@ -1431,9 +1403,8 @@ class _Parser:
 
     def _handle_type_convertion_object_to_array(self, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/objectToArray/
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
 
         if parsed is None:
@@ -1448,9 +1419,8 @@ class _Parser:
 
     def _handle_type_convertion_to_object_id(self, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toObjectId/
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if parsed is None:
             return None
@@ -1469,9 +1439,8 @@ class _Parser:
         )
 
     def _handle_type_convertion_to_double(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if parsed is None:
             return None
@@ -1499,9 +1468,8 @@ class _Parser:
         )
 
     def _handle_type_convertion_to_bool(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if parsed is None:
             return None
@@ -1518,9 +1486,8 @@ class _Parser:
         return True
 
     def _handle_type_convertion_to_date(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         if parsed is None:
             return None
@@ -1548,9 +1515,8 @@ class _Parser:
         )
 
     def _handle_convert(self, values):
-        try:
-            parsed = self.parse(values)
-        except KeyError:
+        parsed = self.parse(values)
+        if parsed is NOTHING:
             return None
         input_ = parsed['input']
         to_ = parsed['to']
@@ -1620,43 +1586,40 @@ class _Parser:
     def _handle_type_operator(self, operator, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
         if operator == '$isNumber':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self.parse(values)
+            if parsed is NOTHING:
                 return False
             return False if isinstance(parsed, bool) else isinstance(parsed, numbers.Number)
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isArray/
         if operator == '$isArray':
-            try:
-                parsed = self.parse(values)
-            except KeyError:
+            parsed = self.parse(values)
+            if parsed is NOTHING:
                 return False
             return isinstance(parsed, (tuple, list))
 
         if operator == '$type':
-            try:
-                parsed = self.parse(values)
-                if isinstance(parsed, bool):
-                    return 'bool'
-                if isinstance(parsed, str):
-                    return 'string'
-                if isinstance(parsed, dict):
-                    return 'object'
-                if isinstance(parsed, (list, tuple)):
-                    return 'array'
-                if parsed is None:
-                    return 'null'
-                if isinstance(parsed, float):
-                    return 'double'
-                if isinstance(parsed, int) and parsed > 2**31 - 1:
-                    return 'long'
-                if isinstance(parsed, int):
-                    return 'int'
-                if isinstance(parsed, datetime.datetime):
-                    return 'date'
-            except KeyError:
+            parsed = self.parse(values)
+            if parsed is NOTHING:
                 return 'missing'
+            if isinstance(parsed, bool):
+                return 'bool'
+            if isinstance(parsed, str):
+                return 'string'
+            if isinstance(parsed, dict):
+                return 'object'
+            if isinstance(parsed, (list, tuple)):
+                return 'array'
+            if parsed is None:
+                return 'null'
+            if isinstance(parsed, float):
+                return 'double'
+            if isinstance(parsed, int) and parsed > 2**31 - 1:
+                return 'long'
+            if isinstance(parsed, int):
+                return 'int'
+            if isinstance(parsed, datetime.datetime):
+                return 'date'
             raise NotImplementedError(f"Type '{type(parsed)}' is not supported yet")
 
         raise NotImplementedError(  # pragma: no cover
@@ -1675,12 +1638,9 @@ class _Parser:
                 )
             fallback = values[-1]
             for field in fields:
-                try:
-                    out_value = self.parse(field)
-                    if out_value is not None:
-                        return out_value
-                except KeyError:
-                    pass
+                out_value = self.parse(field)
+                if not _is_nullish(out_value):
+                    return out_value
             return self.parse(fallback)
         if operator == '$cond':
             if isinstance(values, list):
@@ -1766,7 +1726,7 @@ class _Parser:
                 '$setUnion': (None, NOTHING),
                 '$setIntersection': (None, NOTHING),
             }
-            values = [self._parse_or_nothing(v) for v in values]
+            values = [self.parse(v) for v in values]
             for v in values:
                 if not isinstance(v, list) and v not in accepted_special_values.get(operator, []):
                     type_ = 'missing' if v is NOTHING else type(v)
@@ -1807,7 +1767,7 @@ class _Parser:
             return result
 
         if operator == '$setDifference':
-            values = [self._parse_or_nothing(v) for v in values]
+            values = [self.parse(v) for v in values]
             values = [None if v is NOTHING else v for v in values]
             for v in values:
                 if not isinstance(v, list) and v is not None:
@@ -1920,19 +1880,15 @@ class _Parser:
         )
 
 
-def _parse_expression(expression, doc_dict, ignore_missing_keys=False, user_vars=None):
+def _parse_expression(expression, doc_dict, user_vars=None):
     """Parse an expression.
 
     Args:
         expression: an Aggregate Expression, see
             https://docs.mongodb.com/manual/meta/aggregation-quick-reference/#aggregation-expressions.
         doc_dict: the document on which to evaluate the expression.
-        ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
-            if it is possible.
     """
-    return _Parser(doc_dict, user_vars=user_vars, ignore_missing_keys=ignore_missing_keys).parse(
-        expression
-    )
+    return _Parser(doc_dict, user_vars=user_vars).parse(expression)
 
 
 filtering.register_parse_expression(_parse_expression)
@@ -1946,12 +1902,9 @@ def _accumulate_group(output_fields, group_list, user_vars):
         for operator, key in value.items():
             values = []
             for doc in group_list:
-                try:
-                    values.append(
-                        _parse_expression(key, doc, ignore_missing_keys=True, user_vars=user_vars)
-                    )
-                except KeyError:
-                    continue
+                parsed = _parse_expression(key, doc, user_vars=user_vars)
+                if parsed is not NOTHING:
+                    values.append(parsed)
             if operator in _GROUPING_OPERATOR_MAP:
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
             elif operator == '$addToSet':
@@ -2151,9 +2104,8 @@ def _handle_lookup_stage(in_collection, database, options, user_vars):
 
     for doc in in_collection:
         if local_field and foreign_field:
-            try:
-                query = helpers.get_value_by_dot(doc, local_field, can_generate_array=True)
-            except KeyError:
+            query = helpers.get_value_by_dot(doc, local_field, can_generate_array=True)
+            if query is NOTHING:
                 query = None
             if isinstance(query, list):
                 query = {'$in': query}
@@ -2255,9 +2207,8 @@ def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
     for doc in out_doc:
         found_items = set()
         depth = 0
-        try:
-            result = _parse_expression(start_with, doc, user_vars=user_vars)
-        except KeyError:
+        result = _parse_expression(start_with, doc, user_vars=user_vars)
+        if result is NOTHING:
             continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
         while origin_matches and (max_depth is None or depth < max_depth):
@@ -2278,10 +2229,8 @@ def _handle_group_stage(in_collection, unused_database, options, user_vars):
     if _id:
 
         def _key_getter(doc):
-            try:
-                return _parse_expression(_id, doc, ignore_missing_keys=True, user_vars=user_vars)
-            except KeyError:
-                return None
+            key = _parse_expression(_id, doc, user_vars=user_vars)
+            return None if key is NOTHING else key
 
         def _sort_key_getter(doc):
             return filtering.BsonComparable(_key_getter(doc))
@@ -2308,10 +2257,8 @@ def _handle_set_window_fields_stage(in_collection, unused_database, options, unu
     if partition_key is not None:
 
         def _key_getter(doc):
-            try:
-                return _parse_expression(partition_key, doc, ignore_missing_keys=True)
-            except KeyError:
-                return None
+            key = _parse_expression(partition_key, doc)
+            return None if key is NOTHING else key
 
         def _sort_key_getter(doc):
             return filtering.BsonComparable(_key_getter(doc))
@@ -2380,9 +2327,8 @@ def _handle_bucket_stage(in_collection, unused_database, options, user_vars):
         param being a sort key to sort the default bucket even
         if it's not the same type as the boundaries.
         """
-        try:
-            value = _parse_expression(group_by, doc, user_vars=user_vars)
-        except KeyError:
+        value = _parse_expression(group_by, doc, user_vars=user_vars)
+        if value is NOTHING:
             return (is_default_last, _get_default_bucket())
         index = bisect.bisect_right(boundaries, value)
         if index and index < len(boundaries):
@@ -2530,13 +2476,8 @@ def _handle_unwind_stage(in_collection, unused_database, options, unused_user_va
     include_array_index = options.get('includeArrayIndex')
     unwound_collection = []
     for doc in in_collection:
-        try:
-            array_value = helpers.get_value_by_dot(doc, path)
-        except KeyError:
-            if should_preserve_null_and_empty:
-                unwound_collection.append(doc)
-            continue
-        if array_value is None:
+        array_value = helpers.get_value_by_dot(doc, path)
+        if _is_nullish(array_value):
             if should_preserve_null_and_empty:
                 unwound_collection.append(doc)
             continue
@@ -2635,12 +2576,7 @@ def _handle_replace_root_stage(in_collection, unused_database, options, user_var
 def _replace_root_documents(in_collection, expression, user_vars):
     out_collection = []
     for doc in in_collection:
-        try:
-            new_doc = _parse_expression(
-                expression, doc, ignore_missing_keys=True, user_vars=user_vars
-            )
-        except KeyError:
-            new_doc = NOTHING
+        new_doc = _parse_expression(expression, doc, user_vars=user_vars)
         if not isinstance(new_doc, dict):
             raise OperationFailure(
                 f"'newRoot' expression must evaluate to an object, but resulting value was: "
@@ -2682,10 +2618,9 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
             new_fields_collection = [{} for unused_doc in in_collection]
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
-            with contextlib.suppress(KeyError):
-                out_doc[field] = _parse_expression(
-                    value, in_doc, ignore_missing_keys=True, user_vars=user_vars
-                )
+            out_value = _parse_expression(value, in_doc, user_vars=user_vars)
+            if out_value is not NOTHING:
+                out_doc[field] = out_value
     if (method == 'include') == (include_id is not False and include_id != 0):
         filter_list.append('_id')
 
@@ -2719,10 +2654,7 @@ def _handle_redact_stage(in_collection, unused_database, options, user_vars):
 
 def _handle_redact_stage_expression(expression, doc):
     redact_vars = {i: i for i in ['PRUNE', 'KEEP', 'DESCEND']}
-    try:
-        expr_result = _parse_expression(expression, doc, user_vars=redact_vars)
-    except KeyError as ex:
-        raise OperationFailure(f'Invalid $redact :: caused by :: {ex}') from ex
+    expr_result = _parse_expression(expression, doc, user_vars=redact_vars)
 
     if expr_result == 'PRUNE':
         return None
@@ -2730,6 +2662,8 @@ def _handle_redact_stage_expression(expression, doc):
         return doc
     elif expr_result == 'DESCEND':
         return {k: _handle_redact_descend_values(expression, v) for k, v in doc.items()}
+
+    raise OperationFailure(f'Unrecognized $$PRUNE variable: {expr_result}')
 
 
 def _handle_redact_descend_values(expression, value):
@@ -2754,11 +2688,8 @@ def _handle_add_fields_stage(in_collection, unused_database, options, user_vars)
     out_collection = [dict(doc) for doc in in_collection]
     for field, value in options.items():
         for in_doc, out_doc in zip(in_collection, out_collection):
-            try:
-                out_value = _parse_expression(
-                    value, in_doc, user_vars=user_vars, ignore_missing_keys=True
-                )
-            except KeyError:
+            out_value = _parse_expression(value, in_doc, user_vars=user_vars)
+            if out_value is NOTHING:
                 continue
             parts = field.split('.')
             for subfield in parts[:-1]:
@@ -2812,12 +2743,11 @@ def _normalize_merge_on(on):
 def _build_merge_query(doc, on_fields):
     query = {}
     for field in on_fields:
-        try:
-            value = helpers.get_value_by_dot(doc, field)
-        except KeyError as err:
+        value = helpers.get_value_by_dot(doc, field)
+        if value is NOTHING:
             raise OperationFailure(
                 f"$merge requires the field '{field}' to be present in each input document"
-            ) from err
+            )
         helpers.set_value_by_dot(query, field, value)
     return query
 

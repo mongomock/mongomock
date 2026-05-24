@@ -120,7 +120,9 @@ create_uri_spec_tests()
 
 class ValueByDotTest(TestCase):
     def test__get_value_by_dot_missing_key(self):
-        """Test get_value_by_dot raises KeyError when looking for a missing key"""
+        """Test get_value_by_dot returns NOTHING when looking for a missing key"""
+        from sentinels import NOTHING
+
         for doc, key in (
             ({}, 'a'),
             ({'a': 1}, 'b'),
@@ -130,7 +132,7 @@ class ValueByDotTest(TestCase):
             ({'a': [{'b': 1}]}, 'a.b'),
             ({'a': [{'b': 1}]}, 'a.1.b'),
         ):
-            self.assertRaises(KeyError, get_value_by_dot, doc, key)
+            self.assertIs(get_value_by_dot(doc, key), NOTHING)
 
     def test__get_value_by_dot_find_key(self):
         """Test get_value_by_dot when key can be found"""
