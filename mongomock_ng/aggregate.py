@@ -57,6 +57,10 @@ _RE_TYPES: tuple[type[Any], ...] = (
 _random = random.Random()  # noqa: S311
 
 
+def _is_nat(value: Any) -> bool:
+    return type(value).__name__ == 'NaTType'
+
+
 group_operators = [
     '$addToSet',
     '$avg',
@@ -118,9 +122,19 @@ binary_bitwise_operators = {
 unary_bitwise_operators = {
     '$bitNot',
 }
+binary_bitwise_operators = {
+    '$bitAnd',
+    '$bitOr',
+    '$bitXor',
+}
+unary_bitwise_operators = {
+    '$bitNot',
+}
 arithmetic_operators = (
     unary_arithmetic_operators
     | binary_arithmetic_operators
+    | binary_bitwise_operators
+    | unary_bitwise_operators
     | binary_bitwise_operators
     | unary_bitwise_operators
     | {
@@ -309,7 +323,7 @@ def _truncate_date(value: datetime.datetime, unit: str) -> datetime.datetime:
 
 def _handle_date_add_operator(
     operator: str, values: Any, out_value: dict[str, Any]
-) -> datetime.datetime:
+) -> Optional[datetime.datetime]:
     if not isinstance(values, dict) or not {'startDate', 'amount', 'unit'} <= set(values):
         raise OperationFailure(
             f'{operator} operator must correspond a dict'
@@ -321,6 +335,9 @@ def _handle_date_add_operator(
             f'{operator} operator, it is currently not implemented '
             'in Mongomock-ng.'
         )
+
+    if _is_nat(out_value['startDate']):
+        return None
 
     amount = out_value.get('amount')
     if not isinstance(amount, int) or isinstance(amount, bool):
@@ -334,7 +351,7 @@ def _handle_date_add_operator(
     return _add_to_date(out_value['startDate'], out_value['unit'], amount)
 
 
-def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> int:
+def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> Optional[int]:
     if not isinstance(values, dict) or not {'startDate', 'endDate', 'unit'} <= set(values):
         raise OperationFailure(
             '$dateDiff operator must correspond a dict'
@@ -355,6 +372,10 @@ def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> int:
 
     start_date = out_value['startDate']
     end_date = out_value['endDate']
+
+    if _is_nat(start_date) or _is_nat(end_date):
+        return None
+
     unit = out_value['unit']
     delta = end_date - start_date
     if unit == 'millisecond':
@@ -384,7 +405,9 @@ def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> int:
     return math.floor(result)
 
 
-def _handle_date_trunc_operator(values: Any, out_value: dict[str, Any]) -> datetime.datetime:
+def _handle_date_trunc_operator(
+    values: Any, out_value: dict[str, Any]
+) -> Optional[datetime.datetime]:
     if not isinstance(values, dict) or not {'date', 'unit'} <= set(values):
         raise OperationFailure(
             '$dateTrunc operator must correspond a dictthat has "unit" and "date" fields.'
@@ -397,6 +420,9 @@ def _handle_date_trunc_operator(values: Any, out_value: dict[str, Any]) -> datet
             '$dateTrunc operator, it is currently not implemented '
             'in Mongomock-ng.'
         )
+
+    if _is_nat(out_value['date']):
+        return None
     return _truncate_date(out_value['date'], out_value['unit'])
 
 
@@ -471,9 +497,11 @@ def _parse_and_execute_trim(operator, values, parser):
     if not isinstance(input_str, str):
         raise OperationFailure(
             f'${operator} requires input to be of type string, got {type(input_str).__name__}'
+            f'${operator} requires input to be of type string, got {type(input_str).__name__}'
         )
     if chars is not None and not isinstance(chars, str):
         raise OperationFailure(
+            f'${operator} requires chars to be of type string, got {type(chars).__name__}'
             f'${operator} requires chars to be of type string, got {type(chars).__name__}'
         )
     strip_chars = chars if chars else None
@@ -663,7 +691,39 @@ class _Parser:
             f' in Mongomock-ng.'
         )
 
-    def _handle_unary_arithmetic(self, operator, values):
+    def _handle_arithmetic_operator(self, operator, values):
+        try:
+            return self._eval_arithmetic_operator(operator, values)
+        except (OverflowError, ValueError) as e:
+            raise OperationFailure(f'Error processing {operator}: {e}') from e
+
+    def _eval_arithmetic_operator(self, operator, values):
+        if operator in unary_arithmetic_operators | unary_bitwise_operators:
+            return self._eval_unary_arithmetic_operator(operator, values)
+        if operator in binary_arithmetic_operators | binary_bitwise_operators:
+            return self._eval_binary_arithmetic_operator(operator, values)
+        # N-ary operators
+        assert isinstance(
+            values, (tuple, list)
+        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+
+        parsed_values = list(self.parse_many(values))
+        assert parsed_values, f'{operator} must have at least one parameter'
+        for value in parsed_values:
+            if value is None:
+                return None
+            assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
+        if operator == '$add':
+            return sum(parsed_values)
+        if operator == '$multiply':
+            return functools.reduce(lambda x, y: x * y, parsed_values)
+
+        raise NotImplementedError(  # pragma: no cover
+            f"Although '{operator}' is a valid aritmetic operator for the aggregation "
+            f'pipeline, it is currently not implemented  in Mongomock-ng.'
+        )
+
+    def _eval_unary_arithmetic_operator(self, operator, values):
         try:
             number = self.parse(values)
         except KeyError:
@@ -679,10 +739,7 @@ class _Parser:
         if operator == '$ceil':
             return math.ceil(number)
         if operator == '$exp':
-            try:
-                return math.exp(number)
-            except OverflowError as e:
-                raise OperationFailure(str(e)) from e
+            return math.exp(number)
         if operator == '$floor':
             return math.floor(number)
         if operator == '$ln':
@@ -700,9 +757,8 @@ class _Parser:
                     f"got '{type(number).__name__}'"
                 )
             return ~number
-        return None
 
-    def _handle_binary_arithmetic(self, operator, values):
+    def _eval_binary_arithmetic_operator(self, operator, values):
         if not isinstance(values, (tuple, list)):
             raise OperationFailure(
                 f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
@@ -722,7 +778,10 @@ class _Parser:
                 raise OperationFailure(f'{operator} must have only 2 parameters')
 
         number_0, number_1, *_ = list(self.parse_many(values)) + [None] * 2
-        if number_0 is None or (number_1 is None and not supports_optional_number_2):
+        if operator in binary_bitwise_operators:
+            if number_0 is None or number_1 is None:
+                return None
+        elif number_0 is None or (number_1 is None and not supports_optional_number_2):
             return None
 
         if operator == '$divide':
@@ -760,34 +819,6 @@ class _Parser:
                 return number_0 | number_1
             if operator == '$bitXor':
                 return number_0 ^ number_1
-        return None
-
-    def _handle_arithmetic_operator(self, operator, values):
-        if operator in unary_arithmetic_operators | unary_bitwise_operators:
-            return self._handle_unary_arithmetic(operator, values)
-
-        if operator in binary_arithmetic_operators | binary_bitwise_operators:
-            return self._handle_binary_arithmetic(operator, values)
-
-        assert isinstance(
-            values, (tuple, list)
-        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
-
-        parsed_values = list(self.parse_many(values))
-        assert parsed_values, f'{operator} must have at least one parameter'
-        for value in parsed_values:
-            if value is None:
-                return None
-            assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
-        if operator == '$add':
-            return sum(parsed_values)
-        if operator == '$multiply':
-            return functools.reduce(lambda x, y: x * y, parsed_values)
-
-        raise NotImplementedError(  # pragma: no cover
-            f"Although '{operator}' is a valid aritmetic operator for the aggregation "
-            f'pipeline, it is currently not implemented  in Mongomock-ng.'
-        )
 
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
@@ -982,6 +1013,9 @@ class _Parser:
         else:
             out_value = self.parse(values)
 
+        if _is_nat(out_value):
+            return None
+
         if operator == '$dayOfYear':
             return out_value.timetuple().tm_yday
         if operator == '$dayOfMonth':
@@ -1031,6 +1065,8 @@ class _Parser:
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock-ng.'
                 )
+            if _is_nat(out_value['date']):
+                return None
             return out_value['date'].strftime(out_value['format'])
         if operator == '$dateFromParts':
             if not isinstance(out_value, dict):
@@ -1300,6 +1336,8 @@ class _Parser:
             return None
         if isinstance(parsed, bool):
             return str(parsed).lower()
+        if _is_nat(parsed):
+            return None
         if isinstance(parsed, datetime.datetime):
             return parsed.isoformat()[:-3] + 'Z'
         return str(parsed)
@@ -1485,6 +1523,8 @@ class _Parser:
         except KeyError:
             return None
         if parsed is None:
+            return None
+        if _is_nat(parsed):
             return None
         if isinstance(parsed, datetime.datetime):
             return parsed
@@ -1845,6 +1885,7 @@ class _Parser:
                 field_name = self.parse(values.get('field', ''))
                 if not isinstance(field_name, str):
                     raise OperationFailure(
+                        f'$getField requires field to be a string, got {type(field_name).__name__}'
                         f'$getField requires field to be a string, got {type(field_name).__name__}'
                     )
                 field_name = field_name.lstrip('$')

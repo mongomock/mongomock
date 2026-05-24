@@ -942,12 +942,11 @@ class Collection:
         existing_document.clear()
         existing_document.update(new_document)
 
-    def _apply_update_document(self, existing_document, spec, document, was_insert):  # noqa: C901
+    def _apply_update_document(self, existing_document, spec, document, was_insert):
         """Apply document, which is an update document, to existing_document.
 
         This method updates existing_document in-place.
         """
-
         first = True
         subdocument = None
         for k, v in document.items():
@@ -956,7 +955,6 @@ class Collection:
                 subdocument = self._update_document_fields_with_positional_awareness(
                     existing_document, v, spec, updater, subdocument
                 )
-
             elif k == '$rename':
                 for src, dst in v.items():
                     if '.' in src or '.' in dst:
@@ -966,227 +964,199 @@ class Collection:
                         )
                     if self._has_key(existing_document, src):
                         existing_document[dst] = existing_document.pop(src)
-
             elif k == '$setOnInsert':
                 if not was_insert:
                     continue
                 subdocument = self._update_document_fields_with_positional_awareness(
                     existing_document, v, spec, _set_updater, subdocument
                 )
-
             elif k == '$currentDate':
                 subdocument = self._update_document_fields_with_positional_awareness(
                     existing_document, v, spec, _current_date_updater, subdocument
                 )
-
             elif k == '$addToSet':
-                for field, value in v.items():
-                    nested_field_list = field.rsplit('.')
-                    if len(nested_field_list) == 1:
-                        if field not in existing_document:
-                            existing_document[field] = []
-                        # document should be a list append to it
-                        if isinstance(value, dict) and '$each' in value:
-                            # append the objects to the field
-                            for obj in list(value['$each']):
-                                if obj not in existing_document[field]:
-                                    existing_document[field].append(obj)
-                            continue
-                        if value not in existing_document[field]:
-                            existing_document[field].append(value)
-                        continue
-                    # push to array in a nested attribute
-                    else:
-                        # create nested attributes if they do not exist
-                        subdocument = existing_document
-                        for field_part in nested_field_list[:-1]:
-                            if field_part == '$':
-                                break
-                            if field_part not in subdocument:
-                                subdocument[field_part] = {}
-
-                            subdocument = subdocument[field_part]
-
-                        # get subdocument with $ oprator support
-                        subdocument, _ = self._get_subdocument(
-                            existing_document, spec, nested_field_list
-                        )
-
-                        # we're pushing a list
-                        push_results = []
-                        if nested_field_list[-1] in subdocument:
-                            # if the list exists, then use that list
-                            push_results = subdocument[nested_field_list[-1]]
-
-                        if isinstance(value, dict) and '$each' in value:
-                            push_results += [
-                                obj for obj in list(value['$each']) if obj not in push_results
-                            ]
-                        elif value not in push_results:
-                            push_results.append(value)
-
-                        subdocument[nested_field_list[-1]] = push_results
+                self._apply_add_to_set_operator(existing_document, spec, v)
             elif k == '$pull':
-                for field, value in v.items():
-                    nested_field_list = field.rsplit('.')
-                    # nested fields includes a positional element
-                    # need to find that element
-                    if '$' in nested_field_list:
-                        if not subdocument:
-                            subdocument, _ = self._get_subdocument(
-                                existing_document, spec, nested_field_list
-                            )
-
-                        # value should be a dictionary since we're pulling
-                        pull_results = []
-                        # and the last subdoc should be an array
-                        for obj in subdocument[nested_field_list[-1]]:
-                            if isinstance(obj, dict):
-                                for pull_key, pull_value in value.items():
-                                    if obj[pull_key] != pull_value:
-                                        pull_results.append(obj)
-                                continue
-                            if obj != value:
-                                pull_results.append(obj)
-
-                        # cannot write to doc directly as it doesn't save to
-                        # existing_document
-                        subdocument[nested_field_list[-1]] = pull_results
-                    else:
-                        arr = existing_document
-                        for field_part in nested_field_list:
-                            if field_part not in arr:
-                                break
-                            arr = arr[field_part]
-                        if not isinstance(arr, list):
-                            continue
-
-                        arr_copy = copy.deepcopy(arr)
-                        if isinstance(value, dict):
-                            for obj in arr_copy:
-                                try:
-                                    is_matching = filter_applies(value, obj)
-                                except OperationFailure:
-                                    is_matching = False
-                                if is_matching:
-                                    arr.remove(obj)
-                                    continue
-
-                                if filter_applies({'field': value}, {'field': obj}):
-                                    arr.remove(obj)
-                        else:
-                            for obj in arr_copy:
-                                if value == obj:
-                                    arr.remove(obj)
+                self._apply_pull_operator(existing_document, spec, v)
             elif k == '$pullAll':
-                for field, value in v.items():
-                    nested_field_list = field.rsplit('.')
-                    if len(nested_field_list) == 1:
-                        if field in existing_document:
-                            arr = existing_document[field]
-                            existing_document[field] = [obj for obj in arr if obj not in value]
-                        continue
-                    else:
-                        subdocument, _ = self._get_subdocument(
-                            existing_document, spec, nested_field_list
-                        )
-
-                        if nested_field_list[-1] in subdocument:
-                            arr = subdocument[nested_field_list[-1]]
-                            subdocument[nested_field_list[-1]] = [
-                                obj for obj in arr if obj not in value
-                            ]
+                self._apply_pull_all_operator(existing_document, spec, v)
             elif k == '$push':
-                for field, value in v.items():
-                    # Find the place where to push.
-                    nested_field_list = field.rsplit('.')
-                    subdocument, field = self._get_subdocument(
-                        existing_document, spec, nested_field_list
-                    )
-
-                    # Push the new element or elements.
-                    if isinstance(subdocument, dict) and field not in subdocument:
-                        subdocument[field] = []
-                    push_results = subdocument[field]
-                    if isinstance(value, dict) and '$each' in value:
-                        if '$position' in value:
-                            push_results = (
-                                push_results[0 : value['$position']]
-                                + list(value['$each'])
-                                + push_results[value['$position'] :]
-                            )
-                        else:
-                            push_results += list(value['$each'])
-
-                        if '$sort' in value:
-                            sort_spec = value['$sort']
-                            if isinstance(sort_spec, dict):
-                                sort_key = set(sort_spec.keys()).pop()
-                                push_results = sorted(
-                                    push_results,
-                                    key=lambda d: helpers.get_value_by_dot(d, sort_key),
-                                    reverse=set(sort_spec.values()).pop() < 0,
-                                )
-                            else:
-                                push_results = sorted(push_results, reverse=sort_spec < 0)
-
-                        if '$slice' in value:
-                            slice_value = value['$slice']
-                            if slice_value < 0:
-                                push_results = push_results[slice_value:]
-                            elif slice_value == 0:
-                                push_results = []
-                            else:
-                                push_results = push_results[:slice_value]
-
-                        unused_modifiers = set(value.keys()) - {
-                            '$each',
-                            '$slice',
-                            '$position',
-                            '$sort',
-                        }
-                        if unused_modifiers:
-                            raise WriteError(
-                                'Unrecognized clause in $push: ' + unused_modifiers.pop()
-                            )
-                    else:
-                        push_results.append(value)
-                    subdocument[field] = push_results
+                subdocument = self._apply_push_operator(existing_document, v, spec, subdocument)
             elif first:
-                # replace entire document
-                for key in document:
-                    if key.startswith('$'):
-                        # can't mix modifiers with non-modifiers in
-                        # update
-                        raise ValueError(f'field names cannot start with $ [{k}]')
-                _id = spec.get('_id', existing_document.get('_id'))
-                existing_document.clear()
-                if _id is not None:
-                    existing_document['_id'] = _id
-                if BSON:
-                    # bson validation
-                    check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
-                    if not check_keys:
-                        _validate_data_fields(document)
-                    _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
-                existing_document.update(self._internalize_dict(document))
-                if existing_document['_id'] != _id:
-                    raise OperationFailure(
-                        'The _id field cannot be changed from {} to {}'.format(
-                            existing_document['_id'], _id
-                        )
-                    )
+                self._apply_replace_document(existing_document, spec, document)
                 break
             else:
-                # can't mix modifiers with non-modifiers in update
                 raise ValueError(f'Invalid modifier specified: {k}')
             first = False
-        # if empty document comes
         if not document:
-            _id = spec.get('_id', existing_document.get('_id'))
-            existing_document.clear()
-            if _id:
-                existing_document['_id'] = _id
+            self._apply_empty_document(existing_document, spec)
+
+    def _apply_add_to_set_operator(self, existing_document, spec, v):
+        """Apply $addToSet operator."""
+        for field, value in v.items():
+            nested_field_list = field.rsplit('.')
+            if len(nested_field_list) == 1:
+                if field not in existing_document:
+                    existing_document[field] = []
+                if isinstance(value, dict) and '$each' in value:
+                    for obj in list(value['$each']):
+                        if obj not in existing_document[field]:
+                            existing_document[field].append(obj)
+                    continue
+                if value not in existing_document[field]:
+                    existing_document[field].append(value)
+                continue
+            else:
+                subdocument = existing_document
+                for field_part in nested_field_list[:-1]:
+                    if field_part == '$':
+                        break
+                    if field_part not in subdocument:
+                        subdocument[field_part] = {}
+                    subdocument = subdocument[field_part]
+                subdocument, _ = self._get_subdocument(existing_document, spec, nested_field_list)
+                push_results = []
+                if nested_field_list[-1] in subdocument:
+                    push_results = subdocument[nested_field_list[-1]]
+                if isinstance(value, dict) and '$each' in value:
+                    push_results += [obj for obj in list(value['$each']) if obj not in push_results]
+                elif value not in push_results:
+                    push_results.append(value)
+                subdocument[nested_field_list[-1]] = push_results
+
+    def _apply_pull_operator(self, existing_document, spec, v):
+        """Apply $pull operator."""
+        for field, value in v.items():
+            nested_field_list = field.rsplit('.')
+            if '$' in nested_field_list:
+                subdocument, _ = self._get_subdocument(existing_document, spec, nested_field_list)
+                pull_results = []
+                for obj in subdocument[nested_field_list[-1]]:
+                    if isinstance(obj, dict):
+                        for pull_key, pull_value in value.items():
+                            if obj[pull_key] != pull_value:
+                                pull_results.append(obj)
+                        continue
+                    if obj != value:
+                        pull_results.append(obj)
+                subdocument[nested_field_list[-1]] = pull_results
+            else:
+                arr = existing_document
+                for field_part in nested_field_list:
+                    if field_part not in arr:
+                        break
+                    arr = arr[field_part]
+                if not isinstance(arr, list):
+                    continue
+                arr_copy = copy.deepcopy(arr)
+                if isinstance(value, dict):
+                    for obj in arr_copy:
+                        try:
+                            is_matching = filter_applies(value, obj)
+                        except OperationFailure:
+                            is_matching = False
+                        if is_matching:
+                            arr.remove(obj)
+                            continue
+                        if filter_applies({'field': value}, {'field': obj}):
+                            arr.remove(obj)
+                else:
+                    for obj in arr_copy:
+                        if value == obj:
+                            arr.remove(obj)
+
+    def _apply_pull_all_operator(self, existing_document, spec, v):
+        """Apply $pullAll operator."""
+        for field, value in v.items():
+            nested_field_list = field.rsplit('.')
+            if len(nested_field_list) == 1:
+                if field in existing_document:
+                    arr = existing_document[field]
+                    existing_document[field] = [obj for obj in arr if obj not in value]
+                continue
+            else:
+                subdocument, _ = self._get_subdocument(existing_document, spec, nested_field_list)
+                if nested_field_list[-1] in subdocument:
+                    arr = subdocument[nested_field_list[-1]]
+                    subdocument[nested_field_list[-1]] = [obj for obj in arr if obj not in value]
+
+    def _apply_push_operator(self, existing_document, v, spec, subdocument):
+        """Apply $push operator."""
+        for field, value in v.items():
+            nested_field_list = field.rsplit('.')
+            subdocument, field = self._get_subdocument(existing_document, spec, nested_field_list)
+            if isinstance(subdocument, dict) and field not in subdocument:
+                subdocument[field] = []
+            push_results = subdocument[field]
+            if isinstance(value, dict) and '$each' in value:
+                if '$position' in value:
+                    push_results = (
+                        push_results[0 : value['$position']]
+                        + list(value['$each'])
+                        + push_results[value['$position'] :]
+                    )
+                else:
+                    push_results += list(value['$each'])
+                if '$sort' in value:
+                    sort_spec = value['$sort']
+                    if isinstance(sort_spec, dict):
+                        sort_key = set(sort_spec.keys()).pop()
+                        push_results = sorted(
+                            push_results,
+                            key=lambda d: helpers.get_value_by_dot(d, sort_key),
+                            reverse=set(sort_spec.values()).pop() < 0,
+                        )
+                    else:
+                        push_results = sorted(push_results, reverse=sort_spec < 0)
+                if '$slice' in value:
+                    slice_value = value['$slice']
+                    if slice_value < 0:
+                        push_results = push_results[slice_value:]
+                    elif slice_value == 0:
+                        push_results = []
+                    else:
+                        push_results = push_results[:slice_value]
+                unused_modifiers = set(value.keys()) - {
+                    '$each',
+                    '$slice',
+                    '$position',
+                    '$sort',
+                }
+                if unused_modifiers:
+                    raise WriteError('Unrecognized clause in $push: ' + unused_modifiers.pop())
+            else:
+                push_results.append(value)
+            subdocument[field] = push_results
+        return subdocument
+
+    def _apply_replace_document(self, existing_document, spec, document):
+        """Replace entire document."""
+        for key in document:
+            if key.startswith('$'):
+                raise ValueError(f'field names cannot start with $ [{key}]')
+        _id = spec.get('_id', existing_document.get('_id'))
+        existing_document.clear()
+        if _id is not None:
+            existing_document['_id'] = _id
+        if BSON:
+            check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+            if not check_keys:
+                _validate_data_fields(document)
+            _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
+        existing_document.update(self._internalize_dict(document))
+        if existing_document['_id'] != _id:
+            raise OperationFailure(
+                'The _id field cannot be changed from {} to {}'.format(
+                    existing_document['_id'], _id
+                )
+            )
+
+    def _apply_empty_document(self, existing_document, spec):
+        """Handle empty document case."""
+        _id = spec.get('_id', existing_document.get('_id'))
+        existing_document.clear()
+        if _id:
+            existing_document['_id'] = _id
 
     def _get_subdocument(self, existing_document, spec, nested_field_list):
         """This method retrieves the subdocument of the existing_document.nested_field_list.

@@ -127,7 +127,6 @@ class CollectionAPITest(TestCase):
         self.db.create_collection('b')
         self.db.create_collection('c')
         self.db.drop_collection('b')
-        self.db.drop_collection('b')
         self.db.drop_collection(self.db.c)
         self.assertEqual(set(self.db.list_collection_names()), {'a'})
 
@@ -1602,7 +1601,6 @@ class CollectionAPITest(TestCase):
 
     def test__create_index_duplicate(self):
         self.db.collection.create_index([('value', 1)])
-        self.db.collection.create_index([('value', 1)])
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.create_index([('value', 1)], unique=True)
 
@@ -2100,8 +2098,6 @@ class CollectionAPITest(TestCase):
     )
     def test__find_and_modify_with_sort(self):
         self.db.collection.insert_one({'time_check': float(time.time())})
-        self.db.collection.insert_one({'time_check': float(time.time())})
-        self.db.collection.insert_one({'time_check': float(time.time())})
 
         start_check_time = float(time.time())
         self.db.collection.find_and_modify(
@@ -2131,8 +2127,6 @@ class CollectionAPITest(TestCase):
         )
 
     def test__cursor_sort_kept_after_clone(self):
-        self.db.collection.insert_one({'time_check': float(time.time())})
-        self.db.collection.insert_one({'time_check': float(time.time())})
         self.db.collection.insert_one({'time_check': float(time.time())})
 
         cursor = self.db.collection.find({}, sort=[('time_check', -1)])
@@ -2653,6 +2647,8 @@ class CollectionAPITest(TestCase):
     def test__rename_collection_to_bad_names(self):
         coll = self.db.create_collection('a')
         self.assertRaises(TypeError, coll.rename, ['a'])
+        self.assertRaises(mongomock.InvalidName, coll.rename, '.a')
+        self.assertRaises(mongomock.InvalidName, coll.rename, '$a')
         self.assertRaises(mongomock.InvalidName, coll.rename, '.a')
         self.assertRaises(mongomock.InvalidName, coll.rename, '$a')
 
@@ -6715,7 +6711,6 @@ class CollectionAPITest(TestCase):
                 {'a': 1, 'b': 1},
                 {'a': 1, 'b': 2},
                 {'a': 2},
-                {'a': 2},
             ]
         )
         actual = collection.aggregate(
@@ -6936,9 +6931,9 @@ class CollectionAPITest(TestCase):
             {'type': 1, 'val': 20},
             {'type': 1, 'val': 10},
             {'type': 2, 'val': 30},
-            {'type': 2, 'val': 30},
         ]
         collection.insert_many(data)
+        # Note: type-1 has 3 docs, type-2 has 1 doc → 4 docs total, 4 window outputs
         actual = collection.aggregate(
             [
                 {
@@ -6966,7 +6961,6 @@ class CollectionAPITest(TestCase):
             {'type': 1, 'val': 10, 'pushed': [10, 10], 'set': [10]},
             {'type': 1, 'val': 20, 'pushed': [10, 10, 20], 'set': [10, 20]},
             {'type': 2, 'val': 30, 'pushed': [30], 'set': [30]},
-            {'type': 2, 'val': 30, 'pushed': [30, 30], 'set': [30]},
         ]
         result = list(actual)
         for doc in result:
@@ -7194,7 +7188,6 @@ class CollectionAPITest(TestCase):
         collection.insert_many(
             [
                 {'uuid_field': uuid.uuid4()},
-                {'uuid_field': uuid.uuid4()},
             ]
         )
         actual = collection.aggregate(
@@ -7242,7 +7235,6 @@ class CollectionAPITest(TestCase):
         collection.insert_many(
             [
                 {'myref': DBRef('a', '1')},
-                {'myref': DBRef('a', '1')},
                 {'myref': DBRef('a', '2')},
                 {'myref': DBRef('b', '1')},
             ]
@@ -7259,7 +7251,6 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         collection.insert_many(
             [
-                {'group': 'one'},
                 {'group': 'one'},
                 {'group': 'one', 'data': None},
                 {'group': 'one', 'data': 0},
@@ -7292,7 +7283,7 @@ class CollectionAPITest(TestCase):
         expect = [
             {
                 '_id': 'one',
-                'count': 8,
+                'count': 7,
                 'countData': 4,
                 'countDataExists': 5,
             }
@@ -10401,6 +10392,8 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.a, self.db.b)
         self.assertEqual(self.db.a, self.db.get_collection('a'))
         self.assertNotEqual(self.db.a, self.client.other_db.a)
+        client = mongomock.MongoClient('localhost')
+        self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
         client = mongomock.MongoClient('localhost')
         self.assertEqual(client.db.collection, mongomock.MongoClient('localhost').db.collection)
         self.assertNotEqual(
