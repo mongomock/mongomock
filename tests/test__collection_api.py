@@ -10618,3 +10618,405 @@ class CollectionAPITest(TestCase):
         collection._store[oid3] = {'_id': oid3, 'dt': pd.Timestamp('2020-01-01')}
         docs = list(collection.find().sort('dt', -1))
         self.assertEqual(len(docs), 3)
+
+    def test__update_all_positional(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [99, 99, 99])
+
+    def test__update_all_positional_with_query(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one({'arr': [1, 2, 3]}, {'$set': {'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [99, 99, 99])
+
+    def test__update_all_positional_multiple_fields(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'x': [1, 2], 'y': [3, 4]})
+        collection.update_one({'_id': 1}, {'$set': {'x.$[]': 99, 'y.$[]': 88}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['x'], [99, 99])
+        self.assertEqual(doc['y'], [88, 88])
+
+    def test__update_all_positional_multiple_arrays(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr1': [1, 2], 'arr2': [3, 4]})
+        collection.update_one({'_id': 1}, {'$set': {'arr1.$[]': 10, 'arr2.$[]': 20}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr1'], [10, 10])
+        self.assertEqual(doc['arr2'], [20, 20])
+
+    def test__update_all_positional_with_inc(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one({'_id': 1}, {'$inc': {'arr.$[]': 1}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [2, 3, 4])
+
+    def test__update_all_positional_with_unset(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}, {'x': 3}]})
+        collection.update_one({'_id': 1}, {'$unset': {'arr.$[].x': ''}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{}, {}, {}])
+
+    def test__update_all_positional_nested_arrays(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'items': [1, 2]}, {'items': [3, 4]}]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[].items': [99]}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'items': [99]}, {'items': [99]}])
+
+    def test__update_all_positional_empty_array(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': []})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 10}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [])
+
+    def test__update_all_positional_upsert(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2, 3]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [99, 99, 99])
+
+    def test__update_all_positional_mixed(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2], 'other': 'keep'})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [99, 99])
+        self.assertEqual(doc['other'], 'keep')
+
+    def test__update_all_positional_with_positional(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one({'arr.x': 1}, {'$set': {'arr.$.x': 99, 'arr.$[].x': 88}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 88}, {'x': 88}])
+
+    def test__update_all_positional_with_array_filters(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[].x': 99}},
+            array_filters=[{'elem.x': {'$gte': 0}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}, {'x': 99}])
+
+    def test__update_all_positional_nested_doc(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'a': 1}, {'a': 2}]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[].a': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'a': 99}, {'a': 99}])
+
+    def test__update_all_positional_subdocument_array(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'data': {'items': [1, 2, 3]}})
+        collection.update_one({'_id': 1}, {'$set': {'data.items.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['data'], {'items': [99, 99, 99]})
+
+    def test__update_all_positional_regex_array_filter(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': ['abc', 'def', 'abc']})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem]': 'xxx'}},
+            array_filters=[{'elem': {'$regex': '^abc'}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], ['xxx', 'def', 'xxx'])
+
+    def test__update_all_positional_push_combined(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 2]})
+        with self.assertRaises(InvalidDocument):
+            collection.update_one({'_id': 1}, {'$push': {'arr': 3}, '$set': {'arr.$[]': 99}})
+
+    def test__update_all_positional_deeply_nested(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'outer': [{'inner': [1, 2]}, {'inner': [3, 4]}]})
+        collection.update_one({'_id': 1}, {'$set': {'outer.$[].inner': [99]}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['outer'], [{'inner': [99]}, {'inner': [99]}])
+
+    def test__update_all_positional_dotted_path_atom(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'e': {'x': 1}}, {'e': {'x': 2}}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].e.x': 99}},
+            array_filters=[{'elem.e.x': {'$gte': 1}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'e': {'x': 99}}, {'e': {'x': 99}}])
+
+    def test__update_all_positional_type_consistency(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [1, 'two', 3.0]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': None}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [None, None, None])
+
+    def test__update_all_positional_none_values(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [None, 1, None]})
+        collection.update_one({'_id': 1}, {'$set': {'arr.$[]': 99}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [99, 99, 99])
+
+    def test__update_all_positional_empty_update(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': []})
+        collection.update_one({'_id': 1}, {'$min': {'arr.$[]': 1}})
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [])
+
+    def test__array_filter_update_positional(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}, {'x': 2}])
+
+    def test__array_filter_multiple_conditions(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1, 'y': 10}, {'x': 2, 'y': 5}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].y': 99}},
+            array_filters=[{'elem.x': {'$gte': 1}, 'elem.y': {'$gte': 8}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 1, 'y': 99}, {'x': 2, 'y': 5}])
+
+    def test__array_filter_with_update(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$inc': {'arr.$[elem].x': 10}},
+            array_filters=[{'elem.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 11}, {'x': 2}])
+
+    def test__array_filter_multiple_filters(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1, 'y': 10}, {'x': 2, 'y': 20}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99, 'arr.$[elem].y': 88}},
+            array_filters=[{'elem.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99, 'y': 10}, {'x': 2, 'y': 20}])
+
+    def test__array_filter_with_and(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1, 'y': 10}, {'x': 2, 'y': 5}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].y': 99}},
+            array_filters=[{'$and': [{'elem.x': 1}, {'elem.y': 10}]}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 1, 'y': 99}, {'x': 2, 'y': 5}])
+
+    def test__array_filter_with_or(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}, {'x': 3}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'$or': [{'elem.x': 1}, {'elem.x': 3}]}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}, {'x': 2}, {'x': 99}])
+
+    def test__array_filter_nested_doc(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'data': [{'nested': {'val': 1}}, {'nested': {'val': 2}}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'data.$[elem].nested.val': 99}},
+            array_filters=[{'elem.nested.val': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['data'], [{'nested': {'val': 99}}, {'nested': {'val': 2}}])
+
+    def test__array_filter_multiple_array_fields(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': [{'x': 1}], 'b': [{'y': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'a.$[elem].x': 99}},
+            array_filters=[{'elem.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['a'], [{'x': 99}])
+
+    def test__array_filter_no_match(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': 100}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 1}, {'x': 2}])
+
+    def test__array_filter_all_match(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 1}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}, {'x': 99}])
+
+    def test__array_filter_positional_combined(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1, 'y': 2}, {'x': 2, 'y': 3}]})
+        collection.update_one(
+            {'arr.x': 1},
+            {'$set': {'arr.$.y': 99, 'arr.$[elem].x': 88}},
+            array_filters=[{'elem.x': 2}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 1, 'y': 99}, {'x': 88, 'y': 3}])
+
+    def test__array_filter_dotted_path_filter(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'e': {'x': 1}}, {'e': {'x': 2}}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].e.x': 99}},
+            array_filters=[{'elem.e.x': {'$gte': 1}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'e': {'x': 99}}, {'e': {'x': 99}}])
+
+    def test__array_filter_dotted_path_filter_mixed(self):
+        collection = self.db.collection
+        collection.insert_one(
+            {'_id': 1, 'arr': [{'e': {'x': 1}, 'y': 10}, {'e': {'x': 2}, 'y': 5}]}
+        )
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].y': 99}},
+            array_filters=[{'elem.e.x': {'$gte': 1}, 'elem.y': {'$gte': 8}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'e': {'x': 1}, 'y': 99}, {'e': {'x': 2}, 'y': 5}])
+
+    def test__array_filter_gte_lte(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 5}, {'x': 15}, {'x': 25}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': {'$gte': 10, '$lte': 20}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 5}, {'x': 99}, {'x': 25}])
+
+    def test__array_filter_identifier_named_x(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[x].x': 99}},
+            array_filters=[{'x.x': 1}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}, {'x': 2}])
+
+    def test__array_filter_upsert(self):
+        collection = self.db.collection
+        collection.update_one(
+            {'_id': 1, 'arr': [{'x': 1}, {'x': 2}]},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': 1}],
+            upsert=True,
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertIsNotNone(doc)
+
+    def test__array_filter_upsert_no_match(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 10}]})
+        collection.update_one(
+            {'_id': 1},
+            {'$set': {'arr.$[elem].x': 99}},
+            array_filters=[{'elem.x': {'$gte': 0}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [{'x': 99}])
+
+    def test__array_filter_update_uses_mul(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 5}, {'x': 10}]})
+        with self.assertRaises(ValueError):
+            collection.update_one(
+                {'_id': 1},
+                {'$mul': {'arr.$[elem].x': 2}},
+                array_filters=[{'elem.x': 5}],
+            )
+
+    def test__array_filter_update_rename_fails(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
+        with self.assertRaises(NotImplementedError):
+            collection.update_one(
+                {'_id': 1},
+                {'$rename': {'arr.$[elem].x': 'arr.$[elem].y'}},
+                array_filters=[{'elem.x': 1}],
+            )
+
+    def test__array_filter_update_pop(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [[1, 2, 3], [4, 5, 6]]})
+        collection.update_one(
+            {'_id': 1},
+            {'$pop': {'arr.$[elem]': -1}},
+            array_filters=[{'elem': {'$exists': True}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(doc['arr'], [[2, 3], [5, 6]])
+
+    def test__array_filter_update_pull(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [[1, 2, 3], [4, 5, 6]]})
+        collection.update_one(
+            {'_id': 1},
+            {'$pull': {'arr.$[elem]': {'$gte': 5}}},
+            array_filters=[{'elem': {'$exists': True}}],
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertEqual(len(doc['arr']), 1)
+
+    def test__array_filter_update_add_to_set(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'arr': [[1, 2], [3, 4]]})
+        with self.assertRaises(ValueError):
+            collection.update_one(
+                {'_id': 1},
+                {'$addToSet': {'arr.$[elem]': 99}},
+                array_filters=[{'elem': {'$exists': True}}],
+            )

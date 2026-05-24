@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.8] - 2026-05-24
+### Added
+- `Database.__iter__` returns `self`, `Database.__next__` raises `TypeError`, matching PyMongo behavior (closes #64)
+- 48+ edge-case tests for `$[]` positional all and `arrayFilters` operators
+
+### Fixed
+- `_lookup_array_filter` now handles dot-notation filter keys (e.g., `{'e.x': {'$gte': 1}}`)
+- `_lookup_array_filter` now handles `$and`/`$or` logical operators in array filter specs
+- `_array_filter_applies` now strips `filter_id` prefix from `$and`/`$or` subfilters
+- `_update_document_fields_positional` no longer overwrites the `subdocument` parameter with `current_doc`, preventing incorrect subdocument carry-over between fields
+
 ## [7.5.7] - 2026-05-24
 ### Fixed
 - `Database.__bool__` raises `NotImplementedError`, matching PyMongo behavior (closes #64)

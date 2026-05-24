@@ -288,5 +288,41 @@ class DatabaseAPITest(TestCase):
         ):
             mongomock.database.Database(client, 'foo', None, read_concern='bar')
 
+    def test__database_bool(self):
+        with self.assertRaises(NotImplementedError):
+            bool(self.database)
+
+    def test__database_bool_comparison(self):
+        self.assertIsNotNone(self.database)
+
+    def test__database_bool_inline_condition(self):
+        with self.assertRaises(NotImplementedError):
+            if self.database:
+                pass
+
+    def test__database_iter(self):
+        it = self.database.__iter__()
+        self.assertIs(it, self.database)
+        with self.assertRaises(TypeError):
+            next(it)
+
+    def test__database_iter_loop(self):
+        with self.assertRaises(TypeError):
+            for _ in self.database:
+                pass
+
+    def test__database_iter_return_self(self):
+        self.assertIs(self.database.__iter__(), self.database)
+
+    def test__database_iter_next(self):
+        it = self.database.__iter__()
+        with self.assertRaises(TypeError):
+            next(it)
+
+    def test__database_iter_next_default(self):
+        it = self.database.__iter__()
+        with self.assertRaises(TypeError):
+            next(it, None)
+
 
 _DBRef = collections.namedtuple('_DBRef', ['database', 'collection', 'id'])

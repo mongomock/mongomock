@@ -1524,29 +1524,29 @@ class Collection:
             if _handle_all_positional:
                 continue
 
-            subdocument = current_doc
-            if field_name_parts[-1] == '$' and isinstance(subdocument, list):
-                for i, doc in enumerate(subdocument):
+            target_doc = current_doc
+            if field_name_parts[-1] == '$' and isinstance(target_doc, list):
+                for i, doc in enumerate(target_doc):
                     subspec_dollar = subspec.get('$elemMatch', subspec)
                     if filter_applies(subspec_dollar, doc):
-                        subdocument[i] = v
+                        target_doc[i] = v
                         break
                 continue
 
-            if field_name_parts[-1] == '$[]' and isinstance(subdocument, list):
-                for i in range(len(subdocument)):
-                    updater(subdocument, str(i), v, codec_options=self.codec_options)
+            if field_name_parts[-1] == '$[]' and isinstance(target_doc, list):
+                for i in range(len(target_doc)):
+                    updater(target_doc, str(i), v, codec_options=self.codec_options)
                 continue
 
             filter_id = _parse_array_filter_id(field_name_parts[-1])
-            if filter_id is not None and isinstance(subdocument, list):
+            if filter_id is not None and isinstance(target_doc, list):
                 filter_spec = _lookup_array_filter(self._current_array_filters, filter_id, k)
-                for i, item in enumerate(subdocument):
+                for i, item in enumerate(target_doc):
                     if _array_filter_applies(filter_spec, filter_id, item):
-                        updater(subdocument, str(i), v, codec_options=self.codec_options)
+                        updater(target_doc, str(i), v, codec_options=self.codec_options)
                 continue
 
-            updater(subdocument, field_name_parts[-1], v, codec_options=self.codec_options)
+            updater(target_doc, field_name_parts[-1], v, codec_options=self.codec_options)
 
         return subdocument
 
@@ -2457,10 +2457,35 @@ def _parse_array_filter_id(part):
     return m.group(1) if m else None
 
 
+def _strip_filter_prefix(filter_dict, filter_id):
+    result = {}
+    for k, v in filter_dict.items():
+        if k.startswith(f'{filter_id}.'):
+            result[k[len(filter_id) + 1 :]] = v
+        elif k == filter_id:
+            result.update(v if isinstance(v, dict) else {k: v})
+        elif k in ('$and', '$or'):
+            result[k] = [_strip_filter_prefix(sub, filter_id) for sub in v]
+        else:
+            result[k] = v
+    return result
+
+
 def _lookup_array_filter(array_filters, filter_id, path):
     for af in array_filters:
-        if filter_id in af:
-            return af
+        for key in af:
+            if key == filter_id or key.startswith(f'{filter_id}.'):
+                return af
+        if '$and' in af:
+            for sub in af['$and']:
+                result = _lookup_array_filter([sub], filter_id, path)
+                if result is not None:
+                    return af
+        if '$or' in af:
+            for sub in af['$or']:
+                result = _lookup_array_filter([sub], filter_id, path)
+                if result is not None:
+                    return af
     raise WriteError(f"No array filter found for identifier '{filter_id}' in path '{path}'")
 
 
@@ -2472,6 +2497,8 @@ def _array_filter_applies(filter_spec, filter_id, item):
                 stripped[k[len(filter_id) + 1 :]] = v
             elif k == filter_id:
                 stripped.update(v if isinstance(v, dict) else {k: v})
+            elif k in ('$and', '$or'):
+                stripped[k] = [_strip_filter_prefix(sub, filter_id) for sub in v]
             else:
                 stripped[k] = v
         return filter_applies(stripped, item) if stripped else True
