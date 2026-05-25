@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `database.command('ismaster')` omits replica set keys for standalone mock
 - `Cursor.explain()` caches `_compute_results` to avoid double computation
 
+
 ## [7.5.9] - 2026-05-24
 ### Fixed
 - Aggregation missing vs null distinction: `get_value_by_dot` returns `NOTHING` sentinel instead of raising `KeyError` for missing fields (mongomock#770)
