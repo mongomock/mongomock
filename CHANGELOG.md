@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CommandCursor.alive` now tracks exhaustion; returns `False` after iteration complete (closes #901)
 - `list_database_names()` returns active databases including defaults (closes #802)
 - `list_collection_names()` filter behavior aligned with PyMongo (closes #872)
+- `database.command('ismaster')` omits replica set keys for standalone mock (closes #764)
+- `Cursor.explain()` caches `_compute_results` to avoid double computation
 
 ## [7.5.9] - 2026-05-24
 ### Fixed

@@ -2450,7 +2450,10 @@ class Cursor:
     def explain(self):
         from mongomock_ng import SERVER_VERSION
 
-        results = self._compute_results(with_limit_and_skip=True)
+        results_limit = self._compute_results(with_limit_and_skip=True)
+        results_all = self._compute_results(with_limit_and_skip=False)
+        n_returned = len(results_limit)
+        n_examined = len(results_all)
         namespace = f'{self.collection.database.name}.{self.collection.name}'
         parsed = dict(self._spec or {})
         return {
@@ -2468,20 +2471,20 @@ class Cursor:
             },
             'executionStats': {
                 'executionSuccess': True,
-                'nReturned': len(results),
+                'nReturned': n_returned,
                 'executionTimeMillis': 0,
                 'totalKeysExamined': 0,
-                'totalDocsExamined': len(self._compute_results(with_limit_and_skip=False)),
+                'totalDocsExamined': n_examined,
                 'executionStages': {
                     'stage': 'COLLSCAN',
-                    'nReturned': len(results),
+                    'nReturned': n_returned,
                     'executionTimeMillisEstimate': 0,
-                    'works': max(len(results), 1),
-                    'advanced': len(results),
+                    'works': max(n_returned, 1),
+                    'advanced': n_returned,
                     'needTime': 0,
                     'needFetch': 0,
                     'isEOF': 1,
-                    'docsExamined': len(self._compute_results(with_limit_and_skip=False)),
+                    'docsExamined': n_examined,
                     'keysExamined': 0,
                 },
             },

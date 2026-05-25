@@ -290,14 +290,6 @@ class Database:
             return {
                 'ismaster': True,
                 'secondary': False,
-                'hosts': [f'{host}:{port}'],
-                'passives': [],
-                'arbiters': [],
-                'setName': None,
-                'setVersion': None,
-                'electionId': None,
-                'primary': None,
-                'me': f'{host}:{port}',
                 'ok': 1.0,
             }
         # TODO(pascal): Differentiate NotImplementedError for valid commands
