@@ -7,16 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.5.10] - 2026-05-25
 ### Added
-- `Database.list_collections()` returns `CommandCursor` with collection metadata (closes #729)
-- `Database.command()` now supports `ismaster`/`isMaster` admin command (closes #764)
-- `Cursor.explain()` returns mock query execution plan (closes #843)
-- `MongoClient` constructor accepts `_store` parameter (closes #841)
+- `Database.list_collections()` returns `CommandCursor` with collection metadata
+- `Database.command()` now supports `ismaster`/`isMaster` admin command
+- `Cursor.explain()` returns mock query execution plan
+- `MongoClient` constructor accepts `_store` parameter
 
 ### Fixed
-- `CommandCursor.alive` now tracks exhaustion; returns `False` after iteration complete (closes #901)
-- `list_database_names()` returns active databases including defaults (closes #802)
-- `list_collection_names()` filter behavior aligned with PyMongo (closes #872)
-- `database.command('ismaster')` omits replica set keys for standalone mock (closes #764)
+- `CommandCursor.alive` now tracks exhaustion; returns `False` after iteration complete
+- `list_database_names()` returns active databases including defaults
+- `list_collection_names()` filter behavior aligned with PyMongo
+- `database.command('ismaster')` omits replica set keys for standalone mock
 - `Cursor.explain()` caches `_compute_results` to avoid double computation
 
 ## [7.5.9] - 2026-05-24
