@@ -249,10 +249,70 @@ class DatabaseAPITest(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['name'], 'history_2025')
 
+    def test__list_collections_empty(self):
+        cursor = self.database.list_collections()
+        self.assertIsInstance(cursor, CommandCursor)
+        self.assertTrue(cursor.alive)
+        results = list(cursor)
+        self.assertEqual(results, [])
+        self.assertFalse(cursor.alive)
+
+    def test__list_collections_filter_no_match(self):
+        self.database.create_collection('a')
+        cursor = self.database.list_collections(filter={'name': {'$eq': 'nonexistent'}})
+        results = list(cursor)
+        self.assertEqual(results, [])
+
+    def test__list_collections_system_excluded(self):
+        self.database.create_collection('a')
+        cursor = self.database.list_collections()
+        names = [c['name'] for c in cursor]
+        self.assertIn('a', names)
+        self.assertNotIn('system.indexes', names)
+
+    def test__list_collections_with_session_raises(self):
+        with self.assertRaises(NotImplementedError):
+            self.database.list_collections(session='mock')
+
+    def test__command_cursor_alive_after_close(self):
+        self.database.create_collection('a')
+        cursor = self.database.list_collections()
+        self.assertTrue(cursor.alive)
+        cursor.close()
+        self.assertFalse(cursor.alive)
+
+    def test__command_cursor_alive_context_manager(self):
+        self.database.create_collection('a')
+        with self.database.list_collections() as cursor:
+            list(cursor)
+        self.assertFalse(cursor.alive)
+
+    def test__command_cursor_empty(self):
+        cursor = self.database.list_collections()
+        self.assertTrue(cursor.alive)
+        with self.assertRaises(StopIteration):
+            next(cursor)
+        self.assertFalse(cursor.alive)
+
     def test__command_ismaster(self):
         result = self.database.command('ismaster')
         self.assertTrue(result['ismaster'])
         self.assertFalse(result['secondary'])
+        self.assertEqual(result['ok'], 1.0)
+
+    def test__command_isMaster_string(self):
+        result = self.database.command('isMaster')
+        self.assertTrue(result['ismaster'])
+        self.assertEqual(result['ok'], 1.0)
+
+    def test__command_ismaster_dict(self):
+        result = self.database.command({'ismaster': 1})
+        self.assertTrue(result['ismaster'])
+        self.assertEqual(result['ok'], 1.0)
+
+    def test__command_isMaster_dict(self):
+        result = self.database.command({'isMaster': 1})
+        self.assertTrue(result['ismaster'])
         self.assertEqual(result['ok'], 1.0)
 
     def test__create_collection(self):

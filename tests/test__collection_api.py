@@ -122,6 +122,31 @@ class CollectionAPITest(TestCase):
         self.assertEqual(result['ok'], 1.0)
         self.assertEqual(result['executionStats']['nReturned'], 1)
 
+    def test__cursor_explain_empty(self):
+        self.db.collection.insert_one({'x': 1})
+        cursor = self.db.collection.find({'x': {'$gt': 999}})
+        result = cursor.explain()
+        self.assertEqual(result['ok'], 1.0)
+        self.assertEqual(result['executionStats']['nReturned'], 0)
+        self.assertEqual(result['executionStats']['totalDocsExamined'], 0)
+
+    def test__cursor_explain_no_filter(self):
+        self.db.collection.insert_one({'x': 1})
+        cursor = self.db.collection.find()
+        result = cursor.explain()
+        self.assertEqual(result['ok'], 1.0)
+        self.assertEqual(result['executionStats']['nReturned'], 1)
+        self.assertEqual(result['queryPlanner']['parsedQuery'], {})
+
+    def test__cursor_explain_after_exhaustion(self):
+        self.db.collection.insert_one({'x': 1})
+        cursor = self.db.collection.find()
+        list(cursor)
+        self.assertFalse(cursor.alive)
+        result = cursor.explain()
+        self.assertEqual(result['ok'], 1.0)
+        self.assertEqual(result['executionStats']['nReturned'], 1)
+
     def test__cursor_collation_directly_in_find(self):
         self.db.collection.insert_one({'foo': 'bar'})
         cursor = self.db.collection.find(collation={'locale': 'fr'})
