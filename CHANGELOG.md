@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [7.5.10] - 2026-05-25
 ### Added
+- Python 3.14 and PyPy 3.10 support in test matrix and classifiers
 - `Database.list_collections()` returns `CommandCursor` with collection metadata
 - `Database.command()` now supports `ismaster`/`isMaster` admin command
 - `Cursor.explain()` returns mock query execution plan
