@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.10] - 2026-05-25
+### Added
+- Python 3.14 and PyPy 3.10 support in test matrix and classifiers
+- `Database.list_collections()` returns `CommandCursor` with collection metadata
+- `Database.command()` now supports `ismaster`/`isMaster` admin command
+- `Cursor.explain()` returns mock query execution plan
+- `MongoClient` constructor accepts `_store` parameter
+
+### Fixed
+- `CommandCursor.alive` now tracks exhaustion; returns `False` after iteration complete
+- `list_database_names()` returns active databases including defaults
+- `list_collection_names()` filter behavior aligned with PyMongo
+- `database.command('ismaster')` omits replica set keys for standalone mock
+- `Cursor.explain()` caches `_compute_results` to avoid double computation
+
+
 ## [7.5.9] - 2026-05-24
 ### Fixed
 - Aggregation missing vs null distinction: `get_value_by_dot` returns `NOTHING` sentinel instead of raising `KeyError` for missing fields (mongomock#770)

@@ -2447,6 +2447,56 @@ class Cursor:
             raise TypeError('allow_disk_use must be a bool')
         return self
 
+    def explain(self):
+        from mongomock_ng import SERVER_VERSION
+
+        results_limit = self._compute_results(with_limit_and_skip=True)
+        results_all = self._compute_results(with_limit_and_skip=False)
+        n_returned = len(results_limit)
+        n_examined = len(results_all)
+        namespace = f'{self.collection.database.name}.{self.collection.name}'
+        parsed = dict(self._spec or {})
+        return {
+            'queryPlanner': {
+                'plannerVersion': 1,
+                'namespace': namespace,
+                'indexFilterSet': False,
+                'parsedQuery': parsed,
+                'winningPlan': {
+                    'stage': 'COLLSCAN',
+                    'filter': parsed,
+                    'direction': 'forward',
+                },
+                'rejectedPlans': [],
+            },
+            'executionStats': {
+                'executionSuccess': True,
+                'nReturned': n_returned,
+                'executionTimeMillis': 0,
+                'totalKeysExamined': 0,
+                'totalDocsExamined': n_examined,
+                'executionStages': {
+                    'stage': 'COLLSCAN',
+                    'nReturned': n_returned,
+                    'executionTimeMillisEstimate': 0,
+                    'works': max(n_returned, 1),
+                    'advanced': n_returned,
+                    'needTime': 0,
+                    'needFetch': 0,
+                    'isEOF': 1,
+                    'docsExamined': n_examined,
+                    'keysExamined': 0,
+                },
+            },
+            'serverInfo': {
+                'host': self.collection.database.client.address[0],
+                'port': self.collection.database.client.address[1],
+                'version': SERVER_VERSION,
+                'gitVersion': 'mock',
+            },
+            'ok': 1.0,
+        }
+
 
 _ARRAY_FILTER_PATTERN = re.compile(r'^\$\[(\w+)\]$')
 

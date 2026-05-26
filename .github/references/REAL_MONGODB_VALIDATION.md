@@ -196,7 +196,7 @@ NO_LOCAL_MONGO=1 pytest tests/
 
 ```yaml
 matrix:
-  python: ['3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3']
+  python: ['3.10', '3.11', '3.12', '3.13', '3.14', 'pypy3.10']
   pymongo: ['4.11.0', 'latest']
 ```
 
