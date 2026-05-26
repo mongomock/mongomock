@@ -1,12 +1,16 @@
 from unittest import mock
 
-from mongomock import Database as MongoMockDatabase, Collection as MongoMockCollection
+from mongomock import Collection as MongoMockCollection
+from mongomock import Database as MongoMockDatabase
 from mongomock.collection import Cursor as MongoMockCursor
 
+
 try:
+    from gridfs.grid_file import GridOut as PyMongoGridOut
+    from gridfs.grid_file import GridOutCursor as PyMongoGridOutCursor
     from pymongo.collection import Collection as PyMongoCollection
     from pymongo.database import Database as PyMongoDatabase
-    from gridfs.grid_file import GridOut as PyMongoGridOut, GridOutCursor as PyMongoGridOutCursor
+
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
@@ -16,23 +20,21 @@ except ImportError:
 # need both classes as one might want to access both mongomock and real
 # MongoDb.
 class _MongoMockGridOutCursor(MongoMockCursor):
-
     def __init__(self, collection, *args, **kwargs):
         self.__root_collection = collection
-        super(_MongoMockGridOutCursor, self).__init__(collection.files, *args, **kwargs)
+        super().__init__(collection.files, *args, **kwargs)
 
     def next(self):
-        next_file = super(_MongoMockGridOutCursor, self).next()
-        return PyMongoGridOut(
-            self.__root_collection, file_document=next_file, session=self.session)
+        next_file = super().next()
+        return PyMongoGridOut(self.__root_collection, file_document=next_file, session=self.session)
 
     __next__ = next
 
     def add_option(self, *args, **kwargs):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def remove_option(self, *args, **kwargs):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _clone_base(self, session):
         return _MongoMockGridOutCursor(self.__root_collection, session=session)
@@ -45,7 +47,6 @@ def _create_grid_out_cursor(collection, *args, **kwargs):
 
 
 def enable_gridfs_integration():
-
     """This function enables the use of mongomock Database's and Collection's inside gridfs
 
     Gridfs library use `isinstance` to make sure the passed elements
@@ -56,6 +57,14 @@ def enable_gridfs_integration():
     if not _HAVE_PYMONGO:
         raise NotImplementedError('gridfs mocking requires pymongo to work')
 
-    mock.patch('gridfs.Database', (PyMongoDatabase, MongoMockDatabase)).start()
-    mock.patch('gridfs.grid_file.Collection', (PyMongoCollection, MongoMockCollection)).start()
-    mock.patch('gridfs.GridOutCursor', _create_grid_out_cursor).start()
+    Database = (PyMongoDatabase, MongoMockDatabase)  # noqa: N806
+    Collection = (PyMongoCollection, MongoMockCollection)  # noqa: N806
+
+    try:
+        mock.patch('gridfs.synchronous.grid_file.Database', Database).start()
+        mock.patch('gridfs.synchronous.grid_file.Collection', Collection).start()
+        mock.patch('gridfs.synchronous.grid_file.GridOutCursor', _create_grid_out_cursor).start()
+    except (AttributeError, ModuleNotFoundError):
+        mock.patch('gridfs.Database', Database).start()
+        mock.patch('gridfs.grid_file.Collection', Collection).start()
+        mock.patch('gridfs.GridOutCursor', _create_grid_out_cursor).start()

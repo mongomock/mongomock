@@ -1,6 +1,5 @@
-from contextlib import contextmanager
-
 import threading
+from contextlib import contextmanager
 
 
 class RWLock:
@@ -68,7 +67,6 @@ class RWLock:
 
 
 class _LightSwitch:
-
     """An auxiliary "light switch"-like object
 
     The first thread turns on the "switch", the last one turns it off.

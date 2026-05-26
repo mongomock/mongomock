@@ -2,6 +2,7 @@
 
 import bisect
 import collections
+import contextlib
 import copy
 import datetime
 import decimal
@@ -9,13 +10,12 @@ import functools
 import itertools
 import math
 import numbers
-from packaging import version
 import random
 import re
-import sys
 import warnings
 
 import pytz
+from packaging import version
 from sentinels import NOTHING
 
 import mongomock
@@ -24,17 +24,20 @@ from mongomock import filtering
 from mongomock import helpers
 from mongomock import OperationFailure
 
+
 try:
+    from bson import decimal128
+    from bson import Regex
     from bson.errors import InvalidDocument
-    from bson import Regex, decimal128
+
     decimal_support = True
     _RE_TYPES = (helpers.RE_TYPE, Regex)
 except ImportError:
     InvalidDocument = OperationFailure
     decimal_support = False
-    _RE_TYPES = (helpers.RE_TYPE)
+    _RE_TYPES = (helpers.RE_TYPE,)
 
-_random = random.Random()
+_random = random.Random()  # noqa: S311
 
 
 group_operators = [
@@ -67,10 +70,14 @@ binary_arithmetic_operators = {
     '$pow',
     '$subtract',
 }
-arithmetic_operators = unary_arithmetic_operators | binary_arithmetic_operators | {
-    '$add',
-    '$multiply',
-}
+arithmetic_operators = (
+    unary_arithmetic_operators
+    | binary_arithmetic_operators
+    | {
+        '$add',
+        '$multiply',
+    }
+)
 project_operators = [
     '$max',
     '$min',
@@ -144,7 +151,8 @@ comparison_operators = [
     '$cmp',
     '$eq',
     '$ne',
-] + list(filtering.SORTING_OPERATOR_MAP.keys())
+    *list(filtering.SORTING_OPERATOR_MAP.keys()),
+]
 boolean_operators = ['$and', '$or', '$not']
 set_operators = [
     '$in',
@@ -173,21 +181,21 @@ type_operators = [
 
 
 def _avg_operation(values):
-    values_list = list(v for v in values if isinstance(v, numbers.Number))
+    values_list = [v for v in values if isinstance(v, numbers.Number)]
     if not values_list:
         return None
     return sum(values_list) / float(len(list(values_list)))
 
 
 def _group_operation(values, operator):
-    values_list = list(v for v in values if v is not None)
+    values_list = [v for v in values if v is not None]
     if not values_list:
         return None
     return operator(values_list)
 
 
 def _sum_operation(values):
-    values_list = list()
+    values_list = []
     if decimal_support:
         for v in values:
             if isinstance(v, numbers.Number):
@@ -195,13 +203,13 @@ def _sum_operation(values):
             elif isinstance(v, decimal128.Decimal128):
                 values_list.append(v.to_decimal())
     else:
-        values_list = list(v for v in values if isinstance(v, numbers.Number))
+        values_list = [v for v in values if isinstance(v, numbers.Number)]
     sum_value = sum(values_list)
     return decimal128.Decimal128(sum_value) if isinstance(sum_value, decimal.Decimal) else sum_value
 
 
 def _merge_objects_operation(values):
-    merged_doc = dict()
+    merged_doc = {}
     for v in values:
         if isinstance(v, dict):
             merged_doc.update(v)
@@ -219,7 +227,7 @@ _GROUPING_OPERATOR_MAP = {
 }
 
 
-class _Parser(object):
+class _Parser:
     """Helper to parse expressions within the aggregate pipeline."""
 
     def __init__(self, doc_dict, user_vars=None, ignore_missing_keys=False):
@@ -235,9 +243,9 @@ class _Parser(object):
 
         if len(expression) > 1 and any(key.startswith('$') for key in expression):
             raise OperationFailure(
-                'an expression specification must contain exactly one field, '
-                'the name of the expression. Found %d fields in %s'
-                % (len(expression), expression))
+                f'an expression specification must contain exactly one field, '
+                f'the name of the expression. Found {len(expression)} fields in {expression}'
+            )
 
         value_dict = {}
         for k, v in expression.items():
@@ -267,11 +275,14 @@ class _Parser(object):
                 return self._handle_type_operator(k, v)
             if k in boolean_operators:
                 return self._handle_boolean_operator(k, v)
+            if k in object_operators:
+                return self._handle_object_operator(k, v)
             if k in text_search_operators + projection_operators + object_operators:
                 raise NotImplementedError(
-                    "'%s' is a valid operation but it is not supported by Mongomock yet." % k)
+                    f"'{k}' is a valid operation but it is not supported by Mongomock yet."
+                )
             if k.startswith('$'):
-                raise OperationFailure("Unrecognized expression '%s'" % k)
+                raise OperationFailure(f"Unrecognized expression '{k}'")
             try:
                 value = self.parse(v)
             except KeyError:
@@ -309,25 +320,32 @@ class _Parser(object):
     def _parse_basic_expression(self, expression):
         if isinstance(expression, str) and expression.startswith('$'):
             if expression.startswith('$$'):
-                return helpers.get_value_by_dot(dict({
-                    'ROOT': self._doc_dict,
-                    'CURRENT': self._doc_dict,
-                }, **self._user_vars), expression[2:], can_generate_array=True)
+                return helpers.get_value_by_dot(
+                    dict(
+                        {
+                            'ROOT': self._doc_dict,
+                            'CURRENT': self._doc_dict,
+                        },
+                        **self._user_vars,
+                    ),
+                    expression[2:],
+                    can_generate_array=True,
+                )
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
         return expression
 
     def _handle_boolean_operator(self, operator, values):
         if operator == '$and':
-            return all([self._parse_to_bool(value) for value in values])
+            return all(self._parse_to_bool(value) for value in values)
         if operator == '$or':
             return any(self._parse_to_bool(value) for value in values)
         if operator == '$not':
             return not self._parse_to_bool(values)
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid boolean operator for the "
-            'aggregation pipeline, it is currently not implemented'
-            ' in Mongomock.' % operator
+            f"Although '{operator}' is a valid boolean operator for the "
+            f'aggregation pipeline, it is currently not implemented'
+            f' in Mongomock.'
         )
 
     def _handle_arithmetic_operator(self, operator, values):
@@ -340,9 +358,8 @@ class _Parser(object):
                 return None
             if not isinstance(number, numbers.Number):
                 raise OperationFailure(
-                    "Parameter to %s must evaluate to a number, got '%s'" %
-                    (operator, type(number)))
-
+                    f"Parameter to {operator} must evaluate to a number, got '{type(number)}'"
+                )
             if operator == '$abs':
                 return abs(number)
             if operator == '$ceil':
@@ -363,11 +380,11 @@ class _Parser(object):
         if operator in binary_arithmetic_operators:
             if not isinstance(values, (tuple, list)):
                 raise OperationFailure(
-                    "Parameter to %s must evaluate to a list, got '%s'" %
-                    (operator, type(values)))
+                    f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
+                )
 
             if len(values) != 2:
-                raise OperationFailure('%s must have only 2 parameters' % operator)
+                raise OperationFailure(f'{operator} must have only 2 parameters')
             number_0, number_1 = self.parse_many(values)
             if number_0 is None or number_1 is None:
                 return None
@@ -381,23 +398,23 @@ class _Parser(object):
             if operator == '$pow':
                 return math.pow(number_0, number_1)
             if operator == '$subtract':
-                if isinstance(number_0, datetime.datetime) and \
-                        isinstance(number_1, (int, float)):
+                if isinstance(number_0, datetime.datetime) and isinstance(number_1, (int, float)):
                     number_1 = datetime.timedelta(milliseconds=number_1)
                 res = number_0 - number_1
                 if isinstance(res, datetime.timedelta):
                     return round(res.total_seconds() * 1000)
                 return res
 
-        assert isinstance(values, (tuple, list)), \
-            "Parameter to %s must evaluate to a list, got '%s'" % (operator, type(values))
+        assert isinstance(
+            values, (tuple, list)
+        ), f"Parameter to {operator} must evaluate to a list, got '{type(values)}'"
 
         parsed_values = list(self.parse_many(values))
-        assert parsed_values, '%s must have at least one parameter' % operator
+        assert parsed_values, f'{operator} must have at least one parameter'
         for value in parsed_values:
             if value is None:
                 return None
-            assert isinstance(value, numbers.Number), '%s only uses numbers' % operator
+            assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
         if operator == '$add':
             return sum(parsed_values)
         if operator == '$multiply':
@@ -405,8 +422,9 @@ class _Parser(object):
 
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid aritmetic operator for the aggregation "
-            'pipeline, it is currently not implemented  in Mongomock.' % operator)
+            f"Although '{operator}' is a valid aritmetic operator for the aggregation "
+            f'pipeline, it is currently not implemented  in Mongomock.'
+        )
 
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
@@ -421,9 +439,11 @@ class _Parser(object):
             except IndexError as error:
                 raise KeyError('Array have length less than index value') from error
 
-        raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                  'aggregation pipeline, it is currently not implemented '
-                                  'in Mongomock.' % operator)
+        raise NotImplementedError(
+            f"Although '{operator}' is a valid project operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f'in Mongomock.'
+        )
 
     def _handle_projection_operator(self, operator, value):
         if operator == '$literal':
@@ -433,20 +453,21 @@ class _Parser(object):
                 raise InvalidDocument('$let only supports an object as its argument')
             for field in ('vars', 'in'):
                 if field not in value:
-                    raise OperationFailure("Missing '{}' parameter to $let".format(field))
+                    raise OperationFailure(f"Missing '{field}' parameter to $let")
             if not isinstance(value['vars'], dict):
                 raise OperationFailure('invalid parameter: expected an object (vars)')
             user_vars = {
-                var_key: self.parse(var_value)
-                for var_key, var_value in value['vars'].items()
+                var_key: self.parse(var_value) for var_key, var_value in value['vars'].items()
             }
             return _Parser(
                 self._doc_dict,
                 dict(self._user_vars, **user_vars)
             ).parse(value['in'])
-        raise NotImplementedError("Although '%s' is a valid project operator for the "
-                                  'aggregation pipeline, it is currently not implemented '
-                                  'in Mongomock.' % operator)
+        raise NotImplementedError(
+            f"Although '{operator}' is a valid project operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f'in Mongomock.'
+        )
 
     def _handle_comparison_operator(self, operator, values):
         assert len(values) == 2, 'Comparison requires two expressions'
@@ -459,9 +480,10 @@ class _Parser(object):
         if operator in filtering.SORTING_OPERATOR_MAP:
             return filtering.bson_compare(filtering.SORTING_OPERATOR_MAP[operator], a, b)
         raise NotImplementedError(
-            "Although '%s' is a valid comparison operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            ' in Mongomock.' % operator)
+            f"Although '{operator}' is a valid comparison operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f' in Mongomock.'
+        )
 
     def _handle_string_operator(self, operator, values):
         if operator == '$toLower':
@@ -498,12 +520,18 @@ class _Parser(object):
             if string is None:
                 return ''
             if first < 0:
-                warnings.warn('Negative starting point given to $substr is accepted only until '
-                              'MongoDB 3.7. This behavior will change in the future.')
+                warnings.warn(
+                    'Negative starting point given to $substr is accepted only until '
+                    'MongoDB 3.7. This behavior will change in the future.',
+                    stacklevel=2,
+                )
                 return ''
             if length < 0:
-                warnings.warn('Negative length given to $substr is accepted only until '
-                              'MongoDB 3.7. This behavior will change in the future.')
+                warnings.warn(
+                    'Negative length given to $substr is accepted only until '
+                    'MongoDB 3.7. This behavior will change in the future.',
+                    stacklevel=2,
+                )
             second = len(string) if length < 0 else first + length
             return string[first:second]
         if operator == '$strcasecmp':
@@ -514,14 +542,16 @@ class _Parser(object):
         if operator == '$regexMatch':
             if not isinstance(values, dict):
                 raise OperationFailure(
-                    '$regexMatch expects an object of named arguments but found: %s' % type(values))
+                    f'$regexMatch expects an object of named arguments but found: {type(values)}'
+                )
             for field in ('input', 'regex'):
                 if field not in values:
-                    raise OperationFailure("$regexMatch requires '%s' parameter" % field)
+                    raise OperationFailure(f"$regexMatch requires '{field}' parameter")
             unknown_args = set(values) - {'input', 'regex', 'options'}
             if unknown_args:
                 raise OperationFailure(
-                    '$regexMatch found an unknown argument: %s' % list(unknown_args)[0])
+                    f'$regexMatch found an unknown argument: {next(iter(unknown_args))}'
+                )
 
             try:
                 input_value = self.parse(values['input'])
@@ -535,36 +565,36 @@ class _Parser(object):
             except KeyError:
                 return False
             options = None
-            for option in values.get('options', ''):
+            raw_options = values.get('options', '').lower()
+            for option in raw_options:
                 if option not in 'imxs':
-                    raise OperationFailure(
-                        '$regexMatch invalid flag in regex options: %s' % option)
+                    raise OperationFailure(f'$regexMatch invalid flag in regex options: {option}')
                 re_option = getattr(re, option.upper())
                 if options is None:
                     options = re_option
                 else:
                     options |= re_option
             if isinstance(regex_val, str):
-                if options is None:
-                    regex = re.compile(regex_val)
-                else:
-                    regex = re.compile(regex_val, options)
+                regex = re.compile(regex_val, options) if options else re.compile(regex_val)
             elif 'options' in values and regex_val.flags:
                 raise OperationFailure(
-                    "$regexMatch: regex option(s) specified in both 'regex' and 'option' fields")
+                    "$regexMatch: regex option(s) specified in both 'regex' and 'option' fields"
+                )
             elif isinstance(regex_val, helpers.RE_TYPE):
                 if options and not regex_val.flags:
                     regex = re.compile(regex_val.pattern, options)
-                elif regex_val.flags & ~(re.I | re.M | re.X | re.S):
+                elif regex_val.flags & ~(re.I | re.M | re.X | re.S | re.U):
                     raise OperationFailure(
-                        '$regexMatch invalid flag in regex options: %s' % regex_val.flags)
+                        f'$regexMatch invalid flag in regex options: {regex_val.flags}'
+                    )
                 else:
                     regex = regex_val
             elif isinstance(regex_val, _RE_TYPES):
                 # bson.Regex
-                if regex_val.flags & ~(re.I | re.M | re.X | re.S):
+                if regex_val.flags & ~(re.I | re.M | re.X | re.S | re.U):
                     raise OperationFailure(
-                        '$regexMatch invalid flag in regex options: %s' % regex_val.flags)
+                        f'$regexMatch invalid flag in regex options: {regex_val.flags}'
+                    )
                 regex = re.compile(regex_val.pattern, regex_val.flags or options)
             else:
                 raise OperationFailure("$regexMatch needs 'regex' to be of type string or regex")
@@ -573,8 +603,9 @@ class _Parser(object):
 
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid string operator for the aggregation "
-            'pipeline, it is currently not implemented  in Mongomock.' % operator)
+            f"Although '{operator}' is a valid string operator for the aggregation "
+            f'pipeline, it is currently not implemented  in Mongomock.'
+        )
 
     def _handle_date_operator(self, operator, values):
         if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
@@ -627,7 +658,7 @@ class _Parser(object):
                     '$dateToString operator, it is currently not implemented '
                     ' in Mongomock.'
                 )
-            if 'timezone' in values.keys():
+            if 'timezone' in values:
                 raise NotImplementedError(
                     'Although timezone is a valid field for the '
                     '$dateToString operator, it is currently not implemented '
@@ -668,13 +699,14 @@ class _Parser(object):
                 hour=hour,
                 minute=minute,
                 second=second,
-                microsecond=millisecond
+                microsecond=millisecond,
             )
 
         raise NotImplementedError(
-            "Although '%s' is a valid date operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            ' in Mongomock.' % operator)
+            f"Although '{operator}' is a valid date operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f' in Mongomock.'
+        )
 
     def _handle_array_operator(self, operator, value):
         if operator == '$concatArrays':
@@ -685,7 +717,7 @@ class _Parser(object):
             for parsed_item in parsed_list:
                 if parsed_item is not None and not isinstance(parsed_item, (list, tuple)):
                     raise OperationFailure(
-                        '$concatArrays only supports arrays, not {}'.format(type(parsed_item))
+                        f'$concatArrays only supports arrays, not {type(parsed_item)}'
                     )
 
             return None if None in parsed_list else list(itertools.chain.from_iterable(parsed_list))
@@ -702,11 +734,11 @@ class _Parser(object):
             # 'in'.
             for k in ('input', 'in'):
                 if k not in value:
-                    raise OperationFailure("Missing '%s' parameter to $map" % k)
+                    raise OperationFailure(f"Missing '{k}' parameter to $map")
 
             for k in value:
                 if k not in {'input', 'as', 'in'}:
-                    raise OperationFailure('Unrecognized parameter to $map: %s' % k)
+                    raise OperationFailure(f'Unrecognized parameter to $map: {k}')
 
             input_array = self._parse_or_nothing(value['input'])
 
@@ -714,7 +746,7 @@ class _Parser(object):
                 return None
 
             if not isinstance(input_array, (list, tuple)):
-                raise OperationFailure('input to $map must be an array not %s' % type(input_array))
+                raise OperationFailure(f'input to $map must be an array not {type(input_array)}')
 
             fieldname = value.get('as', 'this')
             in_expr = value['in']
@@ -730,14 +762,17 @@ class _Parser(object):
         if operator == '$size':
             if isinstance(value, list):
                 if len(value) != 1:
-                    raise OperationFailure('Expression $size takes exactly 1 arguments. '
-                                           '%d were passed in.' % len(value))
+                    raise OperationFailure(
+                        'Expression $size takes exactly 1 arguments. '
+                        '%d were passed in.' % len(value)
+                    )
                 value = value[0]
             array_value = self._parse_or_nothing(value)
             if not isinstance(array_value, (list, tuple)):
                 raise OperationFailure(
-                    'The argument to $size must be an array, but was of type: %s' %
-                    ('missing' if array_value is NOTHING else type(array_value)))
+                    'The argument to $size must be an array, but was of type: %s'
+                    % ('missing' if array_value is NOTHING else type(array_value))
+                )
             return len(array_value)
 
         if operator == '$filter':
@@ -745,16 +780,17 @@ class _Parser(object):
                 raise OperationFailure('$filter only supports an object as its argument')
             extra_params = set(value) - {'input', 'cond', 'as'}
             if extra_params:
-                raise OperationFailure('Unrecognized parameter to $filter: %s' % extra_params.pop())
+                raise OperationFailure(f'Unrecognized parameter to $filter: {extra_params.pop()}')
             missing_params = {'input', 'cond'} - set(value)
             if missing_params:
-                raise OperationFailure("Missing '%s' parameter to $filter" % missing_params.pop())
+                raise OperationFailure(f"Missing '{missing_params.pop()}' parameter to $filter")
 
             input_array = self.parse(value['input'])
             fieldname = value.get('as', 'this')
             cond = value['cond']
             return [
-                item for item in input_array
+                item
+                for item in input_array
                 if _Parser(
                     self._doc_dict,
                     dict(self._user_vars, **{fieldname: item}),
@@ -765,28 +801,29 @@ class _Parser(object):
             if not isinstance(value, list):
                 raise OperationFailure('$slice only supports a list as its argument')
             if len(value) < 2 or len(value) > 3:
-                raise OperationFailure('Expression $slice takes at least 2 arguments, and at most '
-                                       '3, but {} were passed in'.format(len(value)))
+                raise OperationFailure(
+                    f'Expression $slice takes at least 2 arguments, and at most '
+                    f'3, but {len(value)} were passed in'
+                )
             array_value = self.parse(value[0])
             if not isinstance(array_value, list):
                 raise OperationFailure(
-                    'First argument to $slice must be an array, but is of type: {}'
-                    .format(type(array_value)))
+                    f'First argument to $slice must be an array, but is of '
+                    f'type: {type(array_value)}'
+                )
             for num, v in zip(('Second', 'Third'), value[1:]):
                 if not isinstance(v, int):
                     raise OperationFailure(
-                        '{} argument to $slice must be numeric, but is of type: {}'
-                        .format(num, type(v)))
+                        f'{num} argument to $slice must be numeric, but is of type: {type(v)}'
+                    )
             if len(value) > 2 and value[2] <= 0:
-                raise OperationFailure('Third argument to $slice must be '
-                                       'positive: {}'.format(value[2]))
+                raise OperationFailure(f'Third argument to $slice must be positive: {value[2]}')
 
             start = value[1]
+            stop = None
             if start < 0:
                 if len(value) > 2:
                     stop = len(array_value) + start + value[2]
-                else:
-                    stop = None
             elif len(value) > 2:
                 stop = start + value[2]
             else:
@@ -795,9 +832,10 @@ class _Parser(object):
             return array_value[start:stop]
 
         raise NotImplementedError(
-            "Although '%s' is a valid array operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            'in Mongomock.' % operator)
+            f"Although '{operator}' is a valid array operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f'in Mongomock.'
+        )
 
     def _handle_type_convertion_operator(self, operator, values):
         if operator == '$toString':
@@ -863,14 +901,15 @@ class _Parser(object):
                     decimal_value = decimal128.Decimal128(parsed)
                 except decimal.InvalidOperation as err:
                     raise OperationFailure(
-                        "Failed to parse number '%s' in $convert with no onError value:"
-                        'Failed to parse string to decimal' % parsed) from err
+                        f"Failed to parse number '{parsed}' in $convert with no onError value:"
+                        f'Failed to parse string to decimal'
+                    ) from err
             elif isinstance(parsed, datetime.datetime):
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 string_micro_seconds = str((parsed - epoch).total_seconds() * 1000).split('.', 1)[0]
                 decimal_value = decimal128.Decimal128(string_micro_seconds)
             else:
-                raise TypeError("'%s' type is not supported" % type(parsed))
+                raise TypeError(f"'{type(parsed)}' type is not supported")
             return decimal_value
 
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/arrayToObject/
@@ -885,7 +924,7 @@ class _Parser(object):
 
             if not isinstance(parsed, (list, tuple)):
                 raise OperationFailure(
-                    '$arrayToObject requires an array input, found: {}'.format(type(parsed))
+                    f'$arrayToObject requires an array input, found: {type(parsed)}'
                 )
 
             if all(isinstance(x, dict) and set(x.keys()) == {'k', 'v'} for x in parsed):
@@ -911,20 +950,16 @@ class _Parser(object):
 
             if not isinstance(parsed, (dict, collections.OrderedDict)):
                 raise OperationFailure(
-                    '$objectToArray requires an object input, found: {}'.format(type(parsed))
+                    f'$objectToArray requires an object input, found: {type(parsed)}'
                 )
-
-            if len(parsed) > 1 and sys.version_info < (3, 6):
-                raise NotImplementedError(
-                    "Although '%s' is a valid type conversion, it is not implemented for Python 2 "
-                    'and Python 3.5 in Mongomock yet.' % operator)
 
             return [{'k': k, 'v': v} for k, v in parsed.items()]
 
         raise NotImplementedError(
-            "Although '%s' is a valid type conversion operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            'in Mongomock.' % operator)
+            f"Although '{operator}' is a valid type conversion operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f'in Mongomock.'
+        )
 
     def _handle_type_operator(self, operator, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/isNumber/
@@ -944,16 +979,16 @@ class _Parser(object):
             return isinstance(parsed, (tuple, list))
 
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid type operator for the aggregation pipeline, it is currently "
-            'not implemented in Mongomock.' % operator)
+            f"Although '{operator}' is a valid type operator for the aggregation pipeline, "
+            f'it is currently not implemented in Mongomock.'
+        )
 
     def _handle_conditional_operator(self, operator, values):
         if operator == '$ifNull':
             fields = values[:-1]
             if len(fields) > 1 and version.parse(mongomock.SERVER_VERSION) <= version.parse('4.4'):
                 raise OperationFailure(
-                    '$ifNull supports only one input expression '
-                    ' in MongoDB v4.4 and lower'
+                    '$ifNull supports only one input expression ' ' in MongoDB v4.4 and lower'
                 )
             fallback = values[-1]
             for field in fields:
@@ -976,43 +1011,35 @@ class _Parser(object):
             return self.parse(expression)
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid conditional operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            ' in Mongomock.' % operator)
+            f"Although '{operator}' is a valid conditional operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f' in Mongomock.'
+        )
 
     def _handle_control_flow_operator(self, operator, values):
         if operator == '$switch':
             if not isinstance(values, dict):
                 raise OperationFailure(
-                    '$switch requires an object as an argument, '
-                    'found: %s' % type(values)
+                    f'$switch requires an object as an argument, found: {type(values)}'
                 )
 
             branches = values.get('branches', [])
             if not isinstance(branches, (list, tuple)):
                 raise OperationFailure(
-                    "$switch expected an array for 'branches', "
-                    'found: %s' % type(branches)
+                    f"$switch expected an array for 'branches', found: {type(branches)}"
                 )
             if not branches:
-                raise OperationFailure(
-                    '$switch requires at least one branch.'
-                )
+                raise OperationFailure('$switch requires at least one branch.')
 
             for branch in branches:
                 if not isinstance(branch, dict):
                     raise OperationFailure(
-                        '$switch expected each branch to be an object, '
-                        'found: %s' % type(branch)
+                        f'$switch expected each branch to be an object, found: {type(branch)}'
                     )
                 if 'case' not in branch:
-                    raise OperationFailure(
-                        "$switch requires each branch have a 'case' expression"
-                    )
+                    raise OperationFailure("$switch requires each branch have a 'case' expression")
                 if 'then' not in branch:
-                    raise OperationFailure(
-                        "$switch requires each branch have a 'then' expression."
-                    )
+                    raise OperationFailure("$switch requires each branch have a 'then' expression.")
 
             for branch in branches:
                 if self._parse_to_bool(branch['case']):
@@ -1027,9 +1054,10 @@ class _Parser(object):
 
         # This should never happen: it is only a safe fallback if something went wrong.
         raise NotImplementedError(  # pragma: no cover
-            "Although '%s' is a valid control flow operator for the "
-            'aggregation pipeline, it is currently not implemented '
-            'in Mongomock.' % operator)
+            f"Although '{operator}' is a valid control flow operator for the "
+            f'aggregation pipeline, it is currently not implemented '
+            f'in Mongomock.'
+        )
 
     def _handle_set_operator(self, operator, values):
         if operator == '$in':
@@ -1044,16 +1072,25 @@ class _Parser(object):
             return result
         if operator == '$setEquals':
             set_values = [set(self.parse(value)) for value in values]
-            for set1, set2 in itertools.combinations(set_values, 2):
-                if set1 != set2:
-                    return False
-            return True
+            return all(set1 == set2 for set1, set2 in itertools.combinations(set_values, 2))
         raise NotImplementedError(
-            "Although '%s' is a valid set operator for the aggregation "
-            'pipeline, it is currently not implemented in Mongomock.' % operator)
+            f"Although '{operator}' is a valid set operator for the aggregation "
+            f'pipeline, it is currently not implemented in Mongomock.'
+        )
+
+    def _handle_object_operator(self, operator, values):
+        if operator == '$mergeObjects':
+            values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
+            return _merge_objects_operation(values)
+
+        # This should never happen: it is only a safe fallback if something went wrong.
+        raise NotImplementedError(
+            f"Although '{operator}' is a valid object operator for the aggregation pipeline, "
+            'it is currently not implemented in Mongomock.'
+        )
 
 
-def _parse_expression(expression, doc_dict, user_vars=None, ignore_missing_keys=False):
+def _parse_expression(expression, doc_dict, ignore_missing_keys=False, user_vars=None):
     """Parse an expression.
 
     Args:
@@ -1063,13 +1100,15 @@ def _parse_expression(expression, doc_dict, user_vars=None, ignore_missing_keys=
         ignore_missing_keys: if True, missing keys evaluated by the expression are ignored silently
             if it is possible.
     """
-    return _Parser(doc_dict, user_vars=user_vars, ignore_missing_keys=ignore_missing_keys).parse(expression)
+    return _Parser(doc_dict, user_vars=user_vars, ignore_missing_keys=ignore_missing_keys).parse(
+        expression
+    )
 
 
 filtering.register_parse_expression(_parse_expression)
 
 
-def _accumulate_group(output_fields, group_list):
+def _accumulate_group(output_fields, group_list, user_vars):
     doc_dict = {}
     for field, value in output_fields.items():
         if field == '_id':
@@ -1078,7 +1117,7 @@ def _accumulate_group(output_fields, group_list):
             values = []
             for doc in group_list:
                 try:
-                    values.append(_parse_expression(key, doc))
+                    values.append(_parse_expression(key, doc, user_vars=user_vars))
                 except KeyError:
                     continue
             if operator in _GROUPING_OPERATOR_MAP:
@@ -1098,15 +1137,17 @@ def _accumulate_group(output_fields, group_list):
                     doc_dict[field].extend(values)
             elif operator in group_operators:
                 raise NotImplementedError(
-                    'Although %s is a valid group operator for the '
-                    'aggregation pipeline, it is currently not implemented '
-                    'in Mongomock.' % operator)
+                    f'Although {operator} is a valid group operator for the '
+                    f'aggregation pipeline, it is currently not implemented '
+                    f'in Mongomock.'
+                )
             else:
                 raise NotImplementedError(
-                    '%s is not a valid group operator for the aggregation '
-                    'pipeline. See http://docs.mongodb.org/manual/meta/'
-                    'aggregation-quick-reference/ for a complete list of '
-                    'valid operators.' % operator)
+                    f'{operator} is not a valid group operator for the aggregation '
+                    f'pipeline. See http://docs.mongodb.org/manual/meta/'
+                    f'aggregation-quick-reference/ for a complete list of '
+                    f'valid operators.'
+                )
     return doc_dict
 
 
@@ -1115,50 +1156,71 @@ def _fix_sort_key(key_getter):
         key = key_getter(doc)
         # Convert dictionaries to make sorted() work in Python 3.
         if isinstance(key, dict):
-            return [(k, v) for (k, v) in sorted(key.items())]
+            return sorted(key.items())
         return key
+
     return fixed_getter
 
 
-def _handle_lookup_stage(in_collection, database, options):
-    for operator in ('let', 'pipeline'):
-        if operator in options:
-            raise NotImplementedError(
-                "Although '%s' is a valid lookup operator for the "
-                'aggregation pipeline, it is currently not '
-                'implemented in Mongomock.' % operator)
-    for operator in ('from', 'localField', 'foreignField', 'as'):
+def _handle_lookup_stage(in_collection, database, options, user_vars):
+    required_fields = ['as', 'from']
+    if 'pipeline' not in options:
+        required_fields.extend(['localField', 'foreignField'])
+
+    for operator in required_fields:
         if operator not in options:
-            raise OperationFailure(
-                "Must specify '%s' field for a $lookup" % operator)
+            raise OperationFailure(f"Must specify '{operator}' field for a $lookup")
         if not isinstance(options[operator], str):
-            raise OperationFailure(
-                'Arguments to $lookup must be strings')
-        if operator in ('as', 'localField', 'foreignField') and \
-                options[operator].startswith('$'):
-            raise OperationFailure(
-                "FieldPath field names may not start with '$'")
-        if operator == 'as' and \
-                '.' in options[operator]:
+            raise OperationFailure('Arguments to $lookup must be strings')
+        if operator in ('as', 'localField', 'foreignField') and options[operator].startswith('$'):
+            raise OperationFailure("FieldPath field names may not start with '$'")
+        if operator == 'as' and '.' in options[operator]:
             raise NotImplementedError(
                 "Although '.' is valid in the 'as' "
                 'parameters for the lookup stage of the aggregation '
-                'pipeline, it is currently not implemented in Mongomock.')
+                'pipeline, it is currently not implemented in Mongomock.'
+            )
 
     foreign_name = options['from']
-    local_field = options['localField']
-    foreign_field = options['foreignField']
     local_name = options['as']
+    local_field = options.get('localField')
+    foreign_field = options.get('foreignField')
+    pipeline = options.get('pipeline')
+    let = options.get('let')
     foreign_collection = database.get_collection(foreign_name)
+
     for doc in in_collection:
-        try:
-            query = helpers.get_value_by_dot(doc, local_field)
-        except KeyError:
-            query = None
-        if isinstance(query, list):
-            query = {'$in': query}
-        matches = foreign_collection.find({foreign_field: query})
-        doc[local_name] = [foreign_doc for foreign_doc in matches]
+        if local_field and foreign_field:
+            try:
+                query = helpers.get_value_by_dot(doc, local_field)
+            except KeyError:
+                query = None
+            if isinstance(query, list):
+                query = {'$in': query}
+
+            query = {foreign_field: query}
+        else:
+            query = {}
+
+        matches = foreign_collection.find(query)
+
+        if pipeline:
+            if let:
+                doc_user_vars = dict(user_vars or {})
+                for var, expr in let.items():
+                    doc_user_vars[var] = _parse_expression(expr, doc, user_vars=user_vars)
+            else:
+                doc_user_vars = user_vars
+
+            matches = process_pipeline(
+                (doc for doc in matches),
+                database,
+                pipeline,
+                None,
+                user_vars=doc_user_vars,
+            )
+
+        doc[local_name] = list(matches)
 
     return in_collection
 
@@ -1173,42 +1235,35 @@ def _recursive_get(match, nested_fields):
     # More fields to go, must be list, tuple, or dict.
     if isinstance(head, (list, tuple)):
         for m in head:
-            # Yield from _recursive_get(m, remaining_fields).
-            for answer in _recursive_get(m, remaining_fields):
-                yield answer
+            yield from _recursive_get(m, remaining_fields)
     elif isinstance(head, dict):
-        # Yield from _recursive_get(head, remaining_fields).
-        for answer in _recursive_get(head, remaining_fields):
-            yield answer
+        yield from _recursive_get(head, remaining_fields)
 
 
-def _handle_graph_lookup_stage(in_collection, database, options):
+def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
     if not isinstance(options.get('maxDepth', 0), int):
-        raise OperationFailure(
-            "Argument 'maxDepth' to $graphLookup must be a number")
+        raise OperationFailure("Argument 'maxDepth' to $graphLookup must be a number")
     if not isinstance(options.get('restrictSearchWithMatch', {}), dict):
         raise OperationFailure(
-            "Argument 'restrictSearchWithMatch' to $graphLookup must be a Dictionary")
+            "Argument 'restrictSearchWithMatch' to $graphLookup must be a Dictionary"
+        )
     if not isinstance(options.get('depthField', ''), str):
-        raise OperationFailure(
-            "Argument 'depthField' to $graphlookup must be a string")
+        raise OperationFailure("Argument 'depthField' to $graphlookup must be a string")
     if 'startWith' not in options:
-        raise OperationFailure(
-            "Must specify 'startWith' field for a $graphLookup")
+        raise OperationFailure("Must specify 'startWith' field for a $graphLookup")
     for operator in ('as', 'connectFromField', 'connectToField', 'from'):
         if operator not in options:
-            raise OperationFailure(
-                "Must specify '%s' field for a $graphLookup" % operator)
+            raise OperationFailure(f"Must specify '{operator}' field for a $graphLookup")
         if not isinstance(options[operator], str):
-            raise OperationFailure(
-                "Argument '%s' to $graphLookup must be string" % operator)
+            raise OperationFailure(f"Argument '{operator}' to $graphLookup must be string")
         if options[operator].startswith('$'):
             raise OperationFailure("FieldPath field names may not start with '$'")
         if operator == 'as' and '.' in options[operator]:
             raise NotImplementedError(
-                "Although '.' is valid in the '%s' "
-                'parameter for the $graphLookup stage of the aggregation '
-                'pipeline, it is currently not implemented in Mongomock.' % operator)
+                f"Although '.' is valid in the '{operator}' "
+                f'parameter for the $graphLookup stage of the aggregation '
+                f'pipeline, it is currently not implemented in Mongomock.'
+            )
 
     foreign_name = options['from']
     start_with = options['startWith']
@@ -1227,8 +1282,10 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         matches = foreign_collection.find({connect_to_field: query})
         new_matches = []
         for new_match in matches:
-            if filtering.filter_applies(restrict_search_with_match, new_match) \
-                    and new_match['_id'] not in found_items:
+            if (
+                filtering.filter_applies(restrict_search_with_match, new_match)
+                and new_match['_id'] not in found_items
+            ):
                 if depth_field is not None:
                     new_match = collections.OrderedDict(new_match, **{depth_field: depth})
                 new_matches.append(new_match)
@@ -1239,7 +1296,7 @@ def _handle_graph_lookup_stage(in_collection, database, options):
         found_items = set()
         depth = 0
         try:
-            result = _parse_expression(start_with, doc)
+            result = _parse_expression(start_with, doc, user_vars=user_vars)
         except KeyError:
             continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
@@ -1255,14 +1312,14 @@ def _handle_graph_lookup_stage(in_collection, database, options):
     return out_doc
 
 
-def _handle_group_stage(in_collection, unused_database, options):
+def _handle_group_stage(in_collection, unused_database, options, user_vars):
     grouped_collection = []
     _id = options['_id']
     if _id:
 
         def _key_getter(doc):
             try:
-                return _parse_expression(_id, doc, ignore_missing_keys=True)
+                return _parse_expression(_id, doc, ignore_missing_keys=True, user_vars=user_vars)
             except KeyError:
                 return None
 
@@ -1277,35 +1334,35 @@ def _handle_group_stage(in_collection, unused_database, options):
         grouped = [(None, in_collection)]
 
     for doc_id, group in grouped:
-        group_list = ([x for x in group])
-        doc_dict = _accumulate_group(options, group_list)
+        group_list = list(group)
+        doc_dict = _accumulate_group(options, group_list, user_vars=user_vars)
         doc_dict['_id'] = doc_id
         grouped_collection.append(doc_dict)
 
     return grouped_collection
 
 
-def _handle_bucket_stage(in_collection, unused_database, options):
+def _handle_bucket_stage(in_collection, unused_database, options, user_vars):
     unknown_options = set(options) - {'groupBy', 'boundaries', 'output', 'default'}
     if unknown_options:
-        raise OperationFailure(
-            'Unrecognized option to $bucket: %s.' % unknown_options.pop())
+        raise OperationFailure(f'Unrecognized option to $bucket: {unknown_options.pop()}.')
     if 'groupBy' not in options or 'boundaries' not in options:
-        raise OperationFailure(
-            "$bucket requires 'groupBy' and 'boundaries' to be specified.")
+        raise OperationFailure("$bucket requires 'groupBy' and 'boundaries' to be specified.")
     group_by = options['groupBy']
     boundaries = options['boundaries']
     if not isinstance(boundaries, list):
         raise OperationFailure(
-            "The $bucket 'boundaries' field must be an array, but found type: %s"
-            % type(boundaries))
+            f"The $bucket 'boundaries' field must be an array, but found type: {type(boundaries)}"
+        )
     if len(boundaries) < 2:
         raise OperationFailure(
-            "The $bucket 'boundaries' field must have at least 2 values, but "
-            'found %d value(s).' % len(boundaries))
+            f"The $bucket 'boundaries' field must have at least 2 values, but "
+            f'found {len(boundaries)} value(s).'
+        )
     if sorted(boundaries) != boundaries:
         raise OperationFailure(
-            "The 'boundaries' option to $bucket must be sorted in ascending order")
+            "The 'boundaries' option to $bucket must be sorted in ascending order"
+        )
     output_fields = options.get('output', {'count': {'$sum': 1}})
     default_value = options.get('default', None)
     try:
@@ -1319,7 +1376,8 @@ def _handle_bucket_stage(in_collection, unused_database, options):
         except KeyError as err:
             raise OperationFailure(
                 '$bucket could not find a matching branch for '
-                'an input, and no default was specified.') from err
+                'an input, and no default was specified.'
+            ) from err
 
     def _get_bucket_id(doc):
         """Get the bucket ID for a document.
@@ -1329,7 +1387,7 @@ def _handle_bucket_stage(in_collection, unused_database, options):
         if it's not the same type as the boundaries.
         """
         try:
-            value = _parse_expression(group_by, doc)
+            value = _parse_expression(group_by, doc, user_vars=user_vars)
         except KeyError:
             return (is_default_last, _get_default_bucket())
         index = bisect.bisect_right(boundaries, value)
@@ -1342,47 +1400,49 @@ def _handle_bucket_stage(in_collection, unused_database, options):
     grouped = itertools.groupby(out_collection, lambda kv: kv[0])
 
     out_collection = []
-    for (unused_key, doc_id), group in grouped:
+    for (_, doc_id), group in grouped:
         group_list = [kv[1] for kv in group]
-        doc_dict = _accumulate_group(output_fields, group_list)
+        doc_dict = _accumulate_group(output_fields, group_list, user_vars=user_vars)
         doc_dict['_id'] = doc_id
         out_collection.append(doc_dict)
     return out_collection
 
 
-def _handle_sample_stage(in_collection, unused_database, options):
+def _handle_sample_stage(in_collection, unused_database, options, unused_user_vars):
     if not isinstance(options, dict):
         raise OperationFailure('the $sample stage specification must be an object')
     size = options.pop('size', None)
     if size is None:
         raise OperationFailure('$sample stage must specify a size')
     if options:
-        raise OperationFailure('unrecognized option to $sample: %s' % set(options).pop())
+        raise OperationFailure(f'unrecognized option to $sample: {set(options).pop()}')
     shuffled = list(in_collection)
     _random.shuffle(shuffled)
     return shuffled[:size]
 
 
-def _handle_sort_stage(in_collection, unused_database, options):
+def _handle_sort_stage(in_collection, unused_database, options, unused_user_vars):
     sort_array = reversed([{x: y} for x, y in options.items()])
     sorted_collection = in_collection
     for sort_pair in sort_array:
-        for sortKey, sortDirection in sort_pair.items():
+        for sort_key, sort_direction in sort_pair.items():
             sorted_collection = sorted(
                 sorted_collection,
-                key=lambda x: filtering.resolve_sort_key(sortKey, x),
-                reverse=sortDirection < 0)
+                key=lambda x: filtering.resolve_sort_key(sort_key, x),
+                reverse=sort_direction < 0,
+            )
     return sorted_collection
 
 
-def _handle_unwind_stage(in_collection, unused_database, options):
+def _handle_unwind_stage(in_collection, unused_database, options, unused_user_vars):
     if not isinstance(options, dict):
         options = {'path': options}
     path = options['path']
     if not isinstance(path, str) or path[0] != '$':
         raise ValueError(
-            '$unwind failed: exception: field path references must be prefixed '
-            "with a '$' '%s'" % path)
+            f'$unwind failed: exception: field path references must be prefixed '
+            f"with a '$' '{path}'"
+        )
     path = path[1:]
     should_preserve_null_and_empty = options.get('preserveNullAndEmptyArrays')
     include_array_index = options.get('includeArrayIndex')
@@ -1438,19 +1498,20 @@ def _combine_projection_spec(filter_list, original_filter, prefix=''):
                 other_key = field + '.' + filter_dict[field][0]
                 raise OperationFailure(
                     'Invalid $project :: caused by :: specification contains two conflicting paths.'
-                    ' Cannot specify both %s and %s: %s' % (
-                        repr(prefix + field), repr(prefix + other_key), original_filter))
+                    f' Cannot specify both {prefix + field!r} and {prefix + other_key!r}: '
+                    f'{original_filter}'
+                )
             filter_dict[field] = 1
             continue
         if not isinstance(filter_dict.get(field, []), list):
             raise OperationFailure(
                 'Invalid $project :: caused by :: specification contains two conflicting paths.'
-                ' Cannot specify both %s and %s: %s' % (
-                    repr(prefix + field), repr(prefix + key), original_filter))
-        filter_dict[field] = filter_dict.get(field, []) + [subkey]
+                f' Cannot specify both {prefix + field!r} and {prefix + key!r}: {original_filter}'
+            )
+        filter_dict[field] = [*filter_dict.get(field, []), subkey]
 
     return collections.OrderedDict(
-        (k, _combine_projection_spec(v, original_filter, prefix='%s%s.' % (prefix, k)))
+        (k, _combine_projection_spec(v, original_filter, prefix=f'{prefix}{k}.'))
         for k, v in filter_dict.items()
     )
 
@@ -1471,33 +1532,39 @@ def _project_by_spec(doc, proj_spec, is_include):
         if isinstance(value, dict):
             output[key] = _project_by_spec(value, proj_spec[key], is_include)
         elif isinstance(value, list):
-            output[key] = [_project_by_spec(array_value, proj_spec[key], is_include)
-                           for array_value in value if isinstance(array_value, dict)]
+            output[key] = [
+                _project_by_spec(array_value, proj_spec[key], is_include)
+                for array_value in value
+                if isinstance(array_value, dict)
+            ]
         elif not is_include:
             output[key] = value
 
     return output
 
 
-def _handle_replace_root_stage(in_collection, unused_database, options):
+def _handle_replace_root_stage(in_collection, unused_database, options, user_vars):
     if 'newRoot' not in options:
         raise OperationFailure("Parameter 'newRoot' is missing for $replaceRoot operation.")
     new_root = options['newRoot']
     out_collection = []
     for doc in in_collection:
         try:
-            new_doc = _parse_expression(new_root, doc, ignore_missing_keys=True)
+            new_doc = _parse_expression(
+                new_root, doc, ignore_missing_keys=True, user_vars=user_vars
+            )
         except KeyError:
             new_doc = NOTHING
         if not isinstance(new_doc, dict):
             raise OperationFailure(
-                "'newRoot' expression must evaluate to an object, but resulting value was: {}"
-                .format(new_doc))
+                f"'newRoot' expression must evaluate to an object, but resulting value was: "
+                f'{new_doc}'
+            )
         out_collection.append(new_doc)
     return out_collection
 
 
-def _handle_project_stage(in_collection, unused_database, options):
+def _handle_project_stage(in_collection, unused_database, options, user_vars):
     filter_list = []
     method = None
     include_id = options.get('_id')
@@ -1509,12 +1576,14 @@ def _handle_project_stage(in_collection, unused_database, options):
             method = 'include' if value else 'exclude'
         elif method == 'include' and not value and field != '_id':
             raise OperationFailure(
-                'Bad projection specification, cannot exclude fields '
-                "other than '_id' in an inclusion projection: %s" % options)
+                f'Bad projection specification, cannot exclude fields '
+                f"other than '_id' in an inclusion projection: {options}"
+            )
         elif method == 'exclude' and value:
             raise OperationFailure(
-                'Bad projection specification, cannot include fields '
-                'or add computed fields during an exclusion projection: %s' % options)
+                f'Bad projection specification, cannot include fields '
+                f'or add computed fields during an exclusion projection: {options}'
+            )
         if value in (0, 1, True, False):
             if field != '_id':
                 filter_list.append(field)
@@ -1523,11 +1592,10 @@ def _handle_project_stage(in_collection, unused_database, options):
             new_fields_collection = [{} for unused_doc in in_collection]
 
         for in_doc, out_doc in zip(in_collection, new_fields_collection):
-            try:
-                out_doc[field] = _parse_expression(value, in_doc, ignore_missing_keys=True)
-            except KeyError:
-                # Ignore missing key.
-                pass
+            with contextlib.suppress(KeyError):
+                out_doc[field] = _parse_expression(
+                    value, in_doc, ignore_missing_keys=True, user_vars=user_vars
+                )
     if (method == 'include') == (include_id is not False and include_id != 0):
         filter_list.append('_id')
 
@@ -1537,14 +1605,11 @@ def _handle_project_stage(in_collection, unused_database, options):
     # Final steps: include or exclude fields and merge with newly created fields.
     projection_spec = _combine_projection_spec(filter_list, original_filter=options)
     out_collection = [
-        _project_by_spec(doc, projection_spec, is_include=(method == 'include'))
+        _project_by_spec(doc, projection_spec, is_include=method == 'include')
         for doc in in_collection
     ]
     if new_fields_collection:
-        return [
-            dict(a, **b)
-            for a, b in zip(out_collection, new_fields_collection)
-        ]
+        return [dict(a, **b) for a, b in zip(out_collection, new_fields_collection)]
     return out_collection
 
 
@@ -1591,15 +1656,18 @@ def _handle_redact_descend_values(expression, value):
     return value
 
 
-def _handle_add_fields_stage(in_collection, unused_database, options):
+def _handle_add_fields_stage(in_collection, unused_database, options, user_vars):
     if not options:
         raise OperationFailure(
-            'Invalid $addFields :: caused by :: specification must have at least one field')
+            'Invalid $addFields :: caused by :: specification must have at least one field'
+        )
     out_collection = [dict(doc) for doc in in_collection]
     for field, value in options.items():
         for in_doc, out_doc in zip(in_collection, out_collection):
             try:
-                out_value = _parse_expression(value, in_doc, ignore_missing_keys=True)
+                out_value = _parse_expression(
+                    value, in_doc, user_vars=user_vars, ignore_missing_keys=True
+                )
             except KeyError:
                 continue
             parts = field.split('.')
@@ -1612,7 +1680,7 @@ def _handle_add_fields_stage(in_collection, unused_database, options):
     return out_collection
 
 
-def _handle_out_stage(in_collection, database, options):
+def _handle_out_stage(in_collection, database, options, unused_user_vars):
     # TODO(MetrodataTeam): should leave the origin collection unchanged
     out_collection = database.get_collection(options)
     if out_collection.find_one():
@@ -1622,7 +1690,7 @@ def _handle_out_stage(in_collection, database, options):
     return in_collection
 
 
-def _handle_count_stage(in_collection, database, options):
+def _handle_count_stage(in_collection, database, options, unused_user_vars):
     if not isinstance(options, str) or options == '':
         raise OperationFailure('the count field must be a non-empty string')
     elif options.startswith('$'):
@@ -1632,19 +1700,23 @@ def _handle_count_stage(in_collection, database, options):
     return [{options: len(in_collection)}]
 
 
-def _handle_facet_stage(in_collection, database, options):
+def _handle_facet_stage(in_collection, database, options, user_vars):
     out_collection_by_pipeline = {}
     for pipeline_title, pipeline in options.items():
-        out_collection_by_pipeline[pipeline_title] = list(process_pipeline(
-            in_collection, database, pipeline, None))
+        out_collection_by_pipeline[pipeline_title] = list(
+            process_pipeline(in_collection, database, pipeline, None, user_vars=user_vars)
+        )
     return [out_collection_by_pipeline]
 
 
-def _handle_match_stage(in_collection, database, options):
+def _handle_match_stage(in_collection, database, options, user_vars):
     spec = helpers.patch_datetime_awareness_in_document(options)
     return [
-        doc for doc in in_collection
-        if filtering.filter_applies(spec, helpers.patch_datetime_awareness_in_document(doc))
+        doc
+        for doc in in_collection
+        if filtering.filter_applies(
+            spec, helpers.patch_datetime_awareness_in_document(doc), user_vars=user_vars
+        )
     ]
 
 
@@ -1660,7 +1732,7 @@ _PIPELINE_HANDLERS = {
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
     '$indexStats': None,
-    '$limit': lambda c, d, o: c[:o],
+    '$limit': lambda c, d, o, v: c[:o],
     '$listLocalSessions': None,
     '$listSessions': None,
     '$lookup': _handle_lookup_stage,
@@ -1674,7 +1746,7 @@ _PIPELINE_HANDLERS = {
     '$replaceWith': None,
     '$sample': _handle_sample_stage,
     '$set': _handle_add_fields_stage,
-    '$skip': lambda c, d, o: c[o:],
+    '$skip': lambda c, d, o, v: c[o:],
     '$sort': _handle_sort_stage,
     '$sortByCount': None,
     '$unset': None,
@@ -1682,7 +1754,7 @@ _PIPELINE_HANDLERS = {
 }
 
 
-def process_pipeline(collection, database, pipeline, session):
+def process_pipeline(collection, database, pipeline, session, user_vars=None):
     if session:
         raise NotImplementedError('Mongomock does not handle sessions yet')
 
@@ -1692,13 +1764,20 @@ def process_pipeline(collection, database, pipeline, session):
                 handler = _PIPELINE_HANDLERS[operator]
             except KeyError as err:
                 raise NotImplementedError(
-                    '%s is not a valid operator for the aggregation pipeline. '
-                    'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
-                    'for a complete list of valid operators.' % operator) from err
+                    f'{operator} is not a valid operator for the aggregation pipeline. '
+                    f'See http://docs.mongodb.org/manual/meta/aggregation-quick-reference/ '
+                    f'for a complete list of valid operators.'
+                ) from err
             if not handler:
                 raise NotImplementedError(
-                    "Although '%s' is a valid operator for the aggregation pipeline, it is "
-                    'currently not implemented in Mongomock.' % operator)
-            collection = handler(collection, database, options)
+                    f"Although '{operator}' is a valid operator for the aggregation pipeline, "
+                    f'it is currently not implemented in Mongomock.'
+                )
+            collection = handler(collection, database, options, user_vars)
 
     return command_cursor.CommandCursor(collection)
+
+
+def validate_stage_name(name):
+    if name not in _PIPELINE_HANDLERS:
+        raise OperationFailure(f"Unrecognized pipeline stage name: '{name}'")

@@ -12,23 +12,14 @@ from pymongo.errors import (
     OperationFailure as OperationFailure,
 )
 
-
 def patch(
-        servers: Union[str, Tuple[str, int], Sequence[Union[str, Tuple[str, int]]]] = ...,
-        on_new: Literal['error', 'create', 'timeout', 'pymongo'] = ...,
-        ) -> mock._patch:
-    ...
-
+    servers: Union[str, Tuple[str, int], Sequence[Union[str, Tuple[str, int]]]] = ...,
+    on_new: Literal['error', 'create', 'timeout', 'pymongo'] = ...,
+) -> mock._patch: ...
 
 _FeatureName = Literal['collation', 'session']
 
-
-def ignore_feature(feature: _FeatureName) -> None:
-    ...
-
-
-def warn_on_feature(feature: _FeatureName) -> None:
-    ...
-
+def ignore_feature(feature: _FeatureName) -> None: ...
+def warn_on_feature(feature: _FeatureName) -> None: ...
 
 SERVER_VERSION: str = ...

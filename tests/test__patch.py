@@ -1,20 +1,19 @@
+import platform
 import time
 import unittest
+from unittest import mock
 
 import mongomock
 
+
 try:
     import pymongo
+
     _HAVE_PYMONGO = True
 except ImportError:
     _HAVE_PYMONGO = False
 
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
-import platform
 _USING_PYPY = platform.python_implementation() == 'PyPy'
 
 
@@ -55,14 +54,16 @@ class PatchTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             pymongo.MongoClient('myserver.example.com', port=12345)
 
-    @mongomock.patch((
-        'mongodb://myserver.example.com:12345',
-        'mongodb://otherserver.example.com:27017/default-db',
-        'mongodb://[2001:67c:2e8:22::c100:68b]',
-        'mongodb://[2001:67c:2e8:22::c100:68b]:1234',
-        'mongodb://r1.example.net:27017,r2.example.net:27017/',
-        '/var/lib/mongo.sock',
-    ))
+    @mongomock.patch(
+        (
+            'mongodb://myserver.example.com:12345',
+            'mongodb://otherserver.example.com:27017/default-db',
+            'mongodb://[2001:67c:2e8:22::c100:68b]',
+            'mongodb://[2001:67c:2e8:22::c100:68b]:1234',
+            'mongodb://r1.example.net:27017,r2.example.net:27017/',
+            '/var/lib/mongo.sock',
+        )
+    )
     def test__create_servers(self):
         pymongo.MongoClient('myserver.example.com', port=12345)
         pymongo.MongoClient('otherserver.example.com')
@@ -119,7 +120,7 @@ class PatchTest(unittest.TestCase):
 
     @mongomock.patch(servers=(('server.example.com', 27017),))
     def test__tuple_server_host_and_port(self):
-        objects = [dict(votes=1), dict(votes=2)]
+        objects = [{'votes': 1}, {'votes': 2}]
         client = pymongo.MongoClient('server.example.com')
         client.db.collection.insert_many(objects)
 

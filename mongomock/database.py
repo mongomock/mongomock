@@ -1,18 +1,22 @@
-from packaging import version
 import warnings
+
+from packaging import version
+
+from mongomock import codec_options as mongomock_codec_options
+from mongomock import helpers
+from mongomock import read_preferences
+from mongomock import store
 
 from . import CollectionInvalid
 from . import InvalidName
 from . import OperationFailure
 from .collection import Collection
 from .filtering import filter_applies
-from mongomock import codec_options as mongomock_codec_options
-from mongomock import helpers
-from mongomock import read_preferences
-from mongomock import store
+
 
 try:
     from pymongo import ReadPreference
+
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
@@ -28,12 +32,12 @@ _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS = frozenset(['$regex', '$eq', '$ne'])
 def _verify_list_collection_supported_op(keys):
     if set(keys) - _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS:
         raise NotImplementedError(
-            'list collection names filter operator {0} is not implemented yet in mongomock '
-            'allowed operators are {1}'.format(keys, _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS))
+            f'list collection names filter operator {keys} is not implemented yet in mongomock '
+            f'allowed operators are {_LIST_COLLECTION_FILTER_ALLOWED_OPERATORS}'
+        )
 
 
-class Database(object):
-
+class Database:
     def __init__(
         self, client, name, _store, read_preference=None, codec_options=None, read_concern=None
     ):
@@ -54,19 +58,21 @@ class Database(object):
     def __getattr__(self, attr):
         if attr.startswith('_'):
             raise AttributeError(
-                "%s has no attribute '%s'. To access the %s collection, use database['%s']." %
-                (self.__class__.__name__, attr, attr, attr))
+                f"{self.__class__.__name__} has no attribute '{attr}'. To access the {attr} "
+                f"collection, use database['{attr}']."
+            )
         return self[attr]
 
     def __repr__(self):
-        return "Database({0}, '{1}')".format(self._client, self.name)
+        return f"Database({self._client}, '{self.name}')"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self._client == other._client and self.name == other.name
         return NotImplemented
 
-    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
+    if version.parse('3.12') <= helpers.PYMONGO_VERSION:
+
         def __hash__(self):
             return hash((self._client, self.name))
 
@@ -89,17 +95,21 @@ class Database(object):
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def collection_names(self, include_system_collections=True, session=None):
-            warnings.warn('collection_names is deprecated. Use list_collection_names instead.')
+            warnings.warn(
+                'collection_names is deprecated. Use list_collection_names instead.', stacklevel=2
+            )
             if include_system_collections:
                 return list(self._get_created_collections())
             return self.list_collection_names(session=session)
 
-    def list_collections(self, filter=None, session=None, nameOnly=False):
+    def list_collections(self, filter=None, session=None, nameOnly=False):  # noqa: N803
         raise NotImplementedError(
             'list_collections is a valid method of Database but has not been implemented in '
-            'mongomock yet.')
+            'mongomock yet.'
+        )
 
     def list_collection_names(self, filter=None, session=None):
         """filter: only name field type with eq,ne or regex operator
@@ -114,26 +124,30 @@ class Database(object):
 
         if filter:
             if not filter.get('name'):
-                raise NotImplementedError('list collection {0} might be valid but is not '
-                                          'implemented yet in mongomock'.format(filter))
+                raise NotImplementedError(
+                    f'list collection {filter} might be valid but is not '
+                    'implemented yet in mongomock'
+                )
 
-            filter = {field_name: {'$eq': filter.get(field_name)}} \
-                if isinstance(filter.get(field_name), str) else filter
+            filter = (
+                {field_name: {'$eq': filter.get(field_name)}}
+                if isinstance(filter.get(field_name), str)
+                else filter
+            )
 
             _verify_list_collection_supported_op(filter.get(field_name).keys())
 
             return [
-                name for name in list(self._store._collections)
+                name
+                for name in list(self._store._collections)
                 if filter_applies(filter, {field_name: name}) and not name.startswith('system.')
             ]
 
-        return [
-            name for name in self._get_created_collections()
-            if not name.startswith('system.')
-        ]
+        return [name for name in self._get_created_collections() if not name.startswith('system.')]
 
-    def get_collection(self, name, codec_options=None, read_preference=None,
-                       write_concern=None, read_concern=None):
+    def get_collection(
+        self, name, codec_options=None, read_preference=None, write_concern=None, read_concern=None
+    ):
         if read_preference is not None:
             read_preferences.ensure_read_preference_type('read_preference', read_preference)
         mongomock_codec_options.is_supported(codec_options)
@@ -141,13 +155,20 @@ class Database(object):
             return self._collection_accesses[name].with_options(
                 codec_options=codec_options or self._codec_options,
                 read_preference=read_preference or self.read_preference,
-                read_concern=read_concern, write_concern=write_concern)
+                read_concern=read_concern,
+                write_concern=write_concern,
+            )
         except KeyError:
             self._ensure_valid_collection_name(name)
             collection = self._collection_accesses[name] = Collection(
-                self, name=name, read_concern=read_concern, write_concern=write_concern,
+                self,
+                name=name,
+                read_concern=read_concern,
+                write_concern=write_concern,
                 read_preference=read_preference or self.read_preference,
-                codec_options=codec_options or self._codec_options, _db_store=self._store, )
+                codec_options=codec_options or self._codec_options,
+                _db_store=self._store,
+            )
             return collection
 
     def drop_collection(self, name_or_collection, session=None):
@@ -174,7 +195,7 @@ class Database(object):
     def create_collection(self, name, **kwargs):
         self._ensure_valid_collection_name(name)
         if name in self.list_collection_names():
-            raise CollectionInvalid('collection %s already exists' % name)
+            raise CollectionInvalid(f'collection {name} already exists')
 
         if kwargs:
             raise NotImplementedError('Special options not supported')
@@ -182,22 +203,19 @@ class Database(object):
         self._store.create_collection(name)
         return self[name]
 
-    def rename_collection(self, name, new_name, dropTarget=False):
+    def rename_collection(self, name, new_name, dropTarget=False):  # noqa: N803
         """Changes the name of an existing collection."""
         self._ensure_valid_collection_name(new_name)
 
         # Reference for server implementation:
         # https://docs.mongodb.com/manual/reference/command/renameCollection/
         if not self._store[name].is_created:
-            raise OperationFailure(
-                'The collection "{0}" does not exist.'.format(name), 10026)
+            raise OperationFailure(f'The collection "{name}" does not exist.', 10026)
         if new_name in self._store:
             if dropTarget:
                 self.drop_collection(new_name)
             else:
-                raise OperationFailure(
-                    'The target collection "{0}" already exists'.format(new_name),
-                    10027)
+                raise OperationFailure(f'The target collection "{new_name}" already exists', 10027)
         self._store.rename(name, new_name)
         return {'ok': 1}
 
@@ -206,38 +224,43 @@ class Database(object):
             raise NotImplementedError('Mongomock does not handle sessions yet')
 
         if not hasattr(dbref, 'collection') or not hasattr(dbref, 'id'):
-            raise TypeError('cannot dereference a %s' % type(dbref))
+            raise TypeError(f'cannot dereference a {type(dbref)}')
         if dbref.database is not None and dbref.database != self.name:
-            raise ValueError('trying to dereference a DBRef that points to '
-                             'another database (%r not %r)' % (dbref.database,
-                                                               self.name))
+            raise ValueError(
+                'trying to dereference a DBRef that points to '
+                f'another database ({dbref.database!r} not {self.name!r})'
+            )
         return self[dbref.collection].find_one({'_id': dbref.id})
 
     def command(self, command, **unused_kwargs):
         if isinstance(command, str):
             command = {command: 1}
         if 'ping' in command:
-            return {'ok': 1.}
+            return {'ok': 1.0}
         # TODO(pascal): Differentiate NotImplementedError for valid commands
         # and OperationFailure if the command is not valid.
         raise NotImplementedError(
-            'command is a valid Database method but is not implemented in Mongomock yet')
+            'command is a valid Database method but is not implemented in Mongomock yet'
+        )
 
     def with_options(
-            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
-
+        self, codec_options=None, read_preference=None, write_concern=None, read_concern=None
+    ):
         mongomock_codec_options.is_supported(codec_options)
 
         if write_concern:
             raise NotImplementedError(
                 'write_concern is a valid parameter for with_options but is not implemented yet in '
-                'mongomock')
+                'mongomock'
+            )
 
         if read_preference is None or read_preference == self._read_preference:
             return self
 
         return Database(
-            self._client, self.name, self._store,
+            self._client,
+            self.name,
+            self._store,
             read_preference=read_preference or self._read_preference,
             codec_options=codec_options or self._codec_options,
             read_concern=read_concern or self._read_concern,

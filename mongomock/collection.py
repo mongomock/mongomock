@@ -1,35 +1,45 @@
-from __future__ import division
 import collections
-from collections import OrderedDict
-from collections.abc import Iterable, Mapping, MutableMapping
 import copy
 import functools
 import itertools
 import json
 import math
-from packaging import version
 import time
 import warnings
+from collections import OrderedDict
+from collections.abc import Iterable
+from collections.abc import Mapping
+from collections.abc import MutableMapping
+
+from packaging import version
+
 
 try:
-    from bson import json_util, SON, BSON
+    from bson import BSON
+    from bson import json_util
+    from bson import SON
+    from bson.codec_options import CodecOptions
+    from bson.errors import InvalidDocument
 except ImportError:
     json_utils = SON = BSON = None
+    CodecOptions = None
 try:
     import execjs
 except ImportError:
     execjs = None
 
 try:
-    from pymongo.operations import IndexModel
     from pymongo import ReadPreference
     from pymongo import ReturnDocument
+    from pymongo.operations import IndexModel
+
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
-    class IndexModel(object):
+
+    class IndexModel:
         pass
 
-    class ReturnDocument(object):
+    class ReturnDocument:
         BEFORE = False
         AFTER = True
 
@@ -37,25 +47,27 @@ except ImportError:
 
 from sentinels import NOTHING
 
-
 import mongomock  # Used for utcnow - please see https://github.com/mongomock/mongomock#utcnow
 from mongomock import aggregate
+from mongomock import BulkWriteError
 from mongomock import codec_options as mongomock_codec_options
-from mongomock import ConfigurationError, DuplicateKeyError, BulkWriteError
+from mongomock import ConfigurationError
+from mongomock import DuplicateKeyError
 from mongomock import filtering
-from mongomock.filtering import filter_applies
 from mongomock import helpers
 from mongomock import InvalidOperation
-from mongomock.not_implemented import raise_for_feature as raise_not_implemented
 from mongomock import ObjectId
 from mongomock import OperationFailure
+from mongomock import WriteError
+from mongomock.filtering import filter_applies
+from mongomock.not_implemented import raise_for_feature as raise_not_implemented
 from mongomock.results import BulkWriteResult
 from mongomock.results import DeleteResult
 from mongomock.results import InsertManyResult
 from mongomock.results import InsertOneResult
 from mongomock.results import UpdateResult
 from mongomock.write_concern import WriteConcern
-from mongomock import WriteError
+
 
 try:
     from pymongo.read_concern import ReadConcern
@@ -66,26 +78,60 @@ _KwargOption = collections.namedtuple('KwargOption', ['typename', 'default', 'at
 
 _WITH_OPTIONS_KWARGS = {
     'read_preference': _KwargOption(
-        'pymongo.read_preference.ReadPreference', _READ_PREFERENCE_PRIMARY,
-        ('document', 'mode', 'mongos_mode', 'max_staleness')),
+        'pymongo.read_preference.ReadPreference',
+        _READ_PREFERENCE_PRIMARY,
+        ('document', 'mode', 'mongos_mode', 'max_staleness'),
+    ),
     'write_concern': _KwargOption(
-        'pymongo.write_concern.WriteConcern', WriteConcern(),
-        ('acknowledged', 'document')),
+        'pymongo.write_concern.WriteConcern', WriteConcern(), ('acknowledged', 'document')
+    ),
 }
+
+VALID_UPDATE_PIPELINE_STAGES = (
+    '$addFields',
+    '$set',
+    '$project',
+    '$unset',
+    '$replaceRoot',
+    '$replaceWith',
+)
+
+
+def validate_list_or_mapping(option, value):
+    if not isinstance(value, (Mapping, list)):
+        raise TypeError(
+            f'{option} must either be a list or an instance of dict, '
+            'bson.son.SON, or any other type that inherits from '
+            'collections.Mapping'
+        )
+
+
+def _bson_encode(document, check_keys, codec_options):
+    if codec_options:
+        if isinstance(codec_options, mongomock_codec_options.CodecOptions):
+            codec_options = codec_options.to_pymongo()
+        if isinstance(codec_options, CodecOptions):
+            BSON.encode(document, check_keys=check_keys, codec_options=codec_options)
+    else:
+        BSON.encode(document, check_keys=check_keys)
 
 
 def validate_is_mapping(option, value):
     if not isinstance(value, Mapping):
-        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
-                        'other type that inherits from '
-                        'collections.Mapping' % (option,))
+        raise TypeError(
+            f'{option} must be an instance of dict, bson.son.SON, or '
+            'other type that inherits from '
+            'collections.Mapping'
+        )
 
 
 def validate_is_mutable_mapping(option, value):
     if not isinstance(value, MutableMapping):
-        raise TypeError('%s must be an instance of dict, bson.son.SON, or '
-                        'other type that inherits from '
-                        'collections.MutableMapping' % (option,))
+        raise TypeError(
+            f'{option} must be an instance of dict, bson.son.SON, or '
+            'other type that inherits from '
+            'collections.MutableMapping'
+        )
 
 
 def validate_ok_for_replace(replacement):
@@ -97,11 +143,12 @@ def validate_ok_for_replace(replacement):
 
 
 def validate_ok_for_update(update):
-    validate_is_mapping('update', update)
+    validate_list_or_mapping('update', update)
     if not update:
-        raise ValueError('update only works with $ operators')
+        raise ValueError('update cannot be empty')
+    is_document = not isinstance(update, list)
     first = next(iter(update))
-    if not first.startswith('$'):
+    if is_document and not first.startswith('$'):
         raise ValueError('update only works with $ operators')
 
 
@@ -110,7 +157,7 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
-class BulkWriteOperation(object):
+class BulkWriteOperation:
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
         self.selector = selector
@@ -135,13 +182,16 @@ class BulkWriteOperation(object):
             if err:
                 return {'writeErrors': [err]}
             return {}
+
         self.builder.executors.append(exec_remove)
 
     def remove(self):
         assert not self.is_upsert
         self.register_remove_op(multi=True)
 
-    def remove_one(self,):
+    def remove_one(
+        self,
+    ):
         assert not self.is_upsert
         self.register_remove_op(multi=False)
 
@@ -153,9 +203,9 @@ class BulkWriteOperation(object):
         selector = self.selector
 
         def exec_update():
-            result = collection._update(spec=selector, document=document,
-                                        multi=multi, upsert=self.is_upsert,
-                                        **extra_args)
+            result = collection._update(
+                spec=selector, document=document, multi=multi, upsert=self.is_upsert, **extra_args
+            )
             ret_val = {}
             if result.get('upserted'):
                 ret_val['upserted'] = result.get('upserted')
@@ -170,16 +220,17 @@ class BulkWriteOperation(object):
             if result.get('err'):
                 ret_val['err'] = result.get('err')
             return ret_val
+
         self.builder.executors.append(exec_update)
 
-    def update(self, document, hint=None):
-        self.register_update_op(document, multi=True, hint=hint)
+    def update(self, document, hint=None, sort=None):
+        self.register_update_op(document, multi=True, hint=hint, sort=sort)
 
-    def update_one(self, document, hint=None):
-        self.register_update_op(document, multi=False, hint=hint)
+    def update_one(self, document, hint=None, sort=None):
+        self.register_update_op(document, multi=False, hint=hint, sort=sort)
 
-    def replace_one(self, document, hint=None):
-        self.register_update_op(document, multi=False, remove=True, hint=hint)
+    def replace_one(self, document, hint=None, sort=None):
+        self.register_update_op(document, multi=False, remove=True, hint=hint, sort=sort)
 
 
 def _combine_projection_spec(projection_fields_spec):
@@ -194,17 +245,17 @@ def _combine_projection_spec(projection_fields_spec):
             if isinstance(tmp_spec.get(f), dict):
                 if not v:
                     raise NotImplementedError(
-                        'Mongomock does not support overriding excluding projection: %s' %
-                        projection_fields_spec)
-                raise OperationFailure('Path collision at %s' % f)
+                        f'Mongomock does not support overriding excluding '
+                        f'projection: {projection_fields_spec}'
+                    )
+                raise OperationFailure(f'Path collision at {f}')
             tmp_spec[f] = v
         else:
             split_field = f.split('.', 1)
             base_field, new_field = tuple(split_field)
             if not isinstance(tmp_spec.get(base_field), dict):
                 if base_field in tmp_spec:
-                    raise OperationFailure(
-                        'Path collision at %s remaining portion %s' % (f, new_field))
+                    raise OperationFailure(f'Path collision at {f} remaining portion {new_field}')
                 tmp_spec[base_field] = OrderedDict()
             tmp_spec[base_field][new_field] = v
 
@@ -230,8 +281,9 @@ def _project_by_spec(doc, combined_projection_spec, is_include, container):
         spec = combined_projection_spec.get(key, NOTHING)
         if isinstance(spec, dict):
             if isinstance(val, (list, tuple)):
-                doc_copy[key] = [_project_by_spec(sub_doc, spec, is_include, container)
-                                 for sub_doc in val]
+                doc_copy[key] = [
+                    _project_by_spec(sub_doc, spec, is_include, container) for sub_doc in val
+                ]
             elif isinstance(val, dict):
                 doc_copy[key] = _project_by_spec(val, spec, is_include, container)
         elif (is_include and spec is not NOTHING) or (not is_include and spec is NOTHING):
@@ -254,7 +306,32 @@ def _copy_field(obj, container):
     return copy.copy(obj)
 
 
-class BulkOperationBuilder(object):
+def _recursive_key_check_null_character(data):
+    for key, value in data.items():
+        if '\0' in key:
+            raise InvalidDocument(f'Field names cannot contain the null character (found: {key})')
+        if isinstance(value, Mapping):
+            _recursive_key_check_null_character(value)
+
+
+def _validate_data_fields(data):
+    _recursive_key_check_null_character(data)
+    for key in data:
+        if key.startswith('$'):
+            raise InvalidDocument(
+                f'Top-level field names cannot start with the "$" sign (found: {key})'
+            )
+
+
+def _validate_document_stages(document):
+    for stage in document:
+        for stage_name in stage:
+            aggregate.validate_stage_name(stage_name)
+            if stage_name not in VALID_UPDATE_PIPELINE_STAGES:
+                raise WriteError(f'{stage_name} is not allowed to be used within an update')
+
+
+class BulkOperationBuilder:
     def __init__(self, collection, ordered=False, bypass_document_validation=False):
         self.collection = collection
         self.ordered = ordered
@@ -271,14 +348,15 @@ class BulkOperationBuilder(object):
     def insert(self, doc):
         def exec_insert():
             self.collection.insert_one(
-                doc, bypass_document_validation=self._bypass_document_validation)
+                doc, bypass_document_validation=self._bypass_document_validation
+            )
             return {'nInserted': 1}
+
         self.executors.append(exec_insert)
 
     def __aggregate_operation_result(self, total_result, key, value):
         agg_val = total_result.get(key)
-        assert agg_val is not None, 'Unknow operation result %s=%s' \
-                                    ' (unrecognized key)' % (key, value)
+        assert agg_val is not None, f'Unknow operation result {key}={value} (unrecognized key)'
         if isinstance(agg_val, int):
             total_result[key] += value
         elif isinstance(agg_val, list):
@@ -288,10 +366,12 @@ class BulkOperationBuilder(object):
             else:
                 agg_val.append(value)
         else:
-            assert False, 'Fixme: missed aggreation rule for type: %s for' \
-                          ' key {%s=%s}' % (type(agg_val), key, agg_val)
+            raise AssertionError(
+                f'Fixme: missed aggreation rule for type: {type(agg_val)} '
+                f'for key {key}={agg_val}'
+            )
 
-    def _set_nModified_policy(self, insert, update):
+    def _set_nModified_policy(self, insert, update):  # noqa: N802
         self._insert_returns_nModified = insert
         self._update_returns_nModified = update
 
@@ -301,41 +381,53 @@ class BulkOperationBuilder(object):
         if self.done:
             raise InvalidOperation('Bulk operation already executed!')
         self.done = True
-        result = {'nModified': 0, 'nUpserted': 0, 'nMatched': 0,
-                  'writeErrors': [], 'upserted': [], 'writeConcernErrors': [],
-                  'nRemoved': 0, 'nInserted': 0}
+        result = {
+            'nModified': 0,
+            'nUpserted': 0,
+            'nMatched': 0,
+            'writeErrors': [],
+            'upserted': [],
+            'writeConcernErrors': [],
+            'nRemoved': 0,
+            'nInserted': 0,
+        }
 
         has_update = False
         has_insert = False
-        broken_nModified_info = False
+        broken_nModified_info = False  # noqa: N806
         for index, execute_func in enumerate(self.executors):
             exec_name = execute_func.__name__
             try:
                 op_result = execute_func()
             except WriteError as error:
-                result['writeErrors'].append({
-                    'index': index,
-                    'code': error.code,
-                    'errmsg': str(error),
-                })
+                result['writeErrors'].append(
+                    {
+                        'index': index,
+                        'code': error.code,
+                        'errmsg': str(error),
+                    }
+                )
                 if self.ordered:
                     break
                 continue
-            for (key, value) in op_result.items():
+            for key, value in op_result.items():
                 self.__aggregate_operation_result(result, key, value)
             if exec_name == 'exec_update':
                 has_update = True
                 if 'nModified' not in op_result:
-                    broken_nModified_info = True
+                    broken_nModified_info = True  # noqa: N806
             has_insert |= exec_name == 'exec_insert'
 
         if broken_nModified_info:
             result.pop('nModified')
-        elif has_insert and self._insert_returns_nModified:
-            pass
-        elif has_update and self._update_returns_nModified:
-            pass
-        elif self._update_returns_nModified and self._insert_returns_nModified:
+        elif (
+            has_insert
+            and self._insert_returns_nModified
+            or has_update
+            and self._update_returns_nModified
+            or self._update_returns_nModified
+            and self._insert_returns_nModified
+        ):
             pass
         else:
             result.pop('nModified')
@@ -348,28 +440,44 @@ class BulkOperationBuilder(object):
     def add_insert(self, doc):
         self.insert(doc)
 
-    def add_update(self, selector, doc, multi=False, upsert=False, collation=None,
-                   array_filters=None, hint=None):
+    def add_update(
+        self,
+        selector,
+        doc,
+        multi=False,
+        upsert=False,
+        collation=None,
+        array_filters=None,
+        hint=None,
+        sort=None,
+    ):
         if array_filters:
             raise_not_implemented(
-                'array_filters', 'Array filters are not implemented in mongomock yet.')
+                'array_filters', 'Array filters are not implemented in mongomock yet.'
+            )
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.register_update_op(doc, multi, hint=hint)
+        write_operation.register_update_op(doc, multi, hint=hint, sort=sort)
 
-    def add_replace(self, selector, doc, upsert, collation=None, hint=None):
+    def add_replace(self, selector, doc, upsert, collation=None, hint=None, sort=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=upsert)
-        write_operation.replace_one(doc, hint=hint)
+        write_operation.replace_one(doc, hint=hint, sort=sort)
 
     def add_delete(self, selector, just_one, collation=None, hint=None):
         write_operation = BulkWriteOperation(self, selector, is_upsert=False)
         write_operation.register_remove_op(not just_one, hint=hint)
 
 
-class Collection(object):
-
+class Collection:
     def __init__(
-            self, database, name, _db_store, write_concern=None, read_concern=None,
-            read_preference=None, codec_options=None):
+        self,
+        database,
+        name,
+        _db_store,
+        write_concern=None,
+        read_concern=None,
+        read_preference=None,
+        codec_options=None,
+    ):
         self.database = database
         self._name = name
         self._db_store = _db_store
@@ -381,7 +489,7 @@ class Collection(object):
         self._codec_options = codec_options or mongomock_codec_options.CodecOptions()
 
     def __repr__(self):
-        return "Collection({0}, '{1}')".format(self.database, self.name)
+        return f"Collection({self.database}, '{self.name}')"
 
     def __getitem__(self, name):
         return self.database[self.name + '.' + name]
@@ -389,28 +497,31 @@ class Collection(object):
     def __getattr__(self, attr):
         if attr.startswith('_'):
             raise AttributeError(
-                "%s has no attribute '%s'. To access the %s.%s collection, use database['%s.%s']." %
-                (self.__class__.__name__, attr, self.name, attr, self.name, attr))
+                f"{self.__class__.__name__} has no attribute '{attr}'. "
+                f"To access the {self.name}.{attr} collection, use database['{self.name}.{attr}']."
+            )
         return self.__getitem__(attr)
 
     def __call__(self, *args, **kwargs):
         name = self._name if '.' not in self._name else self._name.split('.')[-1]
         raise TypeError(
-            "'Collection' object is not callable. If you meant to call the '%s' method on a "
-            "'Collection' object it is failing because no such method exists." % name)
+            f"'Collection' object is not callable. If you meant to call the '{name}' method on a "
+            "'Collection' object it is failing because no such method exists."
+        )
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.database == other.database and self.name == other.name
         return NotImplemented
 
-    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
+    if version.parse('3.12') <= helpers.PYMONGO_VERSION:
+
         def __hash__(self):
             return hash((self.database, self.name))
 
     @property
     def full_name(self):
-        return '{0}.{1}'.format(self.database.name, self._name)
+        return f'{self.database.name}.{self._name}'
 
     @property
     def name(self):
@@ -434,17 +545,22 @@ class Collection(object):
 
     def initialize_unordered_bulk_op(self, bypass_document_validation=False):
         return BulkOperationBuilder(
-            self, ordered=False, bypass_document_validation=bypass_document_validation)
+            self, ordered=False, bypass_document_validation=bypass_document_validation
+        )
 
     def initialize_ordered_bulk_op(self, bypass_document_validation=False):
         return BulkOperationBuilder(
-            self, ordered=True, bypass_document_validation=bypass_document_validation)
+            self, ordered=True, bypass_document_validation=bypass_document_validation
+        )
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
-        def insert(self, data, manipulate=True, check_keys=True,
-                   continue_on_error=False, **kwargs):
-            warnings.warn('insert is deprecated. Use insert_one or insert_many '
-                          'instead.', DeprecationWarning, stacklevel=2)
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
+        def insert(self, data, manipulate=True, check_keys=True, continue_on_error=False, **kwargs):
+            warnings.warn(
+                'insert is deprecated. Use insert_one or insert_many ' 'instead.',
+                DeprecationWarning,
+                stacklevel=2,
+            )
             validate_write_concern_params(**kwargs)
             return self._insert(data)
 
@@ -461,8 +577,8 @@ class Collection(object):
             for document in documents:
                 validate_is_mutable_mapping('document', document)
         return InsertManyResult(
-            self._insert(documents, session, ordered=ordered),
-            acknowledged=True)
+            self._insert(documents, session, ordered=ordered), acknowledged=True
+        )
 
     @property
     def _store(self):
@@ -479,22 +595,26 @@ class Collection(object):
                 try:
                     results.append(self._insert(item))
                 except WriteError as error:
-                    write_errors.append({
-                        'index': index,
-                        'code': error.code,
-                        'errmsg': str(error),
-                        'op': item,
-                    })
+                    write_errors.append(
+                        {
+                            'index': index,
+                            'code': error.code,
+                            'errmsg': str(error),
+                            'op': item,
+                        }
+                    )
                     if ordered:
                         break
                     else:
                         continue
                 num_inserted += 1
             if write_errors:
-                raise BulkWriteError({
-                    'writeErrors': write_errors,
-                    'nInserted': num_inserted,
-                })
+                raise BulkWriteError(
+                    {
+                        'writeErrors': write_errors,
+                        'nInserted': num_inserted,
+                    }
+                )
             return results
 
         if not all(isinstance(k, str) for k in data):
@@ -502,7 +622,11 @@ class Collection(object):
 
         if BSON:
             # bson validation
-            BSON.encode(data, check_keys=True)
+            check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+            if not check_keys:
+                _validate_data_fields(data)
+
+            _bson_encode(data, check_keys=check_keys, codec_options=self._codec_options)
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -561,78 +685,152 @@ class Collection(object):
         return True
 
     def update_one(
-            self, filter, update, upsert=False, bypass_document_validation=False, collation=None,
-            array_filters=None, hint=None, session=None, let=None):
+        self,
+        filter,
+        update,
+        upsert=False,
+        bypass_document_validation=False,
+        collation=None,
+        array_filters=None,
+        hint=None,
+        session=None,
+        let=None,
+        sort=None,
+    ):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
             self._update(
-                filter, update, upsert=upsert, hint=hint, session=session, collation=collation,
-                array_filters=array_filters, let=let),
-            acknowledged=True)
+                filter,
+                update,
+                upsert=upsert,
+                hint=hint,
+                session=session,
+                collation=collation,
+                array_filters=array_filters,
+                let=let,
+                sort=sort,
+            ),
+            acknowledged=True,
+        )
 
     def update_many(
-            self, filter, update, upsert=False, array_filters=None,
-            bypass_document_validation=False, collation=None, hint=None,
-            session=None, let=None):
+        self,
+        filter,
+        update,
+        upsert=False,
+        array_filters=None,
+        bypass_document_validation=False,
+        collation=None,
+        hint=None,
+        session=None,
+        let=None,
+    ):
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
             self._update(
-                filter, update, upsert=upsert, multi=True, hint=hint, session=session,
-                collation=collation, array_filters=array_filters, let=let),
-            acknowledged=True)
+                filter,
+                update,
+                upsert=upsert,
+                multi=True,
+                hint=hint,
+                session=session,
+                collation=collation,
+                array_filters=array_filters,
+                let=let,
+            ),
+            acknowledged=True,
+        )
 
     def replace_one(
-            self, filter, replacement, upsert=False, bypass_document_validation=False,
-            session=None, hint=None):
+        self,
+        filter,
+        replacement,
+        upsert=False,
+        bypass_document_validation=False,
+        session=None,
+        hint=None,
+        sort=None,
+    ):
         if not bypass_document_validation:
             validate_ok_for_replace(replacement)
         return UpdateResult(
-            self._update(filter, replacement, upsert=upsert, hint=hint, session=session),
-            acknowledged=True)
+            self._update(filter, replacement, upsert=upsert, hint=hint, session=session, sort=sort),
+            acknowledged=True,
+        )
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
-        def update(self, spec, document, upsert=False, manipulate=False,
-                   multi=False, check_keys=False, **kwargs):
-            warnings.warn('update is deprecated. Use replace_one, update_one or '
-                          'update_many instead.', DeprecationWarning, stacklevel=2)
-            return self._update(spec, document, upsert, manipulate, multi,
-                                check_keys, **kwargs)
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
 
-    def _update(self, spec, document, upsert=False, manipulate=False,
-                multi=False, check_keys=False, hint=None, session=None,
-                collation=None, let=None, array_filters=None, **kwargs):
+        def update(
+            self,
+            spec,
+            document,
+            upsert=False,
+            manipulate=False,
+            multi=False,
+            check_keys=False,
+            **kwargs,
+        ):
+            warnings.warn(
+                'update is deprecated. Use replace_one, update_one or ' 'update_many instead.',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self._update(spec, document, upsert, manipulate, multi, check_keys, **kwargs)
+
+    def _update(
+        self,
+        spec,
+        document,
+        upsert=False,
+        manipulate=False,
+        multi=False,
+        check_keys=False,
+        hint=None,
+        session=None,
+        collation=None,
+        let=None,
+        array_filters=None,
+        **kwargs,
+    ):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         if hint:
             raise NotImplementedError(
                 'The hint argument of update is valid but has not been implemented in '
-                'mongomock yet')
+                'mongomock yet'
+            )
         if collation:
             raise_not_implemented(
                 'collation',
                 'The collation argument of update is valid but has not been implemented in '
-                'mongomock yet')
+                'mongomock yet',
+            )
         if array_filters:
             raise_not_implemented(
-                'array_filters', 'Array filters are not implemented in mongomock yet.')
+                'array_filters', 'Array filters are not implemented in mongomock yet.'
+            )
         if let:
             raise_not_implemented(
                 'let',
                 'The let argument of update is valid but has not been implemented in mongomock '
-                'yet')
+                'yet',
+            )
         spec = helpers.patch_datetime_awareness_in_document(spec)
         document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
-        validate_is_mapping('document', document)
+        validate_list_or_mapping('document', document)
+
+        if isinstance(document, list):
+            _validate_document_stages(document)
 
         if self.database.client.server_info()['versionArray'] < [5]:
             for operator in _updaters:
                 if not document.get(operator, True):
                     raise WriteError(
-                        "'%s' is empty. You must specify a field like so: {%s: {<field>: ...}}"
-                        % (operator, operator),
+                        f"'{operator}' is empty. You must specify a field like so: "
+                        '{' + operator + ': {<field>: ...}}'
                     )
 
         updated_existing = False
@@ -650,7 +848,7 @@ class Collection(object):
                 # update it like a regular one, then finally insert it
                 if spec.get('_id') is not None:
                     _id = spec['_id']
-                elif document.get('_id') is not None:
+                elif not isinstance(document, list) and document.get('_id') is not None:
                     _id = document['_id']
                 else:
                     _id = ObjectId()
@@ -663,230 +861,11 @@ class Collection(object):
                 original_document_snapshot = copy.deepcopy(existing_document)
                 updated_existing = True
             num_matched += 1
-            first = True
-            subdocument = None
-            for k, v in document.items():
-                if k in _updaters:
-                    updater = _updaters[k]
-                    subdocument = self._update_document_fields_with_positional_awareness(
-                        existing_document, v, spec, updater, subdocument)
 
-                elif k == '$rename':
-                    for src, dst in v.items():
-                        if '.' in src or '.' in dst:
-                            raise NotImplementedError(
-                                'Using the $rename operator with dots is a valid MongoDB '
-                                'operation, but it is not yet supported by mongomock'
-                            )
-                        if self._has_key(existing_document, src):
-                            existing_document[dst] = existing_document.pop(src)
-
-                elif k == '$setOnInsert':
-                    if not was_insert:
-                        continue
-                    subdocument = self._update_document_fields_with_positional_awareness(
-                        existing_document, v, spec, _set_updater, subdocument)
-
-                elif k == '$currentDate':
-                    subdocument = self._update_document_fields_with_positional_awareness(
-                        existing_document, v, spec, _current_date_updater, subdocument)
-
-                elif k == '$addToSet':
-                    for field, value in v.items():
-                        nested_field_list = field.rsplit('.')
-                        if len(nested_field_list) == 1:
-                            if field not in existing_document:
-                                existing_document[field] = []
-                            # document should be a list append to it
-                            if isinstance(value, dict):
-                                if '$each' in value:
-                                    # append the list to the field
-                                    existing_document[field] += [
-                                        obj for obj in list(value['$each'])
-                                        if obj not in existing_document[field]]
-                                    continue
-                            if value not in existing_document[field]:
-                                existing_document[field].append(value)
-                            continue
-                        # push to array in a nested attribute
-                        else:
-                            # create nested attributes if they do not exist
-                            subdocument = existing_document
-                            for field_part in nested_field_list[:-1]:
-                                if field_part == '$':
-                                    break
-                                if field_part not in subdocument:
-                                    subdocument[field_part] = {}
-
-                                subdocument = subdocument[field_part]
-
-                            # get subdocument with $ oprator support
-                            subdocument, _ = self._get_subdocument(
-                                existing_document, spec, nested_field_list)
-
-                            # we're pushing a list
-                            push_results = []
-                            if nested_field_list[-1] in subdocument:
-                                # if the list exists, then use that list
-                                push_results = subdocument[
-                                    nested_field_list[-1]]
-
-                            if isinstance(value, dict) and '$each' in value:
-                                push_results += [
-                                    obj for obj in list(value['$each'])
-                                    if obj not in push_results]
-                            elif value not in push_results:
-                                push_results.append(value)
-
-                            subdocument[nested_field_list[-1]] = push_results
-                elif k == '$pull':
-                    for field, value in v.items():
-                        nested_field_list = field.rsplit('.')
-                        # nested fields includes a positional element
-                        # need to find that element
-                        if '$' in nested_field_list:
-                            if not subdocument:
-                                subdocument, _ = self._get_subdocument(
-                                    existing_document, spec, nested_field_list)
-
-                            # value should be a dictionary since we're pulling
-                            pull_results = []
-                            # and the last subdoc should be an array
-                            for obj in subdocument[nested_field_list[-1]]:
-                                if isinstance(obj, dict):
-                                    for pull_key, pull_value in value.items():
-                                        if obj[pull_key] != pull_value:
-                                            pull_results.append(obj)
-                                    continue
-                                if obj != value:
-                                    pull_results.append(obj)
-
-                            # cannot write to doc directly as it doesn't save to
-                            # existing_document
-                            subdocument[nested_field_list[-1]] = pull_results
-                        else:
-                            arr = existing_document
-                            for field_part in nested_field_list:
-                                if field_part not in arr:
-                                    break
-                                arr = arr[field_part]
-                            if not isinstance(arr, list):
-                                continue
-
-                            arr_copy = copy.deepcopy(arr)
-                            if isinstance(value, dict):
-                                for obj in arr_copy:
-                                    try:
-                                        is_matching = filter_applies(value, obj)
-                                    except OperationFailure:
-                                        is_matching = False
-                                    if is_matching:
-                                        arr.remove(obj)
-                                        continue
-
-                                    if filter_applies({'field': value}, {'field': obj}):
-                                        arr.remove(obj)
-                            else:
-                                for obj in arr_copy:
-                                    if value == obj:
-                                        arr.remove(obj)
-                elif k == '$pullAll':
-                    for field, value in v.items():
-                        nested_field_list = field.rsplit('.')
-                        if len(nested_field_list) == 1:
-                            if field in existing_document:
-                                arr = existing_document[field]
-                                existing_document[field] = [
-                                    obj for obj in arr if obj not in value]
-                            continue
-                        else:
-                            subdocument, _ = self._get_subdocument(
-                                existing_document, spec, nested_field_list)
-
-                            if nested_field_list[-1] in subdocument:
-                                arr = subdocument[nested_field_list[-1]]
-                                subdocument[nested_field_list[-1]] = [
-                                    obj for obj in arr if obj not in value]
-                elif k == '$push':
-                    for field, value in v.items():
-                        # Find the place where to push.
-                        nested_field_list = field.rsplit('.')
-                        subdocument, field = self._get_subdocument(
-                            existing_document, spec, nested_field_list)
-
-                        # Push the new element or elements.
-                        if isinstance(subdocument, dict) and field not in subdocument:
-                            subdocument[field] = []
-                        push_results = subdocument[field]
-                        if isinstance(value, dict) and '$each' in value:
-                            if '$position' in value:
-                                push_results = \
-                                    push_results[0:value['$position']] + \
-                                    list(value['$each']) + \
-                                    push_results[value['$position']:]
-                            else:
-                                push_results += list(value['$each'])
-
-                            if '$sort' in value:
-                                sort_spec = value['$sort']
-                                if isinstance(sort_spec, dict):
-                                    sort_key = set(sort_spec.keys()).pop()
-                                    push_results = sorted(
-                                        push_results,
-                                        key=lambda d: helpers.get_value_by_dot(d, sort_key),
-                                        reverse=set(sort_spec.values()).pop() < 0)
-                                else:
-                                    push_results = sorted(push_results, reverse=sort_spec < 0)
-
-                            if '$slice' in value:
-                                slice_value = value['$slice']
-                                if slice_value < 0:
-                                    push_results = push_results[slice_value:]
-                                elif slice_value == 0:
-                                    push_results = []
-                                else:
-                                    push_results = push_results[:slice_value]
-
-                            unused_modifiers = \
-                                set(value.keys()) - {'$each', '$slice', '$position', '$sort'}
-                            if unused_modifiers:
-                                raise WriteError(
-                                    'Unrecognized clause in $push: ' + unused_modifiers.pop())
-                        else:
-                            push_results.append(value)
-                        subdocument[field] = push_results
-                else:
-                    if first:
-                        # replace entire document
-                        for key in document.keys():
-                            if key.startswith('$'):
-                                # can't mix modifiers with non-modifiers in
-                                # update
-                                raise ValueError('field names cannot start with $ [{}]'.format(k))
-                        _id = spec.get('_id', existing_document.get('_id'))
-                        existing_document.clear()
-                        if _id is not None:
-                            existing_document['_id'] = _id
-                        if BSON:
-                            # bson validation
-                            BSON.encode(document, check_keys=True)
-                        existing_document.update(self._internalize_dict(document))
-                        if existing_document['_id'] != _id:
-                            raise OperationFailure(
-                                'The _id field cannot be changed from {0} to {1}'
-                                .format(existing_document['_id'], _id))
-                        break
-                    else:
-                        # can't mix modifiers with non-modifiers in update
-                        raise ValueError(
-                            'Invalid modifier specified: {}'.format(k))
-                first = False
-            # if empty document comes
-            if not document:
-                _id = spec.get('_id', existing_document.get('_id'))
-                existing_document.clear()
-                if _id:
-                    existing_document['_id'] = _id
+            if isinstance(document, list):
+                self._apply_update_pipeline(existing_document, document, session)
+            else:
+                self._apply_update_document(existing_document, spec, document, was_insert)
 
             if was_insert:
                 upserted_id = self._insert(existing_document)
@@ -900,7 +879,8 @@ class Collection(object):
                     self._store[original_document_snapshot['_id']] = original_document_snapshot
                     raise WriteError(
                         "After applying the update, the (immutable) field '_id' was found to have "
-                        'been altered to _id: {}'.format(existing_document.get('_id')))
+                        'been altered to _id: {}'.format(existing_document.get('_id'))
+                    )
 
                 # Make sure it still respect the unique indexes and, if not, to
                 # revert modifications
@@ -925,6 +905,266 @@ class Collection(object):
             'updatedExisting': updated_existing,
         }
 
+    def _apply_update_pipeline(self, existing_document, pipeline, session):
+        """Apply the aggregation pipeline to a single document.
+
+        This method updates existing_document in-place.
+        """
+
+        [new_document] = aggregate.process_pipeline(
+            [existing_document], self.database, pipeline, session
+        )
+        existing_document.clear()
+        existing_document.update(new_document)
+
+    def _apply_update_document(self, existing_document, spec, document, was_insert):  # noqa: C901
+        """Apply document, which is an update document, to existing_document.
+
+        This method updates existing_document in-place.
+        """
+
+        first = True
+        subdocument = None
+        for k, v in document.items():
+            if k in _updaters:
+                updater = _updaters[k]
+                subdocument = self._update_document_fields_with_positional_awareness(
+                    existing_document, v, spec, updater, subdocument
+                )
+
+            elif k == '$rename':
+                for src, dst in v.items():
+                    if '.' in src or '.' in dst:
+                        raise NotImplementedError(
+                            'Using the $rename operator with dots is a valid MongoDB '
+                            'operation, but it is not yet supported by mongomock'
+                        )
+                    if self._has_key(existing_document, src):
+                        existing_document[dst] = existing_document.pop(src)
+
+            elif k == '$setOnInsert':
+                if not was_insert:
+                    continue
+                subdocument = self._update_document_fields_with_positional_awareness(
+                    existing_document, v, spec, _set_updater, subdocument
+                )
+
+            elif k == '$currentDate':
+                subdocument = self._update_document_fields_with_positional_awareness(
+                    existing_document, v, spec, _current_date_updater, subdocument
+                )
+
+            elif k == '$addToSet':
+                for field, value in v.items():
+                    nested_field_list = field.rsplit('.')
+                    if len(nested_field_list) == 1:
+                        if field not in existing_document:
+                            existing_document[field] = []
+                        # document should be a list append to it
+                        if isinstance(value, dict) and '$each' in value:
+                            # append the list to the field
+                            existing_document[field] += [
+                                obj
+                                for obj in list(value['$each'])
+                                if obj not in existing_document[field]
+                            ]
+                            continue
+                        if value not in existing_document[field]:
+                            existing_document[field].append(value)
+                        continue
+                    # push to array in a nested attribute
+                    else:
+                        # create nested attributes if they do not exist
+                        subdocument = existing_document
+                        for field_part in nested_field_list[:-1]:
+                            if field_part == '$':
+                                break
+                            if field_part not in subdocument:
+                                subdocument[field_part] = {}
+
+                            subdocument = subdocument[field_part]
+
+                        # get subdocument with $ oprator support
+                        subdocument, _ = self._get_subdocument(
+                            existing_document, spec, nested_field_list
+                        )
+
+                        # we're pushing a list
+                        push_results = []
+                        if nested_field_list[-1] in subdocument:
+                            # if the list exists, then use that list
+                            push_results = subdocument[nested_field_list[-1]]
+
+                        if isinstance(value, dict) and '$each' in value:
+                            push_results += [
+                                obj for obj in list(value['$each']) if obj not in push_results
+                            ]
+                        elif value not in push_results:
+                            push_results.append(value)
+
+                        subdocument[nested_field_list[-1]] = push_results
+            elif k == '$pull':
+                for field, value in v.items():
+                    nested_field_list = field.rsplit('.')
+                    # nested fields includes a positional element
+                    # need to find that element
+                    if '$' in nested_field_list:
+                        if not subdocument:
+                            subdocument, _ = self._get_subdocument(
+                                existing_document, spec, nested_field_list
+                            )
+
+                        # value should be a dictionary since we're pulling
+                        pull_results = []
+                        # and the last subdoc should be an array
+                        for obj in subdocument[nested_field_list[-1]]:
+                            if isinstance(obj, dict):
+                                for pull_key, pull_value in value.items():
+                                    if obj[pull_key] != pull_value:
+                                        pull_results.append(obj)
+                                continue
+                            if obj != value:
+                                pull_results.append(obj)
+
+                        # cannot write to doc directly as it doesn't save to
+                        # existing_document
+                        subdocument[nested_field_list[-1]] = pull_results
+                    else:
+                        arr = existing_document
+                        for field_part in nested_field_list:
+                            if field_part not in arr:
+                                break
+                            arr = arr[field_part]
+                        if not isinstance(arr, list):
+                            continue
+
+                        arr_copy = copy.deepcopy(arr)
+                        if isinstance(value, dict):
+                            for obj in arr_copy:
+                                try:
+                                    is_matching = filter_applies(value, obj)
+                                except OperationFailure:
+                                    is_matching = False
+                                if is_matching:
+                                    arr.remove(obj)
+                                    continue
+
+                                if filter_applies({'field': value}, {'field': obj}):
+                                    arr.remove(obj)
+                        else:
+                            for obj in arr_copy:
+                                if value == obj:
+                                    arr.remove(obj)
+            elif k == '$pullAll':
+                for field, value in v.items():
+                    nested_field_list = field.rsplit('.')
+                    if len(nested_field_list) == 1:
+                        if field in existing_document:
+                            arr = existing_document[field]
+                            existing_document[field] = [obj for obj in arr if obj not in value]
+                        continue
+                    else:
+                        subdocument, _ = self._get_subdocument(
+                            existing_document, spec, nested_field_list
+                        )
+
+                        if nested_field_list[-1] in subdocument:
+                            arr = subdocument[nested_field_list[-1]]
+                            subdocument[nested_field_list[-1]] = [
+                                obj for obj in arr if obj not in value
+                            ]
+            elif k == '$push':
+                for field, value in v.items():
+                    # Find the place where to push.
+                    nested_field_list = field.rsplit('.')
+                    subdocument, field = self._get_subdocument(
+                        existing_document, spec, nested_field_list
+                    )
+
+                    # Push the new element or elements.
+                    if isinstance(subdocument, dict) and field not in subdocument:
+                        subdocument[field] = []
+                    push_results = subdocument[field]
+                    if isinstance(value, dict) and '$each' in value:
+                        if '$position' in value:
+                            push_results = (
+                                push_results[0 : value['$position']]
+                                + list(value['$each'])
+                                + push_results[value['$position'] :]
+                            )
+                        else:
+                            push_results += list(value['$each'])
+
+                        if '$sort' in value:
+                            sort_spec = value['$sort']
+                            if isinstance(sort_spec, dict):
+                                sort_key = set(sort_spec.keys()).pop()
+                                push_results = sorted(
+                                    push_results,
+                                    key=lambda d: helpers.get_value_by_dot(d, sort_key),
+                                    reverse=set(sort_spec.values()).pop() < 0,
+                                )
+                            else:
+                                push_results = sorted(push_results, reverse=sort_spec < 0)
+
+                        if '$slice' in value:
+                            slice_value = value['$slice']
+                            if slice_value < 0:
+                                push_results = push_results[slice_value:]
+                            elif slice_value == 0:
+                                push_results = []
+                            else:
+                                push_results = push_results[:slice_value]
+
+                        unused_modifiers = set(value.keys()) - {
+                            '$each',
+                            '$slice',
+                            '$position',
+                            '$sort',
+                        }
+                        if unused_modifiers:
+                            raise WriteError(
+                                'Unrecognized clause in $push: ' + unused_modifiers.pop()
+                            )
+                    else:
+                        push_results.append(value)
+                    subdocument[field] = push_results
+            elif first:
+                # replace entire document
+                for key in document:
+                    if key.startswith('$'):
+                        # can't mix modifiers with non-modifiers in
+                        # update
+                        raise ValueError(f'field names cannot start with $ [{k}]')
+                _id = spec.get('_id', existing_document.get('_id'))
+                existing_document.clear()
+                if _id is not None:
+                    existing_document['_id'] = _id
+                if BSON:
+                    # bson validation
+                    check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+                    if not check_keys:
+                        _validate_data_fields(document)
+                    _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
+                existing_document.update(self._internalize_dict(document))
+                if existing_document['_id'] != _id:
+                    raise OperationFailure(
+                        'The _id field cannot be changed from {} to {}'.format(
+                            existing_document['_id'], _id
+                        )
+                    )
+                break
+            else:
+                # can't mix modifiers with non-modifiers in update
+                raise ValueError(f'Invalid modifier specified: {k}')
+            first = False
+        # if empty document comes
+        if not document:
+            _id = spec.get('_id', existing_document.get('_id'))
+            existing_document.clear()
+            if _id:
+                existing_document['_id'] = _id
+
     def _get_subdocument(self, existing_document, spec, nested_field_list):
         """This method retrieves the subdocument of the existing_document.nested_field_list.
 
@@ -946,7 +1186,8 @@ class Collection(object):
             if subfield == '$':
                 if not is_following_spec:
                     raise WriteError(
-                        'The positional operator did not find the match needed from the query')
+                        'The positional operator did not find the match needed from the query'
+                    )
                 # Positional element should have the equivalent elemMatch in the query.
                 subspec = subspec['$elemMatch']
                 is_following_spec = False
@@ -957,7 +1198,8 @@ class Collection(object):
                         break
                 else:
                     raise WriteError(
-                        'The positional operator did not find the match needed from the query')
+                        'The positional operator did not find the match needed from the query'
+                    )
 
             parent_doc = doc
             if isinstance(parent_doc, list):
@@ -985,8 +1227,9 @@ class Collection(object):
 
             def _raise_incompatible(subkey):
                 raise WriteError(
-                    "cannot infer query fields to set, both paths '%s' and '%s' are matched"
-                    % (k, paths[subkey]))
+                    f"cannot infer query fields to set, both paths '{k}' and "  # noqa: B023
+                    f"'{paths[subkey]}' are matched"
+                )
 
             if k in paths:
                 _raise_incompatible(k)
@@ -999,7 +1242,7 @@ class Collection(object):
                 if key_part not in sub_expanded:
                     sub_expanded[key_part] = {}
                 sub_expanded = sub_expanded[key_part]
-                key = '.'.join(key_parts[:i + 1])
+                key = '.'.join(key_parts[: i + 1])
                 if not isinstance(sub_expanded, dict):
                     _raise_incompatible(key)
                 paths[key] = k
@@ -1020,24 +1263,44 @@ class Collection(object):
                 new_doc[k] = new_v
         return new_doc, not bool(new_doc)
 
-    def find(self, filter=None, projection=None, skip=0, limit=0,
-             no_cursor_timeout=False, cursor_type=None, sort=None,
-             allow_partial_results=False, oplog_replay=False, modifiers=None,
-             batch_size=0, manipulate=True, collation=None, session=None,
-             max_time_ms=None, allow_disk_use=False, **kwargs):
+    def find(
+        self,
+        filter=None,
+        projection=None,
+        skip=0,
+        limit=0,
+        no_cursor_timeout=False,
+        cursor_type=None,
+        sort=None,
+        allow_partial_results=False,
+        oplog_replay=False,
+        modifiers=None,
+        batch_size=0,
+        manipulate=True,
+        collation=None,
+        session=None,
+        max_time_ms=None,
+        allow_disk_use=False,
+        **kwargs,
+    ):
         spec = filter
         if spec is None:
             spec = {}
         validate_is_mapping('filter', spec)
         for kwarg, value in kwargs.items():
             if value:
-                raise OperationFailure("Unrecognized field '%s'" % kwarg)
-        return Cursor(self, spec, sort, projection, skip, limit,
-                      collation=collation).max_time_ms(max_time_ms).allow_disk_use(allow_disk_use)
+                raise OperationFailure(f"Unrecognized field '{kwarg}'")
+        return (
+            Cursor(self, spec, sort, projection, skip, limit, collation=collation)
+            .max_time_ms(max_time_ms)
+            .allow_disk_use(allow_disk_use)
+        )
 
     def _get_dataset(self, spec, sort, fields, as_class):
         dataset = self._iter_documents(spec)
         if sort:
+            if isinstance(sort, dict):
+                sort = sort.items()
             for sort_key, sort_direction in reversed(sort):
                 if sort_key == '$natural':
                     if sort_direction < 0:
@@ -1045,10 +1308,15 @@ class Collection(object):
                     continue
                 if sort_key.startswith('$'):
                     raise NotImplementedError(
-                        'Sorting by {} is not implemented in mongomock yet'.format(sort_key))
-                dataset = iter(sorted(
-                    dataset, key=lambda x: filtering.resolve_sort_key(sort_key, x),
-                    reverse=sort_direction < 0))
+                        f'Sorting by {sort_key} is not implemented in mongomock yet'
+                    )
+                dataset = iter(
+                    sorted(
+                        dataset,
+                        key=lambda x: filtering.resolve_sort_key(sort_key, x),
+                        reverse=sort_direction < 0,
+                    )
+                )
         for document in dataset:
             yield self._copy_only_fields(document, fields, as_class)
 
@@ -1060,7 +1328,7 @@ class Collection(object):
             if isinstance(value, dict):
                 for op in value:
                     if op not in allowed_projection_operators:
-                        raise ValueError('Unsupported projection option: {}'.format(op))
+                        raise ValueError(f'Unsupported projection option: {op}')
                 result[key] = value
 
         for key in result:
@@ -1082,15 +1350,15 @@ class Collection(object):
             if '$slice' in op:
                 if not isinstance(doc_copy[field], list):
                     raise OperationFailure(
-                        'Unsupported type {} for slicing operation: {}'.format(
-                            type(doc_copy[field]), op))
+                        f'Unsupported type {type(doc_copy[field])} for slicing operation: {op}'
+                    )
                 op_value = op['$slice']
                 slice_ = None
                 if isinstance(op_value, list):
                     if len(op_value) != 2:
                         raise OperationFailure(
-                            'Unsupported slice format {} for slicing operation: {}'.format(
-                                op_value, op))
+                            f'Unsupported slice format {op_value} for slicing operation: {op}'
+                        )
                     skip, limit = op_value
                     if skip < 0:
                         skip = len(doc_copy[field]) + skip
@@ -1110,8 +1378,8 @@ class Collection(object):
                     doc_copy[field] = doc_copy[field][slice_]
                 else:
                     raise OperationFailure(
-                        'Unsupported slice value {} for slicing operation: {}'.format(
-                            op_value, op))
+                        f'Unsupported slice value {op_value} for slicing operation: {op}'
+                    )
 
             if '$elemMatch' in op:
                 if isinstance(doc_copy[field], list):
@@ -1135,7 +1403,7 @@ class Collection(object):
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or not fields and helpers.PYMONGO_VERSION >= version.parse('4.0'):
+        if fields is None or not fields and version.parse('4.0') <= helpers.PYMONGO_VERSION:
             return _copy_field(doc, container)
 
         if not fields:
@@ -1152,29 +1420,26 @@ class Collection(object):
 
         # other than the _id field, all fields must be either includes or
         # excludes, this can evaluate to 0
-        if len(set(list(fields.values()))) > 1:
-            raise ValueError(
-                'You cannot currently mix including and excluding fields.')
+        if len(set(fields.values())) > 1:
+            raise ValueError('You cannot currently mix including and excluding fields.')
 
         # if we have novalues passed in, make a doc_copy based on the
         # id_value
         if not fields:
-            if id_value == 1:
-                doc_copy = container()
-            else:
-                doc_copy = _copy_field(doc, container)
+            doc_copy = container() if id_value == 1 else _copy_field(doc, container)
         else:
             doc_copy = _project_by_spec(
-                doc, _combine_projection_spec(fields),
-                is_include=list(fields.values())[0],
-                container=container)
+                doc,
+                _combine_projection_spec(fields),
+                is_include=next(iter(fields.values())),
+                container=container,
+            )
 
         # set the _id value if we requested it, otherwise remove it
         if id_value == 0:
             doc_copy.pop('_id', None)
-        else:
-            if '_id' in doc:
-                doc_copy['_id'] = doc['_id']
+        elif '_id' in doc:
+            doc_copy['_id'] = doc['_id']
 
         fields['_id'] = id_value  # put _id back in fields
 
@@ -1189,12 +1454,10 @@ class Collection(object):
         for k, v in fields.items():
             self._update_document_single_field(doc, k, v, updater)
 
-    def _update_document_fields_positional(self, doc, fields, spec, updater,
-                                           subdocument=None):
+    def _update_document_fields_positional(self, doc, fields, spec, updater, subdocument=None):
         """Implements the $set behavior on an existing document"""
         for k, v in fields.items():
             if '$' in k:
-
                 field_name_parts = k.split('.')
                 if not subdocument:
                     current_doc = doc
@@ -1212,8 +1475,7 @@ class Collection(object):
                         for el in subspec:
                             if el.startswith(part):
                                 if len(el.split('.')) > 1:
-                                    new_spec['.'.join(
-                                        el.split('.')[1:])] = subspec[el]
+                                    new_spec['.'.join(el.split('.')[1:])] = subspec[el]
                                 else:
                                     new_spec = subspec[el]
                         subspec = new_spec
@@ -1228,20 +1490,22 @@ class Collection(object):
                                 break
                         continue
 
-                updater(subdocument, field_name_parts[-1], v)
+                updater(subdocument, field_name_parts[-1], v, codec_options=self.codec_options)
                 continue
             # otherwise, we handle it the standard way
             self._update_document_single_field(doc, k, v, updater)
 
         return subdocument
 
-    def _update_document_fields_with_positional_awareness(self, existing_document, v, spec,
-                                                          updater, subdocument):
-        positional = any('$' in key for key in v.keys())
+    def _update_document_fields_with_positional_awareness(
+        self, existing_document, v, spec, updater, subdocument
+    ):
+        positional = any('$' in key for key in v)
 
         if positional:
             return self._update_document_fields_positional(
-                existing_document, v, spec, updater, subdocument)
+                existing_document, v, spec, updater, subdocument
+            )
         self._update_document_fields(existing_document, v, updater)
         return subdocument
 
@@ -1250,10 +1514,7 @@ class Collection(object):
         for part in field_name_parts[:-1]:
             if isinstance(doc, list):
                 try:
-                    if part == '$':
-                        doc = doc[0]
-                    else:
-                        doc = doc[int(part)]
+                    doc = doc[0] if part == '$' else doc[int(part)]
                     continue
                 except ValueError:
                     pass
@@ -1265,15 +1526,16 @@ class Collection(object):
             else:
                 return
         field_name = field_name_parts[-1]
-        updater(doc, field_name, field_value)
+        updater(doc, field_name, field_value, codec_options=self.codec_options)
 
     def _iter_documents(self, filter):
         # Validate the filter even if no documents can be returned.
         if self._store.is_empty:
             filter_applies(filter, {})
 
-        return (document for document in list(self._store.documents)
-                if filter_applies(filter, document))
+        return (
+            document for document in list(self._store.documents) if filter_applies(filter, document)
+        )
 
     def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
         # Allow calling find_one with a non-dict argument that gets used as
@@ -1293,36 +1555,74 @@ class Collection(object):
         validate_is_mapping('filter', filter)
         return self._find_and_modify(filter, projection, sort=sort, **kwargs)
 
-    def find_one_and_replace(self, filter, replacement,
-                             projection=None, sort=None, upsert=False,
-                             return_document=ReturnDocument.BEFORE, **kwargs):
+    def find_one_and_replace(
+        self,
+        filter,
+        replacement,
+        projection=None,
+        sort=None,
+        upsert=False,
+        return_document=ReturnDocument.BEFORE,
+        **kwargs,
+    ):
         validate_is_mapping('filter', filter)
         validate_ok_for_replace(replacement)
-        return self._find_and_modify(filter, projection, replacement, upsert,
-                                     sort, return_document, **kwargs)
+        return self._find_and_modify(
+            filter, projection, replacement, upsert, sort, return_document, **kwargs
+        )
 
-    def find_one_and_update(self, filter, update,
-                            projection=None, sort=None, upsert=False,
-                            return_document=ReturnDocument.BEFORE, **kwargs):
+    def find_one_and_update(
+        self,
+        filter,
+        update,
+        projection=None,
+        sort=None,
+        upsert=False,
+        return_document=ReturnDocument.BEFORE,
+        **kwargs,
+    ):
         validate_is_mapping('filter', filter)
         validate_ok_for_update(update)
-        return self._find_and_modify(filter, projection, update, upsert,
-                                     sort, return_document, **kwargs)
+        return self._find_and_modify(
+            filter, projection, update, upsert, sort, return_document, **kwargs
+        )
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
-        def find_and_modify(self, query={}, update=None, upsert=False, sort=None,
-                            full_response=False, manipulate=False, fields=None, **kwargs):
-            warnings.warn('find_and_modify is deprecated, use find_one_and_delete'
-                          ', find_one_and_replace, or find_one_and_update instead',
-                          DeprecationWarning, stacklevel=2)
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
+        def find_and_modify(
+            self,
+            query=None,
+            update=None,
+            upsert=False,
+            sort=None,
+            full_response=False,
+            manipulate=False,
+            fields=None,
+            **kwargs,
+        ):
+            warnings.warn(
+                'find_and_modify is deprecated, use find_one_and_delete'
+                ', find_one_and_replace, or find_one_and_update instead',
+                DeprecationWarning,
+                stacklevel=2,
+            )
             if 'projection' in kwargs:
                 raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
-            return self._find_and_modify(query, update=update, upsert=upsert,
-                                         sort=sort, projection=fields, **kwargs)
+            return self._find_and_modify(
+                query or {}, update=update, upsert=upsert, sort=sort, projection=fields, **kwargs
+            )
 
-    def _find_and_modify(self, query, projection=None, update=None,
-                         upsert=False, sort=None,
-                         return_document=ReturnDocument.BEFORE, session=None, **kwargs):
+    def _find_and_modify(
+        self,
+        query,
+        projection=None,
+        update=None,
+        upsert=False,
+        sort=None,
+        return_document=ReturnDocument.BEFORE,
+        session=None,
+        **kwargs,
+    ):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         remove = kwargs.get('remove', False)
@@ -1354,39 +1654,48 @@ class Collection(object):
             return self.find_one(query, projection)
         return old
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
-            warnings.warn('save is deprecated. Use insert_one or replace_one '
-                          'instead', DeprecationWarning, stacklevel=2)
+            warnings.warn(
+                'save is deprecated. Use insert_one or replace_one ' 'instead',
+                DeprecationWarning,
+                stacklevel=2,
+            )
             validate_is_mutable_mapping('to_save', to_save)
             validate_write_concern_params(**kwargs)
 
             if '_id' not in to_save:
                 return self.insert(to_save)
             self._update(
-                {'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs)
+                {'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs
+            )
             return to_save.get('_id', None)
 
     def delete_one(self, filter, collation=None, hint=None, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(
-            self._delete(filter, collation=collation, hint=hint, session=session), True)
+            self._delete(filter, collation=collation, hint=hint, session=session), True
+        )
 
     def delete_many(self, filter, collation=None, hint=None, session=None):
         validate_is_mapping('filter', filter)
         return DeleteResult(
-            self._delete(filter, collation=collation, hint=hint, multi=True, session=session), True)
+            self._delete(filter, collation=collation, hint=hint, multi=True, session=session), True
+        )
 
     def _delete(self, filter, collation=None, hint=None, multi=False, session=None):
         if hint:
             raise NotImplementedError(
                 'The hint argument of delete is valid but has not been implemented in '
-                'mongomock yet')
+                'mongomock yet'
+            )
         if collation:
             raise_not_implemented(
                 'collation',
                 'The collation argument of delete is valid but has not been '
-                'implemented in mongomock yet')
+                'implemented in mongomock yet',
+            )
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         filter = helpers.patch_datetime_awareness_in_document(filter)
@@ -1412,10 +1721,14 @@ class Collection(object):
             'err': None,
         }
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def remove(self, spec_or_id=None, multi=True, **kwargs):
-            warnings.warn('remove is deprecated. Use delete_one or delete_many '
-                          'instead.', DeprecationWarning, stacklevel=2)
+            warnings.warn(
+                'remove is deprecated. Use delete_one or delete_many ' 'instead.',
+                DeprecationWarning,
+                stacklevel=2,
+            )
             validate_write_concern_params(**kwargs)
             return self._delete(spec_or_id, multi=multi)
 
@@ -1425,7 +1738,9 @@ class Collection(object):
                 'count_documents instead. Please note that $where must be replaced '
                 'by $expr, $near must be replaced by $geoWithin with $center, and '
                 '$nearSphere must be replaced by $geoWithin with $centerSphere',
-                DeprecationWarning, stacklevel=2)
+                DeprecationWarning,
+                stacklevel=2,
+            )
             if kwargs.pop('session', None):
                 raise_not_implemented('session', 'Mongomock does not handle sessions yet')
             if filter is None:
@@ -1438,7 +1753,8 @@ class Collection(object):
             raise_not_implemented(
                 'collation',
                 'The collation argument of count_documents is valid but has not been '
-                'implemented in mongomock yet')
+                'implemented in mongomock yet',
+            )
         if kwargs.pop('session', None):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         skip = kwargs.pop('skip', 0)
@@ -1453,7 +1769,7 @@ class Collection(object):
             limit = None
         unknown_kwargs = set(kwargs) - {'maxTimeMS', 'hint'}
         if unknown_kwargs:
-            raise OperationFailure("unrecognized field '%s'" % unknown_kwargs.pop())
+            raise OperationFailure(f"unrecognized field '{next(iter(unknown_kwargs))}'")
 
         spec = helpers.patch_datetime_awareness_in_document(filter)
         doc_num = len(list(self._iter_documents(spec)))
@@ -1464,11 +1780,17 @@ class Collection(object):
         if kwargs.pop('session', None):
             raise ConfigurationError('estimated_document_count does not support sessions')
         unknown_kwargs = set(kwargs) - {'limit', 'maxTimeMS', 'hint'}
+
         if self.database.client.server_info()['versionArray'] < [5]:
-            unknown_kwargs.discard('skip')
+            unknown_kwargs -= {'skip'}
+
+        if version.parse('4.2') <= helpers.PYMONGO_VERSION:
+            unknown_kwargs -= {'skip'}
+
         if unknown_kwargs:
             raise OperationFailure(
-                "BSON field 'count.%s' is an unknown field." % list(unknown_kwargs)[0])
+                f"BSON field 'count.{next(iter(unknown_kwargs))}' is an unknown field."
+            )
         return self.count_documents({}, **kwargs)
 
     def drop(self, session=None):
@@ -1476,32 +1798,34 @@ class Collection(object):
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self.database.drop_collection(self.name)
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def ensure_index(self, key_or_list, cache_for=300, **kwargs):
             return self.create_index(key_or_list, cache_for, **kwargs)
 
-    def create_index(self, key_or_list, cache_for=300, session=None, **kwargs):
+    def create_index(self, keys, cache_for=300, session=None, **kwargs):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        index_list = helpers.create_index_list(key_or_list)
+        index_list = helpers.create_index_list(keys)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
 
         index_name = kwargs.pop('name', helpers.gen_index_name(index_list))
-        index_dict = {'key': index_list}
+        config = {'key': index_list}
         if is_sparse:
-            index_dict['sparse'] = True
+            config['sparse'] = True
         if is_unique:
-            index_dict['unique'] = True
+            config['unique'] = True
         if 'expireAfterSeconds' in kwargs and kwargs['expireAfterSeconds'] is not None:
-            index_dict['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
+            config['expireAfterSeconds'] = kwargs.pop('expireAfterSeconds')
         if 'partialFilterExpression' in kwargs and kwargs['partialFilterExpression'] is not None:
-            index_dict['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
+            config['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
 
         existing_index = self._store.indexes.get(index_name)
-        if existing_index and index_dict != existing_index:
+        if existing_index and config != existing_index:
             raise OperationFailure(
-                'Index with name: %s already exists with different options' % index_name)
+                f'Index with name: {index_name} already exists with different options'
+            )
 
         # Check that documents already verify the uniquess of this new index.
         if is_unique:
@@ -1510,7 +1834,7 @@ class Collection(object):
             documents_gen = self._store.documents
             for doc in documents_gen:
                 index = []
-                for key, unused_order in index_list:
+                for key, _order in index_list:
                     try:
                         index.append(helpers.get_value_by_dot(doc, key))
                     except KeyError:
@@ -1524,24 +1848,25 @@ class Collection(object):
                     if index in indexed:
                         # Need to throw this inside the generator so it can clean the locks
                         documents_gen.throw(
-                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None)
+                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
+                        )
                     indexed.add(index)
                 except TypeError as err:
                     # index is not hashable.
                     if index in indexed_list:
                         documents_gen.throw(
-                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err)
+                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err
+                        )
                     indexed_list.append(index)
 
-        self._store.create_index(index_name, index_dict)
+        self._store.create_index(index_name, config)
 
         return index_name
 
     def create_indexes(self, indexes, session=None):
         for index in indexes:
             if not isinstance(index, IndexModel):
-                raise TypeError(
-                    '%s is not an instance of pymongo.operations.IndexModel' % index)
+                raise TypeError(f'{index} is not an instance of pymongo.operations.IndexModel')
 
         return [
             self.create_index(
@@ -1550,7 +1875,8 @@ class Collection(object):
                 expireAfterSeconds=index.document.get('expireAfterSeconds'),
                 unique=index.document.get('unique', False),
                 sparse=index.document.get('sparse', False),
-                name=index.document.get('name'))
+                name=index.document.get('name'),
+            )
             for index in indexes
         ]
 
@@ -1564,14 +1890,15 @@ class Collection(object):
         try:
             self._store.drop_index(name)
         except KeyError as err:
-            raise OperationFailure('index not found with name [%s]' % name) from err
+            raise OperationFailure(f'index not found with name [{name}]') from err
 
     def drop_indexes(self, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         self._store.indexes = {}
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def reindex(self, session=None):
             if session:
                 raise_not_implemented('session', 'Mongomock does not handle sessions yet')
@@ -1580,30 +1907,24 @@ class Collection(object):
         if not self._store.is_created:
             return
         yield '_id_', {'key': [('_id', 1)]}
-        for name, information in self._store.indexes.items():
-            yield name, information
+        yield from self._store.indexes.items()
 
     def list_indexes(self, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         for name, information in self._list_all_indexes():
-            yield dict(
-                information,
-                key=dict(information['key']),
-                name=name,
-                v=2)
+            yield dict(information, key=dict(information['key']), name=name, v=2)
 
     def index_information(self, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
-        return {
-            name: dict(index, v=2)
-            for name, index in self._list_all_indexes()
-        }
+        return {name: dict(index, v=2) for name, index in self._list_all_indexes()}
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
-        def map_reduce(self, map_func, reduce_func, out, full_response=False,
-                       query=None, limit=0, session=None):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
+        def map_reduce(
+            self, map_func, reduce_func, out, full_response=False, query=None, limit=0, session=None
+        ):
             if execjs is None:
                 raise NotImplementedError(
                     'PyExecJS is required in order to run Map-Reduce. '
@@ -1617,15 +1938,12 @@ class Collection(object):
             out_collection = None
             reduced_rows = None
             full_dict = {
-                'counts': {
-                    'input': 0,
-                    'reduce': 0,
-                    'emit': 0,
-                    'output': 0},
+                'counts': {'input': 0, 'reduce': 0, 'emit': 0, 'output': 0},
                 'timeMillis': 0,
                 'ok': 1.0,
-                'result': None}
-            map_ctx = execjs.compile('''
+                'result': None,
+            }
+            map_ctx = execjs.compile("""
                 function doMap(fnc, docList) {
                     var mappedDict = {};
                     function emit(key, val) {
@@ -1648,8 +1966,8 @@ class Collection(object):
                     }
                     return mappedDict;
                 }
-            ''')
-            reduce_ctx = execjs.compile('''
+            """)
+            reduce_ctx = execjs.compile("""
                 function doReduce(fnc, docList) {
                     var reducedList = new Array();
                     reducer = eval('('+fnc+')');
@@ -1660,9 +1978,8 @@ class Collection(object):
                     }
                     return reducedList;
                 }
-            ''')
-            doc_list = [json.dumps(doc, default=json_util.default)
-                        for doc in self.find(query)]
+            """)
+            doc_list = [json.dumps(doc, default=json_util.default) for doc in self.find(query)]
             mapped_rows = map_ctx.call('doMap', map_func, doc_list)
             reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
             for reduced_row in reduced_rows:
@@ -1671,7 +1988,7 @@ class Collection(object):
             reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
             if full_response:
                 full_dict['counts']['input'] = len(doc_list)
-                for key in mapped_rows.keys():
+                for key in mapped_rows:
                     emit_count = len(mapped_rows[key])
                     full_dict['counts']['emit'] += emit_count
                     if emit_count > 1:
@@ -1701,26 +2018,29 @@ class Collection(object):
                 ret_val = full_dict
             return ret_val
 
-        def inline_map_reduce(self, map_func, reduce_func, full_response=False,
-                              query=None, limit=0, session=None):
+        def inline_map_reduce(
+            self, map_func, reduce_func, full_response=False, query=None, limit=0, session=None
+        ):
             return self.map_reduce(
-                map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session)
+                map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session
+            )
 
     def distinct(self, key, filter=None, session=None):
         if session:
             raise_not_implemented('session', 'Mongomock does not handle sessions yet')
         return self.find(filter).distinct(key)
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def group(self, key, condition, initial, reduce, finalize=None):
-            if helpers.PYMONGO_VERSION >= version.parse('3.6'):
+            if version.parse('3.6') <= helpers.PYMONGO_VERSION:
                 raise OperationFailure("no such command: 'group'")
             if execjs is None:
                 raise NotImplementedError(
                     'PyExecJS is required in order to use group. '
                     "Use 'pip install pyexecjs pymongo' to support group mock."
                 )
-            reduce_ctx = execjs.compile('''
+            reduce_ctx = execjs.compile("""
                 function doReduce(fnc, docList) {
                     reducer = eval('('+fnc+')');
                     for(var i=0, l=docList.length; i<l; i++) {
@@ -1733,13 +2053,13 @@ class Collection(object):
                     }
                 return docList[docList.length - 1];
                 }
-            ''')
+            """)
 
             ret_array = []
             doc_list_copy = []
             ret_array_copy = []
             reduced_val = {}
-            doc_list = [doc for doc in self.find(condition)]
+            doc_list = list(self.find(condition))
             for doc in doc_list:
                 doc_copy = copy.deepcopy(doc)
                 for doc_key in doc:
@@ -1748,7 +2068,7 @@ class Collection(object):
                     if doc_key not in key and doc_key not in reduce:
                         del doc_copy[doc_key]
                 for initial_key in initial:
-                    if initial_key in doc.keys():
+                    if initial_key in doc:
                         pass
                     else:
                         doc_copy[initial_key] = initial[initial_key]
@@ -1759,25 +2079,26 @@ class Collection(object):
             for k2 in key:
                 if not isinstance(k2, str):
                     raise TypeError('Keys must be a list of key names, each an instance of str')
-                for _, group in itertools.groupby(doc_list, lambda item: item[k2]):
-                    group_list = ([x for x in group])
+                for _, group in itertools.groupby(doc_list, lambda item: item[k2]):  # noqa: B023
+                    group_list = list(group)
                     reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
                     ret_array.append(reduced_val)
             for doc in ret_array:
                 doc_copy = copy.deepcopy(doc)
                 for k in doc:
-                    if k not in key and k not in initial.keys():
+                    if k not in key and k not in initial:
                         del doc_copy[k]
                 ret_array_copy.append(doc_copy)
             ret_array = ret_array_copy
             return ret_array
 
     def aggregate(self, pipeline, session=None, **unused_kwargs):
-        in_collection = [doc for doc in self.find()]
+        in_collection = list(self.find())
         return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
     def with_options(
-            self, codec_options=None, read_preference=None, write_concern=None, read_concern=None):
+        self, codec_options=None, read_preference=None, write_concern=None, read_concern=None
+    ):
         has_changes = False
         for key, options in _WITH_OPTIONS_KWARGS.items():
             value = locals()[key]
@@ -1786,8 +2107,7 @@ class Collection(object):
             has_changes = True
             for attr in options.attrs:
                 if not hasattr(value, attr):
-                    raise TypeError(
-                        '{} must be an instance of {}'.format(key, options.typename))
+                    raise TypeError(f'{key} must be an instance of {options.typename}')
 
         mongomock_codec_options.is_supported(codec_options)
         if codec_options != self.codec_options:
@@ -1797,10 +2117,14 @@ class Collection(object):
             return self
 
         return Collection(
-            self.database, self.name, write_concern=write_concern or self._write_concern,
+            self.database,
+            self.name,
+            write_concern=write_concern or self._write_concern,
             read_concern=read_concern or self._read_concern,
             read_preference=read_preference or self._read_preference,
-            codec_options=codec_options or self._codec_options, _db_store=self._db_store)
+            codec_options=codec_options or self._codec_options,
+            _db_store=self._db_store,
+        )
 
     def rename(self, new_name, session=None, **kwargs):
         if session:
@@ -1811,35 +2135,68 @@ class Collection(object):
         if bypass_document_validation:
             raise NotImplementedError(
                 'Skipping document validation is a valid MongoDB operation;'
-                ' however Mongomock does not support it yet.')
+                ' however Mongomock does not support it yet.'
+            )
         if session:
             raise_not_implemented(
                 'session',
                 'Sessions are valid in MongoDB 3.6 and newer; however Mongomock'
-                ' does not support them yet.')
+                ' does not support them yet.',
+            )
         bulk = BulkOperationBuilder(self, ordered=ordered)
         for operation in requests:
             operation._add_to_bulk(bulk)
         return BulkWriteResult(bulk.execute(), True)
 
     def find_raw_batches(
-            self, filter=None, projection=None, skip=0, limit=0, no_cursor_timeout=False,
-            cursor_type=None, sort=None, allow_partial_results=False,
-            oplog_replay=False, modifiers=None, batch_size=0, manipulate=True, collation=None,
-            hint=None, max_scan=None, max_time_ms=None, max=None, min=None, return_key=False,
-            how_record_id=False, snapshot=False, comment=None, allow_disk_use=False):
+        self,
+        filter=None,
+        projection=None,
+        skip=0,
+        limit=0,
+        no_cursor_timeout=False,
+        cursor_type=None,
+        sort=None,
+        allow_partial_results=False,
+        oplog_replay=False,
+        modifiers=None,
+        batch_size=0,
+        manipulate=True,
+        collation=None,
+        hint=None,
+        max_scan=None,
+        max_time_ms=None,
+        max=None,
+        min=None,
+        return_key=False,
+        how_record_id=False,
+        snapshot=False,
+        comment=None,
+        allow_disk_use=False,
+    ):
         raise NotImplementedError('find_raw_batches method is not implemented in mongomock yet')
 
     def aggregate_raw_batches(self, pipeline, **kwargs):
         raise NotImplementedError(
-            'aggregate_raw_batches method is not implemented in mongomock yet')
+            'aggregate_raw_batches method is not implemented in mongomock yet'
+        )
 
 
-class Cursor(object):
-
-    def __init__(self, collection, spec=None, sort=None, projection=None, skip=0, limit=0,
-                 collation=None, no_cursor_timeout=False, batch_size=0, session=None):
-        super(Cursor, self).__init__()
+class Cursor:
+    def __init__(
+        self,
+        collection,
+        spec=None,
+        sort=None,
+        projection=None,
+        skip=0,
+        limit=0,
+        collation=None,
+        no_cursor_timeout=False,
+        batch_size=0,
+        session=None,
+    ):
+        super().__init__()
         self.collection = collection
         spec = helpers.patch_datetime_awareness_in_document(spec)
         self._spec = spec
@@ -1848,8 +2205,7 @@ class Cursor(object):
         self._skip = skip
         self._factory_last_generated_results = None
         self._results = None
-        self._factory = functools.partial(
-            collection._get_dataset, spec, sort, projection, dict)
+        self._factory = functools.partial(collection._get_dataset, spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
         self._collation = collation
@@ -1860,16 +2216,17 @@ class Cursor(object):
         # Recompute the result only if the query has changed
         if not self._results or self._factory_last_generated_results != self._factory:
             if self.collection.codec_options.tz_aware:
-                results = [helpers.make_datetime_timezone_aware_in_document(x)
-                           for x in self._factory()]
+                results = [
+                    helpers.make_datetime_timezone_aware_in_document(x) for x in self._factory()
+                ]
             else:
                 results = list(self._factory())
             self._factory_last_generated_results = self._factory
             self._results = results
         if with_limit_and_skip:
-            results = self._results[self._skip:]
+            results = self._results[self._skip :]
             if self._limit:
-                results = results[:abs(self._limit)]
+                results = results[: abs(self._limit)]
         else:
             results = self._results
         return results
@@ -1878,8 +2235,9 @@ class Cursor(object):
         return self
 
     def clone(self):
-        cursor = Cursor(self.collection,
-                        self._spec, self._sort, self._projection, self._skip, self._limit)
+        cursor = Cursor(
+            self.collection, self._spec, self._sort, self._projection, self._skip, self._limit
+        )
         cursor._factory = self._factory
         return cursor
 
@@ -1889,7 +2247,7 @@ class Cursor(object):
             self._emitted += 1
             return doc
         except IndexError as err:
-            raise StopIteration() from err
+            raise StopIteration from err
 
     next = __next__
 
@@ -1902,14 +2260,18 @@ class Cursor(object):
             raise ValueError('key_or_list must not be the empty list')
         self._sort = sort
         self._factory = functools.partial(
-            self.collection._get_dataset, self._spec, self._sort, self._projection, dict)
+            self.collection._get_dataset, self._spec, self._sort, self._projection, dict
+        )
         return self
 
-    if helpers.PYMONGO_VERSION < version.parse('4.0'):
+    if version.parse('4.0') > helpers.PYMONGO_VERSION:
+
         def count(self, with_limit_and_skip=False):
             warnings.warn(
                 'count is deprecated. Use Collection.count_documents instead.',
-                DeprecationWarning, stacklevel=2)
+                DeprecationWarning,
+                stacklevel=2,
+            )
             results = self._compute_results(with_limit_and_skip)
             return len(results)
 
@@ -1962,15 +2324,15 @@ class Cursor(object):
             skip = 0
             if index.start is not None:
                 if index.start < 0:
-                    raise IndexError('Cursor instances do not support'
-                                     'negative indices')
+                    raise IndexError('Cursor instances do not support' 'negative indices')
                 skip = index.start
 
             if index.stop is not None:
                 limit = index.stop - skip
                 if limit < 0:
-                    raise IndexError('stop index must be greater than start'
-                                     'index for slice %r' % index)
+                    raise IndexError(
+                        f'stop index must be greater than start index for slice {index!r}'
+                    )
                 if limit == 0:
                     self.__empty = True
             else:
@@ -1980,7 +2342,7 @@ class Cursor(object):
             self._limit = limit
             return self
         if not isinstance(index, int):
-            raise TypeError("index '%s' cannot be applied to Cursor instances" % index)
+            raise TypeError(f"index '{index}' cannot be applied to Cursor instances")
         if index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
         return self._compute_results(with_limit_and_skip=True)[index]
@@ -2011,12 +2373,18 @@ class Cursor(object):
         return self
 
 
-def _set_updater(doc, field_name, value):
+def _set_updater(doc, field_name, value, codec_options=None):
     if isinstance(value, (tuple, list)):
         value = copy.deepcopy(value)
     if BSON:
         # bson validation
-        BSON.encode({field_name: value}, check_keys=True)
+        check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+        if not check_keys and '\0' in field_name or field_name.startswith('$'):
+            raise InvalidDocument(
+                f'Field name cannot contain the null character and top-level field name '
+                f'cannot start with "$" (found: {field_name})'
+            )
+        _bson_encode({field_name: value}, check_keys=check_keys, codec_options=codec_options)
     if isinstance(doc, dict):
         doc[field_name] = value
     if isinstance(doc, list):
@@ -2029,12 +2397,12 @@ def _set_updater(doc, field_name, value):
         doc[field_index] = value
 
 
-def _unset_updater(doc, field_name, value):
+def _unset_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc.pop(field_name, None)
 
 
-def _inc_updater(doc, field_name, value):
+def _inc_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = doc.get(field_name, 0) + value
 
@@ -2050,17 +2418,17 @@ def _inc_updater(doc, field_name, value):
             doc[field_index] = value
 
 
-def _max_updater(doc, field_name, value):
+def _max_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = max(doc.get(field_name, value), value)
 
 
-def _min_updater(doc, field_name, value):
+def _min_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
-def _pop_updater(doc, field_name, value):
+def _pop_updater(doc, field_name, value, codec_options=None):
     if value not in {1, -1}:
         raise WriteError('$pop expects 1 or -1, found: ' + str(value))
 
@@ -2080,7 +2448,7 @@ def _pop_updater(doc, field_name, value):
         _pop_from_list(doc[field_index], value)
 
 
-def _pop_from_list(list_instance, mongo_pop_value):
+def _pop_from_list(list_instance, mongo_pop_value, codec_options=None):
     if not list_instance:
         return
 
@@ -2090,7 +2458,7 @@ def _pop_from_list(list_instance, mongo_pop_value):
         list_instance.pop(0)
 
 
-def _current_date_updater(doc, field_name, value):
+def _current_date_updater(doc, field_name, value, codec_options=None):
     if isinstance(doc, dict):
         if value == {'$type': 'timestamp'}:
             # TODO(juannyg): get_current_timestamp should also be using helpers utcnow,
@@ -2106,5 +2474,5 @@ _updaters = {
     '$inc': _inc_updater,
     '$max': _max_updater,
     '$min': _min_updater,
-    '$pop': _pop_updater
+    '$pop': _pop_updater,
 }

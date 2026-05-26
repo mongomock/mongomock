@@ -1,12 +1,17 @@
 import collections
 import datetime
-from packaging import version
 import sys
-from unittest import TestCase, skipIf, skipUnless
+from unittest import skipIf
+from unittest import skipUnless
+from unittest import TestCase
+from uuid import uuid4
+
+from packaging import version
 
 import mongomock
 from mongomock import helpers
 from mongomock import read_concern
+
 
 try:
     from bson import codec_options
@@ -30,13 +35,12 @@ class UTCPlus2(datetime.tzinfo):
 
 
 class DatabaseAPITest(TestCase):
-
     def setUp(self):
         self.database = mongomock.MongoClient().somedb
 
     def test__get_collection_by_attribute_underscore(self):
         with self.assertRaises(AttributeError) as err_context:
-            self.database._users  # pylint: disable=pointless-statement
+            self.database._users  # noqa: B018
 
         self.assertIn("Database has no attribute '_users'", str(err_context.exception))
 
@@ -70,7 +74,8 @@ class DatabaseAPITest(TestCase):
 
     def test__repr(self):
         self.assertEqual(
-            "Database(mongomock.MongoClient('localhost', 27017), 'somedb')", repr(self.database))
+            "Database(mongomock.MongoClient('localhost', 27017), 'somedb')", repr(self.database)
+        )
 
     def test__rename_unknown_collection(self):
         with self.assertRaises(mongomock.OperationFailure):
@@ -99,8 +104,9 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_read_preference(self):
-        database = mongomock.MongoClient()\
-            .get_database('somedb', read_preference=ReadPreference.NEAREST)
+        database = mongomock.MongoClient().get_database(
+            'somedb', read_preference=ReadPreference.NEAREST
+        )
         self.assertEqual('Nearest', database.read_preference.name)
         self.assertEqual(database.read_preference, database.collection.read_preference)
 
@@ -141,18 +147,22 @@ class DatabaseAPITest(TestCase):
         tz_aware_db = mongomock.MongoClient(tz_aware=True).somedb
         self.assertIs(
             tz_aware_db,
-            tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)))
+            tz_aware_db.with_options(codec_options=codec_options.CodecOptions(tz_aware=True)),
+        )
 
         custom_document_class = codec_options.CodecOptions(document_class=collections.OrderedDict)
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_document_class)
 
         custom_uuid_representation = codec_options.CodecOptions(uuid_representation=4)
-        with self.assertRaises(NotImplementedError):
-            self.database.with_options(custom_uuid_representation)
+        db = self.database
+        db.get_collection('yes_hello', codec_options=custom_uuid_representation).insert_one(
+            {'_id': uuid4()}
+        )
 
         custom_unicode_error_hander = codec_options.CodecOptions(
-            unicode_decode_error_handler='ignore')
+            unicode_decode_error_handler='ignore'
+        )
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_unicode_error_hander)
 
@@ -161,8 +171,9 @@ class DatabaseAPITest(TestCase):
             self.database.with_options(custom_tzinfo)
 
     @skipIf(
-        not helpers.HAVE_PYMONGO or helpers.PYMONGO_VERSION < version.parse('3.8'),
-        'pymongo not installed or <3.8')
+        not helpers.HAVE_PYMONGO or version.parse('3.8') > helpers.PYMONGO_VERSION,
+        'pymongo not installed or <3.8',
+    )
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
             @property
@@ -180,7 +191,8 @@ class DatabaseAPITest(TestCase):
                 pass
 
         custom_type_registry = codec_options.CodecOptions(
-            type_registry=codec_options.TypeRegistry([_CustomTypeCodec()]))
+            type_registry=codec_options.TypeRegistry([_CustomTypeCodec()])
+        )
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_type_registry)
 
@@ -188,23 +200,23 @@ class DatabaseAPITest(TestCase):
         self.database.create_collection('a')
         self.database.create_collection('b')
 
-        if helpers.PYMONGO_VERSION >= version.parse('4.0'):
+        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
             with self.assertRaises(TypeError):
                 self.database.collection_names()
             return
 
-        self.assertEqual(set(self.database.collection_names()), set(['a', 'b']))
+        self.assertEqual(set(self.database.collection_names()), {'a', 'b'})
 
         self.database.c.drop()
-        self.assertEqual(set(self.database.collection_names()), set(['a', 'b']))
+        self.assertEqual(set(self.database.collection_names()), {'a', 'b'})
 
     def test__list_collection_names(self):
         self.database.create_collection('a')
         self.database.create_collection('b')
-        self.assertEqual(set(self.database.list_collection_names()), set(['a', 'b']))
+        self.assertEqual(set(self.database.list_collection_names()), {'a', 'b'})
 
         self.database.c.drop()
-        self.assertEqual(set(self.database.list_collection_names()), set(['a', 'b']))
+        self.assertEqual(set(self.database.list_collection_names()), {'a', 'b'})
 
     def test__list_collections(self):
         self.database.create_collection('a')
@@ -215,8 +227,7 @@ class DatabaseAPITest(TestCase):
     def test__create_collection(self):
         coll = self.database.create_collection('c')
         self.assertIs(self.database.c, coll)
-        self.assertRaises(mongomock.CollectionInvalid,
-                          self.database.create_collection, 'c')
+        self.assertRaises(mongomock.CollectionInvalid, self.database.create_collection, 'c')
 
     def test__create_collection_bad_names(self):
         with self.assertRaises(TypeError):
@@ -243,7 +254,7 @@ class DatabaseAPITest(TestCase):
         col = self.database.a
         self.assertEqual(set(self.database.list_collection_names()), set())
         col.insert_one({'foo': 'bar'})
-        self.assertEqual(set(self.database.list_collection_names()), set(['a']))
+        self.assertEqual(set(self.database.list_collection_names()), {'a'})
 
     def test__equality(self):
         self.assertEqual(self.database, self.database)
@@ -255,18 +266,20 @@ class DatabaseAPITest(TestCase):
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipUnless(
-        helpers.PYMONGO_VERSION < version.parse('3.12'),
-        "older versions of pymongo didn't have proper hashing")
+        version.parse('3.12') > helpers.PYMONGO_VERSION,
+        "older versions of pymongo didn't have proper hashing",
+    )
     def test__not_hashable(self):
         with self.assertRaises(TypeError):
-            {self.database}  # pylint: disable=pointless-statement
+            {self.database}  # noqa: B018
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
     @skipIf(
-        helpers.PYMONGO_VERSION < version.parse('3.12'),
-        "older versions of pymongo didn't have proper hashing")
+        version.parse('3.12') > helpers.PYMONGO_VERSION,
+        "older versions of pymongo didn't have proper hashing",
+    )
     def test__hashable(self):
-        {self.database}  # pylint: disable=pointless-statement
+        {self.database}  # noqa: B018
 
     def test__bad_type_as_a_read_concern_returns_type_error(self):
         client = mongomock.MongoClient()

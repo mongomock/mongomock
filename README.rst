@@ -1,10 +1,18 @@
-.. image:: https://app.travis-ci.com/mongomock/mongomock.svg?branch=develop
-  :target: https://app.travis-ci.com/mongomock/mongomock
+.. image:: https://img.shields.io/pypi/v/mongomock.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/mongomock
+.. image:: https://img.shields.io/github/actions/workflow/status/mongomock/mongomock/lint-and-test.yml?branch=develop&style=flat-square
+    :target: https://github.com/mongomock/mongomock/actions?query=workflow%3Alint-and-test
+.. image:: https://img.shields.io/pypi/l/mongomock.svg?style=flat-square
+    :target: https://pypi.python.org/pypi/mongomock
+.. image:: https://img.shields.io/codecov/c/github/mongomock/mongomock.svg?style=flat-square
+    :target: https://codecov.io/gh/mongomock/mongomock
 
-|pypi_version| |pypi_license| |pypi_wheel|
 
-.. image:: https://codecov.io/gh/mongomock/mongomock/branch/develop/graph/badge.svg
-  :target: https://codecov.io/gh/mongomock/mongomock
+Seeking maintainers
+-------------------
+
+This project is seeking maintainers, see `here <https://github.com/mongomock/mongomock/issues/914>`_
+for more information.
 
 
 What is this?
@@ -100,13 +108,13 @@ MongoDB is complex. This library aims at a reasonably complete mock of MongoDB f
 not a perfect replica. This means some features are not likely to make it in any time soon.
 
 Also, since many corner cases are encountered along the way, our goal is to try and TDD our way into
-completeness. This means that every time we encounter a missing or broken (incompatible) feature, we
-write a test for it and fix it. There are probably lots of such issues hiding around lurking, so feel
-free to open issues and/or pull requests and help the project out!
+completeness. This means that every time we encounter a missing or broken (incompatible) feature,
+we write a test for it and fix it. There are probably lots of such issues hiding around lurking,
+so feel free to open issues and/or pull requests and help the project out!
 
 **NOTE**: We don't include pymongo functionality as "stubs" or "placeholders". Since this library is
 used to validate production code, it is unacceptable to behave differently than the real pymongo
-implementation. In such cases it is better to throw `NotImplementedError` than implement a modified
+implementation. In such cases it is better to throw ``NotImplementedError`` than implement a modified
 version of the original behavior.
 
 Upgrading to Pymongo v4
@@ -125,56 +133,64 @@ Contributing
 
 When submitting a PR, please make sure that:
 
-1. You include tests for the feature you are adding or bug you are fixing. Preferably, the test should
-   compare against the real MongoDB engine (see `examples in tests`_ for reference).
+1. You include tests for the feature you are adding or bug you are fixing. Preferably, the test
+   should compare against the real MongoDB engine (see `examples in tests`_ for reference).
 2. No existing test got deleted or unintentionally castrated
-3. The travis build passes on your PR.
+3. The code is auto-formatted (``hatch fmt``).
+4. The build passes on your PR.
 
 To download, setup and perfom tests, run the following commands on Mac / Linux:
 
-.. code-block:: bash
+.. code-block:: console
 
- git clone git@github.com:mongomock/mongomock.git
- pip install tox
- cd mongomock
- tox
+ $ git clone git@github.com:mongomock/mongomock.git
+ $ pipx install hatch
+ $ cd mongomock
+ $ hatch test
 
-Alternatively, docker-compose can be used to simplify dependency management for local development:
+Alternatively, ``docker-compose`` can be used to simplify dependency management for local 
+development:
 
-.. code-block:: bash
+.. code-block:: console
 
- git clone git@github.com:mongomock/mongomock.git
- cd mongomock
- docker-compose build
- docker-compose run --rm mongomock
+ $ git clone git@github.com:mongomock/mongomock.git
+ $ cd mongomock
+ $ docker compose build
+ $ docker compose run --rm mongomock
 
-If you need/want tox to recreate its environments, you can override the container command by running:
+If you want to run ``hatch`` against a specific environment in the container:
 
-.. code-block:: bash
+.. code-block:: console
 
- docker-compose run --rm mongomock tox -r
-
-Similarly, if you'd like to run tox against a specific environment in the container:
-
-.. code-block:: bash
-
- docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs
+ $ docker compose run --rm mongomock hatch test -py=3.11 -i pymongo=4
 
 If you'd like to run only one test, you can also add the test name at the end of your command:
 
-.. code-block:: bash
+.. code-block:: console
 
- docker-compose run --rm mongomock tox -e py38-pymongo-pyexecjs tests.test__mongomock.MongoClientCollectionTest.test__aggregate_system_variables_generate_array
+ $ docker compose run --rm mongomock hatch test -py=3.12 -i pymongo=4 tests/test__mongomock.py::MongoClientCollectionTest::test__insert
 
-NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in docker-compose,
-you'll have to issue a `docker-compose down` before you do anything else to ensure you're running against
-the intended version.
+NOTE: If the MongoDB image was updated, or you want to try a different MongoDB version in
+``docker-compose``, you'll have to issue a ``docker compose down`` before you do anything else to
+ensure you're running against the intended version.
+
+Code formatting
+~~~~~~~~~~~~~~~
+
+All code is automatically formatted with `ruff <https://docs.astral.sh/ruff/formatter/>`_ and
+pull-requests are only accepted if the linter passes without complaints. For an open source project
+this is the only feasible way to maintain a consistent code base, without having to fight endless
+code style wars. To invoke the formatter and discover issues run
+
+.. code-block:: console
+
+  $ hatch fmt
 
 utcnow
-~~~~
+~~~~~~
 
-When developing features that need to make use of "now," please use the libraries :code:`utcnow` helper method
-in the following way:
+When developing features that need to make use of "now," please use the libraries :code:`utcnow`
+helper method in the following way:
 
 .. code-block:: python
 
@@ -182,15 +198,16 @@ in the following way:
    # Awesome code!
    now_reference = mongomock.utcnow()
 
-This provides users a consistent way to mock the notion of "now" in mongomock if they so choose. Please
-see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
+This provides users a consistent way to mock the notion of "now" in mongomock if they so choose.
+Please see `utcnow docstring for more details <mongomock/helpers.py#L52>`_.
 
 Branching model
 ~~~~~~~~~~~~~~~
 
-The branching model used for this project follows the `gitflow workflow`_.  This means that pull requests
-should be issued against the `develop` branch and *not* the `master` branch. If you want to contribute to
-the legacy 2.x branch then your pull request should go into the `support/2.x` branch.
+The branching model used for this project follows the `gitflow workflow`_.  This means that pull
+requests should be issued against the `develop` branch and *not* the `master` branch. If you want
+to contribute to the legacy 2.x branch then your pull request should go into the `support/2.x`
+branch.
 
 Releasing
 ~~~~~~~~~
@@ -203,16 +220,19 @@ then generate the release notes locally with:
 
 .. code-block:: bash
 
-python3 -c "from pbr import git; git.write_git_changelog()"
+  python -c "from pbr import git; git.write_git_changelog()"
 
 Then you can get the relevant section in the generated `Changelog` file.
 
 Acknowledgements
 ----------------
 
-Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by `Martin Domke <https://github.com/mdomke>`. It is currently being developed and maintained by `Pascal Corpet <https://github.com/pcorpet>`_ .
+Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by
+`Martin Domke <https://github.com/mdomke>`_. It is currently being developed and maintained by
+`Pascal Corpet <https://github.com/pcorpet>`_ .
 
-Also, many thanks go to the following people for helping out, contributing pull requests and fixing bugs:
+Also, many thanks go to the following people for helping out, contributing pull requests and fixing
+bugs:
 
 * Alec Perkins
 * Alexandre Viau
@@ -271,22 +291,5 @@ Also, many thanks go to the following people for helping out, contributing pull 
 * lidongyong
 * `Juan Gutierrez <https://github.com/juannyg/>`_
 
-
 .. _examples in tests: https://github.com/mongomock/mongomock/blob/develop/tests/test__mongomock.py
-
 .. _gitflow workflow: https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow
-
-
-.. |travis| image:: https://travis-ci.org/mongomock/mongomock.svg?branch=develop
-    :target: https://travis-ci.org/mongomock/mongomock
-    :alt: Travis CI build
-
-.. |pypi_version| image:: https://img.shields.io/pypi/v/mongomock.svg
-    :target: https://pypi.python.org/pypi/mongomock
-    :alt: PyPI package
-
-.. |pypi_license| image:: https://img.shields.io/pypi/l/mongomock.svg
-    :alt: PyPI license
-
-.. |pypi_wheel| image:: https://img.shields.io/pypi/wheel/mongomock.svg
-    :alt: PyPI wheel status

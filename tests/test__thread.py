@@ -4,7 +4,6 @@ from mongomock.store import RWLock
 
 
 class LockTestCase(unittest.TestCase):
-
     def test_rwlock_exception(self):
         """Asserts exceptions occur between a lock's acquire/release"""
         lock = RWLock()

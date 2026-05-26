@@ -1,21 +1,27 @@
-from datetime import datetime
 import itertools
-import uuid
-
-from .helpers import ObjectId, RE_TYPE
-from . import OperationFailure
-
 import numbers
 import operator
 import re
+import uuid
+from datetime import datetime
+from typing import ClassVar
+
 from sentinels import NOTHING
+
+from . import OperationFailure
+from .helpers import ObjectId
+from .helpers import RE_TYPE
+
+
 try:
     from types import NoneType
 except ImportError:
     NoneType = type(None)
 
 try:
-    from bson import Regex, DBRef
+    from bson import DBRef
+    from bson import Regex
+
     _RE_TYPES = (RE_TYPE, Regex)
 except ImportError:
     DBRef = None
@@ -43,39 +49,42 @@ _NOT_IMPLEMENTED_OPERATORS = {
 }
 
 
-def filter_applies(search_filter, document):
+def filter_applies(search_filter, document, user_vars=None):
     """Applies given filter
 
     This function implements MongoDB's matching strategy over documents in the find() method
     and other related scenarios (like $elemMatch)
     """
-    return _filterer_inst.apply(search_filter, document)
+    return _filterer_inst.apply(search_filter, document, user_vars=user_vars)
 
 
-class _Filterer(object):
+class _Filterer:
     """An object to help applying a filter, using the MongoDB query language."""
 
     # This is populated using register_parse_expression further down.
-    parse_expression = []
+    parse_expression: ClassVar[list] = []
 
     def __init__(self):
-        self._operator_map = dict({
-            '$eq': _list_expand(operator_eq),
-            '$ne': _list_expand(lambda dv, sv: not operator_eq(dv, sv), negative=True),
-            '$all': self._all_op,
-            '$in': _in_op,
-            '$nin': lambda dv, sv: not _in_op(dv, sv),
-            '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
-            '$regex': _not_nothing_and(_regex),
-            '$elemMatch': self._elem_match_op,
-            '$size': _size_op,
-            '$type': _type_op
-        }, **{
-            key: _not_nothing_and(_list_expand(_compare_objects(op)))
-            for key, op in SORTING_OPERATOR_MAP.items()
-        })
+        self._operator_map = dict(
+            {
+                '$eq': _list_expand(operator_eq),
+                '$ne': _list_expand(lambda dv, sv: not operator_eq(dv, sv), negative=True),
+                '$all': self._all_op,
+                '$in': _in_op,
+                '$nin': lambda dv, sv: not _in_op(dv, sv),
+                '$exists': lambda dv, sv: bool(sv) == (dv is not NOTHING),
+                '$regex': _not_nothing_and(_regex),
+                '$elemMatch': self._elem_match_op,
+                '$size': _size_op,
+                '$type': _type_op,
+            },
+            **{
+                key: _not_nothing_and(_list_expand(_compare_objects(op)))
+                for key, op in SORTING_OPERATOR_MAP.items()
+            },
+        )
 
-    def apply(self, search_filter, document):
+    def apply(self, search_filter, document, user_vars=None):
         if not isinstance(search_filter, dict):
             raise OperationFailure('the match filter must be an expression in an object')
 
@@ -91,21 +100,24 @@ class _Filterer(object):
                 continue
             if key == '$expr':
                 parse_expression = self.parse_expression[0]
-                if not parse_expression(search, document, ignore_missing_keys=True):
+                if not parse_expression(
+                    search, document, ignore_missing_keys=True, user_vars=user_vars
+                ):
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
-                raise NotImplementedError(
-                    'The {} operator is not implemented in mongomock yet'.format(key))
+                raise NotImplementedError(f'The {key} operator is not implemented in mongomock yet')
             if key.startswith('$'):
                 raise OperationFailure('unknown top level operator: ' + key)
 
             is_match = False
 
-            is_checking_negative_match = \
-                isinstance(search, dict) and {'$ne', '$nin'} & set(search.keys())
-            is_checking_positive_match = \
-                not isinstance(search, dict) or (set(search.keys()) - {'$ne', '$nin'})
+            is_checking_negative_match = isinstance(search, dict) and {'$ne', '$nin'} & set(
+                search.keys()
+            )
+            is_checking_positive_match = not isinstance(search, dict) or (
+                set(search.keys()) - {'$ne', '$nin'}
+            )
             has_candidates = False
 
             if search == {'$exists': False} and not iter_key_candidates(key, document):
@@ -120,8 +132,11 @@ class _Filterer(object):
 
             for doc_val in iter_key_candidates(key, document):
                 has_candidates |= doc_val is not NOTHING
-                is_ops_filter = search and isinstance(search, dict) and \
-                    all(key.startswith('$') for key in search.keys())
+                is_ops_filter = (
+                    search
+                    and isinstance(search, dict)
+                    and all(key.startswith('$') for key in search)
+                )
                 if is_ops_filter:
                     if '$options' in search and '$regex' in search:
                         search = _combine_regex_options(search)
@@ -130,16 +145,20 @@ class _Filterer(object):
                         not_implemented_operators = unknown_operators & _NOT_IMPLEMENTED_OPERATORS
                         if not_implemented_operators:
                             raise NotImplementedError(
-                                "'%s' is a valid operation but it is not supported by Mongomock "
-                                'yet.' % list(not_implemented_operators)[0])
-                        raise OperationFailure('unknown operator: ' + list(unknown_operators)[0])
-                    is_match = all(
-                        operator_string in self._operator_map
-                        and self._operator_map[operator_string](doc_val, search_val)
-                        or operator_string == '$not'
-                        and self._not_op(document, key, search_val)
-                        for operator_string, search_val in search.items()
-                    ) and search
+                                f"'{next(iter(not_implemented_operators))}' is a valid operation "
+                                'but it is not supported by Mongomock yet.'
+                            )
+                        raise OperationFailure(f'unknown operator: {next(iter(unknown_operators))}')
+                    is_match = (
+                        all(
+                            operator_string in self._operator_map
+                            and self._operator_map[operator_string](doc_val, search_val)
+                            or operator_string == '$not'
+                            and self._not_op(document, key, search_val)
+                            for operator_string, search_val in search.items()
+                        )
+                        and search
+                    )
                 elif isinstance(search, _RE_TYPES) and isinstance(doc_val, (str, list)):
                     is_match = _regex(doc_val, search)
                 elif key in LOGICAL_OPERATOR_MAP:
@@ -147,9 +166,9 @@ class _Filterer(object):
                         raise OperationFailure('BadValue $and/$or/$nor must be a nonempty array')
                     is_match = LOGICAL_OPERATOR_MAP[key](document, search, self.apply)
                 elif isinstance(doc_val, (list, tuple)):
-                    is_match = (search in doc_val or search == doc_val)
+                    is_match = search in doc_val or search == doc_val
                     if isinstance(search, ObjectId):
-                        is_match |= (str(search) in doc_val)
+                        is_match |= str(search) in doc_val
                 else:
                     is_match = (doc_val == search) or (search is None and doc_val is NOTHING)
 
@@ -168,9 +187,9 @@ class _Filterer(object):
 
     def _not_op(self, d, k, s):
         if isinstance(s, dict):
-            for key in s.keys():
+            for key in s:
                 if key not in self._operator_map and key not in LOGICAL_OPERATOR_MAP:
-                    raise OperationFailure('unknown operator: %s' % key)
+                    raise OperationFailure(f'Unknown operator: {key}')
         elif isinstance(s, _RE_TYPES):
             pass
         else:
@@ -285,7 +304,7 @@ def _in_op(doc_val, search_val):
 
 def _not_nothing_and(f):
     """wrap an operator to return False if the first arg is NOTHING"""
-    return lambda v, l: v is not NOTHING and f(v, l)
+    return lambda a, b: a is not NOTHING and f(a, b)
 
 
 def _compare_objects(op):
@@ -293,6 +312,7 @@ def _compare_objects(op):
 
     See https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#objects
     """
+
     def _wrapped(a, b):
         # Do not compare uncomparable types, see Type Bracketing:
         # https://docs.mongodb.com/manual/reference/method/db.collection.find/#type-bracketing
@@ -341,11 +361,10 @@ def bson_compare(op, a, b, can_compare_types=True):
 
     # bson handles bytes as binary in python3+:
     # https://api.mongodb.com/python/current/api/bson/index.html
-    if isinstance(a, bytes):
-        # Performs the same operation as described by:
-        # https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#bindata
-        if len(a) != len(b):
-            return op(len(a), len(b))
+    # Performs the same operation as described by:
+    # https://docs.mongodb.com/manual/reference/bson-type-comparison-order/#bindata
+    if isinstance(a, bytes) and len(a) != len(b):
+        return op(len(a), len(b))
         # bytes is always treated as subtype 0 by the bson library
     return op(a, b)
 
@@ -383,22 +402,18 @@ def _get_compare_type(val):
         # According to the C++ code, this should be 55 but apparently sending a DBRef through
         # pymongo is stored as a dict.
         return 20
-    raise NotImplementedError(
-        "Mongomock does not know how to sort '%s' of type '%s'" %
-        (val, type(val)))
+    raise NotImplementedError(f"Mongomock does not know how to sort '{val}' of type '{type(val)}'")
 
 
 def _regex(doc_val, regex):
-    if not (isinstance(doc_val, (str, list)) or isinstance(doc_val, RE_TYPE)):
+    if not (isinstance(doc_val, (RE_TYPE, list, str))):
         return False
     if isinstance(regex, str):
         regex = re.compile(regex)
     if not isinstance(regex, RE_TYPE):
         # bson.Regex
         regex = regex.try_compile()
-    return any(
-        regex.search(item) for item in _force_list(doc_val)
-        if isinstance(item, str))
+    return any(regex.search(item) for item in _force_list(doc_val) if isinstance(item, str))
 
 
 def _size_op(doc_val, search_val):
@@ -414,14 +429,15 @@ def _list_expand(f, negative=False):
                 return all(f(val, search_val) for val in doc_val)
             return any(f(val, search_val) for val in doc_val)
         return f(doc_val, search_val)
+
     return func
 
 
 def _type_op(doc_val, search_val, in_array=False):
     if search_val not in TYPE_MAP:
-        raise OperationFailure('%r is not a valid $type' % search_val)
+        raise OperationFailure(f'{search_val!r} is not a valid $type')
     elif TYPE_MAP[search_val] is None:
-        raise NotImplementedError('%s is a valid $type but not implemented' % search_val)
+        raise NotImplementedError(f'{search_val} is a valid $type but not implemented')
     if TYPE_MAP[search_val](doc_val):
         return True
     if isinstance(doc_val, (list, tuple)) and not in_array:
@@ -452,7 +468,8 @@ def _combine_regex_options(search):
     if isinstance(search['$regex'], _RE_TYPES):
         if isinstance(search['$regex'], RE_TYPE):
             search_copy['$regex'] = re.compile(
-                search['$regex'].pattern, search['$regex'].flags | options)
+                search['$regex'].pattern, search['$regex'].flags | options
+            )
         else:
             # bson.Regex
             regex = search['$regex']
@@ -500,13 +517,9 @@ TYPE_MAP = {
     'javascript': None,
     'symbol': None,
     'javascriptWithScope': None,
-    'int': lambda v: (
-        isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32
-    ),
+    'int': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() <= 32),
     'timestamp': None,
-    'long': lambda v: (
-        isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32
-    ),
+    'long': lambda v: (isinstance(v, int) and not isinstance(v, bool) and v.bit_length() > 32),
     'decimal': (lambda v: isinstance(v, Decimal128)) if Decimal128 else None,
     'number': lambda v: (
         # pylint: disable-next=isinstance-second-argument-not-valid-type
@@ -537,7 +550,7 @@ def resolve_sort_key(key, doc):
     return 1, BsonComparable(value)
 
 
-class BsonComparable(object):
+class BsonComparable:
     """Wraps a value in an BSON like object that can be compared one to another."""
 
     def __init__(self, obj):

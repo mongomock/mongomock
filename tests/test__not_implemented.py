@@ -4,7 +4,6 @@ import mongomock
 
 
 class NotImplementedTests(unittest.TestCase):
-
     def tearDown(self):
         mongomock.warn_on_feature('session')
 

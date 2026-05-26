@@ -1,36 +1,30 @@
 import os
+from unittest import mock
+
+from packaging import version
 
 import mongomock
 from mongomock import helpers
-from packaging import version
 
-try:
-    from unittest import mock
-    _HAVE_MOCK = True
-except ImportError:
-    try:
-        import mock
-        _HAVE_MOCK = True
-    except ImportError:
-        _HAVE_MOCK = False
 
 try:
     import pymongo
 except ImportError:
     pymongo = None
 
+from unittest import skipIf
+from unittest import TestCase
+
 from tests.multicollection import MultiCollection
-from unittest import TestCase, skipIf
 
 
 # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
+@skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above')
 class BulkOperationsTest(TestCase):
-
     test_with_pymongo = False
 
     def setUp(self):
-        super(BulkOperationsTest, self).setUp()
+        super().setUp()
         if self.test_with_pymongo:
             self.client = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         else:
@@ -39,32 +33,44 @@ class BulkOperationsTest(TestCase):
         self.db.collection.drop()
         for _i in 'abx':
             self.db.collection.create_index(
-                _i, unique=False, name='idx' + _i, sparse=True, background=True)
+                _i, unique=False, name='idx' + _i, sparse=True, background=True
+            )
         self.bulk_op = self.db.collection.initialize_ordered_bulk_op()
 
     def __check_document(self, doc, count=1):
         found_num = self.db.collection.find(doc).count()
         if found_num != count:
             all = list(self.db.collection.find())
-            self.fail('Document %s count()=%s BUT expected count=%s! All'
-                      ' documents: %s' % (doc, found_num, count, all))
+            self.fail(
+                f'Document {doc} count()={found_num} BUT expected count={count}! All'
+                f' documents: {all}'
+            )
 
     def __check_result(self, result, **expecting_values):
-        for key in ('nModified', 'nUpserted', 'nMatched', 'writeErrors',
-                    'upserted', 'writeConcernErrors', 'nRemoved', 'nInserted'):
+        for key in (
+            'nModified',
+            'nUpserted',
+            'nMatched',
+            'writeErrors',
+            'upserted',
+            'writeConcernErrors',
+            'nRemoved',
+            'nInserted',
+        ):
             exp_val = expecting_values.get(key)
             has_val = result.get(key)
             if self.test_with_pymongo and key == 'nModified' and has_val is None:
                 # ops, real pymongo did not returned 'nModified' key!
                 continue
-            self.assertFalse(has_val is None, "Missed key '%s' in result: %s" % (key, result))
+            self.assertFalse(has_val is None, f"Missed key '{key}' in result: {result}")
             if exp_val:
                 self.assertEqual(
-                    exp_val, has_val, 'Invalid result %s=%s (but expected value=%s)' % (
-                        key, has_val, exp_val))
+                    exp_val,
+                    has_val,
+                    f'Invalid result {key}={has_val} (but expected value={exp_val})',
+                )
             else:
-                self.assertFalse(
-                    bool(has_val), 'Received unexpected value %s = %s' % (key, has_val))
+                self.assertFalse(bool(has_val), f'Received unexpected value {key} = {has_val}')
 
     def __execute_and_check_result(self, write_concern=None, **expecting_result):
         result = self.bulk_op.execute(write_concern=write_concern)
@@ -73,7 +79,8 @@ class BulkOperationsTest(TestCase):
     def __check_number_of_elements(self, count):
         has_count = self.db.collection.count()
         self.assertEqual(
-            has_count, count, 'There is %s documents but there should be %s' % (has_count, count))
+            has_count, count, f'There is {has_count} documents but there should be {count}'
+        )
 
     def test__insert(self):
         self.bulk_op.insert({'a': 1, 'b': 2})
@@ -147,7 +154,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({'a': 2}, 1)
         self.__check_number_of_elements(1)
 
-    @skipIf(not _HAVE_MOCK, 'The mock library is not installed')
     def test_upsert_replace_one_on_empty_set(self):
         self.bulk_op.find({}).upsert().replace_one({'x': 1})
         self.__execute_and_check_result(nUpserted=1, upserted=[{'index': 0, '_id': mock.ANY}])
@@ -161,7 +167,6 @@ class BulkOperationsTest(TestCase):
         self.__check_document({'x': 1}, 1)
         self.__check_number_of_elements(2)
 
-    @skipIf(not _HAVE_MOCK, 'The mock library is not installed')
     def test_upsert_update_on_empty_set(self):
         self.bulk_op.find({}).upsert().update({'$set': {'a': 1, 'b': 2}})
         self.__execute_and_check_result(nUpserted=1, upserted=[{'index': 0, '_id': mock.ANY}])
@@ -195,24 +200,27 @@ class BulkOperationsWithPymongoTest(BulkOperationsTest):
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(helpers.PYMONGO_VERSION >= version.parse('4.0'), 'pymongo v4 or above')
+@skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above')
 class CollectionComparisonTest(TestCase):
-
     def setUp(self):
-        super(CollectionComparisonTest, self).setUp()
+        super().setUp()
         self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
         self.db_name = 'mongomock___testing_db'
         self.collection_name = 'mongomock___testing_collection'
         self.mongo_conn[self.db_name][self.collection_name].remove()
-        self.cmp = MultiCollection({
-            'fake': self.fake_conn[self.db_name][self.collection_name],
-            'real': self.mongo_conn[self.db_name][self.collection_name],
-        })
-        self.bulks = MultiCollection({
-            'fake': self.cmp.conns['fake'].initialize_ordered_bulk_op(),
-            'real': self.cmp.conns['real'].initialize_ordered_bulk_op()
-        })
+        self.cmp = MultiCollection(
+            {
+                'fake': self.fake_conn[self.db_name][self.collection_name],
+                'real': self.mongo_conn[self.db_name][self.collection_name],
+            }
+        )
+        self.bulks = MultiCollection(
+            {
+                'fake': self.cmp.conns['fake'].initialize_ordered_bulk_op(),
+                'real': self.cmp.conns['real'].initialize_ordered_bulk_op(),
+            }
+        )
 
         # hacky! Depending on mongo server version 'nModified' is returned or not..
         # so let make simple bulk operation to know what's the server behaviour...
@@ -227,7 +235,8 @@ class CollectionComparisonTest(TestCase):
         coll.drop()
 
         self.bulks.conns['fake']._set_nModified_policy(
-            insert_returns_nmodified, update_returns_nmodified)
+            insert_returns_nmodified, update_returns_nmodified
+        )
 
     def test__insert(self):
         self.bulks.do.insert({'a': 1, 'b': 1})

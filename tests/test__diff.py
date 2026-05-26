@@ -1,13 +1,14 @@
-from tests.diff import diff
 from unittest import TestCase
+
+from tests.diff import diff
 
 
 class DiffTest(TestCase):
     def test__assert_no_diff(self):
         for obj in [
-                1,
-                'string',
-                {'complex': {'object': {'with': ['lists']}}},
+            1,
+            'string',
+            {'complex': {'object': {'with': ['lists']}}},
         ]:
             self.assertEqual(diff(obj, obj), [])
 

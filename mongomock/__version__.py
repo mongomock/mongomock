@@ -1,3 +1,4 @@
-import pkg_resources
+from importlib.metadata import version
 
-__version__ = pkg_resources.get_distribution('mongomock').version
+
+__version__ = version('mongomock')

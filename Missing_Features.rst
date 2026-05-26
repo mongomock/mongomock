@@ -32,7 +32,6 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * Text search operator ($meta)
   * Projection operator $map
   * Array operators ($isArray, $indexOfArray, …)
-  * `$mergeObjects <https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/>`_
   * Some type conversion operators ($convert, …)
 * Operators within the query language (find):
   * `$jsonSchema <https://docs.mongodb.com/manual/reference/operator/query/jsonSchema/>`_

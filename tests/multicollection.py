@@ -1,29 +1,27 @@
-from .diff import diff
-from collections import OrderedDict
 import copy
 import functools
+from collections import OrderedDict
+
 from mongomock.helpers import RE_TYPE
+
+from .diff import diff
 
 
 _COMPARE_EXCEPTIONS = 'exceptions'
 
 
-class MultiCollection(object):
-
+class MultiCollection:
     def __init__(self, conns):
-        super(MultiCollection, self).__init__()
+        super().__init__()
         self.conns = conns.copy()
         self.do = Foreach(self.conns, compare=False)
         self.compare = Foreach(self.conns, compare=True)
-        self.compare_ignore_order = Foreach(
-            self.conns, compare=True, ignore_order=True)
+        self.compare_ignore_order = Foreach(self.conns, compare=True, ignore_order=True)
         self.compare_exceptions = Foreach(self.conns, compare=_COMPARE_EXCEPTIONS)
 
 
-class Foreach(object):
-
-    def __init__(self, objs, compare, ignore_order=False,
-                 method_result_decorators=()):
+class Foreach:
+    def __init__(self, objs, compare, ignore_order=False, method_result_decorators=()):
         self.___objs = objs
         self.___compare = compare
         self.___ignore_order = ignore_order
@@ -37,7 +35,8 @@ class Foreach(object):
             self.___ignore_order,
             method_name,
             self.___decorators,
-            self.___sort_by)
+            self.___sort_by,
+        )
 
     def sort_by(self, fun):
         self.___sort_by = fun
@@ -48,11 +47,19 @@ class Foreach(object):
             self.___objs,
             self.___compare,
             self.___ignore_order,
-            self.___decorators + list(decorators))
+            self.___decorators + list(decorators),
+        )
+
+    def getattr(self, name):
+        return Foreach(
+            {name: getattr(obj, name) for name, obj in self.___objs.items()},
+            self.___compare,
+            self.___ignore_order,
+            self.___decorators,
+        )
 
 
-class ForeachMethod(object):
-
+class ForeachMethod:
     def __init__(self, objs, compare, ignore_order, method_name, decorators, sort_by):
         self.___objs = objs
         self.___compare = compare
@@ -65,26 +72,24 @@ class ForeachMethod(object):
         # copying the args and kwargs is important, because pymongo changes
         # the dicts (fits them with the _id)
         return self.___apply_decorators(
-            getattr(obj, self.___method_name)(*_deepcopy(args), **_deepcopy(kwargs)))
+            getattr(obj, self.___method_name)(*_deepcopy(args), **_deepcopy(kwargs))
+        )
 
     def _get_exception_type(self, obj, args, kwargs, name):
         try:
             self._call(obj, args, kwargs)
-            assert False, 'No exception raised for ' + name
+            raise AssertionError(f'No exception raised for {name}')
         except Exception as err:
             return type(err)
 
     def __call__(self, *args, **kwargs):
         if self.___compare == _COMPARE_EXCEPTIONS:
-            results = dict(
-                (name, self._get_exception_type(obj, args, kwargs, name=name))
+            results = {
+                name: self._get_exception_type(obj, args, kwargs, name=name)
                 for name, obj in self.___objs.items()
-            )
+            }
         else:
-            results = dict(
-                (name, self._call(obj, args, kwargs))
-                for name, obj in self.___objs.items()
-            )
+            results = {name: self._call(obj, args, kwargs) for name, obj in self.___objs.items()}
         if self.___compare:
             _assert_no_diff(results, ignore_order=self.___ignore_order, sort_by=self.___sort_by)
         return results
@@ -121,8 +126,7 @@ def _result_is_cursor(results):
 
 
 def _result_is_command_cursor(results):
-    return any(type(result).__name__ == 'CommandCursor'
-               for result in results.values())
+    return any(type(result).__name__ == 'CommandCursor' for result in results.values())
 
 
 def by_id(document):
@@ -140,12 +144,12 @@ def _expand_cursor(cursor, sort, by=by_id):
 
 def _format_diff_message(a_name, b_name, diff_list):
     msg = 'Unexpected Diff:'
-    for (path, a_value, b_value) in diff_list:
-        a_path = [a_name] + path
-        b_path = [b_name] + path
+    for path, a_value, b_value in diff_list:
+        a_path = [a_name, *path]
+        b_path = [b_name, *path]
         msg += '\n\t{} != {} ({} != {})'.format(
-            '.'.join(map(str, a_path)), '.'.join(
-                map(str, b_path)), a_value, b_value)
+            '.'.join(map(str, a_path)), '.'.join(map(str, b_path)), a_value, b_value
+        )
     return msg
 
 
@@ -153,7 +157,7 @@ def _deepcopy(x):
     """Deepcopy, but ignore regex objects..."""
     if isinstance(x, RE_TYPE):
         return x
-    if isinstance(x, list) or isinstance(x, tuple):
+    if isinstance(x, (list, tuple)):
         return type(x)(_deepcopy(y) for y in x)
     if isinstance(x, (dict, OrderedDict)):
         return type(x)((_deepcopy(k), _deepcopy(v)) for k, v in x.items())

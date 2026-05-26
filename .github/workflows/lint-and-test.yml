@@ -1,0 +1,107 @@
+name: lint-and-test
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  lint-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install hatch
+        uses: pypa/hatch@install
+      - name: Lint style
+        run: hatch fmt --check
+
+  lint-typing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install hatch
+        uses: pypa/hatch@install
+      - name: Lint typing
+        run: hatch run types:check
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Set up NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.10.0
+        with:
+          mongodb-version: "5.0.5"
+
+      - name: Install hatch
+        uses: pypa/hatch@install
+
+      - name: Run tests
+        run: hatch test -py=${{ matrix.python-version }} --cover
+
+      - name: Disambiguate coverage filename
+        run: mv .coverage ".coverage.${{ matrix.os }}.${{ matrix.python-version }}"
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          include-hidden-files: true
+          name: coverage-${{ matrix.os }}-${{ matrix.python-version }}
+          path: .coverage*
+
+  coverage:
+    runs-on: ubuntu-latest
+    name: Report coverage
+    needs:
+      - test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Hatch
+        uses: pypa/hatch@install
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Combine coverage data
+        run: hatch run coverage:combine
+
+      - name: Export coverage reports
+        run: hatch run coverage:xml
+
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  package:
+    name: Build & verify package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hynek/build-and-inspect-python-package@v2
+

@@ -1,7 +1,4 @@
-
-
-class CommandCursor(object):
-
+class CommandCursor:
     def __init__(self, collection, curser_info=None, address=None, retrieved=0):
         self._collection = iter(collection)
         self._id = None
@@ -9,7 +6,7 @@ class CommandCursor(object):
         self._data = {}
         self._retrieved = retrieved
         self._batch_size = 0
-        self._killed = (self._id == 0)
+        self._killed = self._id == 0
 
     @property
     def address(self):

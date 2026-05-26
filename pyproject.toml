@@ -1,0 +1,137 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mongomock"
+dynamic = ["version"]
+description = "Fake pymongo stub for testing simple MongoDB-dependent code"
+readme = "README.rst"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Rotem Yaari", email = "vmalloc@gmail.com" },
+    { name = "Martin Domke", email = "mail@martindomke.net" },
+    { name = "Pascal Corpet", email = "pascal@corpet.net" },
+]
+requires-python = ">=3.9"
+classifiers = [
+    "License :: OSI Approved :: ISC License (ISCL)",
+    "Topic :: Database",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "packaging",
+    "pytz",
+    "sentinels",
+]
+
+[project.optional-dependencies]
+pyexecjs = ["pyexecjs"]
+pymongo = ["pymongo"]
+
+[project.urls]
+Homepage = "https://github.com/mongomock/mongomock"
+Changelog = "https://github.com/mongomock/mongomock/blob/develop/CHANGELOG.md"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mongomock"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+extend-select = [
+    "A",
+    "B",
+    "C",
+    "C4",
+    "E",
+    "F",
+    "I",
+    "N",
+    "Q",
+    "RUF",
+    "S",
+    "SIM",
+    "T10",
+    "UP",
+    "W",
+    "YTT",
+]
+extend-fixable = [
+    "RUF100", 
+    "I001", 
+    "SIM300", 
+    "UP008", 
+    "UP003", 
+    "C403", 
+    "UP031", 
+    "UP032",
+]
+extend-ignore = [
+    "A001",    # Allow shadowing bultins 
+    "A002",    # Allow shadowing bultins 
+    "A003",    # Allow shadowing bultins on classes
+    "FBT002",  # Allow boolean default positional parameter
+    "N818",    # Allow exceptions without Error suffix
+    "UP006",   # Allow typing.Tuple
+    "UP007",   # Allow typing.Union
+    "PYI024",  # Allow use of collections.namedtuple
+    "S101",    # Allow usage of asserts
+    # TODO: Remove in future pull-requests
+    "ARG001",  # Allow unused function argument
+    "ARG002",  # Allow unused method argument
+    "DTZ001",  # Allow datetime.datetime() without tzinfo
+    "DTZ003",  # Allow datetime.utcnow() 
+    "DTZ004",  # Allow datetime.utcfromtimestamp() 
+    "DTZ005",  # Allow datetime.now() without timezone
+    "EM101",   # Allow raw string in exception
+    "EM102",   # Allow f-string in exception
+    "TRY003",  # Allow specifying messages outside exception class
+    "PLR2004", # Allow magic values in comparison
+]
+exclude = [
+    "mongomock/__init__.pyi",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test__*.py" = [
+    "N802",
+    "PT009",
+    "PT027",
+    "SLF001",
+    "DTZ001",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 40
+
+[tool.ruff.lint.isort]
+order-by-type = false
+force-single-line = true
+lines-after-imports = 2
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+
+[tool.doc8]
+max-line-length = 100
