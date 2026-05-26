@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.11] - 2026-05-25
+### Fixed
+- `$rename` operator now supports dot notation for nested field renaming
+- `$addToSet` preserves boolean type distinction from numeric 1/0
+- `$addToSet` with `$each` modifier handles array values correctly
+- Query engine accepts `MutableMapping` objects (not just `dict`)
+- `UpdateOne`/`UpdateMany` validation raises proper errors for list criteria
+
+
 ## [7.5.10] - 2026-05-25
 ### Added
 - Python 3.14 and PyPy 3.10 support in test matrix and classifiers

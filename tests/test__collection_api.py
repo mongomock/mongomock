@@ -924,14 +924,95 @@ class CollectionAPITest(TestCase):
         self.assertEqual(update_result.matched_count, 1)
         self.assert_document_stored(insert_result.inserted_id, input_)
 
-    def test__rename_unsupported(self):
+    def test__rename_with_dots(self):
         input_ = {'_id': 1, 'foo': 'bar'}
         insert_result = self.db.collection.insert_one(input_)
         self.assert_document_stored(insert_result.inserted_id, input_)
 
         query = {'_id': 1}
-        update = {'$rename': {'foo': 'f.o.o.'}}
-        self.assertRaises(NotImplementedError, self.db.collection.update_one, query, update=update)
+        update = {'$rename': {'foo': 'f.o.o'}}
+        self.db.collection.update_one(query, update=update)
+        doc = self.db.collection.find_one(query)
+        self.assertEqual(doc['f']['o']['o'], 'bar')
+        self.assertNotIn('foo', doc)
+
+    def test__rename_nested(self):
+        input_ = {'_id': 1, 'a': {'b': {'c': 'val'}}}
+        self.db.collection.insert_one(input_)
+
+        update = {'$rename': {'a.b.c': 'x.y'}}
+        self.db.collection.update_one({'_id': 1}, update=update)
+        doc = self.db.collection.find_one({'_id': 1})
+        self.assertEqual(doc['x']['y'], 'val')
+        self.assertNotIn('c', doc['a']['b'])
+
+    def test__rename_source_missing(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'a': {'x': 1}})
+        col.update_one({'_id': 1}, {'$rename': {'a.b.c': 'y'}})
+        doc = col.find_one({'_id': 1})
+        self.assertEqual(doc['a']['x'], 1)
+        self.assertNotIn('y', doc)
+
+    def test__add_to_set_with_each(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'items': [1, 2]})
+        col.update_one({'_id': 1}, {'$addToSet': {'items': {'$each': [2, 3, 4]}}})
+        doc = col.find_one({'_id': 1})
+        self.assertEqual(doc['items'], [1, 2, 3, 4])
+
+    def test__add_to_set_with_each_nested(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'nested': {'items': [1, 2]}})
+        col.update_one({'_id': 1}, {'$addToSet': {'nested.items': {'$each': [2, 3, 4]}}})
+        doc = col.find_one({'_id': 1})
+        self.assertEqual(doc['nested']['items'], [1, 2, 3, 4])
+
+    def test__add_to_set_boolean_distinct(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'flags': [1, 0]})
+        col.update_one({'_id': 1}, {'$addToSet': {'flags': True}})
+        col.update_one({'_id': 1}, {'$addToSet': {'flags': False}})
+        doc = col.find_one({'_id': 1})
+        self.assertIn(True, doc['flags'])
+        self.assertIn(False, doc['flags'])
+        self.assertIn(1, doc['flags'])
+        self.assertIn(0, doc['flags'])
+        self.assertEqual(len(doc['flags']), 4)
+
+    def test__add_to_set_boolean_with_each(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'vals': [1, 0]})
+        col.update_one({'_id': 1}, {'$addToSet': {'vals': {'$each': [True, False, 2]}}})
+        doc = col.find_one({'_id': 1})
+        self.assertIn(True, doc['vals'])
+        self.assertIn(False, doc['vals'])
+        self.assertIn(2, doc['vals'])
+
+    def test__add_to_set_each_non_list(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'tags': ['a']})
+        col.update_one({'_id': 1}, {'$addToSet': {'tags': {'$each': 'b'}}})
+        doc = col.find_one({'_id': 1})
+        self.assertIn('b', doc['tags'])
+        self.assertEqual(len(doc['tags']), 2)
+
+    def test__add_to_set_each_non_list_nested(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'nested': {'tags': ['a']}})
+        col.update_one({'_id': 1}, {'$addToSet': {'nested.tags': {'$each': 'b'}}})
+        doc = col.find_one({'_id': 1})
+        self.assertIn('b', doc['nested']['tags'])
+        self.assertEqual(len(doc['nested']['tags']), 2)
+
+    def test__rename_dest_intermediate_not_mapping(self):
+        col = self.db.collection
+        col.insert_one({'_id': 1, 'foo': 'bar', 'x': 5})
+        col.update_one({'_id': 1}, {'$rename': {'foo': 'x.y'}})
+        doc = col.find_one({'_id': 1})
+        self.assertEqual(doc['x'], 5)
+        self.assertNotIn('y', doc)
+        self.assertNotIn('foo', doc)
 
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
@@ -11015,15 +11096,27 @@ class CollectionAPITest(TestCase):
                 array_filters=[{'elem.x': 5}],
             )
 
-    def test__array_filter_update_rename_fails(self):
+    def test__array_filter_update_rename_dotted(self):
         collection = self.db.collection
-        collection.insert_one({'_id': 1, 'arr': [{'x': 1}, {'x': 2}]})
-        with self.assertRaises(NotImplementedError):
-            collection.update_one(
-                {'_id': 1},
-                {'$rename': {'arr.$[elem].x': 'arr.$[elem].y'}},
-                array_filters=[{'elem.x': 1}],
-            )
+        collection.insert_one({'_id': 1, 'a': {'b': {'c': 'deep'}, 'd': 'old'}})
+        collection.update_one(
+            {'_id': 1},
+            {'$rename': {'a.b.c': 'a.b.x'}},
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertNotIn('c', doc['a']['b'])
+        self.assertEqual(doc['a']['b']['x'], 'deep')
+
+    def test__array_filter_update_rename_dotted_to_top(self):
+        collection = self.db.collection
+        collection.insert_one({'_id': 1, 'a': {'b': {'c': 'deep'}}})
+        collection.update_one(
+            {'_id': 1},
+            {'$rename': {'a.b.c': 'x'}},
+        )
+        doc = collection.find_one({'_id': 1})
+        self.assertNotIn('c', doc['a']['b'])
+        self.assertEqual(doc['x'], 'deep')
 
     def test__array_filter_update_pop(self):
         collection = self.db.collection

@@ -112,6 +112,10 @@ VALID_UPDATE_PIPELINE_STAGES = (
 )
 
 
+def _add_to_set_contains(arr, value):
+    return any(type(item) is type(value) and item == value for item in arr)
+
+
 def validate_list_or_mapping(option, value):
     if not isinstance(value, (Mapping, list)):
         raise TypeError(
@@ -838,10 +842,10 @@ class Collection:
                 'The let argument of update is valid but has not been implemented in mongomock-ng '
                 'yet',
             )
-        spec = helpers.patch_datetime_awareness_in_document(spec)
-        document = helpers.patch_datetime_awareness_in_document(document)
         validate_is_mapping('spec', spec)
         validate_list_or_mapping('document', document)
+        spec = helpers.patch_datetime_awareness_in_document(spec)
+        document = helpers.patch_datetime_awareness_in_document(document)
 
         if isinstance(document, list):
             _validate_document_stages(document)
@@ -955,13 +959,27 @@ class Collection:
                 )
             elif k == '$rename':
                 for src, dst in v.items():
-                    if '.' in src or '.' in dst:
-                        raise NotImplementedError(
-                            'Using the $rename operator with dots is a valid MongoDB '
-                            'operation, but it is not yet supported by mongomock-ng'
-                        )
-                    if self._has_key(existing_document, src):
-                        existing_document[dst] = existing_document.pop(src)
+                    src_parts = src.split('.')
+                    dst_parts = dst.split('.')
+
+                    src_doc = existing_document
+                    for part in src_parts[:-1]:
+                        if isinstance(src_doc, MutableMapping) and part in src_doc:
+                            src_doc = src_doc[part]
+                        else:
+                            break
+                    else:
+                        if isinstance(src_doc, MutableMapping) and src_parts[-1] in src_doc:
+                            value = src_doc.pop(src_parts[-1])
+                            dst_doc = existing_document
+                            for part in dst_parts[:-1]:
+                                if isinstance(dst_doc, MutableMapping):
+                                    dst_doc = dst_doc.setdefault(part, {})
+                                else:
+                                    break
+                            else:
+                                if isinstance(dst_doc, MutableMapping):
+                                    dst_doc[dst_parts[-1]] = value
             elif k == '$setOnInsert':
                 if not was_insert:
                     continue
@@ -997,11 +1015,14 @@ class Collection:
                 if field not in existing_document:
                     existing_document[field] = []
                 if isinstance(value, dict) and '$each' in value:
-                    for obj in list(value['$each']):
-                        if obj not in existing_document[field]:
+                    each_values = value['$each']
+                    if not isinstance(each_values, list):
+                        each_values = [each_values]
+                    for obj in each_values:
+                        if not _add_to_set_contains(existing_document[field], obj):
                             existing_document[field].append(obj)
                     continue
-                if value not in existing_document[field]:
+                if not _add_to_set_contains(existing_document[field], value):
                     existing_document[field].append(value)
                 continue
             else:
@@ -1017,8 +1038,13 @@ class Collection:
                 if nested_field_list[-1] in subdocument:
                     push_results = subdocument[nested_field_list[-1]]
                 if isinstance(value, dict) and '$each' in value:
-                    push_results += [obj for obj in list(value['$each']) if obj not in push_results]
-                elif value not in push_results:
+                    each_values = value['$each']
+                    if not isinstance(each_values, list):
+                        each_values = [each_values]
+                    for obj in each_values:
+                        if not _add_to_set_contains(push_results, obj):
+                            push_results.append(obj)
+                elif not _add_to_set_contains(push_results, value):
                     push_results.append(value)
                 subdocument[nested_field_list[-1]] = push_results
 
@@ -1569,9 +1595,8 @@ class Collection:
                     continue
                 except (ValueError, IndexError):
                     pass
-            elif isinstance(doc, dict):
+            elif isinstance(doc, MutableMapping):
                 if updater is _unset_updater and part not in doc:
-                    # If the parent doesn't exists, so does it child.
                     return
                 doc = doc.setdefault(part, {})
             else:
@@ -2512,7 +2537,7 @@ def _strip_filter_prefix(filter_dict, filter_id):
         if k.startswith(f'{filter_id}.'):
             result[k[len(filter_id) + 1 :]] = v
         elif k == filter_id:
-            result.update(v if isinstance(v, dict) else {k: v})
+            result.update(v if isinstance(v, Mapping) else {k: v})
         elif k in ('$and', '$or'):
             result[k] = [_strip_filter_prefix(sub, filter_id) for sub in v]
         else:
@@ -2539,7 +2564,7 @@ def _lookup_array_filter(array_filters, filter_id, path):
 
 
 def _array_filter_applies(filter_spec, filter_id, item):
-    if isinstance(item, dict):
+    if isinstance(item, Mapping):
         stripped = {}
         for k, v in filter_spec.items():
             if k.startswith(f'{filter_id}.'):
@@ -2569,7 +2594,7 @@ def _set_updater(doc, field_name, value, codec_options=None):
                 f'cannot start with "$" (found: {field_name})'
             )
         _bson_encode({field_name: value}, check_keys=check_keys, codec_options=codec_options)
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         doc[field_name] = value
     if isinstance(doc, list):
         field_index = int(field_name)
@@ -2582,12 +2607,12 @@ def _set_updater(doc, field_name, value, codec_options=None):
 
 
 def _unset_updater(doc, field_name, value, codec_options=None):
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         doc.pop(field_name, None)
 
 
 def _inc_updater(doc, field_name, value, codec_options=None):
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         doc[field_name] = doc.get(field_name, 0) + value
 
     if isinstance(doc, list):
@@ -2603,12 +2628,12 @@ def _inc_updater(doc, field_name, value, codec_options=None):
 
 
 def _max_updater(doc, field_name, value, codec_options=None):
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         doc[field_name] = max(doc.get(field_name, value), value)
 
 
 def _min_updater(doc, field_name, value, codec_options=None):
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         doc[field_name] = min(doc.get(field_name, value), value)
 
 
@@ -2616,7 +2641,7 @@ def _pop_updater(doc, field_name, value, codec_options=None):
     if value not in {1, -1}:
         raise WriteError('$pop expects 1 or -1, found: ' + str(value))
 
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         if isinstance(doc[field_name], (tuple, list)):
             doc[field_name] = list(doc[field_name])
             _pop_from_list(doc[field_name], value)
@@ -2653,7 +2678,7 @@ def _bit_updater(doc, field_name, value, codec_options=None):
 
 
 def _current_date_updater(doc, field_name, value, codec_options=None):
-    if isinstance(doc, dict):
+    if isinstance(doc, MutableMapping):
         if value == {'$type': 'timestamp'}:
             # TODO(juannyg): get_current_timestamp should also be using helpers utcnow,
             # as it currently using time.time internally
