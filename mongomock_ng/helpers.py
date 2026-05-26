@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import re
 import sys
 import time
@@ -52,7 +53,7 @@ try:
     PYMONGO_VERSION = version.parse(pymongo_version)
     HAVE_PYMONGO = True
 except ImportError:
-    from .object_id import ObjectId  # noqa
+    from .object_id import ObjectId
 
     SON = None  # type: ignore[assignment]
     Timestamp = None
@@ -60,6 +61,12 @@ except ImportError:
     # Default Pymongo version if not present.
     PYMONGO_VERSION = version.parse('4.0')
     HAVE_PYMONGO = False
+try:
+    from bson.decimal128 import Decimal128 as _Decimal128
+
+    Decimal128 = _Decimal128  # type: ignore[misc]
+except ImportError:
+    Decimal128 = None
 
 # Cache the RegExp pattern type.
 RE_TYPE = type(re.compile(''))
@@ -550,3 +557,21 @@ class ToHashableResult:
 
 def to_hashable(value):
     return _ToHashableParser(value).parse()
+
+
+def _clone_document(d):
+    if d is None or isinstance(d, (bool, int, float, str, bytes, datetime)):
+        return d
+    if isinstance(d, ObjectId):
+        return d
+    if Decimal128 is not None and isinstance(d, Decimal128):
+        return d
+    if isinstance(d, dict):
+        return {k: _clone_document(v) for k, v in d.items()}
+    if isinstance(d, list):
+        return [_clone_document(v) for v in d]
+    if isinstance(d, tuple):
+        return tuple(_clone_document(v) for v in d)
+    if isinstance(d, set):
+        return {_clone_document(v) for v in d}
+    return copy.deepcopy(d)

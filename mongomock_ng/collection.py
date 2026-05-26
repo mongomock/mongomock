@@ -75,6 +75,7 @@ from . import ObjectId
 from . import OperationFailure
 from . import WriteError
 from .filtering import filter_applies
+from .helpers import _clone_document
 from .not_implemented import raise_for_feature as raise_not_implemented
 from .results import BulkWriteResult
 from .results import DeleteResult
@@ -748,7 +749,7 @@ class Collection:
             indexed_list.append(index)
 
     def _internalize_dict(self, d):
-        return {k: copy.deepcopy(v) for k, v in d.items()}
+        return {k: _clone_document(v) for k, v in d.items()}
 
     def _has_key(self, doc, key):
         key_parts = key.split('.')
@@ -940,7 +941,7 @@ class Collection:
                 existing_document = to_insert
                 was_insert = True
             else:
-                original_document_snapshot = copy.deepcopy(existing_document)
+                original_document_snapshot = _clone_document(existing_document)
                 updated_existing = True
             num_matched += 1
 
@@ -1120,7 +1121,7 @@ class Collection:
                     arr = arr[field_part]
                 if not isinstance(arr, list):
                     continue
-                arr_copy = copy.deepcopy(arr)
+                arr_copy = _clone_document(arr)
                 if isinstance(value, dict):
                     for obj in arr_copy:
                         try:
@@ -2201,7 +2202,7 @@ class Collection:
             reduced_val = {}
             doc_list = list(self.find(condition))
             for doc in doc_list:
-                doc_copy = copy.deepcopy(doc)
+                doc_copy = _clone_document(doc)
                 for doc_key in doc:
                     if isinstance(doc[doc_key], ObjectId):
                         doc_copy[doc_key] = str(doc[doc_key])
@@ -2224,7 +2225,7 @@ class Collection:
                     reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
                     ret_array.append(reduced_val)
             for doc in ret_array:
-                doc_copy = copy.deepcopy(doc)
+                doc_copy = _clone_document(doc)
                 for k in doc:
                     if k not in key and k not in initial:
                         del doc_copy[k]
@@ -2638,7 +2639,7 @@ def _array_filter_applies(filter_spec, filter_id, item):
 
 def _set_updater(doc, field_name, value, codec_options=None):
     if isinstance(value, (tuple, list)):
-        value = copy.deepcopy(value)
+        value = _clone_document(value)
     if BSON:
         # bson validation
         check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION

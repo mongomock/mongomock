@@ -4,6 +4,7 @@ import numbers
 import operator
 import re
 import uuid
+import warnings
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -109,6 +110,29 @@ class _Filterer:
             if key == '$expr':
                 parse_expression = self.parse_expression[0]
                 if not parse_expression(search, document, user_vars=user_vars):
+                    return False
+                continue
+            if key == '$where':
+                _where_expr = search
+                _where_expr = _where_expr.replace('!=', '_NE_')
+                _where_expr = _where_expr.replace('this.', 'doc.')
+                _where_expr = _where_expr.replace('this', 'doc')
+                _where_expr = _where_expr.replace('&&', 'and').replace('||', 'or')
+                _where_expr = _where_expr.replace('!', ' not ')
+                _where_expr = _where_expr.replace('_NE_', '!=')
+                warnings.warn(
+                    '$where uses Python eval() - not a real JS environment. '
+                    'Unsafe for untrusted input.',
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                try:
+                    result = eval(_where_expr, {'__builtins__': {}}, {'doc': _WhereDoc(document)})  # noqa: S307
+                except SyntaxError as exc:
+                    raise OperationFailure(f'$where evaluation error: {exc}') from exc
+                except (NameError, TypeError, AttributeError):
+                    return False
+                if not result:
                     return False
                 continue
             if key in _TOP_LEVEL_OPERATORS:
@@ -599,6 +623,17 @@ class BsonComparable:
 
     def __lt__(self, other):
         return bson_compare(operator.lt, self.obj, other.obj)
+
+
+class _WhereDoc:
+    def __getattr__(self, name):
+        return self.__dict__.get(name)
+
+    def __getitem__(self, name):
+        return self.__dict__.get(name)
+
+    def __init__(self, doc):
+        self.__dict__.update(doc)
 
 
 _filterer_inst = _Filterer()
