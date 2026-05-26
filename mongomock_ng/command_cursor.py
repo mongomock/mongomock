@@ -7,26 +7,32 @@ class CommandCursor:
         self._retrieved = retrieved
         self._batch_size = 0
         self._killed = self._id == 0
+        self._exhausted = False
 
     @property
     def address(self):
         return self._address
 
     def close(self):
-        pass
+        self._killed = True
+        self._exhausted = True
 
     def batch_size(self, batch_size):
         return self
 
     @property
     def alive(self):
-        return True
+        return not self._exhausted
 
     def __iter__(self):
         return self
 
     def next(self):
-        return next(self._collection)
+        try:
+            return next(self._collection)
+        except StopIteration:
+            self._exhausted = True
+            raise
 
     __next__ = next
 
@@ -34,4 +40,5 @@ class CommandCursor:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
         return
