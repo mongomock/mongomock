@@ -616,7 +616,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.insert_one({'_id': id, 'test': [3, 2, 1]})
         self.cmp.compare.find({'_id': id, 'test': {'$regex': '1'}})
 
-    def test__find_by_dotted_attributes(self):
+    def test_find_by_dotted_attributes(self):
         """Test seaching with dot notation."""
         green_bowler = {'name': 'bob', 'hat': {'color': 'green', 'type': 'bowler'}}
         red_bowler = {'name': 'sam', 'hat': {'color': 'red', 'type': 'bowler'}}
@@ -2281,6 +2281,33 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             Code("""
             function(cur, result) { result.count += cur.count }
         """),
+        )
+
+    def test__find_where_multiple_results(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many(
+            [
+                {'name': 'Anya', 'age': 25},
+                {'name': 'Bob', 'age': 35},
+                {'name': 'Eve', 'age': 20},
+            ]
+        )
+        self.cmp.compare_ignore_order.find({'$where': 'this.age >= 21'})
+
+    def test__find_where_combined_query(self):
+        self.cmp.do.delete_many({})
+        self.cmp.do.insert_many(
+            [
+                {'name': 'Anya', 'age': 25},
+                {'name': 'Bob', 'age': 35},
+                {'name': 'Eve', 'age': 20},
+            ]
+        )
+        self.cmp.compare.find(
+            {
+                'age': {'$gte': 21},
+                '$where': 'this.age < 30',
+            }
         )
 
     def test__aggregate_system_variables_generate_array(self):
@@ -5375,6 +5402,60 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                     'as': 'related',
                 }
             }
+        ]
+        self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_lookup_pipeline_sort_limit(self):
+        self.cmp.do.delete_many({})
+        books_cmp = self._create_compare_for_collection('books')
+        books_cmp.do.insert_many(
+            [
+                {'_id': 1, 'book_id': 'apple', 'title': 'C', 'created_at': 3},
+                {'_id': 2, 'book_id': 'apple', 'title': 'A', 'created_at': 1},
+                {'_id': 3, 'book_id': 'apple', 'title': 'B', 'created_at': 2},
+                {'_id': 4, 'book_id': 'banana', 'title': 'D', 'created_at': 5},
+            ]
+        )
+        self.cmp.do.insert_many(
+            [
+                {'_id': 1, 'item': 'apple', 'qty': 5},
+                {'_id': 2, 'item': 'banana', 'qty': 3},
+                {'_id': 3, 'item': 'apple', 'qty': 2},
+            ]
+        )
+        pipeline = [
+            {
+                '$lookup': {
+                    'from': 'books',
+                    'let': {'bookId': '$item'},
+                    'pipeline': [
+                        {'$match': {'$expr': {'$eq': ['$book_id', '$$bookId']}}},
+                        {'$sort': {'created_at': -1}},
+                        {'$limit': 1},
+                    ],
+                    'as': 'top_book',
+                }
+            },
+            {'$addFields': {'top_book': {'$first': '$top_book.title'}}},
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_lookup_pipeline_empty_result(self):
+        self.cmp.do.delete_many({})
+        books_cmp = self._create_compare_for_collection('books')
+        books_cmp.do.insert_one({'_id': 1, 'book_id': 'apple', 'title': 'A'})
+        self.cmp.do.insert_one({'_id': 1, 'item': 'nonexistent'})
+        pipeline = [
+            {
+                '$lookup': {
+                    'from': 'books',
+                    'let': {'bookId': '$item'},
+                    'pipeline': [
+                        {'$match': {'$expr': {'$eq': ['$book_id', '$$bookId']}}},
+                    ],
+                    'as': 'matches',
+                }
+            },
         ]
         self.cmp.compare.aggregate(pipeline)
 
