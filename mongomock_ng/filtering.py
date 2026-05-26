@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 from typing import ClassVar
-from typing import Optional
 
 from sentinels import NOTHING  # type: ignore[import-untyped]
 
@@ -24,9 +23,9 @@ except ImportError:
 
 
 # bson types - available only if bson is installed
-DBRef: Optional[type[Any]] = None
-Regex: Optional[type[Any]] = None
-Decimal128: Optional[type[Any]] = None
+DBRef: type[Any] | None = None
+Regex: type[Any] | None = None
+Decimal128: type[Any] | None = None
 
 try:
     from bson import DBRef as _DBRef
@@ -249,7 +248,7 @@ def iter_key_candidates(key, doc):
     if doc is None:
         return ()
 
-    if isinstance(doc, DBRef) and key == '$id':
+    if DBRef and isinstance(doc, DBRef) and key == '$id':
         return [doc.id]
 
     if isinstance(doc, list):
@@ -320,7 +319,7 @@ def _in_op(doc_val, search_val):
         return any(operator_eq(x, sv) for x in doc_val for sv in search_val) or any(
             operator_eq(doc_val, sv) for sv in search_val
         )
-    for x, is_regex in zip(search_val, is_regex_list):
+    for x, is_regex in zip(search_val, is_regex_list, strict=False):
         if is_regex and _regex(doc_val, x):
             return True
         if any(operator_eq(item, x) for item in doc_val):
@@ -377,7 +376,7 @@ def bson_compare(op, a, b, can_compare_types=True):
         b = [(_get_compare_type(v), k, v) for k, v in b.items()]
 
     if isinstance(a, (tuple, list)):
-        for item_a, item_b in zip(a, b):
+        for item_a, item_b in zip(a, b, strict=False):
             if item_a != item_b:
                 return bson_compare(op, item_a, item_b)
         return bson_compare(op, len(a), len(b))

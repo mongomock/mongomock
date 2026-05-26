@@ -204,3 +204,26 @@ Aqui está uma comparação do que você pode esperar de economia com cada ferra
 Com o RTK cuidando para que o Copilot gaste menos tokens processando o que ele *vê* (inputs), e o Caveman reduzindo o que ele *fala* (outputs), você cria um ambiente muito mais econômico.
 
 O RTK (filtro de comandos) é um ótimo começo. Se você notar que as respostas do seu agente ainda estão muito longas, ativar o modo "caveman" no chat será o passo seguinte para maximizar a economia. Depois de instalar, me diga se rodou tudo certo ou se teve alguma dificuldade na configuração que possamos resolver juntos.
+
+# Contributing
+
+See `README.rst` for general contribution guidelines.
+
+## Container Engine
+
+The Makefile uses a configurable container engine via `.container-engine`.
+
+Set your preferred engine:
+
+```bash
+echo podman > .container-engine   # default
+echo docker > .container-engine
+```
+
+This affects these Makefile targets:
+
+- `make docker-build`
+- `make docker-run`
+- `make docker-hatch-test`
+
+If `.container-engine` doesn't exist, `podman` is used as fallback.

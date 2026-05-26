@@ -54,7 +54,7 @@ path = "mongomock_ng/__version__.py"
 packages = ["mongomock_ng"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
 exclude = [
     ".agents/",
@@ -100,6 +100,7 @@ extend-ignore = [
     "N818",    # Allow exceptions without Error suffix
     "UP006",   # Allow typing.Tuple
     "UP007",   # Allow typing.Union
+    "UP038",   # Allow (X, Y) isinstance syntax (ruff removed this rule in 0.15)
     "PYI024",  # Allow use of collections.namedtuple
     "S101",    # Allow usage of asserts
     # TODO: Remove in future pull-requests

@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.12] - 2026-05-26
+### Added
+- Unique index constraints now enforce per-element uniqueness on array fields (multikey behavior)
+- `create_indexes()` forwards `partialFilterExpression` to `create_index()`
+
+### Fixed
+- `create_index()` with `unique=True` and `partialFilterExpression` skips non-matching documents during duplicate pre-check
+- TTL index expiration now resolves nested dotted field names (e.g., `data.timestamp`) correctly
+
+
 ## [7.5.11] - 2026-05-25
 ### Fixed
 - `$rename` operator now supports dot notation for nested field renaming

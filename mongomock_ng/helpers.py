@@ -12,7 +12,6 @@ from datetime import timedelta
 from datetime import timezone
 from datetime import tzinfo
 from typing import Any
-from typing import Optional
 from urllib.parse import unquote_plus
 
 from packaging import version
@@ -34,7 +33,7 @@ except ImportError:
 # Type declarations
 ObjectId: Any
 SON: Any
-Timestamp: Optional[type[Any]]
+Timestamp: type[Any] | None
 DBRef: Any
 PYMONGO_VERSION: version.Version
 HAVE_PYMONGO: bool
@@ -132,7 +131,7 @@ def print_deprecation_warning(old_param_name, new_param_name):
 
 
 def create_index_list(
-    keys: str | Iterable[str | tuple[str, int]], direction: Optional[int] = None
+    keys: str | Iterable[str | tuple[str, int]], direction: int | None = None
 ) -> list[tuple[str, int]]:
     """Helper to generate a list of (key, direction) pairs.
 

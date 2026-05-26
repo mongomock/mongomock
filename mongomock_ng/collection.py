@@ -680,24 +680,72 @@ class Collection:
         return data['_id']
 
     def _ensure_uniques(self, new_data):
-        # Note we consider new_data is already inserted in db
         for index in self._store.indexes.values():
             if not index.get('unique'):
                 continue
             unique = index.get('key')
             is_sparse = index.get('sparse')
             partial_filter_expression = index.get('partialFilterExpression')
-            find_kwargs = {}
-            for key, _ in unique:
-                value = helpers.get_value_by_dot(new_data, key)
-                find_kwargs[key] = None if value is NOTHING else value
-            if is_sparse and set(find_kwargs.values()) == {None}:
+
+            new_entries = self._compute_index_entries(new_data, unique, is_sparse)
+            if new_entries is None:
                 continue
-            if partial_filter_expression is not None:
-                find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
-            answer_count = len(list(self._iter_documents(find_kwargs)))
-            if answer_count > 1:
-                raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+
+            for doc in self._store.documents:
+                if doc['_id'] == new_data.get('_id'):
+                    continue
+                if partial_filter_expression is not None and not filter_applies(
+                    partial_filter_expression, doc
+                ):
+                    continue
+                doc_entries = self._compute_index_entries(doc, unique, is_sparse)
+                if doc_entries is None:
+                    continue
+                if self._entries_overlap(new_entries, doc_entries):
+                    raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+
+    @staticmethod
+    def _compute_index_entries(doc, unique, is_sparse):
+        values = []
+        has_array = False
+        for key, _order in unique:
+            value = helpers.get_value_by_dot(doc, key)
+            if value is NOTHING:
+                if is_sparse:
+                    return None
+                values.append(None)
+            else:
+                values.append(value)
+                if isinstance(value, (list, tuple)):
+                    has_array = True
+        if is_sparse and all(v is None for v in values):
+            return None
+        if has_array:
+            expanded = [list(v) if isinstance(v, (list, tuple)) else [v] for v in values]
+            return [tuple(combo) for combo in itertools.product(*expanded)]
+        return [tuple(values)]
+
+    @staticmethod
+    def _entries_overlap(a, b):
+        try:
+            return bool(set(a) & set(b))
+        except TypeError:
+            return any(e in b for e in a)
+
+    @staticmethod
+    def _raise_if_duplicate_index(index, indexed, indexed_list, documents_gen):
+        try:
+            if index in indexed:
+                documents_gen.throw(
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
+                )
+            indexed.add(index)
+        except TypeError:
+            if index in indexed_list:
+                documents_gen.throw(
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
+                )
+            indexed_list.append(index)
 
     def _internalize_dict(self, d):
         return {k: copy.deepcopy(v) for k, v in d.items()}
@@ -1917,33 +1965,38 @@ class Collection:
             indexed = set()
             indexed_list = []
             documents_gen = self._store.documents
+            index_partial_filter = config.get('partialFilterExpression')
             for doc in documents_gen:
-                index = []
+                if index_partial_filter is not None and not filter_applies(
+                    index_partial_filter, doc
+                ):
+                    continue
+                values = []
+                has_array = False
+                skip_doc = False
                 for key, _order in index_list:
                     value = helpers.get_value_by_dot(doc, key)
                     if value is NOTHING:
                         if is_sparse:
-                            continue
-                        index.append(None)
+                            skip_doc = True
+                            break
+                        values.append(None)
                     else:
-                        index.append(value)
-                if is_sparse and not index:
+                        values.append(value)
+                        if isinstance(value, (list, tuple)):
+                            has_array = True
+                if skip_doc:
                     continue
-                index = tuple(index)
-                try:
-                    if index in indexed:
-                        # Need to throw this inside the generator so it can clean the locks
-                        documents_gen.throw(
-                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
-                        )
-                    indexed.add(index)
-                except TypeError as err:
-                    # index is not hashable.
-                    if index in indexed_list:
-                        documents_gen.throw(
-                            DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, err
-                        )
-                    indexed_list.append(index)
+                if is_sparse and all(v is None for v in values):
+                    continue
+                if has_array:
+                    expanded = [list(v) if isinstance(v, (list, tuple)) else [v] for v in values]
+                    for combo in itertools.product(*expanded):
+                        index = tuple(combo)
+                        self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
+                else:
+                    index = tuple(values)
+                    self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
 
         self._store.create_index(index_name, config)
 
@@ -1962,6 +2015,7 @@ class Collection:
                 unique=index.document.get('unique', False),
                 sparse=index.document.get('sparse', False),
                 name=index.document.get('name'),
+                partialFilterExpression=index.document.get('partialFilterExpression'),
             )
             for index in indexes
         ]
@@ -2099,7 +2153,7 @@ class Collection:
             else:
                 raise TypeError("'out' must be an instance of string, dict or bson.SON")
             time_millis = (time.perf_counter() - start_time) * 1000
-            full_dict['timeMillis'] = int(round(time_millis))
+            full_dict['timeMillis'] = round(time_millis)
             if full_response:
                 ret_val = full_dict
             return ret_val

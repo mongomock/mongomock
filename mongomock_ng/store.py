@@ -3,6 +3,7 @@ import datetime
 import functools
 
 import mongomock_ng
+from mongomock_ng import helpers
 from mongomock_ng.thread import RWLock
 
 
@@ -159,7 +160,9 @@ class CollectionStore:
             expired_ids = [
                 doc['_id']
                 for doc in self._documents.values()
-                if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
+                if self._value_meets_expiry(
+                    helpers.get_value_by_dot(doc, ttl_field_name), expiry, ttl_now
+                )
             ]
 
         for exp_id in expired_ids:

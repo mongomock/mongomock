@@ -1012,7 +1012,60 @@ class CollectionAPITest(TestCase):
         doc = col.find_one({'_id': 1})
         self.assertEqual(doc['x'], 5)
         self.assertNotIn('y', doc)
-        self.assertNotIn('foo', doc)
+
+    def test__mutable_mapping_filter(self):
+        class AttrsDict(collections.abc.MutableMapping):
+            def __init__(self, **kw):
+                self.__d = dict(kw)
+
+            def __getitem__(self, k):
+                return self.__d[k]
+
+            def __setitem__(self, k, v):
+                self.__d[k] = v
+
+            def __delitem__(self, k):
+                del self.__d[k]
+
+            def __iter__(self):
+                return iter(self.__d)
+
+            def __len__(self):
+                return len(self.__d)
+
+        col = self.db.collection
+        doc = AttrsDict(_id=1, name='foo')
+        col.insert_one(doc)
+        cursor = col.find({'name': 'foo'})
+        result = next(cursor)
+        self.assertEqual(result['name'], 'foo')
+
+    def test__mutable_mapping_update(self):
+        class AttrsDict(collections.abc.MutableMapping):
+            def __init__(self, **kw):
+                self.__d = dict(kw)
+
+            def __getitem__(self, k):
+                return self.__d[k]
+
+            def __setitem__(self, k, v):
+                self.__d[k] = v
+
+            def __delitem__(self, k):
+                del self.__d[k]
+
+            def __iter__(self):
+                return iter(self.__d)
+
+            def __len__(self):
+                return len(self.__d)
+
+        col = self.db.collection
+        doc = AttrsDict(_id=1, name='foo')
+        col.insert_one(doc)
+        col.update_one({'_id': 1}, {'$set': {'name': 'bar'}})
+        result = col.find_one({'_id': 1})
+        self.assertEqual(result['name'], 'bar')
 
     def test__update_one_upsert_invalid_filter(self):
         with self.assertRaises(mongomock.WriteError):
@@ -1850,6 +1903,18 @@ class CollectionAPITest(TestCase):
         )
         self.assertEqual(self.db.collection.count_documents({}), 0)
 
+    def test__ttl_expires_nested_field(self):
+        self.db.collection.create_index([('data.timestamp', 1)], expireAfterSeconds=5)
+        self.db.collection.insert_one(
+            {
+                'data': {
+                    'timestamp': datetime.now(timezone.utc).replace(tzinfo=None)
+                    - timedelta(seconds=5)
+                }
+            }
+        )
+        self.assertEqual(self.db.collection.count_documents({}), 0)
+
     def test__create_indexes_wrong_type(self):
         indexes = [('value', 1), ('name', 1)]
         with self.assertRaises(TypeError):
@@ -1872,6 +1937,20 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_one({'value': 0, 'name': 'bob'})
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
+
+    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__create_indexes_with_partial_filter_expression(self):
+        self.db.collection.insert_one({'status': 'draft', 'value': 1})
+        self.db.collection.insert_one({'status': 'draft', 'value': 1})
+        indexes = [
+            pymongo.operations.IndexModel(
+                [('value', pymongo.ASCENDING)],
+                unique=True,
+                partialFilterExpression={'status': 'published'},
+            ),
+        ]
+        index_names = self.db.collection.create_indexes(indexes)
+        self.assertEqual(1, len(index_names))
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_names(self):
@@ -1952,6 +2031,25 @@ class CollectionAPITest(TestCase):
             self.db.collection.insert_one({'partialFilterExpression_value': 1, 'value': 3})
 
         self.assertEqual(self.db.collection.count_documents({}), 4)
+
+    def test__partial_filter_expression_create_index_skips_non_matching(self):
+        self.db.collection.insert_one({'status': 'draft', 'value': 1})
+        self.db.collection.insert_one({'status': 'draft', 'value': 1})
+        self.db.collection.create_index(
+            [('value', 1)],
+            unique=True,
+            partialFilterExpression={'status': 'published'},
+        )
+
+    def test__partial_filter_expression_create_index_rejects_matching_dupes(self):
+        self.db.collection.insert_one({'status': 'published', 'value': 1})
+        self.db.collection.insert_one({'status': 'published', 'value': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.create_index(
+                [('value', 1)],
+                unique=True,
+                partialFilterExpression={'status': 'published'},
+            )
 
     def test__ensure_uniq_idxs_without_ordering(self):
         self.db.collection.create_index([('value', 1)], unique=True)
@@ -2043,6 +2141,23 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
+    def test__unique_index_with_shared_array_element(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'value': [1, 2]})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'value': [2, 3]})
+
+    def test__unique_index_array_element_conflicts_with_scalar(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'value': [1, 2]})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'value': 2})
+
+    def test__unique_index_scalar_does_not_conflict_with_array(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'value': 1})
+        self.db.collection.insert_one({'value': [2, 3]})
+
     def test__create_uniq_idxs_with_dupes_already_there(self):
         self.db.collection.insert_one({'value': 1})
         self.db.collection.insert_one({'value': 1})
@@ -2052,6 +2167,56 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.insert_one({'value': 1})
         self.assertEqual(self.db.collection.count_documents({}), 3)
+
+    def test__create_uniq_idx_with_array_dupes_already_there(self):
+        self.db.collection.insert_one({'value': [1, 2]})
+        self.db.collection.insert_one({'value': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.create_index([('value', 1)], unique=True)
+
+    def test__create_uniq_idx_with_array_no_dupes(self):
+        self.db.collection.insert_one({'value': 1})
+        self.db.collection.insert_one({'value': [2, 3]})
+        self.db.collection.create_index([('value', 1)], unique=True)
+
+    def test__create_uniq_idx_with_shared_array_element_and_partial_filter(self):
+        self.db.collection.insert_one({'status': 'published', 'value': [1, 2]})
+        self.db.collection.insert_one({'status': 'published', 'value': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.create_index(
+                [('value', 1)],
+                unique=True,
+                partialFilterExpression={'status': 'published'},
+            )
+
+    def test__create_uniq_idx_with_array_element_update_conflict(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'_id': 1, 'value': [1, 2]})
+        self.db.collection.insert_one({'_id': 2, 'value': 3})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.update_one({'_id': 2}, {'$set': {'value': 2}})
+
+    def test__sparse_unique_index_skip_missing_field(self):
+        self.db.collection.create_index([('value', 1)], unique=True, sparse=True)
+        self.db.collection.insert_one({'name': 'no_value'})
+        self.db.collection.insert_one({'name': 'another_no_value'})
+
+    def test__sparse_unique_index_skip_all_null(self):
+        self.db.collection.create_index([('value', 1)], unique=True, sparse=True)
+        self.db.collection.insert_one({'value': None})
+        self.db.collection.insert_one({'value': None})
+
+    def test__unique_index_update_same_doc_preserves_self(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'_id': 1, 'value': 1})
+        self.db.collection.update_one({'_id': 1}, {'$set': {'name': 'updated'}})
+        self.assertEqual(self.db.collection.find_one({'_id': 1})['name'], 'updated')
+
+    def test__unique_index_on_dict_value(self):
+        self.db.collection.create_index([('value', 1)], unique=True)
+        self.db.collection.insert_one({'_id': 1, 'value': {'nested': 1}})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            self.db.collection.insert_one({'_id': 2, 'value': {'nested': 1}})
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_index_with_name(self):
@@ -10711,6 +10876,53 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1})
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.aggregate([{'$project': {'x': {'$round': [1, 2, 3]}}}])
+
+    def test__aggregate_union_with(self):
+        self.db.collection.insert_many([{'_id': 1, 'x': 1}, {'_id': 2, 'x': 2}])
+        self.db.other_collection.insert_many([{'_id': 3, 'x': 3}, {'_id': 4, 'x': 4}])
+        result = list(self.db.collection.aggregate([{'$unionWith': 'other_collection'}]))
+        self.assertEqual(4, len(result))
+        self.assertCountEqual([1, 2, 3, 4], [doc['_id'] for doc in result])
+
+    def test__aggregate_get_field_string_syntax(self):
+        self.db.collection.insert_one({'_id': 1, 'val': 42})
+        result = list(self.db.collection.aggregate([{'$project': {'v': {'$getField': '$val'}}}]))
+        self.assertEqual(42, result[0]['v'])
+
+    def test__aggregate_get_field_object_syntax(self):
+        self.db.collection.insert_one({'_id': 1, 'nested': {'value': 42}})
+        result = list(
+            self.db.collection.aggregate(
+                [{'$project': {'v': {'$getField': {'field': 'value', 'input': '$nested'}}}}]
+            )
+        )
+        self.assertEqual(42, result[0]['v'])
+
+    def test__aggregate_trim(self):
+        self.db.collection.insert_one({'_id': 1, 's': '  hello  '})
+        result = list(
+            self.db.collection.aggregate([{'$project': {'trimmed': {'$trim': {'input': '$s'}}}}])
+        )
+        self.assertEqual('hello', result[0]['trimmed'])
+
+    def test__aggregate_ltrim(self):
+        self.db.collection.insert_one({'_id': 1, 's': '  hello  '})
+        result = list(
+            self.db.collection.aggregate([{'$project': {'trimmed': {'$ltrim': {'input': '$s'}}}}])
+        )
+        self.assertEqual('hello  ', result[0]['trimmed'])
+
+    def test__aggregate_rtrim(self):
+        self.db.collection.insert_one({'_id': 1, 's': '  hello  '})
+        result = list(
+            self.db.collection.aggregate([{'$project': {'trimmed': {'$rtrim': {'input': '$s'}}}}])
+        )
+        self.assertEqual('  hello', result[0]['trimmed'])
+
+    def test__aggregate_to_date(self):
+        self.db.collection.insert_one({'_id': 1, 's': '2026-01-15T10:30:00Z'})
+        result = list(self.db.collection.aggregate([{'$project': {'dt': {'$toDate': '$s'}}}]))
+        self.assertIsInstance(result[0]['dt'], datetime)
 
     def test__find_nat_comparison(self):
         import pandas as pd

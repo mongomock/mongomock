@@ -32,17 +32,19 @@ fix:
 hatch-test:
 	hatch test
 
+ENGINE ?= $(shell cat .container-engine 2>/dev/null || echo podman)
+
 # Docker helpers (README: docker compose build / run)
 docker-build:
-	docker compose build
+	$(ENGINE) compose build
 
 docker-run:
-	docker compose run --rm mongomock_ng
+	$(ENGINE) compose run --rm mongomock_ng
 
 # Run tests inside the docker service (customizable: PYTHON, PYMONGO, TEST)
 # Usage: make docker-hatch-test PYTHON=3.12 PYMONGO=4 TEST="tests/..."
 docker-hatch-test:
-	docker compose run --rm mongomock_ng hatch test -py=${PYTHON} -i pymongo=${PYMONGO} ${TEST}
+	$(ENGINE) compose run --rm mongomock_ng hatch test -py=${PYTHON} -i pymongo=${PYMONGO} ${TEST}
 
 
 # Build distribution packages locally for testing.

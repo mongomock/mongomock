@@ -86,3 +86,13 @@
 - `collection.py:_bit_updater` — `$bit` on existing non-int field silently coerces instead of raising error. Should validate `doc_value` is int before bitwise op.
 - `collection.py:_bit_updater` — `$bit` on nonexistent field treats as `0` (matches MongoDB ✅)
 - `aggregate.py:745` — bitwise aggregation ops (`$bitAnd`/`$bitOr`/`$bitXor`) accept `bool` subtypes (`isinstance(True, int)` is `True` in Python). MongoDB would reject bool. Should add `type(x) is int` check.
+- `store.py:162` — `doc.get(ttl_field_name)` does not resolve nested dotted field names (e.g., `data.timestamp`). Fixed in 7.5.12 by replacing with `helpers.get_value_by_dot`.
+
+## Not Tracked (explicitly absent)
+- changeStreams
+- timeseries collections
+- clustered indexes
+- unique multikey indexes on array fields — fixed in 7.5.12 by expanding array values into per-element key entries in `_ensure_uniques` and `create_index`
+- Queryable Encryption (QE)
+- Atlas Search (`$search`, `$vectorSearch`)
+- MongoDB 7.0+ new query operators not yet encountered

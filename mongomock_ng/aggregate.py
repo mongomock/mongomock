@@ -16,7 +16,6 @@ import statistics
 import warnings
 from typing import Any
 from typing import ClassVar
-from typing import Optional
 
 import pytz
 from packaging import version
@@ -31,7 +30,7 @@ from . import OperationFailure
 
 
 # bson types - available only if bson is installed
-Regex: Optional[type[Any]] = None
+Regex: type[Any] | None = None
 InvalidDocument: type[Exception] = OperationFailure
 InvalidId: type[Exception] = OperationFailure
 decimal_support: bool = False
@@ -322,7 +321,7 @@ def _truncate_date(value: datetime.datetime, unit: str) -> datetime.datetime:
 
 def _handle_date_add_operator(
     operator: str, values: Any, out_value: dict[str, Any]
-) -> Optional[datetime.datetime]:
+) -> datetime.datetime | None:
     if not isinstance(values, dict) or not {'startDate', 'amount', 'unit'} <= set(values):
         raise OperationFailure(
             f'{operator} operator must correspond a dict'
@@ -350,7 +349,7 @@ def _handle_date_add_operator(
     return _add_to_date(out_value['startDate'], out_value['unit'], amount)
 
 
-def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> Optional[int]:
+def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> int | None:
     if not isinstance(values, dict) or not {'startDate', 'endDate', 'unit'} <= set(values):
         raise OperationFailure(
             '$dateDiff operator must correspond a dict'
@@ -404,12 +403,10 @@ def _handle_date_diff_operator(values: Any, out_value: dict[str, Any]) -> Option
     return math.floor(result)
 
 
-def _handle_date_trunc_operator(
-    values: Any, out_value: dict[str, Any]
-) -> Optional[datetime.datetime]:
+def _handle_date_trunc_operator(values: Any, out_value: dict[str, Any]) -> datetime.datetime | None:
     if not isinstance(values, dict) or not {'date', 'unit'} <= set(values):
         raise OperationFailure(
-            '$dateTrunc operator must correspond a dictthat has "unit" and "date" fields.'
+            '$dateTrunc operator must correspond a dict that has "unit" and "date" fields.'
         )
     unsupported_fields = {'binSize', 'startOfWeek', 'timezone'} & set(values)
     if unsupported_fields:
@@ -1276,7 +1273,7 @@ class _Parser:
                     f'First argument to $slice must be an array, but is of '
                     f'type: {type(array_value)}'
                 )
-            for num, v in zip(('Second', 'Third'), out_value[1:]):
+            for num, v in zip(('Second', 'Third'), out_value[1:], strict=False):
                 if not isinstance(v, int):
                     raise OperationFailure(
                         f'{num} argument to $slice must be numeric, but is of type: {type(v)}'
@@ -2617,7 +2614,7 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
         if not new_fields_collection:
             new_fields_collection = [{} for unused_doc in in_collection]
 
-        for in_doc, out_doc in zip(in_collection, new_fields_collection):
+        for in_doc, out_doc in zip(in_collection, new_fields_collection, strict=False):
             out_value = _parse_expression(value, in_doc, user_vars=user_vars)
             if out_value is not NOTHING:
                 out_doc[field] = out_value
@@ -2634,7 +2631,7 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
         for doc in in_collection
     ]
     if new_fields_collection:
-        return [dict(a, **b) for a, b in zip(out_collection, new_fields_collection)]
+        return [dict(a, **b) for a, b in zip(out_collection, new_fields_collection, strict=False)]
     return out_collection
 
 
@@ -2687,7 +2684,7 @@ def _handle_add_fields_stage(in_collection, unused_database, options, user_vars)
         )
     out_collection = [dict(doc) for doc in in_collection]
     for field, value in options.items():
-        for in_doc, out_doc in zip(in_collection, out_collection):
+        for in_doc, out_doc in zip(in_collection, out_collection, strict=False):
             out_value = _parse_expression(value, in_doc, user_vars=user_vars)
             if out_value is NOTHING:
                 continue

@@ -286,7 +286,7 @@ class Database:
         if 'ping' in command:
             return {'ok': 1.0}
         if 'ismaster' in command or 'isMaster' in command:
-            host, port = self.client.address
+            _host, _port = self.client.address
             return {
                 'ismaster': True,
                 'secondary': False,

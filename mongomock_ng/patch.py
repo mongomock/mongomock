@@ -80,7 +80,7 @@ def patch(servers='localhost', on_new='error'):
             # TODO(pcorpet): Only wait when trying to access the server's data.
             time.sleep(kwargs.get('serverSelectionTimeoutMS', 30000))
             raise pymongo.errors.ServerSelectionTimeoutError(
-                '%s:%d: [Errno 111] Connection refused' % client.address
+                f'{client.address[0]}:{client.address[1]}: [Errno 111] Connection refused'
             )
 
         if on_new == 'pymongo':
