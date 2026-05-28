@@ -75,6 +75,10 @@ from . import ObjectId
 from . import OperationFailure
 from . import WriteError
 from .filtering import filter_applies
+from .geospatial import extract_near_specs
+from .geospatial import near_filter
+from .geospatial import parse_geojson
+from .geospatial import validate_geojson
 from .helpers import _clone_document
 from .not_implemented import raise_for_feature as raise_not_implemented
 from .results import BulkWriteResult
@@ -1419,7 +1423,33 @@ class Collection:
         )
 
     def _get_dataset(self, spec, sort, fields, as_class):
-        dataset = self._iter_documents(spec)
+        near_specs, clean_spec = extract_near_specs(spec) if spec else ([], spec)
+        dataset = self._iter_documents(clean_spec if near_specs else spec)
+        if near_specs and not sort:
+            docs_with_dist = []
+            for doc in dataset:
+                distances = []
+                for field_path, near_info in near_specs:
+                    doc_val = filtering.resolve_key(field_path, doc)
+                    if doc_val is NOTHING:
+                        continue
+                    try:
+                        doc_geo = parse_geojson(doc_val)
+                        validate_geojson(doc_geo)
+                    except Exception:  # noqa: S112
+                        continue
+                    is_match, dist = near_filter(
+                        doc_geo,
+                        near_info['query_point'],
+                        max_distance=near_info.get('max_distance'),
+                        min_distance=near_info.get('min_distance'),
+                        spherical=near_info.get('spherical', False),
+                    )
+                    if is_match and dist is not None:
+                        distances.append(dist)
+                if distances:
+                    docs_with_dist.append((min(distances), doc))
+            dataset = (doc for _, doc in sorted(docs_with_dist, key=lambda x: x[0]))
         if sort:
             if isinstance(sort, dict):
                 sort = sort.items()

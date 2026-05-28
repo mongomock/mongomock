@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.6.0] - 2026-05-28
+### Added
+- Geospatial query operators: `$geoIntersects` and `$geoWithin` for Point-in-Polygon and Polygon intersection queries
+- Geospatial distance operators: `$near` and `$nearSphere` for proximity queries with distance filtering
+- `$geoNear` aggregation stage for geospatial aggregation pipelines
+- Pure Python GeoJSON support: Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, GeometryCollection
+- Point-in-polygon ray casting algorithm with hole (inner ring) support
+- Haversine distance calculations for spherical geometry
+- Euclidean distance calculations for planar geometry
+- GeoJSON coordinate validation (longitude [-180, 180], latitude [-90, 90])
+- Distance-based sorting on `$near` queries (implicit unless explicit `.sort()` provided)
+- Support for `$maxDistance` and `$minDistance` constraints on proximity queries
+
 ## [7.5.14] - 2026-05-28
 ### Added
 - Document validation on collections via `validator` option on `create_collection` and `collMod` command (mongomock#704)

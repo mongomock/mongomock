@@ -27,6 +27,10 @@ from . import command_cursor
 from . import filtering
 from . import helpers
 from . import OperationFailure
+from .geospatial import haversine_distance
+from .geospatial import parse_geojson
+from .geospatial import point_from_geojson
+from .geospatial import validate_geojson
 
 
 # bson types - available only if bson is installed
@@ -2813,6 +2817,83 @@ def _handle_merge_stage(in_collection, database, options, unused_user_vars):
     return in_collection
 
 
+def _handle_geonear_stage(in_collection, database, options, user_vars):
+    if not isinstance(options, dict):
+        raise OperationFailure('$geoNear requires an object')
+    near_raw = options.get('near')
+    if near_raw is None:
+        raise OperationFailure("Missing 'near' field in $geoNear")
+    spherical = options.get('spherical', False)
+    distance_field = options.get('distanceField')
+    if not distance_field:
+        raise OperationFailure("Missing 'distanceField' in $geoNear")
+    max_distance = options.get('maxDistance')
+    min_distance = options.get('minDistance')
+    limit = options.get('limit') or options.get('num')
+    key = options.get('key')
+    query = options.get('query')
+
+    if isinstance(near_raw, (list, tuple)):
+        if len(near_raw) < 2:
+            raise OperationFailure('$geoNear near requires a point')
+        query_point = (float(near_raw[0]), float(near_raw[1]))
+        from .geospatial import validate_coord_range
+
+        validate_coord_range(query_point[0], query_point[1])
+    else:
+        near_geo = parse_geojson(near_raw)
+        if near_geo['type'] != 'Point':
+            raise OperationFailure('$geoNear near must be a Point')
+        validate_geojson(near_geo)
+        query_point = point_from_geojson(near_geo)
+        if not spherical:
+            spherical = True
+
+    def get_geo_point(doc):
+        if key:
+            val = filtering.resolve_key(key, doc)
+        else:
+            for field in ('location', 'geo', 'coordinates', 'loc'):
+                val = filtering.resolve_key(field, doc)
+                if val is not NOTHING:
+                    break
+            else:
+                return None
+        if val is NOTHING:
+            return None
+        try:
+            geo = parse_geojson(val)
+            validate_geojson(geo)
+        except Exception:
+            return None
+        if geo['type'] != 'Point':
+            return None
+        return point_from_geojson(geo)
+
+    results = []
+    for doc in in_collection:
+        if query and not filtering.filter_applies(query, doc):
+            continue
+        pt = get_geo_point(doc)
+        if pt is None:
+            continue
+        if spherical:
+            dist = haversine_distance(query_point[0], query_point[1], pt[0], pt[1])
+        else:
+            dist = math.sqrt((query_point[0] - pt[0]) ** 2 + (query_point[1] - pt[1]) ** 2)
+        if min_distance is not None and dist < min_distance:
+            continue
+        if max_distance is not None and dist > max_distance:
+            continue
+        new_doc = dict(doc)
+        new_doc[distance_field] = dist
+        results.append(new_doc)
+    results.sort(key=lambda x: x[distance_field])
+    if limit is not None:
+        results = results[:limit]
+    return results
+
+
 def _handle_count_stage(in_collection, database, options, unused_user_vars):
     if not isinstance(options, str) or options == '':
         raise OperationFailure('the count field must be a non-empty string')
@@ -2897,7 +2978,7 @@ _PIPELINE_HANDLERS = {
     '$count': _handle_count_stage,
     '$currentOp': None,
     '$facet': _handle_facet_stage,
-    '$geoNear': None,
+    '$geoNear': _handle_geonear_stage,
     '$graphLookup': _handle_graph_lookup_stage,
     '$group': _handle_group_stage,
     '$setWindowFields': _handle_set_window_fields_stage,

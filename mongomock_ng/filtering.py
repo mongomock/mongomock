@@ -13,6 +13,10 @@ from typing import ClassVar
 from sentinels import NOTHING  # type: ignore[import-untyped]
 
 from . import OperationFailure
+from .geospatial import geo_intersects
+from .geospatial import geo_within
+from .geospatial import parse_geojson
+from .geospatial import validate_geojson
 from .helpers import ObjectId
 from .helpers import RE_TYPE
 
@@ -49,12 +53,6 @@ _NOT_IMPLEMENTED_OPERATORS = {
     '$bitsAllSet',
     '$bitsAnyClear',
     '$bitsAnySet',
-    '$geoIntersects',
-    '$geoWithin',
-    '$maxDistance',
-    '$minDistance',
-    '$near',
-    '$nearSphere',
 }
 
 
@@ -65,6 +63,42 @@ def filter_applies(search_filter, document, user_vars=None):
     and other related scenarios (like $elemMatch)
     """
     return _filterer_inst.apply(search_filter, document, user_vars=user_vars)
+
+
+def _geo_intersects_op(doc_value, spec_value):
+    if not isinstance(spec_value, dict) or '$geometry' not in spec_value:
+        raise OperationFailure('$geoIntersects requires a $geometry field')
+    try:
+        query_geo = parse_geojson(spec_value['$geometry'])
+    except Exception as e:
+        raise OperationFailure('$geoIntersects requires a valid GeoJSON object') from e
+    validate_geojson(query_geo)
+    if doc_value is None or not isinstance(doc_value, dict):
+        return False
+    try:
+        doc_geo = parse_geojson(doc_value)
+        validate_geojson(doc_geo)
+    except Exception:
+        return False
+    return geo_intersects(doc_geo, query_geo)
+
+
+def _geo_within_op(doc_value, spec_value):
+    if not isinstance(spec_value, dict) or '$geometry' not in spec_value:
+        raise OperationFailure('$geoWithin requires a $geometry field')
+    try:
+        query_geo = parse_geojson(spec_value['$geometry'])
+    except Exception as e:
+        raise OperationFailure('$geoWithin requires a valid GeoJSON object') from e
+    validate_geojson(query_geo)
+    if doc_value is None or not isinstance(doc_value, dict):
+        return False
+    try:
+        doc_geo = parse_geojson(doc_value)
+        validate_geojson(doc_geo)
+    except Exception:
+        return False
+    return geo_within(doc_geo, query_geo)
 
 
 class _Filterer:
@@ -86,6 +120,8 @@ class _Filterer:
                 '$elemMatch': self._elem_match_op,
                 '$size': _size_op,
                 '$type': _type_op,
+                '$geoIntersects': _geo_intersects_op,
+                '$geoWithin': _geo_within_op,
             },
             **{
                 key: _not_nothing_and(_list_expand(_compare_objects(op)))

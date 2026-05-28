@@ -8917,18 +8917,7 @@ class CollectionAPITest(TestCase):
     def test__not_implemented_operator(self):
         collection = self.db.collection
         with self.assertRaises(NotImplementedError):
-            collection.find_one(
-                {
-                    'geometry': {
-                        '$geoIntersects': {
-                            '$geometry': {
-                                'coordinates': [-122.4194, 37.7749],
-                                'type': "<GeoJSONGeometryType.Point: 'Point'>",
-                            }
-                        }
-                    }
-                }
-            )
+            collection.find_one({'field': {'$bitsAllClear': 5}})
 
     def test__not_implemented_methods(self):
         collection = self.db.collection
