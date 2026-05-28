@@ -1448,6 +1448,8 @@ class Collection:
                     if is_match and dist is not None:
                         distances.append(dist)
                 if distances:
+                    # When multiple $near specs exist, sort by min(distance).
+                    # This makes the first $near field primary for sort order.
                     docs_with_dist.append((min(distances), doc))
             dataset = (doc for _, doc in sorted(docs_with_dist, key=lambda x: x[0]))
         if sort:

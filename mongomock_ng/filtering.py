@@ -78,7 +78,7 @@ def _geo_intersects_op(doc_value, spec_value):
     try:
         doc_geo = parse_geojson(doc_value)
         validate_geojson(doc_geo)
-    except Exception:
+    except (OperationFailure, ValueError, TypeError):
         return False
     return geo_intersects(doc_geo, query_geo)
 
@@ -96,7 +96,7 @@ def _geo_within_op(doc_value, spec_value):
     try:
         doc_geo = parse_geojson(doc_value)
         validate_geojson(doc_geo)
-    except Exception:
+    except (OperationFailure, ValueError, TypeError):
         return False
     return geo_within(doc_geo, query_geo)
 
