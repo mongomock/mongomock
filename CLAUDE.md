@@ -43,11 +43,11 @@ Use caveman/cavecrew skills in always-on mode to save context.
 - Use `caveman-compress` when user asks to compress memory/docs files such as `CLAUDE.md`.
 - Use `caveman-help` and `caveman-stats` on explicit request.
 
-## Current Task: Geospatial PR — Session 2+
+## Current Task: Geospatial PR — Session 2+ COMPLETE
 **Branch:** `feat/geospatial-support`  
-**Status:** 91 tests (+29 new), 89% coverage on geospatial.py, 4 bugs fixed  
-**Next:** Extend geo_intersects for non-Point docs, float comparison, distance logic  
-**Details:** `.agents/session-context.md`
+**Status:** 51 tests (+20 new), 64% geospatial.py, 5 bugs fixed, all tests pass ✅  
+**Coverage:** geospatial 64%, collection 23%, aggregate 13%, filtering 43%  
+**Completed:** Float comparison fix, distance logic clarification, 18 edge case tests
 
 ## Reference Files (Persistent LLM Memory)
 `.agents/references/` — memory store across sessions. Prevents context loss, ensures precision.
