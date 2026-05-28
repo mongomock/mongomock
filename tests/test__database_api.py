@@ -347,6 +347,46 @@ class DatabaseAPITest(TestCase):
         col.insert_one({'foo': 'bar'})
         self.assertEqual(set(self.database.list_collection_names()), {'a'})
 
+    def test__create_collection_with_validator(self):
+        coll = self.database.create_collection('validated', validator={'a': {'$type': 'int'}})
+        opts = coll.options()
+        self.assertEqual(opts.get('validator'), {'a': {'$type': 'int'}})
+        self.assertEqual(opts.get('validationLevel'), 'strict')
+        self.assertEqual(opts.get('validationAction'), 'error')
+
+    def test__create_collection_unsupported_option(self):
+        with self.assertRaises(NotImplementedError):
+            self.database.create_collection('bad', unsupported=True)
+
+    def test__collmod_validator(self):
+        coll = self.database.create_collection('opts1')
+        self.database.command('collMod', 'opts1', validator={'b': {'$type': 'string'}})
+        opts = coll.options()
+        self.assertEqual(opts.get('validator'), {'b': {'$type': 'string'}})
+
+    def test__collmod_nonexistent_collection(self):
+        with self.assertRaises(mongomock.OperationFailure):
+            self.database.command('collMod', 'noexist', validator={})
+
+    def test__collmod_unsupported_option(self):
+        self.database.create_collection('opts1')
+        with self.assertRaises(NotImplementedError):
+            self.database.command('collMod', 'opts1', fake_opt=1)
+
+    def test__collmod_empty_validator(self):
+        coll = self.database.create_collection('opts1')
+        self.database.command('collMod', 'opts1', validator={'a': {'$type': 'int'}})
+        self.database.command('collMod', 'opts1', validator={})
+        opts = coll.options()
+        self.assertNotIn('validator', opts)
+
+    def test__collmod_sets_validation_defaults(self):
+        coll = self.database.create_collection('opts1')
+        self.database.command('collMod', 'opts1', validator={'a': {'$type': 'int'}})
+        opts = coll.options()
+        self.assertEqual(opts.get('validationLevel'), 'strict')
+        self.assertEqual(opts.get('validationAction'), 'error')
+
     def test__equality(self):
         self.assertEqual(self.database, self.database)
         client = mongomock.MongoClient('localhost')

@@ -177,6 +177,20 @@ def validate_write_concern_params(**params):
         WriteConcern(**params)
 
 
+def validate_against_validator(document, options):
+    validator = options.get('validator')
+    validation_level = options.get('validationLevel', 'strict')
+    validation_action = options.get('validationAction', 'error')
+
+    if not validator or validation_level == 'off' or validation_action == 'warn':
+        return
+
+    from .filtering import filter_applies
+
+    if not filter_applies(validator, document):
+        raise WriteError('Document failed validation', code=121)
+
+
 class BulkWriteOperation:
     def __init__(self, builder, selector, is_upsert=False):
         self.builder = builder
@@ -597,7 +611,10 @@ class Collection:
 
         if not bypass_document_validation:
             validate_is_mutable_mapping('document', document)
-        return InsertOneResult(self._insert(document, session), acknowledged=True)
+        return InsertOneResult(
+            self._insert(document, session, validate=not bypass_document_validation),
+            acknowledged=True,
+        )
 
     def insert_many(self, documents, ordered=True, bypass_document_validation=False, session=None):
         if not isinstance(documents, Iterable) or not documents:
@@ -607,14 +624,17 @@ class Collection:
             for document in documents:
                 validate_is_mutable_mapping('document', document)
         return InsertManyResult(
-            self._insert(documents, session, ordered=ordered), acknowledged=True
+            self._insert(
+                documents, session, ordered=ordered, validate=not bypass_document_validation
+            ),
+            acknowledged=True,
         )
 
     @property
     def _store(self):
         return self._db_store[self._name]
 
-    def _insert(self, data, session=None, ordered=True):
+    def _insert(self, data, session=None, ordered=True, validate=True):
         if session:
             raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
         if not isinstance(data, Mapping):
@@ -623,7 +643,7 @@ class Collection:
             num_inserted = 0
             for index, item in enumerate(data):
                 try:
-                    results.append(self._insert(item))
+                    results.append(self._insert(item, validate=validate))
                 except WriteError as error:
                     write_errors.append(
                         {
@@ -670,6 +690,9 @@ class Collection:
             raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
         data = helpers.patch_datetime_awareness_in_document(data)
+
+        if validate:
+            validate_against_validator(data, self.options())
 
         self._store[object_id] = data
         try:
@@ -760,6 +783,9 @@ class Collection:
             sub_doc = sub_doc[part]
         return True
 
+    def options(self):
+        return copy.deepcopy(self._store.options)
+
     def update_one(
         self,
         filter,
@@ -787,6 +813,7 @@ class Collection:
                 array_filters=array_filters,
                 let=let,
                 sort=sort,
+                validate=not bypass_document_validation,
             ),
             acknowledged=True,
         )
@@ -816,6 +843,7 @@ class Collection:
                 collation=collation,
                 array_filters=array_filters,
                 let=let,
+                validate=not bypass_document_validation,
             ),
             acknowledged=True,
         )
@@ -833,7 +861,15 @@ class Collection:
         if not bypass_document_validation:
             validate_ok_for_replace(replacement)
         return UpdateResult(
-            self._update(filter, replacement, upsert=upsert, hint=hint, session=session, sort=sort),
+            self._update(
+                filter,
+                replacement,
+                upsert=upsert,
+                hint=hint,
+                session=session,
+                sort=sort,
+                validate=not bypass_document_validation,
+            ),
             acknowledged=True,
         )
 
@@ -870,6 +906,7 @@ class Collection:
         let=None,
         array_filters=None,
         sort=None,
+        validate=True,
         **kwargs,
     ):
         if session:
@@ -909,11 +946,13 @@ class Collection:
 
         self._current_array_filters = array_filters or []
         try:
-            return self._update_documents(spec, document, upsert, multi, sort, session)
+            return self._update_documents(
+                spec, document, upsert, multi, sort, session, validate=validate
+            )
         finally:
             self._current_array_filters = None
 
-    def _update_documents(self, spec, document, upsert, multi, sort, session=None):
+    def _update_documents(self, spec, document, upsert, multi, sort, session=None, validate=True):
         updated_existing = False
         upserted_id = None
         num_updated = 0
@@ -951,7 +990,7 @@ class Collection:
                 self._apply_update_document(existing_document, spec, document, was_insert)
 
             if was_insert:
-                upserted_id = self._insert(existing_document)
+                upserted_id = self._insert(existing_document, validate=validate)
                 num_updated += 1
             elif existing_document != original_document_snapshot:
                 if original_document_snapshot.get('_id') != existing_document.get('_id'):
@@ -960,6 +999,21 @@ class Collection:
                         "After applying the update, the (immutable) field '_id' was found to have "
                         'been altered to _id: {}'.format(existing_document.get('_id'))
                     )
+                if validate:
+                    options = self.options()
+                    validation_level = options.get('validationLevel', 'strict')
+                    if validation_level == 'moderate':
+                        try:
+                            validate_against_validator(original_document_snapshot, options)
+                        except WriteError:
+                            validate = False
+
+                if validate:
+                    try:
+                        validate_against_validator(existing_document, options)
+                    except WriteError:
+                        self._store[original_document_snapshot['_id']] = original_document_snapshot
+                        raise
                 try:
                     self._ensure_uniques(existing_document)
                     self._store[existing_document['_id']] = existing_document

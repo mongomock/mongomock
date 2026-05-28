@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.5.14] - 2026-05-28
+### Added
+- Document validation on collections via `validator` option on `create_collection` and `collMod` command (mongomock#704)
+- `Collection.options()` method returns collection options including validator
+- Documents validated on insert/update against JSON Schema-like validator expressions
+- `validationLevel` support: `strict` (default) and `moderate`
+- `validationAction` support: `error` (default) and `warn` (no-op)
+- `bypass_document_validation` flag on insert/update operations as per MongoDB API
+
 ## [7.5.13] - 2026-05-26
 ### Added
 - `$where` operator support with Python-based evaluation (simple `this.field` expressions)

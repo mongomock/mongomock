@@ -1,6 +1,7 @@
 import collections
 import datetime
 import functools
+from typing import ClassVar
 
 import mongomock_ng
 from mongomock_ng import helpers
@@ -46,9 +47,9 @@ class DatabaseStore:
     def list_created_collection_names(self):
         return [name for name, col in self._collections.items() if col.is_created]
 
-    def create_collection(self, name):
+    def create_collection(self, name, **options):
         col = self[name]
-        col.create()
+        col.create(**options)
         return col
 
     def rename(self, name, new_name):
@@ -64,17 +65,28 @@ class DatabaseStore:
 class CollectionStore:
     """Object holding the data for a collection."""
 
+    _supported_options: ClassVar[set[str]] = {'validator', 'validationLevel', 'validationAction'}
+
     def __init__(self, name):
         self._documents = collections.OrderedDict()
         self.indexes = {}
         self._is_force_created = False
         self.name = name
         self._ttl_indexes = {}
+        self.options = {}
 
         # 694 - Lock for safely iterating and mutating OrderedDicts
         self._rwlock = RWLock()
 
-    def create(self):
+    def create(self, **options):
+        for key in options:
+            if key not in self._supported_options:
+                raise NotImplementedError(f'Unsupported collection option: {key}')
+        self.options.update(options)
+        validation_opts = {'validator', 'validationLevel', 'validationAction'}
+        if validation_opts.intersection(options):
+            self.options.setdefault('validationLevel', 'strict')
+            self.options.setdefault('validationAction', 'error')
         self._is_force_created = True
 
     @property

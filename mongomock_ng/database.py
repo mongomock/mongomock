@@ -245,10 +245,7 @@ class Database:
         if name in self.list_collection_names():
             raise CollectionInvalid(f'collection {name} already exists')
 
-        if kwargs:
-            raise NotImplementedError('Special options not supported')
-
-        self._store.create_collection(name)
+        self._store.create_collection(name, **kwargs)
         return self[name]
 
     def rename_collection(self, name, new_name, dropTarget=False):  # noqa: N803
@@ -280,11 +277,24 @@ class Database:
             )
         return self[dbref.collection].find_one({'_id': dbref.id})
 
-    def command(self, command, **unused_kwargs):
+    def command(
+        self,
+        command,
+        value=1,
+        check=True,
+        allowable_errors=None,
+        read_preference=None,
+        codec_options=None,
+        session=None,
+        **kwargs,
+    ):
         if isinstance(command, str):
-            command = {command: 1}
+            command = {command: value}
+        command.update(kwargs)
         if 'ping' in command:
             return {'ok': 1.0}
+        if 'collMod' in command:
+            return self._command_collmod(command)
         if 'ismaster' in command or 'isMaster' in command:
             _host, _port = self.client.address
             return {
@@ -292,11 +302,37 @@ class Database:
                 'secondary': False,
                 'ok': 1.0,
             }
-        # TODO(pascal): Differentiate NotImplementedError for valid commands
-        # and OperationFailure if the command is not valid.
         raise NotImplementedError(
             'command is a valid Database method but is not implemented in Mongomock-ng yet'
         )
+
+    def _command_collmod(self, command):
+        validation_opts = {'validator', 'validationLevel', 'validationAction'}
+        validation_defaults = {'validationLevel': 'strict', 'validationAction': 'error'}
+
+        coll_name = command.pop('collMod')
+        if coll_name not in self._store:
+            raise OperationFailure('ns does not exist', code=26)
+
+        coll_store = self._store[coll_name]
+        for opt in command:
+            if opt not in coll_store._supported_options:
+                raise NotImplementedError(
+                    'setting the {} option with collMod is not supported '
+                    'in Mongomock-ng yet; supported options are: {}'.format(
+                        opt, ', '.join(sorted(coll_store._supported_options))
+                    )
+                )
+
+        coll_store.options.update(command)
+        if validation_opts.intersection(command):
+            for k, v in validation_defaults.items():
+                coll_store.options.setdefault(k, v)
+
+        if 'validator' in coll_store.options and not coll_store.options['validator']:
+            del coll_store.options['validator']
+
+        return {'ok': 1.0}
 
     def with_options(
         self, codec_options=None, read_preference=None, write_concern=None, read_concern=None

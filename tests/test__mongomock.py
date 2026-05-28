@@ -288,11 +288,19 @@ class _CollectionComparisonTest(TestCase):
             }
         )
 
-    def _create_compare_for_collection(self, collection_name, db_name=None):
+    def _create_compare_for_collection(self, collection_name, db_name=None, **options):
         if not db_name:
             db_name = self.db_name
-        mongo_collection = self.mongo_conn[db_name][collection_name]
-        fake_collection = self.fake_conn[db_name][collection_name]
+        mongo_db = self.mongo_conn[db_name]
+        fake_db = self.fake_conn[db_name]
+        if collection_name in mongo_db.list_collection_names():
+            mongo_collection = mongo_db[collection_name]
+        else:
+            mongo_collection = mongo_db.create_collection(collection_name, **options)
+        if collection_name in fake_db.list_collection_names():
+            fake_collection = fake_db[collection_name]
+        else:
+            fake_collection = fake_db.create_collection(collection_name, **options)
         return MultiCollection(
             {
                 'fake': fake_collection,
@@ -5944,3 +5952,170 @@ class DatabaseTest(_CollectionComparisonTest):
                 if db:
                     pass
             self.assertIn('compare with None instead', str(ctx.exception))
+
+
+@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+@skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
+class DocumentValidationTest(_CollectionComparisonTest):
+    def test__validate_on_insert(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='strict',
+            validationAction='error',
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.compare.find()
+        cmp.compare_exceptions.insert_one({'a': 'abc'})
+
+    def test__validate_on_insert_many(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_many([{'a': 1}, {'a': 2}])
+        cmp.compare.find()
+
+    def test__validate_on_update(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 2})
+        cmp.do.update_one({'a': 2}, {'$set': {'a': 1}})
+        cmp.compare.find()
+        cmp.compare_exceptions.update_one({'a': 1}, {'$set': {'a': 'bcd'}})
+        cmp.do.update_one({'a': 1}, {'$set': {'a': 'bcd'}}, bypass_document_validation=True)
+        cmp.compare.find()
+
+    def test__validate_on_update_many(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_many([{'a': 1}, {'a': 2}])
+        cmp.do.update_many({}, {'$set': {'a': 3}})
+        cmp.compare.find()
+        cmp.compare_exceptions.update_many({}, {'$set': {'a': 'xyz'}})
+
+    def test__validate_on_replace_one(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.do.replace_one({'a': 1}, {'a': 2})
+        cmp.compare.find()
+        cmp.compare_exceptions.replace_one({'a': 2}, {'a': 'str'})
+
+    def test__validate_on_insert_with_bypass(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.compare.find()
+        cmp.do.insert_one({'a': 'bypass'}, bypass_document_validation=True)
+        cmp.compare.find()
+
+    def test__collmod_changes_validator(self):
+        cmp = self._create_compare_for_collection('opts1')
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        for db in (fake_db, real_db):
+            db.command(
+                'collMod',
+                'opts1',
+                validator={'b': {'$type': 'string'}},
+                validationLevel='strict',
+            )
+        cmp.compare.find()
+        cmp.do.insert_one({'b': 'hello'})
+        cmp.compare.find()
+        cmp.compare_exceptions.insert_one({'b': 99})
+
+    def test__collmod_sets_defaults(self):
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        self._create_compare_for_collection('opts1')
+        for db in (fake_db, real_db):
+            db.command('collMod', 'opts1', validator={'a': {'$type': 'int'}})
+
+    def test__collmod_empty_validator(self):
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        self._create_compare_for_collection('opts2')
+        for db in (fake_db, real_db):
+            db.command('collMod', 'opts2', validator={'a': {'$type': 'int'}})
+        for db in (fake_db, real_db):
+            db.command('collMod', 'opts2', validator={})
+        opts_fake = fake_db['opts2'].options()
+        opts_real = real_db['opts2'].options()
+        self.assertNotIn('validator', opts_fake)
+        self.assertNotIn('validator', opts_real)
+
+    def test__validation_level_moderate(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.do.update_one({'a': 1}, {'$set': {'a': 'bad'}}, bypass_document_validation=True)
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        for db in (fake_db, real_db):
+            db.command('collMod', 'validated_coll', validationLevel='moderate')
+        cmp.do.update_one({'a': 'bad'}, {'$set': {'a': 'still_bad'}})
+        cmp.compare.find()
+        cmp.do.update_one({'a': 'still_bad'}, {'$set': {'a': 42}})
+        cmp.compare.find()
+
+    def test__validation_level_off(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+            validationLevel='off',
+        )
+        cmp.do.insert_one({'a': 'not an int'})
+        cmp.compare.find()
+
+    def test__validation_action_warn(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+            validationAction='warn',
+        )
+        cmp.do.insert_one({'a': 'not an int'})
+        cmp.compare.find()
+        cmp.do.update_one({'a': 'not an int'}, {'$set': {'a': 'still not int'}})
+        cmp.compare.find()
+
+    def test__validation_level_moderate_rejects_if_original_valid(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        fake_db = self.fake_conn[self.db_name]
+        real_db = self.mongo_conn[self.db_name]
+        for db in (fake_db, real_db):
+            db.command('collMod', 'validated_coll', validationLevel='moderate')
+        cmp.compare_exceptions.update_one({'a': 1}, {'$set': {'a': 'bad'}})
+
+    def test__validation_on_find_one_and_update(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.do.find_one_and_update({'a': 1}, {'$set': {'a': 2}})
+        cmp.compare.find()
+
+    def test__validation_on_find_one_and_replace(self):
+        cmp = self._create_compare_for_collection(
+            'validated_coll',
+            validator={'a': {'$type': 'int'}},
+        )
+        cmp.do.insert_one({'a': 1})
+        cmp.do.find_one_and_replace({'a': 1}, {'a': 2})
+        cmp.compare.find()
