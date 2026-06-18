@@ -4487,6 +4487,25 @@ class CollectionAPITest(TestCase):
                 )
             )
 
+    def test__aggregate_add_date_and_milliseconds(self):
+        self.db.collection.insert_one({'date': datetime(2021, 1, 1), 'hour': 6})
+        actual = self.db.collection.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': False,
+                        'datetime': {'$add': ['$date', {'$multiply': ['$hour', 3600000]}]},
+                        'datetime_reversed': {'$add': [{'$multiply': ['$hour', 3600000]}, '$date']},
+                    }
+                }
+            ]
+        )
+        expected = {
+            'datetime': datetime(2021, 1, 1, 6),
+            'datetime_reversed': datetime(2021, 1, 1, 6),
+        }
+        self.assertEqual([expected], list(actual))
+
     def test__aggregate_project_cond_mongodb_to_bool(self):
         self.db.collection.insert_one({'_id': 1})
         actual = self.db.collection.aggregate(
