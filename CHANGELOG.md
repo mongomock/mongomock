@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Remove support for deprecated Python version 3.8
 
+### Fixed
+- Support adding numeric millisecond offsets to datetimes in aggregation `$add` expressions.
+
 
 ## [4.3.0] - 2024-11-16
 ### Added

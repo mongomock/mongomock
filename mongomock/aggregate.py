@@ -411,12 +411,25 @@ class _Parser:
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
+        if operator == '$add':
+            date_value = None
+            sum_value = 0
+            for value in parsed_values:
+                if value is None:
+                    return None
+                if isinstance(value, datetime.datetime):
+                    assert date_value is None, f'{operator} only accepts one date'
+                    date_value = value
+                else:
+                    assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
+                    sum_value += value
+            if date_value is not None:
+                return date_value + datetime.timedelta(milliseconds=sum_value)
+            return sum_value
         for value in parsed_values:
             if value is None:
                 return None
             assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
-        if operator == '$add':
-            return sum(parsed_values)
         if operator == '$multiply':
             return functools.reduce(lambda x, y: x * y, parsed_values)
 
