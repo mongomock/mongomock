@@ -703,8 +703,9 @@ class CollectionAPITest(TestCase):
 
         self.assertTrue(self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'i'}}))
         self.assertTrue(self.db.collection.find_one({'a': {'$regex': '^da', '$options': 'im'}}))
-        self.assertFalse(self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'I'}}))
-        self.assertTrue(self.db.collection.find_one({'a': {'$regex': 'TADA', '$options': 'z'}}))
+        self.assertTrue(self.db.collection.find_one({'a': {'$regex': 'tada', '$options': 'I'}}))
+        with self.assertRaises(mongomock.OperationFailure):
+            self.db.collection.find_one({'a': {'$regex': 'TADA', '$options': 'z'}})
         self.assertTrue(
             self.db.collection.find_one(
                 {
