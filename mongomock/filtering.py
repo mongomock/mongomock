@@ -452,7 +452,7 @@ def _combine_regex_options(search):
     options = None
     for option in search['$options']:
         if option not in 'imxs':
-            continue
+            raise OperationFailure(f'invalid flag in regex options: {option}')
         re_option = getattr(re, option.upper())
         if options is None:
             options = re_option
