@@ -1,7 +1,10 @@
 """Tests for mongomock_ng.profiler — QueryProfiler, normalize_predicate, coverage analysis."""
+# ruff: noqa: S603 — subprocess with sys.executable + hardcoded strings is safe in tests
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 
 from mongomock_ng.profiler import _analyze_sort_coverage
@@ -120,6 +123,10 @@ class TestExtractQueryFields:
     def test_mixed_fields_and_logical(self):
         result = _extract_query_fields({'status': '?', '$or': [{'x': '?'}]})
         assert result == {'status', 'x'}
+
+    def test_nested_object_field(self):
+        result = _extract_query_fields({'x': {'nested': {'deep': '?'}}})
+        assert result == {'x', 'deep'}
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +274,18 @@ class TestMatchesPartial:
         expr = {'status': 'active', 'qty': {'$gte': 10}}
         assert _matches_partial({'status': 'active', 'qty': 5}, expr) is False
 
+    def test_operator_exists_match(self):
+        assert _matches_partial({'status': 'active'}, {'status': {'$exists': True}}) is True
+
+    def test_operator_exists_no_match(self):
+        assert _matches_partial({}, {'status': {'$exists': True}}) is False
+
+    def test_operator_exists_false_match(self):
+        assert _matches_partial({}, {'status': {'$exists': False}}) is True
+
+    def test_operator_exists_false_field_present(self):
+        assert _matches_partial({'status': 'active'}, {'status': {'$exists': False}}) is False
+
 
 # ---------------------------------------------------------------------------
 # QueryProfiler — record / records / enabled state
@@ -352,6 +371,13 @@ class TestRecordAndRecords:
         assert len(p.records) == 2
         assert p.records[0].collection == 'orders'
         assert p.records[1].collection == 'users'
+
+    def test_test_name_from_standalone_function(self):
+        p = _fresh_profiler()
+        p.start()
+        p.record({'x': 1}, 'coll', 'find')
+        rec = p.records[0]
+        assert 'test_test_name_from_standalone_function' in rec.test_name
 
 
 # ---------------------------------------------------------------------------
@@ -1040,3 +1066,48 @@ class TestOperatorFilters:
         rec = p.records[0]
         # normalize_predicate replaces each list element with '?'.
         assert rec.predicate == {'status': {'$in': ['?', '?']}}
+
+
+# ---------------------------------------------------------------------------
+# Module-level env activation
+# ---------------------------------------------------------------------------
+
+
+class TestModuleLevelActivation:
+    def test_env_activates_profiler(self):
+        code = (
+            'import os; '
+            "os.environ['MONGOMOCK_PROFILER'] = '1'; "
+            'from mongomock_ng.profiler import get_profiler; '
+            'assert get_profiler().enabled'
+        )
+        result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+
+    def test_env_disabled_by_default(self):
+        code = 'from mongomock_ng.profiler import get_profiler; assert not get_profiler().enabled'
+        result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Standalone test function (not a method) — covers profiler.py lines 74-76
+# ---------------------------------------------------------------------------
+
+
+def test__standalone_profiler_recording():
+    p = QueryProfiler()
+    p.start()
+    p.record({'x': 1}, 'coll', 'find')
+    rec = p.records[0]
+    assert 'test__standalone_profiler_recording' in rec.test_name
+
+
+def test__unknown_fallback():
+    code = (
+        'from mongomock_ng.profiler import _test_name_from_stack; '
+        'name = _test_name_from_stack(); '
+        'assert name == "<unknown>", name'
+    )
+    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

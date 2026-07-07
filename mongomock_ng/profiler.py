@@ -31,22 +31,6 @@ def normalize_predicate(filter: Any) -> Any:
     return _PLACEHOLDER
 
 
-def _strip_values(d: Any) -> Any:
-    if isinstance(d, dict):
-        stripped = {}
-        for k, v in d.items():
-            if k in _LOGICAL_OPS:
-                stripped[k] = _strip_values(v)
-            elif k.startswith('$'):
-                stripped[k] = _PLACEHOLDER
-            else:
-                stripped[k] = _strip_values(v)
-        return stripped
-    if isinstance(d, list):
-        return [_strip_values(v) for v in d]
-    return _PLACEHOLDER
-
-
 def _extract_query_fields(predicate: dict) -> set[str]:
     fields: set[str] = set()
     for k, v in predicate.items():
@@ -305,6 +289,11 @@ class QueryProfiler:
 def _matches_partial(filter: dict, partial_expr: dict) -> bool:
     for key, expected_val in partial_expr.items():
         actual_val = filter.get(key)
+        # Check for $exists: False — field absence is a match, not a short-circuit
+        if isinstance(expected_val, dict) and expected_val.get('$exists') is False:
+            if actual_val is not None:
+                return False
+            continue
         if actual_val is None:
             return False
         if isinstance(expected_val, dict) and next(iter(expected_val.keys())).startswith('$'):
@@ -314,8 +303,7 @@ def _matches_partial(filter: dict, partial_expr: dict) -> bool:
                 if actual_val != expected_operand:
                     return False
             elif op == '$exists':
-                if bool(expected_operand) != (actual_val is not None):
-                    return False
+                pass
             elif op == '$gte':
                 if not (actual_val >= expected_operand):
                     return False
