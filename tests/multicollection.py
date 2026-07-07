@@ -21,12 +21,15 @@ class MultiCollection:
 
 
 class Foreach:
-    def __init__(self, objs, compare, ignore_order=False, method_result_decorators=()):
+    def __init__(
+        self, objs, compare, ignore_order=False, method_result_decorators=(), exclude_fields=None
+    ):
         self.___objs = objs
         self.___compare = compare
         self.___ignore_order = ignore_order
         self.___decorators = list(method_result_decorators)
         self.___sort_by = None
+        self.___exclude_fields = exclude_fields or []
 
     def __getattr__(self, method_name):
         return ForeachMethod(
@@ -36,11 +39,22 @@ class Foreach:
             method_name,
             self.___decorators,
             self.___sort_by,
+            self.___exclude_fields,
         )
 
     def sort_by(self, fun):
         self.___sort_by = fun
         return self
+
+    def excluding(self, *fields):
+        """Exclude specific fields from comparison results."""
+        return Foreach(
+            self.___objs,
+            self.___compare,
+            self.___ignore_order,
+            self.___decorators,
+            self.___exclude_fields + list(fields),
+        )
 
     def __call__(self, *decorators):
         return Foreach(
@@ -48,6 +62,7 @@ class Foreach:
             self.___compare,
             self.___ignore_order,
             self.___decorators + list(decorators),
+            self.___exclude_fields,
         )
 
     def getattr(self, name):
@@ -56,24 +71,31 @@ class Foreach:
             self.___compare,
             self.___ignore_order,
             self.___decorators,
+            self.___exclude_fields,
         )
 
 
 class ForeachMethod:
-    def __init__(self, objs, compare, ignore_order, method_name, decorators, sort_by):
+    def __init__(
+        self, objs, compare, ignore_order, method_name, decorators, sort_by, exclude_fields=None
+    ):
         self.___objs = objs
         self.___compare = compare
         self.___ignore_order = ignore_order
         self.___method_name = method_name
         self.___decorators = decorators
         self.___sort_by = sort_by
+        self.___exclude_fields = exclude_fields or []
 
     def _call(self, obj, args, kwargs):
         # copying the args and kwargs is important, because pymongo changes
         # the dicts (fits them with the _id)
-        return self.___apply_decorators(
+        result = self.___apply_decorators(
             getattr(obj, self.___method_name)(*_deepcopy(args), **_deepcopy(kwargs))
         )
+        if self.___exclude_fields:
+            result = _remove_fields(result, self.___exclude_fields)
+        return result
 
     def _get_exception_type(self, obj, args, kwargs, name):
         try:
@@ -162,3 +184,12 @@ def _deepcopy(x):
     if isinstance(x, (dict, OrderedDict)):
         return type(x)((_deepcopy(k), _deepcopy(v)) for k, v in x.items())
     return copy.deepcopy(x)
+
+
+def _remove_fields(obj, fields):
+    """Recursively remove specified fields from a dict or list of dicts."""
+    if isinstance(obj, dict):
+        return {k: _remove_fields(v, fields) for k, v in obj.items() if k not in fields}
+    if isinstance(obj, list):
+        return [_remove_fields(item, fields) for item in obj]
+    return obj

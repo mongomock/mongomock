@@ -2234,10 +2234,9 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__rename_collection(self):
         self.cmp.do.insert_one({'_id': 1, 'foo': 'bar'})
-        # Use do instead of compare for rename because MongoDB replica set
-        # returns $clusterTime and operationTime with real timestamps that
-        # mongomock cannot match
-        self.cmp.do.rename('new_name')
+        # Exclude $clusterTime and operationTime because MongoDB replica set
+        # returns real timestamps that mongomock cannot match
+        self.cmp.compare.excluding('$clusterTime', 'operationTime').rename('new_name')
         self.cmp.compare.find()
 
     def test__set_equals(self):
