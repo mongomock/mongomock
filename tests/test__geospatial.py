@@ -252,6 +252,7 @@ class NearTest(unittest.TestCase):
         self.db = self.client.test
         self.col = self.db.col
         self.col.drop()
+        self.col.create_index([('loc', '2dsphere')])
 
     def test_near_sorts_by_distance(self):
         self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
@@ -327,6 +328,7 @@ class NearTest(unittest.TestCase):
         self.assertEqual(len(result), 2)
 
     def test_near_multiple_fields_uses_min_distance(self):
+        self.col.create_index([('loc1', '2dsphere')])
         self.col.insert_one(
             {
                 '_id': 1,
@@ -391,6 +393,7 @@ class NearTest(unittest.TestCase):
         self.assertEqual(result[0]['_id'], 1)
 
     def test_near_with_nested_field_path(self):
+        self.col.create_index([('geo', '2dsphere')])
         self.col.insert_one({'_id': 1, 'geo': {'type': 'Point', 'coordinates': [0, 0]}})
         self.col.insert_one({'_id': 2, 'geo': {'type': 'Point', 'coordinates': [1, 1]}})
 
@@ -463,6 +466,7 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.db = self.client.test
         self.col = self.db.col
         self.col.drop()
+        self.col.create_index([('loc', '2dsphere')])
 
     def test_geoNear_basic(self):
         self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
@@ -633,6 +637,7 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.assertEqual(result[0]['_id'], 2)
 
     def test_geoNear_with_key_field(self):
+        self.col.create_index([('custom_location', '2dsphere')])
         self.col.insert_one({'_id': 1, 'custom_location': {'type': 'Point', 'coordinates': [0, 0]}})
         self.col.insert_one({'_id': 2, 'custom_location': {'type': 'Point', 'coordinates': [1, 1]}})
 
@@ -840,6 +845,760 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.assertEqual(result[0]['value'], 42)
         self.assertIn('distance', result[0])
         self.assertGreaterEqual(result[0]['distance'], 0)
+
+
+class GeoIntersectsNonPointTest(unittest.TestCase):
+    """Test $geoIntersects with non-Point document geometries."""
+
+    def setUp(self):
+        self.client = MongoClient()
+        self.db = self.client.test
+        self.col = self.db.col
+        self.col.drop()
+
+    def test_geoIntersects_multipoint_in_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiPoint',
+                    'coordinates': [[5, 5], [15, 15]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 1)
+
+    def test_geoIntersects_multipoint_all_outside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiPoint',
+                    'coordinates': [[20, 20], [30, 30]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoIntersects_linestring_intersects_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[5, -5], [5, 15]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_linestring_outside_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[20, 20], [30, 30]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoIntersects_polygon_intersects_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_polygon_disjoint(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoIntersects_linestring_intersects_linestring(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[0, 5], [10, 5]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'LineString',
+                                'coordinates': [[5, 0], [5, 10]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 1)
+
+    def test_geoIntersects_multilinestring(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiLineString',
+                    'coordinates': [[[20, 20], [30, 30]], [[5, -5], [5, 15]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_multipolygon_doc(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiPolygon',
+                    'coordinates': [
+                        [[[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]]],
+                        [[[25, 25], [35, 25], [35, 35], [25, 35], [25, 25]]],
+                    ],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_geometry_collection(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'GeometryCollection',
+                    'geometries': [
+                        {'type': 'Point', 'coordinates': [20, 20]},
+                        {'type': 'Point', 'coordinates': [5, 5]},
+                    ],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_linestring_fully_inside_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[2, 2], [8, 8]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoIntersects_polygon_query_contains_doc_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [8, 2], [8, 8], [2, 8], [2, 2]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+
+class GeoWithinNonPointTest(unittest.TestCase):
+    """Test $geoWithin with non-Point document geometries."""
+
+    def setUp(self):
+        self.client = MongoClient()
+        self.db = self.client.test
+        self.col = self.db.col
+        self.col.drop()
+
+    def test_geoWithin_multipoint_all_inside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiPoint',
+                    'coordinates': [[2, 2], [5, 5]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoWithin_multipoint_one_outside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'MultiPoint',
+                    'coordinates': [[2, 2], [20, 20]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoWithin_linestring_inside_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[2, 2], [8, 8]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoWithin_linestring_crosses_boundary(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[5, -5], [5, 15]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoWithin_linestring_partly_outside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[2, 2], [12, 12]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoWithin_linestring_on_boundary(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[0, 0], [10, 0]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoWithin_polygon_inside_polygon(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [8, 2], [8, 8], [2, 8], [2, 2]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoWithin_polygon_partly_outside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]]],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_geoWithin_geometry_collection_all_inside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'GeometryCollection',
+                    'geometries': [
+                        {'type': 'Point', 'coordinates': [2, 2]},
+                        {'type': 'Point', 'coordinates': [5, 5]},
+                    ],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+
+    def test_geoWithin_geometry_collection_one_outside(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {
+                    'type': 'GeometryCollection',
+                    'geometries': [
+                        {'type': 'Point', 'coordinates': [2, 2]},
+                        {'type': 'Point', 'coordinates': [20, 20]},
+                    ],
+                },
+            }
+        )
+
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+
+class GeoNearOptionsTest(unittest.TestCase):
+    """Test $geoNear aggregation with distanceMultiplier and includeLocs."""
+
+    def setUp(self):
+        self.client = MongoClient()
+        self.db = self.client.test
+        self.col = self.db.col
+        self.col.drop()
+
+    def test_geoNear_distance_multiplier(self):
+        self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
+        self.col.insert_one({'_id': 2, 'loc': {'type': 'Point', 'coordinates': [1, 1]}})
+
+        result = list(
+            self.col.aggregate(
+                [
+                    {
+                        '$geoNear': {
+                            'near': {'type': 'Point', 'coordinates': [0, 0]},
+                            'distanceField': 'distance',
+                            'spherical': True,
+                            'distanceMultiplier': 0.001,
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0]['distance'], 0, places=5)
+        self.assertGreaterEqual(result[1]['distance'], 0)
+
+    def test_geoNear_distance_multiplier_zero(self):
+        self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
+        self.col.insert_one({'_id': 2, 'loc': {'type': 'Point', 'coordinates': [1, 1]}})
+
+        result = list(
+            self.col.aggregate(
+                [
+                    {
+                        '$geoNear': {
+                            'near': {'type': 'Point', 'coordinates': [0, 0]},
+                            'distanceField': 'distance',
+                            'spherical': True,
+                            'distanceMultiplier': 0,
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['distance'], 0)
+        self.assertEqual(result[1]['distance'], 0)
+
+    def test_geoNear_include_locs(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {'type': 'Point', 'coordinates': [0, 0]},
+            }
+        )
+        self.col.insert_one(
+            {
+                '_id': 2,
+                'loc': {'type': 'Point', 'coordinates': [1, 1]},
+            }
+        )
+
+        result = list(
+            self.col.aggregate(
+                [
+                    {
+                        '$geoNear': {
+                            'near': {'type': 'Point', 'coordinates': [0, 0]},
+                            'distanceField': 'distance',
+                            'spherical': True,
+                            'includeLocs': 'usedLocation',
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(len(result), 2)
+        self.assertIn('usedLocation', result[0])
+        self.assertEqual(
+            result[0]['usedLocation'],
+            {'type': 'Point', 'coordinates': [0, 0]},
+        )
+
+    def test_geoNear_distance_multiplier_and_include_locs(self):
+        self.col.insert_one(
+            {
+                '_id': 1,
+                'loc': {'type': 'Point', 'coordinates': [0, 0]},
+            }
+        )
+        self.col.insert_one(
+            {
+                '_id': 2,
+                'loc': {'type': 'Point', 'coordinates': [1, 1]},
+            }
+        )
+
+        result = list(
+            self.col.aggregate(
+                [
+                    {
+                        '$geoNear': {
+                            'near': {'type': 'Point', 'coordinates': [0, 0]},
+                            'distanceField': 'dist_km',
+                            'spherical': True,
+                            'distanceMultiplier': 0.001,
+                            'includeLocs': 'usedLocation',
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(len(result), 2)
+        self.assertIn('dist_km', result[0])
+        self.assertIn('usedLocation', result[0])
+        self.assertEqual(
+            result[0]['usedLocation'],
+            {'type': 'Point', 'coordinates': [0, 0]},
+        )
 
 
 if __name__ == '__main__':

@@ -1434,6 +1434,12 @@ class Collection:
 
     def _get_dataset(self, spec, sort, fields, as_class):
         near_specs, clean_spec = extract_near_specs(spec) if spec else ([], spec)
+        if near_specs:
+            for field_path, _near_info in near_specs:
+                if not self._has_2dsphere_index_on(field_path):
+                    raise OperationFailure(
+                        f'unable to find index for $near query on field "{field_path}"'
+                    )
         dataset = self._iter_documents(clean_spec if near_specs else spec)
         if near_specs and not sort:
             docs_with_dist = []
@@ -2047,6 +2053,12 @@ class Collection:
         if 'partialFilterExpression' in kwargs and kwargs['partialFilterExpression'] is not None:
             config['partialFilterExpression'] = kwargs.pop('partialFilterExpression')
 
+        is_2dsphere = any(direction == '2dsphere' for _, direction in index_list)
+        if is_2dsphere:
+            if is_unique:
+                raise OperationFailure('cannot create a unique index on a 2dsphere index')
+            config['key'] = index_list
+
         existing_index = self._store.indexes.get(index_name)
         if existing_index and config != existing_index:
             raise OperationFailure(
@@ -2054,7 +2066,7 @@ class Collection:
             )
 
         # Check that documents already verify the uniquess of this new index.
-        if is_unique:
+        if is_unique and not is_2dsphere:
             indexed = set()
             indexed_list = []
             documents_gen = self._store.documents
@@ -2147,6 +2159,13 @@ class Collection:
     def index_information(self, session=None):
         _enroll_session(session, self._store)
         return {name: dict(index, v=2) for name, index in self._list_all_indexes()}
+
+    def _has_2dsphere_index_on(self, field: str) -> bool:
+        for _, info in self._store.indexes.items():
+            for key_field, direction in info.get('key', []):
+                if key_field == field and direction == '2dsphere':
+                    return True
+        return False
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
 

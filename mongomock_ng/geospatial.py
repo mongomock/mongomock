@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import math
 from collections.abc import Sequence
 from typing import Any
@@ -250,6 +251,31 @@ def geo_intersects(doc_geo: dict, query_geo: dict) -> bool:
         pt = point_from_geojson(doc_geo)
         return _point_intersects_geo(pt, query_geo)
 
+    if doc_type == 'MultiPoint':
+        pts = [tuple(p[:2]) for p in doc_geo['coordinates']]
+        return any(_point_intersects_geo(pt, query_geo) for pt in pts)
+
+    if doc_type == 'LineString':
+        return _linestring_intersects_geo(_to_float_pairs(doc_geo['coordinates']), query_geo)
+
+    if doc_type == 'MultiLineString':
+        return any(
+            _linestring_intersects_geo(_to_float_pairs(ls), query_geo)
+            for ls in doc_geo['coordinates']
+        )
+
+    if doc_type == 'Polygon':
+        return _polygon_intersects_geo(doc_geo['coordinates'], query_geo)
+
+    if doc_type == 'MultiPolygon':
+        return any(
+            _polygon_intersects_geo(poly_coords, query_geo)
+            for poly_coords in doc_geo['coordinates']
+        )
+
+    if doc_type == 'GeometryCollection':
+        return any(geo_intersects(g, query_geo) for g in doc_geo.get('geometries', []))
+
     return False
 
 
@@ -259,6 +285,29 @@ def geo_within(doc_geo: dict, query_geo: dict) -> bool:
     if doc_type == 'Point':
         pt = point_from_geojson(doc_geo)
         return _point_within_geo(pt, query_geo)
+
+    if doc_type == 'MultiPoint':
+        pts = [tuple(p[:2]) for p in doc_geo['coordinates']]
+        return all(_point_within_geo(pt, query_geo) for pt in pts)
+
+    if doc_type == 'LineString':
+        return _linestring_within_geo(_to_float_pairs(doc_geo['coordinates']), query_geo)
+
+    if doc_type == 'MultiLineString':
+        return all(
+            _linestring_within_geo(_to_float_pairs(ls), query_geo) for ls in doc_geo['coordinates']
+        )
+
+    if doc_type == 'Polygon':
+        return _polygon_within_geo(doc_geo['coordinates'], query_geo)
+
+    if doc_type == 'MultiPolygon':
+        return all(
+            _polygon_within_geo(poly_coords, query_geo) for poly_coords in doc_geo['coordinates']
+        )
+
+    if doc_type == 'GeometryCollection':
+        return all(geo_within(g, query_geo) for g in doc_geo.get('geometries', []))
 
     return False
 
@@ -334,6 +383,249 @@ def _point_on_segment(
         return False
     len_sq = dx * dx + dy * dy
     return not dot > len_sq + 1e-12
+
+
+def _orientation(p: tuple, q: tuple, r: tuple) -> int:
+    val = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    if abs(val) < 1e-12:
+        return 0
+    return 1 if val > 0 else 2
+
+
+def _on_segment_bounds(p: tuple, q: tuple, r: tuple) -> bool:
+    return (
+        min(p[0], q[0]) - 1e-12 <= r[0] <= max(p[0], q[0]) + 1e-12
+        and min(p[1], q[1]) - 1e-12 <= r[1] <= max(p[1], q[1]) + 1e-12
+    )
+
+
+def _segments_intersect(p1: tuple, q1: tuple, p2: tuple, q2: tuple) -> bool:
+    o1 = _orientation(p1, q1, p2)
+    o2 = _orientation(p1, q1, q2)
+    o3 = _orientation(p2, q2, p1)
+    o4 = _orientation(p2, q2, q1)
+
+    if o1 != o2 and o3 != o4:
+        return True
+    if o1 == 0 and _on_segment_bounds(p1, q1, p2):
+        return True
+    if o2 == 0 and _on_segment_bounds(p1, q1, q2):
+        return True
+    if o3 == 0 and _on_segment_bounds(p2, q2, p1):
+        return True
+    return bool(o4 == 0 and _on_segment_bounds(p2, q2, q1))
+
+
+def _linestring_intersects_polygon(
+    points: list[tuple[float, float]],
+    coords: list,
+) -> bool:
+    if point_in_polygon(points[0], coords):
+        return True
+
+    poly_edges = _polygon_edges(coords)
+    for i in range(len(points) - 1):
+        a, b = points[i], points[i + 1]
+        for pe in poly_edges:
+            if _segments_intersect(a, b, pe[0], pe[1]):
+                return True
+    return False
+
+
+def _polygon_edges(coords: list) -> list[tuple[tuple, tuple]]:
+    edges = []
+    for ring in coords:
+        pts = _to_float_pairs(ring)
+        for i in range(len(pts) - 1):
+            edges.append((pts[i], pts[i + 1]))
+    return edges
+
+
+def _linestring_intersects_geo(
+    points: list[tuple[float, float]],
+    geo: dict,
+) -> bool:
+    typ = geo['type']
+    coords = geo['coordinates']
+
+    if typ == 'Polygon':
+        return _linestring_intersects_polygon(points, coords)
+    if typ == 'MultiPolygon':
+        return any(_linestring_intersects_polygon(points, poly_coords) for poly_coords in coords)
+    if typ == 'Point':
+        other = point_from_geojson(geo)
+        for a, b in itertools.pairwise(points):
+            if _point_on_segment(other[0], other[1], a[0], a[1], b[0], b[1]):
+                return True
+        return _points_equal(points[0], other)
+    if typ == 'MultiPoint':
+        return any(_point_on_linestring(tuple(p[:2]), points) for p in coords)
+    if typ == 'LineString':
+        other_pts = _to_float_pairs(coords)
+        return any(
+            _segments_intersect(a, b, c, d)
+            for a, b in itertools.pairwise(points)
+            for c, d in itertools.pairwise(other_pts)
+        )
+    if typ == 'MultiLineString':
+        return any(
+            _linestring_intersects_geo(points, {'type': 'LineString', 'coordinates': ls})
+            for ls in coords
+        )
+    return False
+
+
+def _segments_cross(p1: tuple, q1: tuple, p2: tuple, q2: tuple) -> bool:
+    o1 = _orientation(p1, q1, p2)
+    o2 = _orientation(p1, q1, q2)
+    o3 = _orientation(p2, q2, p1)
+    o4 = _orientation(p2, q2, q1)
+
+    if o1 == 0 and o2 == 0 and o3 == 0 and o4 == 0:
+        return _collinear_segments_overlap(p1, q1, p2, q2)
+    return o1 != o2 and o3 != o4
+
+
+def _segments_cross_interior(p1: tuple, q1: tuple, p2: tuple, q2: tuple) -> bool:
+    o1 = _orientation(p1, q1, p2)
+    o2 = _orientation(p1, q1, q2)
+    o3 = _orientation(p2, q2, p1)
+    o4 = _orientation(p2, q2, q1)
+
+    if o1 == 0 and o2 == 0 and o3 == 0 and o4 == 0:
+        return _collinear_overlap_interior(p1, q1, p2, q2)
+    if o1 == 0 or o2 == 0 or o3 == 0 or o4 == 0:
+        return False
+    return o1 != o2 and o3 != o4
+
+
+def _collinear_segments_overlap(p1: tuple, q1: tuple, p2: tuple, q2: tuple) -> bool:
+    def between(a: float, b: float, c: float) -> bool:
+        return min(a, b) - 1e-12 <= c <= max(a, b) + 1e-12
+
+    return (between(p1[0], q1[0], p2[0]) and between(p1[1], q1[1], p2[1])) or (
+        between(p1[0], q1[0], q2[0]) and between(p1[1], q1[1], q2[1])
+    )
+
+
+def _collinear_overlap_interior(p1: tuple, q1: tuple, p2: tuple, q2: tuple) -> bool:
+    def between_strict(a: float, b: float, c: float) -> bool:
+        return min(a, b) + 1e-12 <= c <= max(a, b) - 1e-12
+
+    def between_loose(a, b, c):
+        return min(a, b) - 1e-12 <= c <= max(a, b) + 1e-12
+
+    p2_on_q1 = between_strict(p1[0], q1[0], p2[0]) and between_strict(p1[1], q1[1], p2[1])
+    q2_on_q1 = between_strict(p1[0], q1[0], q2[0]) and between_strict(p1[1], q1[1], q2[1])
+    if p2_on_q1 or q2_on_q1:
+        return True
+    p1_on_q2 = between_loose(p2[0], q2[0], p1[0]) and between_loose(p2[1], q2[1], p1[1])
+    q1_on_q2 = between_loose(p2[0], q2[0], q1[0]) and between_loose(p2[1], q2[1], q1[1])
+    return (p1_on_q2 and q1_on_q2) and (not _points_equal(p1, p2) or not _points_equal(q1, q2))
+
+
+def _linestring_within_polygon(
+    points: list[tuple[float, float]],
+    coords: list,
+) -> bool:
+    for pt in points:
+        if not point_in_polygon(pt, coords):
+            return False
+    poly_edges = _polygon_edges(coords)
+    for i in range(len(points) - 1):
+        a, b = points[i], points[i + 1]
+        for pe in poly_edges:
+            if _segments_cross_interior(a, b, pe[0], pe[1]):
+                return False
+    return True
+
+
+def _linestring_within_geo(
+    points: list[tuple[float, float]],
+    geo: dict,
+) -> bool:
+    typ = geo['type']
+    coords = geo['coordinates']
+
+    if typ == 'Polygon':
+        return _linestring_within_polygon(points, coords)
+    if typ == 'MultiPolygon':
+        return any(_linestring_within_polygon(points, poly_coords) for poly_coords in coords)
+    if typ == 'LineString':
+        other_pts = _to_float_pairs(coords)
+        if _points_equal(points[0], other_pts[0]) and _points_equal(points[-1], other_pts[-1]):
+            return all(_point_on_linestring(pt, other_pts) for pt in points)
+        return False
+    return False
+
+
+def _polygon_intersects_geo(coords: list, geo: dict) -> bool:
+    typ = geo['type']
+    query_coords = geo['coordinates']
+
+    if typ in ('Polygon', 'MultiPolygon'):
+        other_rings = [query_coords] if typ == 'Polygon' else query_coords
+
+        doc_ring = _to_float_pairs(coords[0])
+        if point_in_polygon(doc_ring[0], other_rings[0]):
+            return True
+
+        doc_edges = _polygon_edges(coords)
+        other_edges_list = []
+        for other_coords in other_rings:
+            other_edges_list.extend(_polygon_edges(other_coords))
+
+        for de in doc_edges:
+            for oe in other_edges_list:
+                if _segments_intersect(de[0], de[1], oe[0], oe[1]):
+                    return True
+        return False
+
+    if typ in ('LineString', 'MultiLineString'):
+        lines = query_coords if typ == 'MultiLineString' else [query_coords]
+        doc_edges = _polygon_edges(coords)
+        for ls in lines:
+            pts = _to_float_pairs(ls)
+            for i in range(len(pts) - 1):
+                for de in doc_edges:
+                    if _segments_intersect(de[0], de[1], pts[i], pts[i + 1]):
+                        return True
+        return False
+
+    if typ == 'Point':
+        pt = point_from_geojson(geo)
+        return point_in_polygon(pt, coords)
+
+    if typ == 'MultiPoint':
+        return any(point_in_polygon(tuple(p[:2]), coords) for p in query_coords)
+
+    return False
+
+
+def _polygon_within_geo(coords: list, geo: dict) -> bool:
+    typ = geo['type']
+    query_coords = geo['coordinates']
+
+    if typ == 'Polygon':
+        doc_ring = _to_float_pairs(coords[0])
+        for pt in doc_ring:
+            if not point_in_polygon(pt, query_coords):
+                return False
+        doc_edges = _polygon_edges(coords)
+        other_edges = _polygon_edges(query_coords)
+        for de in doc_edges:
+            for oe in other_edges:
+                if _segments_cross_interior(de[0], de[1], oe[0], oe[1]):
+                    return False
+        return True
+
+    if typ == 'MultiPolygon':
+        return any(
+            _polygon_within_geo(coords, {'type': 'Polygon', 'coordinates': poly_coords})
+            for poly_coords in query_coords
+        )
+
+    return False
 
 
 def near_filter(

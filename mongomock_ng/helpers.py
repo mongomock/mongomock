@@ -138,14 +138,16 @@ def print_deprecation_warning(old_param_name, new_param_name):
 
 
 def create_index_list(
-    keys: str | Iterable[str | tuple[str, int]], direction: int | None = None
-) -> list[tuple[str, int]]:
+    keys: str | Iterable[str | tuple[str, int | str]], direction: int | str | None = None
+) -> list[tuple[str, int | str]]:
     """Helper to generate a list of (key, direction) pairs.
 
     It takes such a list, or a single key, or a single key and direction.
+    Direction can be 1 (ascending), -1 (descending), or a type string
+    like '2dsphere', 'text', 'hashed'.
     """
 
-    def make_key(spec: str | tuple[str, int]) -> tuple[str, int]:
+    def make_key(spec: str | tuple[str, int | str]) -> tuple[str, int | str]:
         if isinstance(spec, tuple):
             if len(spec) != 2:
                 raise TypeError('index spec has to be a tuple (key, direction)')
