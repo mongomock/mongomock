@@ -126,7 +126,7 @@ def _validate_polygon_coords(coords: Sequence) -> None:
     for ring in coords:
         if len(ring) < 4:
             raise OperationFailure('Polygon ring must have at least 4 points (first = last)')
-        if ring[0] != ring[-1]:
+        if not _points_equal(tuple(ring[0][:2]), tuple(ring[-1][:2])):
             raise OperationFailure('Polygon ring is not closed')
         for pt in ring:
             _validate_point_coords(pt)

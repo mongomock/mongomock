@@ -86,6 +86,7 @@ from .results import DeleteResult
 from .results import InsertManyResult
 from .results import InsertOneResult
 from .results import UpdateResult
+from .session import ClientSession
 from .write_concern import WriteConcern
 
 
@@ -93,6 +94,17 @@ try:
     from pymongo.read_concern import ReadConcern
 except ImportError:
     from .read_concern import ReadConcern
+
+
+def _enroll_session(session, collection_store):
+    if session is None:
+        return
+    if not isinstance(session, ClientSession):
+        raise TypeError('session must be an instance of ClientSession')
+    if session.has_ended:
+        raise InvalidOperation('Cannot use a session that has ended')
+    session._ensure_collection_in_transaction(collection_store)
+
 
 _KwargOption = collections.namedtuple('_KwargOption', ['typename', 'default', 'attrs'])
 
@@ -639,8 +651,7 @@ class Collection:
         return self._db_store[self._name]
 
     def _insert(self, data, session=None, ordered=True, validate=True):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         if not isinstance(data, Mapping):
             results = []
             write_errors = []
@@ -913,8 +924,7 @@ class Collection:
         validate=True,
         **kwargs,
     ):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         if hint:
             raise NotImplementedError(
                 'The hint argument of update is valid but has not been implemented in '
@@ -1448,6 +1458,8 @@ class Collection:
                     if is_match and dist is not None:
                         distances.append(dist)
                 if distances:
+                    # When multiple $near specs exist, sort by min(distance).
+                    # This makes the first $near field primary for sort order.
                     docs_with_dist.append((min(distances), doc))
             dataset = (doc for _, doc in sorted(docs_with_dist, key=lambda x: x[0]))
         if sort:
@@ -1832,8 +1844,7 @@ class Collection:
         session=None,
         **kwargs,
     ):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         remove = kwargs.get('remove', False)
         if kwargs.get('new', False) and remove:
             # message from mongodb
@@ -1905,8 +1916,7 @@ class Collection:
                 'The collation argument of delete is valid but has not been '
                 'implemented in mongomock-ng yet',
             )
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
@@ -1950,8 +1960,8 @@ class Collection:
                 DeprecationWarning,
                 stacklevel=2,
             )
-            if kwargs.pop('session', None):
-                raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+            session = kwargs.pop('session', None)
+            _enroll_session(session, self._store)
             if filter is None:
                 return len(self._store)
             spec = helpers.patch_datetime_awareness_in_document(filter)
@@ -2012,8 +2022,7 @@ class Collection:
         return self.count_documents({}, **kwargs)
 
     def drop(self, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         self.database.drop_collection(self.name)
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
@@ -2022,8 +2031,7 @@ class Collection:
             return self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, keys, cache_for=300, session=None, **kwargs):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         index_list = helpers.create_index_list(keys)
         is_unique = kwargs.pop('unique', False)
         is_sparse = kwargs.pop('sparse', False)
@@ -2106,8 +2114,7 @@ class Collection:
         ]
 
     def drop_index(self, index_or_name, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         if isinstance(index_or_name, list):
             name = helpers.gen_index_name(index_or_name)
         else:
@@ -2118,15 +2125,13 @@ class Collection:
             raise OperationFailure(f'index not found with name [{name}]') from err
 
     def drop_indexes(self, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         self._store.indexes = {}
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
 
         def reindex(self, session=None):
-            if session:
-                raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+            _enroll_session(session, self._store)
 
     def _list_all_indexes(self):
         if not self._store.is_created:
@@ -2135,14 +2140,12 @@ class Collection:
         yield from self._store.indexes.items()
 
     def list_indexes(self, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         for name, information in self._list_all_indexes():
             yield dict(information, key=dict(information['key']), name=name, v=2)
 
     def index_information(self, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         return {name: dict(index, v=2) for name, index in self._list_all_indexes()}
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
@@ -2155,8 +2158,7 @@ class Collection:
                     'PyExecJS is required in order to run Map-Reduce. '
                     "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
                 )
-            if session:
-                raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+            _enroll_session(session, self._store)
             if limit == 0:
                 limit = None
             start_time = time.perf_counter()
@@ -2251,8 +2253,7 @@ class Collection:
             )
 
     def distinct(self, key, filter=None, session=None, comment=None, hint=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         return self.find(filter, comment=comment, hint=hint).distinct(key)
 
     if version.parse('4.0') > helpers.PYMONGO_VERSION:
@@ -2352,8 +2353,7 @@ class Collection:
         )
 
     def rename(self, new_name, session=None, **kwargs):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self._store)
         return self.database.rename_collection(self.name, new_name, **kwargs)
 
     def bulk_write(
@@ -2367,12 +2367,7 @@ class Collection:
                 'Skipping document validation is a valid MongoDB operation;'
                 ' however Mongomock-ng does not support it yet.'
             )
-        if session:
-            raise_not_implemented(
-                'session',
-                'Sessions are valid in MongoDB 3.6 and newer; however Mongomock-ng'
-                ' does not support them yet.',
-            )
+        _enroll_session(session, self._store)
         bulk = BulkOperationBuilder(self, ordered=ordered)
         for operation in requests:
             operation._add_to_bulk(bulk)
@@ -2528,8 +2523,7 @@ class Cursor:
         return self
 
     def distinct(self, key, session=None):
-        if session:
-            raise_not_implemented('session', 'Mongomock-ng does not handle sessions yet')
+        _enroll_session(session, self.collection._store)
         if not isinstance(key, str):
             raise TypeError('cursor.distinct key must be a string')
         unique = set()

@@ -118,6 +118,7 @@ from .__version__ import __version__
 
 __all__ = [
     'SERVER_VERSION',
+    'ClientSession',
     'Collection',
     'CollectionInvalid',
     'Database',
@@ -127,6 +128,7 @@ __all__ = [
     'MongoClient',
     'ObjectId',
     'OperationFailure',
+    'SessionOptions',
     'WriteConcern',
     '__version__',
     'ignore_feature',
@@ -140,6 +142,8 @@ from .mongo_client import MongoClient
 from .not_implemented import ignore_feature
 from .not_implemented import warn_on_feature
 from .patch import patch
+from .session import ClientSession
+from .session import SessionOptions
 from .write_concern import WriteConcern
 
 

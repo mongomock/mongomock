@@ -11,11 +11,30 @@ services:
     volumes:
       - .:/project
     depends_on:
-      - mongo
+      mongo-init:
+        condition: service_completed_successfully
 
   mongo:
     # The image chosen here should be kept in sync with the .travis.yml mongo version and with
     # the value in mongomock_ng/__init__.py
     image: mongo:7.0.34
+    command: mongod --replSet rs0
     ports:
       - 127.0.0.1:27017:27017
+    volumes:
+      - ./init-replica.sh:/init-replica.sh:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mongo-init:
+    image: mongo:7.0.34
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: /init-replica.sh
+    volumes:
+      - ./init-replica.sh:/init-replica.sh:ro

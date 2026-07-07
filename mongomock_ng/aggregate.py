@@ -30,6 +30,7 @@ from . import OperationFailure
 from .geospatial import haversine_distance
 from .geospatial import parse_geojson
 from .geospatial import point_from_geojson
+from .geospatial import validate_coord_range
 from .geospatial import validate_geojson
 
 
@@ -2837,8 +2838,6 @@ def _handle_geonear_stage(in_collection, database, options, user_vars):
         if len(near_raw) < 2:
             raise OperationFailure('$geoNear near requires a point')
         query_point = (float(near_raw[0]), float(near_raw[1]))
-        from .geospatial import validate_coord_range
-
         validate_coord_range(query_point[0], query_point[1])
     else:
         near_geo = parse_geojson(near_raw)
@@ -2864,7 +2863,7 @@ def _handle_geonear_stage(in_collection, database, options, user_vars):
         try:
             geo = parse_geojson(val)
             validate_geojson(geo)
-        except Exception:
+        except (OperationFailure, ValueError, TypeError):
             return None
         if geo['type'] != 'Point':
             return None
@@ -3008,9 +3007,6 @@ _PIPELINE_HANDLERS = {
 
 
 def process_pipeline(collection, database, pipeline, session, user_vars=None):
-    if session:
-        raise NotImplementedError('Mongomock-ng does not handle sessions yet')
-
     for stage in pipeline:
         for operator, options in stage.items():
             try:

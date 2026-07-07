@@ -165,8 +165,12 @@ class MongoClientApiTest(unittest.TestCase):
 
     def test_start_session(self):
         client = mongomock.MongoClient()
-        with self.assertRaises(NotImplementedError):
-            client.start_session()
+        session = client.start_session()
+        self.assertIsNotNone(session)
+        self.assertFalse(session.has_ended)
+        self.assertFalse(session.in_transaction)
+        session.end_session()
+        self.assertTrue(session.has_ended)
 
     @mock.patch('mongomock.SERVER_VERSION', '3.6')
     def test_server_version(self):
