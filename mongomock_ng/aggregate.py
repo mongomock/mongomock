@@ -3007,9 +3007,6 @@ _PIPELINE_HANDLERS = {
 
 
 def process_pipeline(collection, database, pipeline, session, user_vars=None):
-    if session:
-        raise NotImplementedError('Mongomock-ng does not handle sessions yet')
-
     for stage in pipeline:
         for operator, options in stage.items():
             try:

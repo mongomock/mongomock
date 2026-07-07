@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.7.0] - 2026-07-06
+### Added
+- `ClientSession` and transaction support via `MongoClient.start_session()`
+- `SessionOptions` and `TransactionOptions` classes
+- Transaction flow: `start_transaction()`, `commit_transaction()`, `abort_transaction()`
+- `with_transaction(callback)` convenience method
+- Session parameter support in all CRUD operations (insert, update, delete, find, find_one_and_*, bulk_write, aggregate, etc.)
+- Transaction isolation: writes within a transaction are buffered and only applied on commit, discarded on abort
+- Independent client instances have isolated storage
+
 ## [7.6.0] - 2026-05-28
 ### Added
 - Geospatial query operators: `$geoIntersects` and `$geoWithin` for Point-in-Polygon and Polygon intersection queries

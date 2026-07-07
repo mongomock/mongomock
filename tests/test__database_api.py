@@ -50,14 +50,13 @@ class DatabaseAPITest(TestCase):
         self.assertEqual(1, self.database['_users'].find_one().get('a'))
 
     def test__session(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.list_collection_names(session=1)
-        with self.assertRaises(NotImplementedError):
-            self.database.drop_collection('a', session=1)
-        with self.assertRaises(NotImplementedError):
-            self.database.create_collection('a', session=1)
-        with self.assertRaises(NotImplementedError):
-            self.database.dereference(_DBRef('somedb', 'a', 'b'), session=1)
+        client = mongomock.MongoClient()
+        session = client.start_session()
+        self.database.list_collection_names(session=session)
+        self.database.drop_collection('a', session=session)
+        self.database.create_collection('a', session=session)
+        self.database.dereference(_DBRef('somedb', 'a', 'b'), session=session)
+        session.end_session()
 
     def test__command_ping(self):
         self.assertEqual({'ok': 1}, self.database.command({'ping': 1}))
@@ -270,9 +269,15 @@ class DatabaseAPITest(TestCase):
         self.assertIn('a', names)
         self.assertNotIn('system.indexes', names)
 
-    def test__list_collections_with_session_raises(self):
-        with self.assertRaises(NotImplementedError):
-            self.database.list_collections(session='mock')
+    def test__list_collections_with_session(self):
+        client = mongomock.MongoClient()
+        db = client.testdb
+        session = client.start_session()
+        db.create_collection('a')
+        cursor = db.list_collections(session=session)
+        names = [c['name'] for c in cursor]
+        self.assertIn('a', names)
+        session.end_session()
 
     def test__command_cursor_alive_after_close(self):
         self.database.create_collection('a')

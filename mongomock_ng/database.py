@@ -141,9 +141,6 @@ class Database:
             return self.list_collection_names(session=session)
 
     def list_collections(self, filter=None, session=None, nameOnly=False):  # noqa: N803
-        if session:
-            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
-
         names = self.list_collection_names(filter=filter)
         if nameOnly:
             return CommandCursor([{'name': n} for n in names])
@@ -166,9 +163,6 @@ class Database:
         for supported operator please see _LIST_COLLECTION_FILTER_ALLOWED_OPERATORS
         """
         field_name = 'name'
-
-        if session:
-            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
 
         if filter:
             if not filter.get('name'):
@@ -220,8 +214,6 @@ class Database:
             return collection
 
     def drop_collection(self, name_or_collection, session=None):
-        if session:
-            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
         if isinstance(name_or_collection, Collection):
             name_or_collection._store.drop()
         else:
@@ -240,7 +232,7 @@ class Database:
         if '\x00' in name:
             raise InvalidName('collection names must not contain the null character')
 
-    def create_collection(self, name, **kwargs):
+    def create_collection(self, name, session=None, **kwargs):
         self._ensure_valid_collection_name(name)
         if name in self.list_collection_names():
             raise CollectionInvalid(f'collection {name} already exists')
@@ -265,9 +257,6 @@ class Database:
         return {'ok': 1}
 
     def dereference(self, dbref, session=None):
-        if session:
-            raise NotImplementedError('Mongomock-ng does not handle sessions yet')
-
         if not hasattr(dbref, 'collection') or not hasattr(dbref, 'id'):
             raise TypeError(f'cannot dereference a {type(dbref)}')
         if dbref.database is not None and dbref.database != self.name:

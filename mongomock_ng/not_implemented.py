@@ -4,7 +4,6 @@ _IGNORED_FEATURES = {
     'array_filters': False,
     'collation': False,
     'let': False,
-    'session': False,
     'comment': True,
     'hint': True,
 }

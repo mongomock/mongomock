@@ -1,4 +1,5 @@
 import collections
+import copy
 import datetime
 import functools
 from typing import ClassVar
@@ -74,6 +75,9 @@ class CollectionStore:
         self.name = name
         self._ttl_indexes = {}
         self.options = {}
+        self._saved_documents = None
+        self._saved_indexes = None
+        self._saved_ttl_indexes = None
 
         # 694 - Lock for safely iterating and mutating OrderedDicts
         self._rwlock = RWLock()
@@ -111,6 +115,25 @@ class CollectionStore:
         # TTL indexes have no meaning to the outside.
         del self.indexes[index_name]
         self._ttl_indexes.pop(index_name, None)
+
+    def begin_transaction(self):
+        self._saved_documents = copy.deepcopy(self._documents)
+        self._saved_indexes = copy.deepcopy(self.indexes)
+        self._saved_ttl_indexes = copy.deepcopy(self._ttl_indexes)
+
+    def commit_transaction(self):
+        self._saved_documents = None
+        self._saved_indexes = None
+        self._saved_ttl_indexes = None
+
+    def abort_transaction(self):
+        if self._saved_documents is not None:
+            self._documents = self._saved_documents
+            self.indexes = self._saved_indexes
+            self._ttl_indexes = self._saved_ttl_indexes
+            self._saved_documents = None
+            self._saved_indexes = None
+            self._saved_ttl_indexes = None
 
     @property
     def is_empty(self):

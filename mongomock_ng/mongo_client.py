@@ -9,6 +9,8 @@ from mongomock_ng import ConfigurationError
 from mongomock_ng import helpers
 from mongomock_ng import read_preferences
 from mongomock_ng.database import Database
+from mongomock_ng.session import ClientSession
+from mongomock_ng.session import SessionOptions
 from mongomock_ng.store import ServerStore
 
 
@@ -212,4 +214,8 @@ class MongoClient:
 
     def start_session(self, causal_consistency=True, default_transaction_options=None):
         """Start a logical session."""
-        raise NotImplementedError('Mongomock-ng does not support sessions yet')
+        options = SessionOptions(
+            causal_consistency=causal_consistency,
+            default_transaction_options=default_transaction_options,
+        )
+        return ClientSession(self, options)
