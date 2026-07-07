@@ -51,10 +51,17 @@ jobs:
         with:
           node-version: 18
 
-      - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.12.1
-        with:
-          mongodb-version: "7.0.34"
+      - name: Start MongoDB with Replica Set
+        run: |
+          docker run -d --name mongodb -p 27017:27017 mongo:7.0.34 mongod --replSet rs0
+          sleep 5
+          docker exec mongodb mongosh --eval "
+            rs.initiate({
+              _id: 'rs0',
+              members: [{ _id: 0, host: 'localhost:27017' }]
+            })
+          "
+          sleep 5
 
       - name: Install hatch
         uses: pypa/hatch@install
