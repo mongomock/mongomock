@@ -332,8 +332,23 @@ class SessionComparisonTests(unittest.TestCase):
             self.mongo_conn.drop_database(self.db_name)
             self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
             self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
+            self._transactions_supported = self._check_transactions_supported()
         except Exception:
             self.skipTest('MongoDB not available')
+
+    def _check_transactions_supported(self):
+        try:
+            session = self.mongo_conn.start_session()
+            session.start_transaction()
+            session.abort_transaction()
+            session.end_session()
+            return True
+        except pymongo.errors.OperationFailure:
+            return False
+
+    def _skip_if_no_transactions(self):
+        if not self._transactions_supported:
+            self.skipTest('Transactions not supported (standalone MongoDB)')
 
     def _connect_to_local_mongodb(self, num_retries=60):
         import time
@@ -369,6 +384,7 @@ class SessionComparisonTests(unittest.TestCase):
         self.assertTrue(mongo_session.has_ended)
 
     def test_transaction_commit_insert(self):
+        self._skip_if_no_transactions()
         fake_session = self.fake_conn.start_session()
         mongo_session = self.mongo_conn.start_session()
 
@@ -389,6 +405,7 @@ class SessionComparisonTests(unittest.TestCase):
         mongo_session.end_session()
 
     def test_transaction_abort_insert(self):
+        self._skip_if_no_transactions()
         fake_session = self.fake_conn.start_session()
         mongo_session = self.mongo_conn.start_session()
 
@@ -410,6 +427,7 @@ class SessionComparisonTests(unittest.TestCase):
         mongo_session.end_session()
 
     def test_transaction_commit_update(self):
+        self._skip_if_no_transactions()
         self.fake_collection.insert_one({'_id': 1, 'value': 'original'})
         self.mongo_collection.insert_one({'_id': 1, 'value': 'original'})
 
@@ -437,6 +455,7 @@ class SessionComparisonTests(unittest.TestCase):
         mongo_session.end_session()
 
     def test_transaction_abort_update(self):
+        self._skip_if_no_transactions()
         self.fake_collection.insert_one({'_id': 1, 'value': 'original'})
         self.mongo_collection.insert_one({'_id': 1, 'value': 'original'})
 
@@ -465,6 +484,7 @@ class SessionComparisonTests(unittest.TestCase):
         mongo_session.end_session()
 
     def test_transaction_commit_delete(self):
+        self._skip_if_no_transactions()
         self.fake_collection.insert_one({'_id': 1, 'value': 'test'})
         self.mongo_collection.insert_one({'_id': 1, 'value': 'test'})
 
@@ -489,6 +509,7 @@ class SessionComparisonTests(unittest.TestCase):
         mongo_session.end_session()
 
     def test_transaction_abort_delete(self):
+        self._skip_if_no_transactions()
         self.fake_collection.insert_one({'_id': 1, 'value': 'test'})
         self.mongo_collection.insert_one({'_id': 1, 'value': 'test'})
 
