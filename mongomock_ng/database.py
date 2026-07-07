@@ -2,6 +2,12 @@ import warnings
 
 from packaging import version
 
+
+try:
+    import bson
+except ImportError:
+    bson = None
+
 from mongomock_ng import codec_options as mongomock_codec_options
 from mongomock_ng import helpers
 from mongomock_ng import read_preferences
@@ -254,7 +260,14 @@ class Database:
             else:
                 raise OperationFailure(f'The target collection "{new_name}" already exists', 10027)
         self._store.rename(name, new_name)
-        return {'ok': 1}
+        result = {'ok': 1}
+        if bson is not None:
+            result['$clusterTime'] = {
+                'clusterTime': bson.Timestamp(0, 0),
+                'signature': {'hash': b'\x00' * 20, 'keyId': 0},
+            }
+            result['operationTime'] = bson.Timestamp(0, 0)
+        return result
 
     def dereference(self, dbref, session=None):
         if not hasattr(dbref, 'collection') or not hasattr(dbref, 'id'):
