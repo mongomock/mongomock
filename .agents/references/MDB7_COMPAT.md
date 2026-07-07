@@ -4,7 +4,7 @@
 **Type**: compat-gap
 **Covers**: missing stages, missing window operators, not-tracked features, known bugs
 **Refresh**: after every new feature impl or code review finding
-**Last-updated**: 2026-05-23
+**Last-updated**: 2026-07-07
 
 ## Legend
 - ❌ not implemented
@@ -69,17 +69,24 @@
 | `$concatArrays` | ✅ | Supports array expressions and nested array literals with parsed field references |
 | `$indexOfArray` | ✅ | Supports optional `start` / `end`; returns `null` for missing or `null` arrays |
 
-## Not Tracked (explicitly absent)
-- changeStreams
-- timeseries collections
-- clustered indexes
-- Queryable Encryption (QE)
-- Atlas Search (`$search`, `$vectorSearch`)
-- MongoDB 7.0+ new query operators not yet encountered
+## Geospatial Query Operators
 
-## Test Status
-- Tested against MongoDB 7.0.34 per CHANGELOG
-- No formal compatibility matrix in repo
+| Operator | Status | Notes |
+|----------|--------|-------|
+| `$geoIntersects` | ✅ | GeoJSON `$geometry`; all GeoJSON doc types |
+| `$geoWithin` | ✅ | GeoJSON `$geometry`; all GeoJSON doc types |
+| `$near` | ✅ | Planar distance; GeoJSON + legacy array syntax; doc Point only |
+| `$nearSphere` | ✅ | Spherical (haversine) distance; doc Point only |
+| `$geoNear` (agg) | ✅ | `_handle_geonear_stage` in `aggregate.py:2821` |
+| `distanceMultiplier` | ✅ | `$geoNear` option |
+| `includeLocs` | ✅ | `$geoNear` option |
+| Custom CRS | ❌ | `crs` field in `$geometry` ignored |
+| Doc non-Point geometry | ✅ | `geo_intersects`/`geo_within` support all GeoJSON types |
+| 2dsphere index sim | ✅ | Required for `$near`/`$nearSphere`/`$geoNear`; raises `OperationFailure` if missing |
+
+**Module**: `mongomock_ng/geospatial.py` (435 lines)
+**Tests**: `tests/test__geospatial.py` (77 tests, all pass)
+**Docs**: `docs/geospatial.md`
 
 ## Known Bugs
 - `aggregate.py:1757` — "setWindowsFields" typo (fixed)

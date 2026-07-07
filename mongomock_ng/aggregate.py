@@ -2830,9 +2830,23 @@ def _handle_geonear_stage(in_collection, database, options, user_vars):
         raise OperationFailure("Missing 'distanceField' in $geoNear")
     max_distance = options.get('maxDistance')
     min_distance = options.get('minDistance')
+    distance_multiplier = options.get('distanceMultiplier')
+    include_locs = options.get('includeLocs')
     limit = options.get('limit') or options.get('num')
     key = options.get('key')
     query = options.get('query')
+
+    if hasattr(in_collection, '_has_2dsphere_index_on'):
+        if key:
+            if not in_collection._has_2dsphere_index_on(key):
+                raise OperationFailure(f'unable to find index for $geoNear query on field "{key}"')
+        else:
+            has_index = any(
+                in_collection._has_2dsphere_index_on(f)
+                for f in ('location', 'geo', 'coordinates', 'loc')
+            )
+            if not has_index:
+                raise OperationFailure('unable to find index for $geoNear query')
 
     if isinstance(near_raw, (list, tuple)):
         if len(near_raw) < 2:
@@ -2857,35 +2871,39 @@ def _handle_geonear_stage(in_collection, database, options, user_vars):
                 if val is not NOTHING:
                     break
             else:
-                return None
+                return None, None
         if val is NOTHING:
-            return None
+            return None, None
         try:
             geo = parse_geojson(val)
             validate_geojson(geo)
         except (OperationFailure, ValueError, TypeError):
-            return None
+            return None, None
         if geo['type'] != 'Point':
-            return None
-        return point_from_geojson(geo)
+            return None, None
+        return point_from_geojson(geo), geo
 
     results = []
     for doc in in_collection:
         if query and not filtering.filter_applies(query, doc):
             continue
-        pt = get_geo_point(doc)
+        pt, geo_obj = get_geo_point(doc)
         if pt is None:
             continue
         if spherical:
             dist = haversine_distance(query_point[0], query_point[1], pt[0], pt[1])
         else:
             dist = math.sqrt((query_point[0] - pt[0]) ** 2 + (query_point[1] - pt[1]) ** 2)
+        if distance_multiplier is not None:
+            dist = dist * distance_multiplier
         if min_distance is not None and dist < min_distance:
             continue
         if max_distance is not None and dist > max_distance:
             continue
         new_doc = dict(doc)
         new_doc[distance_field] = dist
+        if include_locs and geo_obj is not None:
+            new_doc[include_locs] = geo_obj
         results.append(new_doc)
     results.sort(key=lambda x: x[distance_field])
     if limit is not None:

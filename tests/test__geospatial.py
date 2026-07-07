@@ -252,6 +252,7 @@ class NearTest(unittest.TestCase):
         self.db = self.client.test
         self.col = self.db.col
         self.col.drop()
+        self.col.create_index([('loc', '2dsphere')])
 
     def test_near_sorts_by_distance(self):
         self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
@@ -327,6 +328,7 @@ class NearTest(unittest.TestCase):
         self.assertEqual(len(result), 2)
 
     def test_near_multiple_fields_uses_min_distance(self):
+        self.col.create_index([('loc1', '2dsphere')])
         self.col.insert_one(
             {
                 '_id': 1,
@@ -391,6 +393,7 @@ class NearTest(unittest.TestCase):
         self.assertEqual(result[0]['_id'], 1)
 
     def test_near_with_nested_field_path(self):
+        self.col.create_index([('geo', '2dsphere')])
         self.col.insert_one({'_id': 1, 'geo': {'type': 'Point', 'coordinates': [0, 0]}})
         self.col.insert_one({'_id': 2, 'geo': {'type': 'Point', 'coordinates': [1, 1]}})
 
@@ -463,6 +466,7 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.db = self.client.test
         self.col = self.db.col
         self.col.drop()
+        self.col.create_index([('loc', '2dsphere')])
 
     def test_geoNear_basic(self):
         self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
@@ -633,6 +637,7 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.assertEqual(result[0]['_id'], 2)
 
     def test_geoNear_with_key_field(self):
+        self.col.create_index([('custom_location', '2dsphere')])
         self.col.insert_one({'_id': 1, 'custom_location': {'type': 'Point', 'coordinates': [0, 0]}})
         self.col.insert_one({'_id': 2, 'custom_location': {'type': 'Point', 'coordinates': [1, 1]}})
 
@@ -840,6 +845,16 @@ class GeoNearAggregationTest(unittest.TestCase):
         self.assertEqual(result[0]['value'], 42)
         self.assertIn('distance', result[0])
         self.assertGreaterEqual(result[0]['distance'], 0)
+
+
+class GeoIntersectsNonPointTest(unittest.TestCase):
+    """Test $geoIntersects with non-Point document geometries."""
+
+    def setUp(self):
+        self.client = MongoClient()
+        self.db = self.client.test
+        self.col = self.db.col
+        self.col.drop()
 
 
 if __name__ == '__main__':
