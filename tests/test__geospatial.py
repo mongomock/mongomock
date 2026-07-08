@@ -7,8 +7,11 @@ from mongomock_ng import MongoClient
 from mongomock_ng import OperationFailure
 from mongomock_ng.geospatial import _collinear_overlap_interior
 from mongomock_ng.geospatial import _collinear_segments_overlap
+from mongomock_ng.geospatial import _coord_depth
+from mongomock_ng.geospatial import _depth
 from mongomock_ng.geospatial import _euclidean_distance
 from mongomock_ng.geospatial import _extract_points
+from mongomock_ng.geospatial import _linestring_intersects_geo
 from mongomock_ng.geospatial import _linestring_intersects_polygon
 from mongomock_ng.geospatial import _on_segment_bounds
 from mongomock_ng.geospatial import _orientation
@@ -25,7 +28,9 @@ from mongomock_ng.geospatial import _validate_point_coords
 from mongomock_ng.geospatial import _validate_polygon_coords
 from mongomock_ng.geospatial import bbox_intersects
 from mongomock_ng.geospatial import bounding_box
+from mongomock_ng.geospatial import extract_near_specs
 from mongomock_ng.geospatial import haversine_distance
+from mongomock_ng.geospatial import near_filter
 from mongomock_ng.geospatial import parse_geojson
 from mongomock_ng.geospatial import parse_near_spec
 from mongomock_ng.geospatial import point_from_geojson
@@ -482,6 +487,15 @@ class NearTest(unittest.TestCase):
             )
         )
         self.assertEqual(len(result), 0)
+
+    def test_near_legacy_coordinates_uses_euclidean(self):
+        """$near with legacy [lon, lat] format triggers euclidean distance (spherical=False)."""
+        self.col.insert_one({'_id': 1, 'loc': {'type': 'Point', 'coordinates': [0, 0]}})
+        self.col.insert_one({'_id': 2, 'loc': {'type': 'Point', 'coordinates': [3, 4]}})
+
+        result = list(self.col.find({'loc': {'$near': [0, 0]}}))
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['_id'], 1)
 
 
 class GeoNearAggregationTest(unittest.TestCase):
@@ -1086,6 +1100,233 @@ class GeoIntersectsNonPointTest(unittest.TestCase):
         )
         self.assertEqual(len(result), 0)
 
+    def test_polygon_edge_intersects_query_polygon_edge(self):
+        """Cover _polygon_intersects_geo L581: polygon edge intersects query polygon edge."""
+        self.col.insert_one(
+            {
+                '_id': 13,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[5, -5], [15, -5], [15, 5], [5, 5], [5, -5]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 13)
+
+    def test_polygon_intersects_query_linestring(self):
+        """Cover _polygon_intersects_geo L584-593: query LineString crossing polygon edge."""
+        self.col.insert_one(
+            {
+                '_id': 14,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'LineString',
+                                'coordinates': [[5, -5], [5, 15]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 14)
+
+    def test_polygon_not_intersects_query_linestring(self):
+        """Cover _polygon_intersects_geo L584-593: query LineString not intersecting."""
+        self.col.insert_one(
+            {
+                '_id': 15,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'LineString',
+                                'coordinates': [[-5, -5], [-10, -10]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_polygon_intersects_query_multilinestring(self):
+        """Cover _polygon_intersects_geo L584-593: query MultiLineString with one intersecting."""
+        self.col.insert_one(
+            {
+                '_id': 16,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'MultiLineString',
+                                'coordinates': [
+                                    [[-5, -5], [-10, -10]],
+                                    [[5, -5], [5, 15]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 16)
+
+    def test_polygon_does_not_intersect_query_multilinestring(self):
+        """Cover _polygon_intersects_geo L584-593: query MultiLineString none intersecting."""
+        self.col.insert_one(
+            {
+                '_id': 17,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'MultiLineString',
+                                'coordinates': [
+                                    [[-5, -5], [-10, -10]],
+                                    [[20, 20], [25, 25]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_polygon_intersects_query_point_inside(self):
+        """Cover _polygon_intersects_geo L595-597: query Point inside polygon."""
+        self.col.insert_one(
+            {
+                '_id': 18,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'Point',
+                                'coordinates': [5, 5],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 18)
+
+    def test_polygon_intersects_query_multipoint_any_inside(self):
+        """Cover _polygon_intersects_geo L599-600: query MultiPoint with any point inside."""
+        self.col.insert_one(
+            {
+                '_id': 19,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'MultiPoint',
+                                'coordinates': [[20, 20], [5, 5]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 19)
+
+    def test_polygon_does_not_intersect_query_multipoint(self):
+        """Cover _polygon_intersects_geo L599-600: query MultiPoint no point inside."""
+        self.col.insert_one(
+            {
+                '_id': 20,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoIntersects': {
+                            '$geometry': {
+                                'type': 'MultiPoint',
+                                'coordinates': [[20, 20], [30, 30]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
     def test_multipolygon_any_intersects(self):
         self.col.insert_one(
             {
@@ -1342,6 +1583,282 @@ class GeoWithinNonPointTest(unittest.TestCase):
         )
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['_id'], 105)
+
+    def test_linestring_point_outside_polygon(self):
+        """Cover _linestring_within_polygon L533: one point falls outside polygon."""
+        self.col.insert_one(
+            {
+                '_id': 106,
+                'loc': {'type': 'LineString', 'coordinates': [[2, 2], [5, 5], [12, 2]]},
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_linestring_segment_crosses_hole_edge(self):
+        """Cover _linestring_within_polygon L539: segment crosses polygon edge interiorly."""
+        self.col.insert_one(
+            {
+                '_id': 107,
+                'loc': {'type': 'LineString', 'coordinates': [[1, 1], [10, 1], [10, 19]]},
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [
+                                    [[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]],
+                                    [[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_linestring_within_multipolygon(self):
+        """Cover _linestring_within_geo L552-553: query is MultiPolygon."""
+        self.col.insert_one(
+            {
+                '_id': 108,
+                'loc': {'type': 'LineString', 'coordinates': [[2, 2], [5, 5], [8, 2]]},
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'MultiPolygon',
+                                'coordinates': [
+                                    [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                                    [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 108)
+
+    def test_linestring_not_within_multipolygon(self):
+        """Cover _linestring_within_geo L552-553: not fully inside any sub-polygon."""
+        self.col.insert_one(
+            {
+                '_id': 109,
+                'loc': {'type': 'LineString', 'coordinates': [[2, 2], [25, 25]]},
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'MultiPolygon',
+                                'coordinates': [
+                                    [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                                    [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_linestring_within_linestring_same_endpoints(self):
+        """Cover _linestring_within_geo L554-557: query is LineString, endpoints match."""
+        self.col.insert_one(
+            {
+                '_id': 110,
+                'loc': {
+                    'type': 'LineString',
+                    'coordinates': [[0, 0], [2, 0], [5, 0], [8, 0], [10, 0]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'LineString',
+                                'coordinates': [[0, 0], [5, 0], [10, 0]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 110)
+
+    def test_linestring_not_within_linestring_diff_endpoints(self):
+        """Cover _linestring_within_geo L558: query is LineString, endpoints don't match."""
+        self.col.insert_one(
+            {
+                '_id': 111,
+                'loc': {'type': 'LineString', 'coordinates': [[0, 0], [5, 0], [8, 0]]},
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'LineString',
+                                'coordinates': [[0, 0], [5, 0], [10, 0]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_polygon_vertex_outside_query(self):
+        """Cover _polygon_within_geo L613: doc polygon vertex outside query polygon."""
+        self.col.insert_one(
+            {
+                '_id': 112,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [12, 2], [8, 8], [2, 2]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_polygon_edge_crosses_hole_interiorly(self):
+        """Cover _polygon_within_geo L619: doc polygon edge crosses hole edge interiorly."""
+        self.col.insert_one(
+            {
+                '_id': 113,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [8, 2], [8, 18], [2, 18], [2, 2]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'Polygon',
+                                'coordinates': [
+                                    [[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]],
+                                    [[5, 5], [15, 5], [15, 15], [5, 15], [5, 5]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
+
+    def test_polygon_within_multipolygon(self):
+        """Cover _polygon_within_geo L622-626: query is MultiPolygon containing doc polygon."""
+        self.col.insert_one(
+            {
+                '_id': 114,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [8, 2], [8, 8], [2, 8], [2, 2]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'MultiPolygon',
+                                'coordinates': [
+                                    [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                                    [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], 114)
+
+    def test_polygon_not_within_multipolygon(self):
+        """Cover _polygon_within_geo L622-626: not fully inside any sub-polygon."""
+        self.col.insert_one(
+            {
+                '_id': 115,
+                'loc': {
+                    'type': 'Polygon',
+                    'coordinates': [[[2, 2], [12, 2], [8, 8], [2, 2]]],
+                },
+            }
+        )
+        result = list(
+            self.col.find(
+                {
+                    'loc': {
+                        '$geoWithin': {
+                            '$geometry': {
+                                'type': 'MultiPolygon',
+                                'coordinates': [
+                                    [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                                    [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+                                ],
+                            }
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(len(result), 0)
 
 
 class GeoNearAggregationEdgeCaseTest(unittest.TestCase):
@@ -1805,6 +2322,16 @@ class PureFunctionTest(unittest.TestCase):
         self.assertTrue(point_in_polygon_ray_casting((5, 5), ring))
         self.assertTrue(point_in_polygon_ray_casting((0, 5), ring))
 
+    def test_ray_casting_xinters_epsilon_hit(self):
+        """Edge (4,0)-(6,2): xinters rounds to exactly x (within epsilon)."""
+        ring = [(0, 0), (4, 0), (6, 2), (0, 10), (0, 0)]
+        self.assertTrue(point_in_polygon_ray_casting((5, 1), ring))
+
+    def test_ray_casting_xinters_general_toggle(self):
+        """Non-vertical, non-horizontal edge toggles inside via xinters > x."""
+        ring = [(0, 0), (10, 0), (0, 10), (0, 0)]
+        self.assertTrue(point_in_polygon_ray_casting((2, 2), ring))
+
     def test_point_in_polygon_simple(self):
         coords = [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]
         self.assertTrue(point_in_polygon((5, 5), coords))
@@ -1953,6 +2480,14 @@ class PureFunctionTest(unittest.TestCase):
     def test_segments_intersect_touching_at_endpoint(self):
         self.assertTrue(_segments_intersect((0, 0), (5, 5), (5, 5), (10, 0)))
 
+    def test_segments_intersect_q2_on_p1q1(self):
+        """q2 lies collinearly on p1-q1 (o2==0, L412)."""
+        self.assertTrue(_segments_intersect((0, 0), (4, 0), (-2, 0), (2, 0)))
+
+    def test_segments_intersect_p1_on_p2q2(self):
+        """p1 lies collinearly on p2-q2 (o3==0, L414)."""
+        self.assertTrue(_segments_intersect((2, 0), (6, 0), (0, 0), (10, 0)))
+
     # -- _segments_cross --
 
     def test_segments_cross_proper(self):
@@ -2046,6 +2581,55 @@ class PureFunctionTest(unittest.TestCase):
         coords = [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]
         self.assertTrue(_linestring_intersects_polygon([(5, 0), (15, 5)], coords))
 
+    # -- _linestring_intersects_geo (Point, MultiPoint, LineString, MultiLineString) --
+
+    def test_linestring_intersects_geo_point_on_segment(self):
+        pts = [(0, 0), (10, 0), (10, 10)]
+        geo = {'type': 'Point', 'coordinates': [5, 0]}
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_point_first_vertex(self):
+        pts = [(0, 0), (10, 0), (10, 10)]
+        geo = {'type': 'Point', 'coordinates': [0, 0]}
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_point_no_intersection(self):
+        pts = [(0, 0), (10, 0)]
+        geo = {'type': 'Point', 'coordinates': [5, 5]}
+        self.assertFalse(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_multipoint(self):
+        pts = [(0, 0), (10, 0), (10, 10)]
+        geo = {'type': 'MultiPoint', 'coordinates': [[5, 5], [10, 5]]}
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_linestring(self):
+        pts = [(0, 0), (10, 0)]
+        geo = {'type': 'LineString', 'coordinates': [[5, -5], [5, 5]]}
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_multilinestring(self):
+        pts = [(0, 0), (10, 0)]
+        geo = {
+            'type': 'MultiLineString',
+            'coordinates': [
+                [[5, -5], [5, 5]],
+                [[20, 20], [30, 30]],
+            ],
+        }
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
+    def test_linestring_intersects_geo_multipolygon(self):
+        pts = [(5, 5), (15, 5)]
+        geo = {
+            'type': 'MultiPolygon',
+            'coordinates': [
+                [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]],
+            ],
+        }
+        self.assertTrue(_linestring_intersects_geo(pts, geo))
+
     # -- _euclidean_distance --
 
     def test_euclidean_distance_zero(self):
@@ -2136,6 +2720,61 @@ class PureFunctionTest(unittest.TestCase):
     def test_parse_near_spec_no_geometry_key(self):
         with self.assertRaises(OperationFailure):
             parse_near_spec({'coordinates': [0, 0]})
+
+    def test_parse_near_spec_non_point_geojson_type(self):
+        """L685: dict with non-Point GeoJSON type raises OperationFailure."""
+        with self.assertRaises(OperationFailure):
+            parse_near_spec(
+                {
+                    'type': 'Polygon',
+                    'coordinates': [[[0, 0], [1, 1], [2, 0], [0, 0]]],
+                }
+            )
+
+    # -- near_filter --
+
+    def test_near_filter_euclidean_path(self):
+        """L644: euclidean distance when spherical=False."""
+        doc = {'type': 'Point', 'coordinates': [3, 4]}
+        match, dist = near_filter(doc, (0, 0), spherical=False)
+        self.assertTrue(match)
+        self.assertAlmostEqual(dist, 5.0)
+
+    def test_near_filter_spherical_path(self):
+        """L642: haversine distance when spherical=True (sanity check)."""
+        doc = {'type': 'Point', 'coordinates': [0, 0]}
+        match, dist = near_filter(doc, (0, 0), spherical=True)
+        self.assertTrue(match)
+        self.assertAlmostEqual(dist, 0.0, places=5)
+
+    # -- extract_near_specs --
+
+    def test_extract_near_specs_max_distance_outside(self):
+        """L710-713: $maxDistance alongside $near (outside $near obj)."""
+        spec = {'loc': {'$near': [0, 0], '$maxDistance': 1000}}
+        near_specs, cleaned = extract_near_specs(spec)
+        self.assertEqual(len(near_specs), 1)
+        field, parsed = near_specs[0]
+        self.assertEqual(field, 'loc')
+        self.assertEqual(parsed['max_distance'], 1000)
+        self.assertFalse(parsed['spherical'])
+        self.assertEqual(cleaned, {})
+
+    def test_extract_near_specs_min_distance_outside(self):
+        """L714-715: $minDistance alongside $near (outside $near obj)."""
+        spec = {'loc': {'$near': [0, 0], '$minDistance': 500}}
+        near_specs, cleaned = extract_near_specs(spec)
+        self.assertEqual(len(near_specs), 1)
+        _, parsed = near_specs[0]
+        self.assertEqual(parsed['min_distance'], 500)
+        self.assertEqual(cleaned, {})
+
+    def test_extract_near_specs_remaining_keys(self):
+        """L717-719: extra keys aside from $near/$nearSphere/$maxDistance/$minDistance."""
+        spec = {'loc': {'$near': [0, 0], 'extra': 'value', '$maxDistance': 1000}}
+        near_specs, cleaned = extract_near_specs(spec)
+        self.assertEqual(len(near_specs), 1)
+        self.assertEqual(cleaned, {'loc': {'extra': 'value'}})
 
     # -- parse_geojson --
 
@@ -2362,6 +3001,12 @@ class PureFunctionTest(unittest.TestCase):
                 'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 1e-13]]],
             }
         )
+
+    def test_coord_depth_unknown_type_default(self):
+        self.assertEqual(_coord_depth('UnknownType'), 1)
+
+    def test_depth_empty_list(self):
+        self.assertEqual(_depth([]), 1)
 
 
 if __name__ == '__main__':
