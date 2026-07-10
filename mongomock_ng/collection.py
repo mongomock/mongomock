@@ -5,7 +5,6 @@ import itertools
 import json
 import math
 import re
-import threading
 import time
 import warnings
 from collections import OrderedDict
@@ -82,7 +81,6 @@ from .geospatial import parse_geojson
 from .geospatial import validate_geojson
 from .helpers import _clone_document
 from .not_implemented import raise_for_feature as raise_not_implemented
-from .profiler import get_profiler
 from .results import BulkWriteResult
 from .results import DeleteResult
 from .results import InsertManyResult
@@ -91,8 +89,6 @@ from .results import UpdateResult
 from .session import ClientSession
 from .write_concern import WriteConcern
 
-
-_profiler_ctx = threading.local()
 
 try:
     from pymongo.read_concern import ReadConcern
@@ -108,22 +104,6 @@ def _enroll_session(session, collection_store):
     if session.has_ended:
         raise InvalidOperation('Cannot use a session that has ended')
     session._ensure_collection_in_transaction(collection_store)
-
-
-def _profiler_set_operation(op: str):
-    _profiler_ctx.operation = op
-
-
-def _profiler_get_operation() -> str:
-    return getattr(_profiler_ctx, 'operation', 'find')
-
-
-def _profiler_set_sort(sort):
-    _profiler_ctx.sort = sort
-
-
-def _profiler_get_sort():
-    return getattr(_profiler_ctx, 'sort', None)
 
 
 _KwargOption = collections.namedtuple('_KwargOption', ['typename', 'default', 'attrs'])
@@ -987,7 +967,6 @@ class Collection:
             self._current_array_filters = None
 
     def _update_documents(self, spec, document, upsert, multi, sort, session=None, validate=True):
-        _profiler_set_operation('update')
         updated_existing = False
         upserted_id = None
         num_updated = 0
@@ -1454,7 +1433,6 @@ class Collection:
         )
 
     def _get_dataset(self, spec, sort, fields, as_class):
-        _profiler_set_sort(sort)
         near_specs, clean_spec = extract_near_specs(spec) if spec else ([], spec)
         if near_specs:
             for field_path, _near_info in near_specs:
@@ -1778,14 +1756,7 @@ class Collection:
         updater(doc, field_name, field_value, codec_options=self.codec_options)
 
     def _iter_documents(self, filter):
-        get_profiler().record(
-            filter,
-            self.full_name,
-            _profiler_get_operation(),
-            dict(self._list_all_indexes()) if self._store.is_created else {},
-            sort=_profiler_get_sort(),
-        )
-
+        # Validate the filter even if no documents can be returned.
         if self._store.is_empty:
             filter_applies(filter, {})
 
@@ -1952,7 +1923,6 @@ class Collection:
                 'implemented in mongomock-ng yet',
             )
         _enroll_session(session, self._store)
-        _profiler_set_operation('delete')
         filter = helpers.patch_datetime_awareness_in_document(filter)
         if filter is None:
             filter = {}
@@ -2032,7 +2002,6 @@ class Collection:
         if unknown_kwargs:
             raise OperationFailure(f"unrecognized field '{next(iter(unknown_kwargs))}'")
 
-        _profiler_set_operation('count')
         spec = helpers.patch_datetime_awareness_in_document(filter)
         doc_num = len(list(self._iter_documents(spec)))
         count = max(doc_num - skip, 0)

@@ -2954,10 +2954,7 @@ def _handle_union_with_stage(in_collection, database, options, user_vars):
 
 
 def _handle_match_stage(in_collection, database, options, user_vars):
-    from .profiler import get_profiler
-
     spec = helpers.patch_datetime_awareness_in_document(options)
-    get_profiler().record(spec, f'{database.name}.<aggregate>', 'aggregate')
     return [
         doc
         for doc in in_collection
