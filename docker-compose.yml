@@ -6,11 +6,13 @@ services:
     working_dir: /project
     command: hatch test
     environment:
-      - TEST_MONGO_HOST=mongodb://mongo/mock
+      - TEST_MONGO_HOST=mongodb://mongo:27017/mock?replicaSet=rs0
       - MONGODB=7.0.34
     volumes:
       - .:/project
     depends_on:
+      mongo:
+        condition: service_healthy
       mongo-init:
         condition: service_completed_successfully
 
@@ -18,7 +20,7 @@ services:
     # The image chosen here should be kept in sync with the .travis.yml mongo version and with
     # the value in mongomock_ng/__init__.py
     image: mongo:7.0.34
-    command: mongod --replSet rs0
+    command: mongod --replSet rs0 --bind_ip_all
     ports:
       - 127.0.0.1:27017:27017
     volumes:

@@ -4,7 +4,7 @@
 **Type**: compat-gap
 **Covers**: missing stages, missing window operators, not-tracked features, known bugs
 **Refresh**: after every new feature impl or code review finding
-**Last-updated**: 2026-07-08
+**Last-updated**: 2026-07-07
 
 ## Legend
 - ❌ not implemented
@@ -84,8 +84,8 @@
 | Doc non-Point geometry | ✅ | `geo_intersects`/`geo_within` support all GeoJSON types |
 | 2dsphere index sim | ✅ | Required for `$near`/`$nearSphere`/`$geoNear`; raises `OperationFailure` if missing |
 
-**Module**: `mongomock_ng/geospatial.py` (727 lines)
-**Tests**: `tests/test__geospatial.py` (229 tests, all pass)
+**Module**: `mongomock_ng/geospatial.py` (435 lines)
+**Tests**: `tests/test__geospatial.py` (77 tests, all pass)
 **Docs**: `docs/geospatial.md`
 
 ## Known Bugs
