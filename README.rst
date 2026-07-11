@@ -128,53 +128,6 @@ help you ease the migration:
 2. Upgrade to Pymongo v4 or above: your tests using Mongomock-ng will fail exactly where your code
    would fail in production, so that you can fix it before releasing.
 
-Quick Start
------------
-
-Install with pip:
-
-.. code-block:: console
-
-   pip install mongomock-ng
-
-Minimal usage:
-
-.. code-block:: python
-
-   import mongomock_ng as mongomock
-
-   client = mongomock.MongoClient()
-   db = client['test_db']
-   collection = db['test_collection']
-   collection.insert_one({'name': 'test', 'value': 42})
-   print(collection.find_one())
-
-Mongomock-ng is a drop-in replacement for pymongo in tests. All operations happen in-memory —
-no MongoDB server required.
-
-Examples
---------
-
-Example scripts are located in the ``examples/`` directory (see `examples`_). Each file
-demonstrates a different feature:
-
-* ``examples/basic_crud.py`` — Basic CRUD operations (insert, find, update, delete)
-* ``examples/filtering.py`` — Query operators (``$gt``, ``$in``, ``$regex``, projections, sorting)
-* ``examples/aggregation.py`` — Aggregation pipeline (``$match``, ``$group``, ``$lookup``, ``$sort``)
-* ``examples/validation.py`` — Schema validation with ``$jsonSchema``
-* ``examples/ttl.py`` — TTL index simulation
-
-.. _examples: https://github.com/engFelipeMonteiro/mongomock-ng/tree/develop/examples
-
-Documentation
--------------
-
-Detailed documentation is available under the ``docs/`` directory:
-
-* `API reference <docs/API.md>`_ — API reference for MongoClient, Database, Collection
-* `Aggregation reference <docs/AGGREGATION.md>`_ — Aggregation pipeline operator reference
-* `Limitations <docs/LIMITATIONS.md>`_ — Known limitations compared to real MongoDB
-
 Contributing
 ------------
 

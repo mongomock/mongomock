@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [7.8.0] - 2026-07-10
+## [Unreleased]
 ### Added
 - `QueryProfiler` — query capture and index coverage analyzer (docs/profiler.md)
   - Activated via `MONGOMOCK_PROFILER=1` env var with `atexit` auto-export
@@ -15,8 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort coverage analysis against index keys
   - Partial index support (matches original filter values against `partialFilterExpression`)
   - JSON report with per-collection patterns, indexes, and coverage summary
-- Documentation: AGGREGATION.md, API.md, LIMITATIONS.md
-- Examples: basic CRUD, aggregation, filtering, TTL, validation
 
 ## [7.7.0] - 2026-07-06
 ### Added
