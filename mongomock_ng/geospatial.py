@@ -27,7 +27,7 @@ def parse_geojson(obj: Any) -> dict:
     typ = obj.get('type')
     if not isinstance(typ, str) or typ not in GEOJSON_TYPES:
         raise OperationFailure(
-            f'Invalid GeoJSON type: {typ!r}. Must be one of ' f'{", ".join(sorted(GEOJSON_TYPES))}'
+            f'Invalid GeoJSON type: {typ!r}. Must be one of {", ".join(sorted(GEOJSON_TYPES))}'
         )
     coordinates = obj.get('coordinates')
     if typ == 'GeometryCollection':
@@ -133,45 +133,8 @@ def _validate_polygon_coords(coords: Sequence) -> None:
             _validate_point_coords(pt)
 
 
-def bounding_box(geometry: dict) -> tuple[float, float, float, float]:
-    typ = geometry['type']
-    if typ == 'GeometryCollection':
-        bboxes = [bounding_box(g) for g in geometry['geometries']]
-        return (
-            min(b[0] for b in bboxes),
-            min(b[1] for b in bboxes),
-            max(b[2] for b in bboxes),
-            max(b[3] for b in bboxes),
-        )
-    coords = geometry['coordinates']
-    all_pts = _extract_points(typ, coords)
-    lons = [p[0] for p in all_pts]
-    lats = [p[1] for p in all_pts]
-    return min(lons), min(lats), max(lons), max(lats)
-
-
-def _extract_points(typ: str, coords: Any) -> list[tuple[float, float]]:
-    if typ == 'Point':
-        return [tuple(coords[:2])]
-    if typ in ('LineString', 'MultiPoint'):
-        return [tuple(p[:2]) for p in coords]
-    if typ == 'Polygon':
-        return [tuple(p[:2]) for ring in coords for p in ring]
-    if typ == 'MultiLineString':
-        return [tuple(p[:2]) for ls in coords for p in ls]
-    if typ == 'MultiPolygon':
-        return [tuple(p[:2]) for poly in coords for ring in poly for p in ring]
-    return []
-
-
 def point_from_geojson(obj: dict) -> tuple[float, float]:
     return tuple(obj['coordinates'][:2])
-
-
-def bbox_intersects(bbox_a: tuple, bbox_b: tuple) -> bool:
-    axmin, aymin, axmax, aymax = bbox_a
-    bxmin, bymin, bxmax, bymax = bbox_b
-    return not (axmax < bxmin or axmin > bxmax or aymax < bymin or aymin > bymax)
 
 
 def point_in_polygon_ray_casting(

@@ -2,11 +2,8 @@ import collections
 import datetime
 import sys
 from unittest import skipIf
-from unittest import skipUnless
 from unittest import TestCase
 from uuid import uuid4
-
-from packaging import version
 
 import mongomock_ng as mongomock
 from mongomock_ng import helpers
@@ -171,8 +168,8 @@ class DatabaseAPITest(TestCase):
             self.database.with_options(custom_tzinfo)
 
     @skipIf(
-        not helpers.HAVE_PYMONGO or version.parse('3.8') > helpers.PYMONGO_VERSION,
-        'pymongo not installed or <3.8',
+        not helpers.HAVE_PYMONGO,
+        'pymongo not installed',
     )
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
@@ -195,20 +192,6 @@ class DatabaseAPITest(TestCase):
         )
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_type_registry)
-
-    def test__collection_names(self):
-        self.database.create_collection('a')
-        self.database.create_collection('b')
-
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            with self.assertRaises(TypeError):
-                self.database.collection_names()
-            return
-
-        self.assertEqual(set(self.database.collection_names()), {'a', 'b'})
-
-        self.database.c.drop()
-        self.assertEqual(set(self.database.collection_names()), {'a', 'b'})
 
     def test__list_collection_names(self):
         self.database.create_collection('a')
@@ -401,19 +384,6 @@ class DatabaseAPITest(TestCase):
         self.assertNotEqual(client.a, mongomock.MongoClient('example.com').a)
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipUnless(
-        version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
-    def test__not_hashable(self):
-        with self.assertRaises(TypeError):
-            {self.database}  # noqa: B018
-
-    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipIf(
-        version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
     def test__hashable(self):
         {self.database}  # noqa: B018
 

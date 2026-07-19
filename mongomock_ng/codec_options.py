@@ -4,10 +4,6 @@ import collections
 from typing import Any
 from typing import cast
 
-from packaging import version
-
-from mongomock_ng import helpers
-
 
 try:
     from bson import codec_options as bson_codec_options
@@ -31,21 +27,21 @@ _fields_list: list[str] = [
     'tzinfo',
 ]
 
-if codec_options and version.parse('3.8') <= helpers.PYMONGO_VERSION:
+try:
     _DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
     _fields_list.append('type_registry')
-else:
+except (AttributeError, TypeError):
     _DEFAULT_TYPE_REGISTRY = TypeRegistry()
 
-if codec_options and version.parse('4.3') <= helpers.PYMONGO_VERSION:
+try:
     _DEFAULT_DATETIME_CONVERSION = codec_options.DatetimeConversion.DATETIME
     _fields_list.append('datetime_conversion')
-else:
+except (AttributeError, TypeError):
     _DEFAULT_DATETIME_CONVERSION = 1
 
 # New default in Pymongo v4:
 # https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
-_DEFAULT_UUID_REPRESENTATION = 0 if version.parse('4.0') <= helpers.PYMONGO_VERSION else 3
+_DEFAULT_UUID_REPRESENTATION = 0
 
 _CodecOptions = collections.namedtuple('_CodecOptions', cast(tuple[str, ...], tuple(_fields_list)))  # type: ignore[misc]
 

@@ -1,15 +1,9 @@
-import warnings
-
-from packaging import version
-
-
 try:
     import bson
 except ImportError:
     bson = None
 
 from mongomock_ng import codec_options as mongomock_codec_options
-from mongomock_ng import helpers
 from mongomock_ng import read_preferences
 from mongomock_ng import store
 
@@ -108,10 +102,8 @@ class Database:
     def __next__(self):
         raise TypeError("'Database' object is not iterable")
 
-    if version.parse('3.12') <= helpers.PYMONGO_VERSION:
-
-        def __hash__(self):
-            return hash((self._client, self.name))
+    def __hash__(self):
+        return hash((self._client, self.name))
 
     @property
     def client(self):
@@ -135,16 +127,6 @@ class Database:
 
     def _get_created_collections(self):
         return self._store.list_created_collection_names()
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def collection_names(self, include_system_collections=True, session=None):
-            warnings.warn(
-                'collection_names is deprecated. Use list_collection_names instead.', stacklevel=2
-            )
-            if include_system_collections:
-                return list(self._get_created_collections())
-            return self.list_collection_names(session=session)
 
     def list_collections(self, filter=None, session=None, nameOnly=False):  # noqa: N803
         names = self.list_collection_names(filter=filter)

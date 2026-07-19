@@ -3,7 +3,11 @@ import unittest
 from unittest import skipIf
 
 import mongomock_ng as mongomock
+from mongomock_ng.read_concern import ReadConcern
 from mongomock_ng.session import ClientSession
+from mongomock_ng.session import SessionOptions
+from mongomock_ng.session import TransactionOptions
+from mongomock_ng.write_concern import WriteConcern
 
 
 try:
@@ -15,6 +19,47 @@ try:
     HAVE_PYMONGO = True
 except ImportError:
     HAVE_PYMONGO = False
+
+
+class SessionOptionsTests(unittest.TestCase):
+    def test_transaction_options_defaults(self):
+        opts = TransactionOptions()
+        self.assertIsNone(opts.read_concern)
+        self.assertIsNone(opts.write_concern)
+        self.assertIsNone(opts.read_preference)
+        self.assertIsNone(opts.max_commit_time_ms)
+
+    def test_transaction_options_with_params(self):
+        rc = ReadConcern(level='local')
+        wc = WriteConcern(w=1)
+        opts = TransactionOptions(
+            read_concern=rc,
+            write_concern=wc,
+            read_preference='primary',
+            max_commit_time_ms=1000,
+        )
+        self.assertIs(opts.read_concern, rc)
+        self.assertIs(opts.write_concern, wc)
+        self.assertEqual(opts.read_preference, 'primary')
+        self.assertEqual(opts.max_commit_time_ms, 1000)
+
+    def test_session_options_defaults(self):
+        opts = SessionOptions()
+        self.assertTrue(opts.causal_consistency)
+        self.assertIsNone(opts.default_transaction_options)
+
+    def test_session_options_with_params(self):
+        txn_opts = TransactionOptions(read_concern=ReadConcern(level='snapshot'))
+        opts = SessionOptions(
+            causal_consistency=False,
+            default_transaction_options=txn_opts,
+        )
+        self.assertFalse(opts.causal_consistency)
+        self.assertIs(opts.default_transaction_options, txn_opts)
+
+    def test_session_options_default_transaction_options_property(self):
+        opts = SessionOptions(default_transaction_options='dummy')
+        self.assertEqual(opts.default_transaction_options, 'dummy')
 
 
 class SessionBasicTests(unittest.TestCase):
@@ -70,6 +115,13 @@ class TransactionTests(unittest.TestCase):
             self.assertTrue(session.in_transaction)
         self.assertFalse(session.in_transaction)
         session.end_session()
+
+    def test_start_transaction_on_ended_session_raises(self):
+        client = mongomock.MongoClient()
+        session = client.start_session()
+        session.end_session()
+        with self.assertRaises(mongomock.InvalidOperation):
+            session.start_transaction()
 
     def test_double_start_transaction_raises(self):
         client = mongomock.MongoClient()
@@ -323,18 +375,33 @@ class TransactionTests(unittest.TestCase):
 @skipIf(not HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class SessionComparisonTests(unittest.TestCase):
-    def setUp(self):
+    _mongo_available = None
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
         try:
-            self.fake_conn = mongomock.MongoClient()
-            self.mongo_conn = self._connect_to_local_mongodb()
-            self.db_name = 'mongomock___session_test_db'
-            self.collection_name = 'mongomock___session_test_collection'
-            self.mongo_conn.drop_database(self.db_name)
-            self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
-            self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
-            self._transactions_supported = self._check_transactions_supported()
+            conn = PymongoClient(
+                host=os.environ.get('TEST_MONGO_HOST', 'localhost'),
+                serverSelectionTimeoutMS=2000,
+            )
+            conn.admin.command('ping')
+            conn.close()
+            cls._mongo_available = True
         except Exception:
-            self.skipTest('MongoDB not available')
+            cls._mongo_available = False
+
+    def setUp(self):
+        if not self._mongo_available:
+            self.skipTest('No local MongoDB server available')
+        self.fake_conn = mongomock.MongoClient()
+        self.mongo_conn = self._connect_to_local_mongodb()
+        self.db_name = 'mongomock___session_test_db'
+        self.collection_name = 'mongomock___session_test_collection'
+        self.mongo_conn.drop_database(self.db_name)
+        self.mongo_collection = self.mongo_conn[self.db_name][self.collection_name]
+        self.fake_collection = self.fake_conn[self.db_name][self.collection_name]
+        self._transactions_supported = self._check_transactions_supported()
 
     def _check_transactions_supported(self):
         try:
@@ -360,10 +427,8 @@ class SessionComparisonTests(unittest.TestCase):
                 return PymongoClient(
                     host=os.environ.get('TEST_MONGO_HOST', 'localhost'), maxPoolSize=1
                 )
-            except pymongo.errors.ConnectionFailure as e:
+            except pymongo.errors.ConnectionFailure:
                 if retry == num_retries - 1:
-                    raise
-                if 'connection refused' not in e.message.lower():
                     raise
 
     def tearDown(self):

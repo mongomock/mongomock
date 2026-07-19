@@ -1,6 +1,7 @@
 import os
 import time
 import unittest
+from unittest import mock
 from unittest import skipIf
 from unittest import skipUnless
 from unittest import TestCase
@@ -36,6 +37,15 @@ class GridFsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         mongomock.gridfs.enable_gridfs_integration()
+        try:
+            conn = PymongoClient(
+                host=os.environ.get('TEST_MONGO_HOST', 'localhost'),
+                serverSelectionTimeoutMS=2000,
+            )
+            conn.admin.command('ping')
+            conn.close()
+        except Exception:
+            raise unittest.SkipTest('No local MongoDB server available') from None
 
     def setUp(self):
         super().setUp()
@@ -173,7 +183,7 @@ class GridFsTest(TestCase):
         return self.fake_conn[self.db_name]['fs']['files'].find_one({'_id': i})
 
     def _connect_to_local_mongodb(self, num_retries=60):
-        """Performs retries on connection refused errors (for travis-ci builds)"""
+        """Performs retries on connection errors (for travis-ci builds)"""
         for retry in range(num_retries):
             if retry > 0:
                 time.sleep(0.5)
@@ -181,10 +191,8 @@ class GridFsTest(TestCase):
                 return PymongoClient(
                     host=os.environ.get('TEST_MONGO_HOST', 'localhost'), maxPoolSize=1
                 )
-            except pymongo.errors.ConnectionFailure as e:
+            except pymongo.errors.ConnectionFailure:
                 if retry == num_retries - 1:
-                    raise
-                if 'connection refused' not in e.message.lower():
                     raise
 
 
@@ -214,6 +222,106 @@ class GenFile:
             bytes_left -= 1
             if bytes_left == 0:
                 return self._maybe_encode(s)
+
+
+class TestMongoMockGridOutCursor(unittest.TestCase):
+    """Tests for _MongoMockGridOutCursor: add_option, remove_option, _clone_base."""
+
+    def setUp(self):
+        self.client = mongomock.MongoClient()
+        self.db = self.client['test_db']
+        self.collection = self.db['fs']
+
+    def _make_cursor(self):
+        from mongomock_ng.gridfs import _MongoMockGridOutCursor
+
+        return _MongoMockGridOutCursor(self.collection)
+
+    def test_add_option_raises_not_implemented(self):
+        cursor = self._make_cursor()
+        with self.assertRaises(NotImplementedError):
+            cursor.add_option(64)
+
+    def test_remove_option_raises_not_implemented(self):
+        cursor = self._make_cursor()
+        with self.assertRaises(NotImplementedError):
+            cursor.remove_option(64)
+
+    def test_clone_base_returns_grid_out_cursor(self):
+        from mongomock_ng.gridfs import _MongoMockGridOutCursor
+
+        cursor = self._make_cursor()
+        cloned = cursor._clone_base(session=None)
+        self.assertIsInstance(cloned, _MongoMockGridOutCursor)
+
+    def test_clone_base_creates_new_instance(self):
+        cursor = self._make_cursor()
+        cloned = cursor._clone_base(session=None)
+        self.assertIsNot(cloned, cursor)
+
+    def test_clone_base_carries_session(self):
+        cursor = self._make_cursor()
+        cloned = cursor._clone_base(session='my_session')
+        self.assertEqual(cloned.session, 'my_session')
+
+
+class TestCreateGridOutCursor(unittest.TestCase):
+    """Tests for _create_grid_out_cursor dispatch."""
+
+    def test_with_mongomock_collection(self):
+        from mongomock_ng.gridfs import _create_grid_out_cursor
+        from mongomock_ng.gridfs import _MongoMockGridOutCursor
+
+        client = mongomock.MongoClient()
+        db = client['test_db']
+        result = _create_grid_out_cursor(db['fs'])
+        self.assertIsInstance(result, _MongoMockGridOutCursor)
+
+    @skipUnless(_HAVE_GRIDFS, 'gridfs not installed')
+    def test_with_pymongo_collection(self):
+        from gridfs.grid_file import GridOutCursor as PyMongoGridOutCursor
+        from pymongo.collection import Collection as PyMongoCollection
+
+        from mongomock_ng.gridfs import _create_grid_out_cursor
+
+        mock_collection = mock.MagicMock(spec=PyMongoCollection)
+        mock_collection.files = mock.MagicMock()
+        result = _create_grid_out_cursor(mock_collection)
+        self.assertIsInstance(result, PyMongoGridOutCursor)
+
+
+@skipUnless(_HAVE_GRIDFS, 'gridfs not installed')
+class TestEnableGridFSIntegration(unittest.TestCase):
+    """Tests for enable_gridfs_integration."""
+
+    def test_enable_without_pymongo_raises_error(self):
+        with (
+            mock.patch.object(mongomock.gridfs, '_HAVE_PYMONGO', False),
+            self.assertRaises(NotImplementedError),
+        ):
+            mongomock.gridfs.enable_gridfs_integration()
+
+    def test_enable_runs_without_error(self):
+        mongomock.gridfs.enable_gridfs_integration()
+
+    def test_can_create_gridfs_after_enable(self):
+        import gridfs
+
+        mongomock.gridfs.enable_gridfs_integration()
+        client = mongomock.MongoClient()
+        gfs = gridfs.GridFS(client['test_db'])
+        self.assertIsNotNone(gfs)
+
+    def test_put_and_get_after_enable(self):
+        import gridfs
+
+        mongomock.gridfs.enable_gridfs_integration()
+        client = mongomock.MongoClient()
+        gfs = gridfs.GridFS(client['test_db'])
+        data = b'test data for enable_gridfs_integration'
+        fid = gfs.put(data, filename='test.txt')
+        gout = gfs.get(fid)
+        self.assertEqual(gout.read(), data)
 
 
 if __name__ == '__main__':

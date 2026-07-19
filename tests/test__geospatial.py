@@ -8,7 +8,6 @@ from mongomock_ng import OperationFailure
 from mongomock_ng.geospatial import _collinear_overlap_interior
 from mongomock_ng.geospatial import _collinear_segments_overlap
 from mongomock_ng.geospatial import _euclidean_distance
-from mongomock_ng.geospatial import _extract_points
 from mongomock_ng.geospatial import _linestring_intersects_polygon
 from mongomock_ng.geospatial import _on_segment_bounds
 from mongomock_ng.geospatial import _orientation
@@ -23,9 +22,11 @@ from mongomock_ng.geospatial import _to_float_pairs
 from mongomock_ng.geospatial import _validate_linestring_coords
 from mongomock_ng.geospatial import _validate_point_coords
 from mongomock_ng.geospatial import _validate_polygon_coords
-from mongomock_ng.geospatial import bbox_intersects
-from mongomock_ng.geospatial import bounding_box
+from mongomock_ng.geospatial import extract_near_specs
+from mongomock_ng.geospatial import geo_intersects
+from mongomock_ng.geospatial import geo_within
 from mongomock_ng.geospatial import haversine_distance
+from mongomock_ng.geospatial import near_filter
 from mongomock_ng.geospatial import parse_geojson
 from mongomock_ng.geospatial import parse_near_spec
 from mongomock_ng.geospatial import point_from_geojson
@@ -1662,99 +1663,7 @@ class ValidationEdgeCaseTest(unittest.TestCase):
 class PureFunctionTest(unittest.TestCase):
     """Unit tests for pure (no-side-effect) helper functions."""
 
-    # -- bounding_box, _extract_points, point_from_geojson, bbox_intersects --
-
-    def test_bounding_box_point(self):
-        bbox = bounding_box({'type': 'Point', 'coordinates': [10.5, -20.3]})
-        self.assertEqual(bbox, (10.5, -20.3, 10.5, -20.3))
-
-    def test_bounding_box_linestring(self):
-        bbox = bounding_box(
-            {
-                'type': 'LineString',
-                'coordinates': [[0, 0], [10, 5], [3, 8]],
-            }
-        )
-        self.assertEqual(bbox, (0, 0, 10, 8))
-
-    def test_bounding_box_polygon(self):
-        bbox = bounding_box(
-            {
-                'type': 'Polygon',
-                'coordinates': [[[2, 3], [12, 3], [12, 9], [2, 9], [2, 3]]],
-            }
-        )
-        self.assertEqual(bbox, (2, 3, 12, 9))
-
-    def test_bounding_box_multipolygon(self):
-        bbox = bounding_box(
-            {
-                'type': 'MultiPolygon',
-                'coordinates': [
-                    [[[0, 0], [5, 0], [5, 5], [0, 5], [0, 0]]],
-                    [[[10, 10], [20, 10], [20, 20], [10, 20], [10, 10]]],
-                ],
-            }
-        )
-        self.assertEqual(bbox, (0, 0, 20, 20))
-
-    def test_bounding_box_geometry_collection(self):
-        bbox = bounding_box(
-            {
-                'type': 'GeometryCollection',
-                'geometries': [
-                    {'type': 'Point', 'coordinates': [1, 2]},
-                    {'type': 'Point', 'coordinates': [10, 20]},
-                ],
-            }
-        )
-        self.assertEqual(bbox, (1, 2, 10, 20))
-
-    def test_bounding_box_empty_geometry_collection(self):
-        with self.assertRaises(ValueError):
-            bounding_box({'type': 'GeometryCollection', 'geometries': []})
-
-    def test_extract_points_point(self):
-        pts = _extract_points('Point', [7.5, 3.2])
-        self.assertEqual(pts, [(7.5, 3.2)])
-
-    def test_extract_points_linestring(self):
-        pts = _extract_points('LineString', [[0, 0], [1, 1], [2, 2]])
-        self.assertEqual(pts, [(0, 0), (1, 1), (2, 2)])
-
-    def test_extract_points_multipoint(self):
-        pts = _extract_points('MultiPoint', [[0, 0], [1, 1]])
-        self.assertEqual(pts, [(0, 0), (1, 1)])
-
-    def test_extract_points_polygon(self):
-        pts = _extract_points('Polygon', [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]])
-        self.assertEqual(len(pts), 5)
-        self.assertIn((0, 0), pts)
-        self.assertIn((10, 10), pts)
-
-    def test_extract_points_multilinestring(self):
-        pts = _extract_points('MultiLineString', [[[0, 0], [1, 1]], [[2, 2], [3, 3]]])
-        self.assertEqual(pts, [(0, 0), (1, 1), (2, 2), (3, 3)])
-
-    def test_extract_points_multipolygon(self):
-        pts = _extract_points(
-            'MultiPolygon',
-            [
-                [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
-                [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]],
-            ],
-        )
-        self.assertEqual(len(pts), 10)
-        self.assertIn((0, 0), pts)
-        self.assertIn((3, 3), pts)
-
-    def test_extract_points_unknown_type(self):
-        pts = _extract_points('Unknown', [1, 2, 3])
-        self.assertEqual(pts, [])
-
-    def test_bounding_box_with_z_values(self):
-        bbox = bounding_box({'type': 'Point', 'coordinates': [5, 5, 100]})
-        self.assertEqual(bbox, (5, 5, 5, 5))
+    # -- point_from_geojson --
 
     def test_point_from_geojson(self):
         pt = point_from_geojson({'type': 'Point', 'coordinates': [30, 40]})
@@ -1763,24 +1672,6 @@ class PureFunctionTest(unittest.TestCase):
     def test_point_from_geojson_with_z(self):
         pt = point_from_geojson({'type': 'Point', 'coordinates': [30, 40, 200]})
         self.assertEqual(pt, (30, 40))
-
-    def test_bbox_intersects_overlap(self):
-        self.assertTrue(bbox_intersects((0, 0, 10, 10), (5, 5, 15, 15)))
-
-    def test_bbox_intersects_no_overlap_x(self):
-        self.assertFalse(bbox_intersects((0, 0, 10, 10), (20, 0, 30, 10)))
-
-    def test_bbox_intersects_no_overlap_y(self):
-        self.assertFalse(bbox_intersects((0, 0, 10, 10), (0, 20, 10, 30)))
-
-    def test_bbox_intersects_touching_edge(self):
-        self.assertTrue(bbox_intersects((0, 0, 10, 10), (10, 0, 20, 10)))
-
-    def test_bbox_intersects_identical(self):
-        self.assertTrue(bbox_intersects((0, 0, 10, 10), (0, 0, 10, 10)))
-
-    def test_bbox_intersects_contained(self):
-        self.assertTrue(bbox_intersects((0, 0, 20, 20), (5, 5, 10, 10)))
 
     # -- point_in_polygon_ray_casting, point_in_polygon, point_in_multipolygon --
 
@@ -2362,6 +2253,463 @@ class PureFunctionTest(unittest.TestCase):
                 'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 1e-13]]],
             }
         )
+
+
+class GeospatialValidationTest(unittest.TestCase):
+    """Group 1+2: Validation errors and validate_geojson branches."""
+
+    def test_geometrycollection_non_list_geometries(self):
+        with self.assertRaises(OperationFailure):
+            parse_geojson({'type': 'GeometryCollection', 'geometries': 'not_a_list'})
+
+    def test_coordinates_not_list(self):
+        with self.assertRaises(OperationFailure):
+            parse_geojson({'type': 'Point', 'coordinates': 'not_a_list'})
+
+    def test_empty_list_depth(self):
+        """_depth([]) hits empty list branch at line 68."""
+        with self.assertRaises(OperationFailure):
+            parse_geojson({'type': 'Polygon', 'coordinates': []})
+
+    def test_wrong_coordinate_depth(self):
+        with self.assertRaises(OperationFailure):
+            parse_geojson({'type': 'Point', 'coordinates': [[1, 2]]})
+
+    def test_lon_not_number(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range('not_a_number', 0)
+
+    def test_lat_not_number(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range(0, 'not_a_number')
+
+    def test_lon_out_of_range_positive(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range(200, 0)
+
+    def test_lon_out_of_range_negative(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range(-200, 0)
+
+    def test_lat_out_of_range_positive(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range(0, 100)
+
+    def test_lat_out_of_range_negative(self):
+        with self.assertRaises(OperationFailure):
+            validate_coord_range(0, -100)
+
+    def test_point_less_than_2_coords(self):
+        geo = parse_geojson({'type': 'Point', 'coordinates': [1]})
+        with self.assertRaises(OperationFailure):
+            validate_geojson(geo)
+
+    def test_linestring_less_than_2_points(self):
+        geo = parse_geojson({'type': 'LineString', 'coordinates': [[1, 2]]})
+        with self.assertRaises(OperationFailure):
+            validate_geojson(geo)
+
+    def test_polygon_empty_coords(self):
+        with self.assertRaises(OperationFailure):
+            _validate_polygon_coords([])
+
+    def test_polygon_ring_less_than_4_points(self):
+        with self.assertRaises(OperationFailure):
+            _validate_polygon_coords([[[0, 0], [1, 1], [2, 2]]])
+
+    def test_validate_geojson_linestring(self):
+        geo = parse_geojson({'type': 'LineString', 'coordinates': [[0, 0], [1, 1]]})
+        validate_geojson(geo)
+
+    def test_validate_geojson_multipoint(self):
+        geo = parse_geojson({'type': 'MultiPoint', 'coordinates': [[0, 0], [1, 1]]})
+        validate_geojson(geo)
+
+    def test_validate_geojson_multilinestring(self):
+        geo = parse_geojson(
+            {
+                'type': 'MultiLineString',
+                'coordinates': [[[0, 0], [1, 1]], [[2, 2], [3, 3]]],
+            }
+        )
+        validate_geojson(geo)
+
+    def test_validate_geojson_multipolygon(self):
+        geo = parse_geojson(
+            {
+                'type': 'MultiPolygon',
+                'coordinates': [[[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]],
+            }
+        )
+        validate_geojson(geo)
+
+
+class NearParseEdgeCaseTest(unittest.TestCase):
+    """Group 3: $near/$nearSphere parse_near_spec edge cases."""
+
+    def test_parse_near_spec_legacy_array_too_short(self):
+        with self.assertRaises(OperationFailure):
+            parse_near_spec([1])
+
+    def test_parse_near_spec_invalid_type(self):
+        with self.assertRaises(OperationFailure):
+            parse_near_spec('invalid')
+
+    def test_parse_near_spec_geometry_not_point(self):
+        with self.assertRaises(OperationFailure):
+            parse_near_spec({'$geometry': {'type': 'LineString', 'coordinates': [[0, 0], [1, 1]]}})
+
+    def test_parse_near_spec_type_not_point(self):
+        with self.assertRaises(OperationFailure):
+            parse_near_spec({'type': 'LineString', 'coordinates': [[0, 0], [1, 1]]})
+
+    def test_parse_near_spec_legacy_valid(self):
+        """Legacy array [lon, lat] success path (lines 623-625)."""
+        result = parse_near_spec([0, 0])
+        self.assertEqual(result['query_point'], (0, 0))
+        self.assertFalse(result['spherical'])
+
+    def test_parse_near_spec_type_point(self):
+        """GeoJSON with 'type' directly (not $geometry) success path (lines 649-656)."""
+        result = parse_near_spec({'type': 'Point', 'coordinates': [0, 0]})
+        self.assertEqual(result['query_point'], (0, 0))
+        self.assertTrue(result['spherical'])
+
+    def test_extract_near_specs_with_max_min_distance(self):
+        spec = {
+            'loc': {
+                '$near': {'$geometry': {'type': 'Point', 'coordinates': [0, 0]}},
+                '$maxDistance': 1000,
+                '$minDistance': 100,
+            }
+        }
+        near_specs, _cleaned = extract_near_specs(spec)
+        self.assertEqual(len(near_specs), 1)
+        _, parsed = near_specs[0]
+        self.assertEqual(parsed['max_distance'], 1000)
+        self.assertEqual(parsed['min_distance'], 100)
+
+    def test_extract_near_specs_with_remaining(self):
+        """Non-skip keys alongside $near populate cleaned (line 682)."""
+        spec = {
+            'loc': {
+                '$near': {'$geometry': {'type': 'Point', 'coordinates': [0, 0]}},
+                '$maxDistance': 1000,
+                'otherField': 42,
+            }
+        }
+        near_specs, cleaned = extract_near_specs(spec)
+        self.assertEqual(len(near_specs), 1)
+        self.assertEqual(cleaned, {'loc': {'otherField': 42}})
+
+    def test_parse_near_spec_empty_dict(self):
+        """Empty dict hits final fallback raise (line 657)."""
+        with self.assertRaises(OperationFailure):
+            parse_near_spec({})
+
+
+class NearFilterTest(unittest.TestCase):
+    """Group 3: near_filter unit tests (euclidean distance)."""
+
+    def test_near_filter_euclidean_distance_hits(self):
+        doc = {'type': 'Point', 'coordinates': [0, 0]}
+        ok, dist = near_filter(doc, (1, 0), spherical=False)
+        self.assertTrue(ok)
+        self.assertAlmostEqual(dist, 1.0)
+
+    def test_near_filter_euclidean_non_point_skipped(self):
+        doc = {'type': 'LineString', 'coordinates': [[0, 0], [1, 1]]}
+        ok, dist = near_filter(doc, (0, 0), spherical=False)
+        self.assertFalse(ok)
+        self.assertIsNone(dist)
+
+
+class PointOnSegmentTest(unittest.TestCase):
+    """Group 4: _point_on_segment edge cases."""
+
+    def test_zero_length_segment(self):
+        """Identical start/end points: point must match."""
+        self.assertTrue(_point_on_segment(1, 1, 1, 1, 1, 1))
+
+    def test_point_not_on_line(self):
+        """Point above the segment (cross > epsilon)."""
+        self.assertFalse(_point_on_segment(0, 1, 0, 0, 1, 0))
+
+    def test_point_beyond_segment_start(self):
+        """Point before segment start (dot < 0)."""
+        self.assertFalse(_point_on_segment(-1, 0, 0, 0, 1, 0))
+
+
+class SegmentsIntersectTest(unittest.TestCase):
+    """Group 5: _segments_intersect collinear endpoint cases."""
+
+    def test_o1_zero_within_bounds(self):
+        """o1 == 0: p2 collinear with p1-q1 and within bounds (line 374)."""
+        self.assertTrue(_segments_intersect((0, 0), (2, 0), (1, 0), (3, 0)))
+
+    def test_o2_zero_shared_endpoint(self):
+        """o2 == 0: q2 collinear with p1-q1 and within bounds."""
+        self.assertTrue(_segments_intersect((0, 0), (2, 0), (4, 0), (1, 0)))
+
+    def test_o3_zero_shared_endpoint(self):
+        """o3 == 0: p1 collinear with p2-q2 and within bounds."""
+        self.assertTrue(_segments_intersect((1, 0), (2, 0), (0, 0), (4, 0)))
+
+
+class IntersectsBranchesTest(unittest.TestCase):
+    """_point_intersects_geo branches (Group 6 supplement)."""
+
+    def test_point_intersects_multipoint(self):
+        """Point doc with MultiPoint query where one matches (line 289)."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {'type': 'MultiPoint', 'coordinates': [[5, 5], [20, 20]]}
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_point_intersects_multipoint_none(self):
+        """Point doc with MultiPoint where none match."""
+        doc = {'type': 'Point', 'coordinates': [1, 1]}
+        query = {'type': 'MultiPoint', 'coordinates': [[5, 5], [20, 20]]}
+        self.assertFalse(geo_intersects(doc, query))
+
+    def test_point_intersects_multilinestring(self):
+        """Point doc with MultiLineString query where one contains point."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {
+            'type': 'MultiLineString',
+            'coordinates': [[[0, 0], [10, 10]], [[20, 20], [30, 30]]],
+        }
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_point_intersects_multilinestring_none(self):
+        """Point doc with MultiLineString query where none contain point."""
+        doc = {'type': 'Point', 'coordinates': [1, 2]}
+        query = {
+            'type': 'MultiLineString',
+            'coordinates': [[[0, 0], [10, 10]], [[20, 20], [30, 30]]],
+        }
+        self.assertFalse(geo_intersects(doc, query))
+
+
+class WithinBranchesTest(unittest.TestCase):
+    """_point_within_geo branches (Group 8 supplement)."""
+
+    def test_point_within_multipolygon(self):
+        """Point doc with MultiPolygon query (line 302-303)."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {
+            'type': 'MultiPolygon',
+            'coordinates': [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        }
+        self.assertTrue(geo_within(doc, query))
+
+    def test_point_within_point(self):
+        """Point doc with Point query exact match (lines 304-306)."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {'type': 'Point', 'coordinates': [5, 5]}
+        self.assertTrue(geo_within(doc, query))
+
+    def test_point_within_point_mismatch(self):
+        """Point doc with different Point query."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {'type': 'Point', 'coordinates': [1, 1]}
+        self.assertFalse(geo_within(doc, query))
+
+    def test_point_within_multipoint(self):
+        """Point doc with MultiPoint query where one matches (lines 307-308)."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {'type': 'MultiPoint', 'coordinates': [[1, 1], [5, 5]]}
+        self.assertTrue(geo_within(doc, query))
+
+    def test_point_within_multipoint_none(self):
+        """Point doc with MultiPoint query where none match."""
+        doc = {'type': 'Point', 'coordinates': [5, 5]}
+        query = {'type': 'MultiPoint', 'coordinates': [[1, 1], [2, 2]]}
+        self.assertFalse(geo_within(doc, query))
+
+
+class WithinMultiPointTest(unittest.TestCase):
+    """geo_within MultiPoint doc branch (lines 253-254)."""
+
+    def test_multipoint_all_within_polygon(self):
+        """MultiPoint doc where all points are inside query polygon."""
+        doc = {'type': 'MultiPoint', 'coordinates': [[1, 1], [9, 9]]}
+        query = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        self.assertTrue(geo_within(doc, query))
+
+    def test_multipoint_not_all_within_polygon(self):
+        """MultiPoint doc where one point is outside query polygon."""
+        doc = {'type': 'MultiPoint', 'coordinates': [[1, 1], [20, 20]]}
+        query = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        self.assertFalse(geo_within(doc, query))
+
+
+class LinestringWithinGeoTest(unittest.TestCase):
+    """_linestring_within_geo branches (lines 515-516)."""
+
+    def test_linestring_within_multipolygon(self):
+        """LineString doc within one polygon of query MultiPolygon."""
+        doc = {'type': 'LineString', 'coordinates': [[1, 1], [2, 2], [3, 3]]}
+        query = {
+            'type': 'MultiPolygon',
+            'coordinates': [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        }
+        self.assertTrue(geo_within(doc, query))
+
+    def test_linestring_not_within_multipolygon(self):
+        """LineString doc not fully within any query polygon."""
+        doc = {'type': 'LineString', 'coordinates': [[1, 1], [20, 20]]}
+        query = {
+            'type': 'MultiPolygon',
+            'coordinates': [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        }
+        self.assertFalse(geo_within(doc, query))
+
+    def test_linestring_within_linestring(self):
+        """LineString doc with matching LineString query (lines 517-520)."""
+        doc = {'type': 'LineString', 'coordinates': [[0, 0], [1, 1], [2, 2]]}
+        query = {'type': 'LineString', 'coordinates': [[0, 0], [2, 2]]}
+        self.assertTrue(geo_within(doc, query))
+
+    def test_linestring_within_linestring_mismatch(self):
+        """LineString doc with different endpoint LineString query (line 521)."""
+        doc = {'type': 'LineString', 'coordinates': [[0, 0], [10, 10]]}
+        query = {'type': 'LineString', 'coordinates': [[0, 0], [2, 2]]}
+        self.assertFalse(geo_within(doc, query))
+
+
+class GeoIntersectsPolygonQueryTest(unittest.TestCase):
+    """Group 6: _polygon_intersects_geo query type branches."""
+
+    def test_polygon_intersects_point(self):
+        """Polygon doc with Point query inside."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {'type': 'Point', 'coordinates': [5, 5]}
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_polygon_intersects_multipoint(self):
+        """Polygon doc with MultiPoint query where one is inside."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {'type': 'MultiPoint', 'coordinates': [[5, 5], [20, 20]]}
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_polygon_intersects_multipoint_none(self):
+        """Polygon doc with MultiPoint query where none inside."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {'type': 'MultiPoint', 'coordinates': [[20, 20], [30, 30]]}
+        self.assertFalse(geo_intersects(doc, query))
+
+    def test_polygon_intersects_linestring(self):
+        """Polygon doc with LineString query crossing it."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {'type': 'LineString', 'coordinates': [[5, -5], [5, 15]]}
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_polygon_intersects_linestring_disjoint(self):
+        """Polygon doc with LineString query not touching."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {'type': 'LineString', 'coordinates': [[20, 20], [30, 30]]}
+        self.assertFalse(geo_intersects(doc, query))
+
+    def test_polygon_intersects_multilinestring(self):
+        """Polygon doc with MultiLineString query where one crosses."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        query = {
+            'type': 'MultiLineString',
+            'coordinates': [[[5, -5], [5, 15]], [[20, 20], [30, 30]]],
+        }
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_polygon_edges_intersect_query(self):
+        """Polygon doc where first vertex outside but edges overlap (line 544)."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[5, -5], [5, 5], [15, 5], [15, -5], [5, -5]]],
+        }
+        query = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        self.assertTrue(geo_intersects(doc, query))
+
+
+class LinestringIntersectsGeoTest(unittest.TestCase):
+    """Group 7: _linestring_intersects_geo branches."""
+
+    def test_linestring_intersects_multipolygon(self):
+        """LineString doc with MultiPolygon query."""
+        doc = {'type': 'LineString', 'coordinates': [[5, -5], [5, 15]]}
+        query = {
+            'type': 'MultiPolygon',
+            'coordinates': [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        }
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_linestring_intersects_multipoint(self):
+        """LineString doc with MultiPoint query where a point is on the line."""
+        doc = {'type': 'LineString', 'coordinates': [[0, 0], [10, 10]]}
+        query = {'type': 'MultiPoint', 'coordinates': [[5, 5], [20, 20]]}
+        self.assertTrue(geo_intersects(doc, query))
+
+    def test_linestring_intersects_multilinestring(self):
+        """LineString doc with MultiLineString query where one crosses."""
+        doc = {'type': 'LineString', 'coordinates': [[0, 0], [10, 10]]}
+        query = {
+            'type': 'MultiLineString',
+            'coordinates': [[[0, 10], [10, 0]], [[20, 20], [30, 30]]],
+        }
+        self.assertTrue(geo_intersects(doc, query))
+
+
+class PolygonWithinGeoTest(unittest.TestCase):
+    """Group 8: _polygon_within_geo branches."""
+
+    def test_polygon_not_within_polygon(self):
+        """Doc polygon extends outside query polygon."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[-1, -1], [11, -1], [11, 11], [-1, 11], [-1, -1]]],
+        }
+        query = {
+            'type': 'Polygon',
+            'coordinates': [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+        }
+        self.assertFalse(geo_within(doc, query))
+
+    def test_polygon_within_multipolygon(self):
+        """Doc polygon within one polygon of query MultiPolygon."""
+        doc = {
+            'type': 'Polygon',
+            'coordinates': [[[1, 1], [9, 1], [9, 9], [1, 9], [1, 1]]],
+        }
+        query = {
+            'type': 'MultiPolygon',
+            'coordinates': [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        }
+        self.assertTrue(geo_within(doc, query))
 
 
 if __name__ == '__main__':

@@ -1,12 +1,8 @@
 import itertools
-import warnings
-
-from packaging import version
 
 import mongomock_ng
 from mongomock_ng import codec_options as mongomock_codec_options
 from mongomock_ng import ConfigurationError
-from mongomock_ng import helpers
 from mongomock_ng import read_preferences
 from mongomock_ng.database import Database
 from mongomock_ng.session import ClientSession
@@ -103,10 +99,8 @@ class MongoClient:
             return self.address == other.address
         return NotImplemented
 
-    if version.parse('3.12') <= helpers.PYMONGO_VERSION:
-
-        def __hash__(self):
-            return hash(self.address)
+    def __hash__(self):
+        return hash(self.address)
 
     def close(self):
         pass
@@ -141,14 +135,6 @@ class MongoClient:
             'maxBsonObjectSize': 16777216,
             'ok': 1,
         }
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def database_names(self):
-            warnings.warn(
-                'database_names is deprecated. Use list_database_names instead.', stacklevel=2
-            )
-            return self.list_database_names()
 
     def list_database_names(self):
         return self._store.list_created_database_names()

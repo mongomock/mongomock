@@ -1,7 +1,6 @@
 import os
+import warnings
 from unittest import mock
-
-from packaging import version
 
 import mongomock_ng as mongomock
 from mongomock_ng import helpers
@@ -15,20 +14,16 @@ except ImportError:
 from unittest import skipIf
 from unittest import TestCase
 
+from packaging import version
+
 from tests.multicollection import MultiCollection
 
 
-# https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above')
 class BulkOperationsTest(TestCase):
-    test_with_pymongo = False
-
     def setUp(self):
         super().setUp()
-        if self.test_with_pymongo:
-            self.client = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
-        else:
-            self.client = mongomock.MongoClient()
+        warnings.filterwarnings('ignore', category=DeprecationWarning)
+        self.client = mongomock.MongoClient()
         self.db = self.client['somedb']
         self.db.collection.drop()
         for _i in 'abx':
@@ -38,7 +33,7 @@ class BulkOperationsTest(TestCase):
         self.bulk_op = self.db.collection.initialize_ordered_bulk_op()
 
     def __check_document(self, doc, count=1):
-        found_num = self.db.collection.find(doc).count()
+        found_num = self.db.collection.count_documents(doc)
         if found_num != count:
             all = list(self.db.collection.find())
             self.fail(
@@ -59,9 +54,6 @@ class BulkOperationsTest(TestCase):
         ):
             exp_val = expecting_values.get(key)
             has_val = result.get(key)
-            if self.test_with_pymongo and key == 'nModified' and has_val is None:
-                # ops, real pymongo did not returned 'nModified' key!
-                continue
             self.assertFalse(has_val is None, f"Missed key '{key}' in result: {result}")
             if exp_val:
                 self.assertEqual(
@@ -77,7 +69,7 @@ class BulkOperationsTest(TestCase):
         self.__check_result(result, **expecting_result)
 
     def __check_number_of_elements(self, count):
-        has_count = self.db.collection.count()
+        has_count = self.db.collection.count_documents({})
         self.assertEqual(
             has_count, count, f'There is {has_count} documents but there should be {count}'
         )
@@ -193,77 +185,114 @@ class BulkOperationsTest(TestCase):
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
-class BulkOperationsWithPymongoTest(BulkOperationsTest):
-    test_with_pymongo = True
+class BulkOperationsWithPymongoTest(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.fake_client = mongomock.MongoClient()
+        self.real_client = pymongo.MongoClient(
+            host=os.environ.get('TEST_MONGO_HOST', 'mongodb://127.0.0.1:27017/mock?replicaSet=rs0')
+        )
+        self.db_name = 'mongomock_ng___testing_db'
+        self.collection_name = 'mongomock_ng___testing_collection'
+        self.real_client[self.db_name][self.collection_name].drop()
+        self.cmp = MultiCollection(
+            {
+                'fake': self.fake_client[self.db_name][self.collection_name],
+                'real': self.real_client[self.db_name][self.collection_name],
+            }
+        )
+
+    def test__bulk_write_insert(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 2, 'b': 2}])
+        self.cmp.compare.find(sort=[('a', 1)])
+
+    def test__bulk_write_update_one(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 1, 'b': 2}])
+        self.cmp.do.bulk_write([pymongo.UpdateOne({'a': 1}, {'$set': {'b': 10}})])
+        self.cmp.compare.find({'a': 1}, sort=[('b', 1)])
+
+    def test__bulk_write_update_many(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 1, 'b': 2}])
+        self.cmp.do.bulk_write([pymongo.UpdateMany({'a': 1}, {'$set': {'c': 3}})])
+        self.cmp.compare.find({'a': 1}, sort=[('b', 1)])
+
+    def test__bulk_write_replace_one(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 2, 'b': 2}])
+        self.cmp.do.bulk_write([pymongo.ReplaceOne({'a': 1}, {'a': 1, 'b': 99})])
+        self.cmp.compare.find(sort=[('a', 1)])
+
+    def test__bulk_write_delete_one(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 1, 'b': 2}])
+        self.cmp.do.bulk_write([pymongo.DeleteOne({'a': 1})])
+        self.cmp.compare.find({'a': 1})
+
+    def test__bulk_write_delete_many(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 1, 'b': 2}, {'a': 2, 'b': 3}])
+        self.cmp.do.bulk_write([pymongo.DeleteMany({'a': 1})])
+        self.cmp.compare.find(sort=[('a', 1)])
+
+    def test__bulk_write_mixed_operations(self):
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': 1},
+                {'a': 2, 'b': 2},
+                {'a': 3, 'b': 3},
+                {'a': 4, 'b': 4},
+            ]
+        )
+        self.cmp.do.bulk_write(
+            [
+                pymongo.UpdateOne({'a': 1}, {'$set': {'b': 10}}),
+                pymongo.DeleteOne({'a': 2}),
+                pymongo.ReplaceOne({'a': 3}, {'a': 3, 'b': 30}),
+                pymongo.UpdateMany({'a': 4}, {'$set': {'b': 40}}),
+            ]
+        )
+        self.cmp.compare.find(sort=[('a', 1)])
 
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
-# https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-initialize-ordered-bulk-op-and-initialize-unordered-bulk-op-is-removed
-@skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above')
 class CollectionComparisonTest(TestCase):
     def setUp(self):
         super().setUp()
-        self.fake_conn = mongomock.MongoClient()
-        self.mongo_conn = pymongo.MongoClient(host=os.environ.get('TEST_MONGO_HOST', 'localhost'))
+        self.fake_client = mongomock.MongoClient()
+        self.real_client = pymongo.MongoClient(
+            host=os.environ.get('TEST_MONGO_HOST', 'mongodb://127.0.0.1:27017/mock?replicaSet=rs0')
+        )
         self.db_name = 'mongomock_ng___testing_db'
         self.collection_name = 'mongomock_ng___testing_collection'
-        self.mongo_conn[self.db_name][self.collection_name].remove()
+        self.real_client[self.db_name][self.collection_name].drop()
         self.cmp = MultiCollection(
             {
-                'fake': self.fake_conn[self.db_name][self.collection_name],
-                'real': self.mongo_conn[self.db_name][self.collection_name],
-            }
-        )
-        self.bulks = MultiCollection(
-            {
-                'fake': self.cmp.conns['fake'].initialize_ordered_bulk_op(),
-                'real': self.cmp.conns['real'].initialize_ordered_bulk_op(),
+                'fake': self.fake_client[self.db_name][self.collection_name],
+                'real': self.real_client[self.db_name][self.collection_name],
             }
         )
 
-        # hacky! Depending on mongo server version 'nModified' is returned or not..
-        # so let make simple bulk operation to know what's the server behaviour...
-        coll = self.mongo_conn[self.db_name]['mongomock_ng_testing_prepare_test']
-        bulk = coll.initialize_ordered_bulk_op()
-        bulk.insert({'a': 1})
-        insert_returns_nmodified = 'nModified' in bulk.execute()
+    def test__find_all(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 2, 'b': 2}])
+        self.cmp.compare.find(sort=[('a', 1)])
 
-        bulk = self.cmp.conns['real'].initialize_ordered_bulk_op()
-        bulk.find({'a': 1}).update({'$set': {'a': 2}})
-        update_returns_nmodified = 'nModified' in bulk.execute()
-        coll.drop()
+    def test__find_with_filter(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 2, 'b': 2}])
+        self.cmp.compare.find({'a': 1})
 
-        self.bulks.conns['fake']._set_nModified_policy(
-            insert_returns_nmodified, update_returns_nmodified
-        )
+    def test__insert_and_find(self):
+        self.cmp.do.insert_one({'a': 1, 'b': 3})
+        self.cmp.do.insert_one({'a': 2, 'c': 1})
+        self.cmp.do.insert_one({'a': 2, 'c': 2})
+        self.cmp.compare.find(sort=[('a', 1), ('b', 1), ('c', 1)])
 
-    def test__insert(self):
-        self.bulks.do.insert({'a': 1, 'b': 1})
-        self.bulks.do.insert({'a': 2, 'b': 2})
-        self.bulks.do.insert({'a': 2, 'b': 2})
-        self.bulks.compare.execute()
+    def test__update_and_find(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 1, 'b': 2}])
+        self.cmp.do.update_one({'a': 1}, {'$set': {'b': 10}})
+        self.cmp.compare.find({'a': 1}, sort=[('b', 1)])
 
-    def test__mixed_operations(self):
-        self.cmp.do.insert({'a': 1, 'b': 3})
-        self.cmp.do.insert({'a': 2, 'c': 1})
-        self.cmp.do.insert({'a': 2, 'c': 2})
-        self.cmp.do.insert({'a': 3, 'c': 1})
-        self.cmp.do.insert({'a': 4, 'd': 2})
-        self.cmp.do.insert({'a': 5, 'd': 11})
-        self.cmp.do.insert({'a': 5, 'd': 22})
-
-        self.bulks.do.insert({'a': 1, 'b': 1})
-        for bwo in self.bulks.do.find({'a': 2}).values():
-            bwo.remove_one()
-        for bwo in self.bulks.do.find({'a': 3}).values():
-            bwo.update({'$inc': {'b': 1}})
-        for bwo in self.bulks.do.find({'a': 4}).values():
-            bwo.upsert().replace_one({'b': 11, 'x': 'y'})
-        for bwo in self.bulks.do.find({'a': 5}).values():
-            bwo.upsert().update({'$inc': {'b': 11}})
-        self.bulks.compare.execute()
-        self.cmp.compare.find(sort=[('a', 1), ('b', 1), ('c', 1), ('d', 1)])
+    def test__delete_and_find(self):
+        self.cmp.do.insert_many([{'a': 1, 'b': 1}, {'a': 2, 'b': 2}])
+        self.cmp.do.delete_one({'a': 1})
+        self.cmp.compare.find(sort=[('a', 1)])
 
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')

@@ -2,12 +2,10 @@ import copy
 import datetime
 import os
 import re
-import sys
 import time
 import uuid
 from collections import OrderedDict
 from unittest import skipIf
-from unittest import skipUnless
 from unittest import TestCase
 
 from packaging import version
@@ -28,7 +26,6 @@ try:
     from bson.code import Code
     from bson.objectid import ObjectId
     from bson.regex import Regex
-    from bson.son import SON
     from pymongo import MongoClient as PymongoClient
     from pymongo import read_concern
     from pymongo.read_preferences import ReadPreference
@@ -272,8 +269,26 @@ class _CollectionComparisonTest(TestCase):
     This is done via cross-comparison of the results.
     """
 
+    _mongo_available = None
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        try:
+            conn = PymongoClient(
+                host=os.environ.get('TEST_MONGO_HOST', 'localhost'),
+                serverSelectionTimeoutMS=2000,
+            )
+            conn.admin.command('ping')
+            conn.close()
+            cls._mongo_available = True
+        except Exception:
+            cls._mongo_available = False
+
     def setUp(self):
         super().setUp()
+        if not self._mongo_available:
+            self.skipTest('No local MongoDB server available')
         self.fake_conn = mongomock.MongoClient()
         self.mongo_conn = self._connect_to_local_mongodb()
         self.db_name = 'mongomock___testing_db'
@@ -309,7 +324,7 @@ class _CollectionComparisonTest(TestCase):
         )
 
     def _connect_to_local_mongodb(self, num_retries=60):
-        """Performs retries on connection refused errors (for travis-ci builds)"""
+        """Performs retries on connection errors (for travis-ci builds)"""
         for retry in range(num_retries):
             if retry > 0:
                 time.sleep(0.5)
@@ -317,10 +332,8 @@ class _CollectionComparisonTest(TestCase):
                 return PymongoClient(
                     host=os.environ.get('TEST_MONGO_HOST', 'localhost'), maxPoolSize=1
                 )
-            except pymongo.errors.ConnectionFailure as e:
+            except pymongo.errors.ConnectionFailure:
                 if retry == num_retries - 1:
-                    raise
-                if 'connection refused' not in e.message.lower():
                     raise
 
     def tearDown(self):
@@ -333,25 +346,9 @@ class EqualityCollectionTest(_CollectionComparisonTest):
         self.assertEqual(self.mongo_conn[self.db_name], self.mongo_conn[self.db_name])
         self.assertEqual(self.fake_conn[self.db_name], self.fake_conn[self.db_name])
 
-    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipIf(
-        helpers.PYMONGO_VERSION and version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
     def test__database_hashable(self):
         {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
         {self.fake_conn[self.db_name]}  # pylint: disable=pointless-statement
-
-    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipUnless(
-        helpers.PYMONGO_VERSION and version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
-    def test__database_not_hashable(self):
-        with self.assertRaises(TypeError):
-            {self.mongo_conn[self.db_name]}  # pylint: disable=pointless-statement
-        with self.assertRaises(TypeError):
-            {self.fake_conn[self.db_name]}  # pylint: disable=pointless-statement
 
 
 class MongoClientCollectionTest(_CollectionComparisonTest):
@@ -377,13 +374,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             )
         self.cmp.compare_ignore_order.find()
 
-    def test__insert(self):
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.insert({'a': 1})
-            return
-        self.cmp.do.insert({'a': 1})
-        self.cmp.compare.find()
-
     def test__insert_one(self):
         self.cmp.do.insert_one({'a': 1})
         self.cmp.compare.find()
@@ -391,15 +381,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
     def test__insert_many(self):
         self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
         self.cmp.compare.find()
-
-    def test__save(self):
-        # add an item with a non ObjectId _id first.
-        self.cmp.do.insert_one({'_id': 'b'})
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.save({'_id': ObjectId(), 'someProp': 1})
-            return
-        self.cmp.do.save({'_id': ObjectId(), 'someProp': 1})
-        self.cmp.compare_ignore_order.find()
 
     def test__insert_object_id_as_dict(self):
         self.cmp.do.delete_many({})
@@ -431,21 +412,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
             self.cmp.do.delete_one({'_id': doc_id})
 
-    def test__count(self):
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.count()
-            return
-        self.cmp.compare.count()
-        self.cmp.do.insert_one({'a': 1})
-        self.cmp.compare.count()
-        self.cmp.do.insert_one({'a': 0})
-        self.cmp.compare.count()
-        self.cmp.compare.count({'a': 1})
-
-    @skipIf(
-        helpers.PYMONGO_VERSION and version.parse('3.8') > helpers.PYMONGO_VERSION,
-        'older version of pymongo does not have count_documents',
-    )
     def test__count_documents(self):
         self.cmp.compare.count_documents({})
         self.cmp.do.insert_one({'a': 1})
@@ -460,10 +426,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_exceptions.count_documents({}, limit='one')
         self.cmp.compare_exceptions.count_documents({}, limit='1')
 
-    @skipIf(
-        helpers.PYMONGO_VERSION and version.parse('3.8') > helpers.PYMONGO_VERSION,
-        'older version of pymongo does not have estimated_document_count',
-    )
     def test__estimated_document_count(self):
         self.cmp.compare.estimated_document_count()
         self.cmp.do.insert_one({'a': 1})
@@ -475,14 +437,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         else:
             self.cmp.compare_exceptions.estimated_document_count(skip=2)
         self.cmp.compare_exceptions.estimated_document_count(filter={'a': 1})
-
-    def test__reindex(self):
-        self.cmp.compare.create_index('a')
-        self.cmp.do.insert_one({'a': 1})
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.reindex()
-            return
-        self.cmp.do.reindex()
 
     def test__find_one(self):
         self.cmp.do.insert_one({'_id': 'id1', 'name': 'new'})
@@ -988,16 +942,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$ne': 3}})
         self.cmp.compare_ignore_order.find({'cases.total': {'$gt': 1, '$nin': [1, 3]}})
 
-    def test__find_and_modify_remove(self):
-        self.cmp.do.insert_many([{'a': x, 'junk': True} for x in range(10)])
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.find_and_modify(
-                {'a': 2}, remove=True, fields={'_id': False, 'a': True}
-            )
-            return
-        self.cmp.compare.find_and_modify({'a': 2}, remove=True, fields={'_id': False, 'a': True})
-        self.cmp.compare_ignore_order.find()
-
     def test__find_one_and_delete(self):
         self.cmp.do.insert_many([{'a': i} for i in range(10)])
         self.cmp.compare.find_one_and_delete({'a': 5}, {'_id': False})
@@ -1134,48 +1078,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         )
         for type_name in supported_types:
             self.cmp.compare.find({'a': {'$type': type_name}})
-
-    @skipIf(sys.version_info < (3, 7), 'Older versions of Python cannot copy regex partterns')
-    @skipIf(
-        version.parse('4.0') <= helpers.PYMONGO_VERSION,
-        'pymongo v4 or above do not specify uuid encoding',
-    )
-    def test__sort_mixed_types(self):
-        self.cmp.do.insert_many(
-            [
-                {'type': 'bool', 'a': True},
-                {'type': 'datetime', 'a': datetime.datetime.now()},
-                {'type': 'dict', 'a': {'a': 1}},
-                {'type': 'emptyList', 'a': []},
-                {'type': 'int', 'a': 1},
-                {'type': 'listOfList', 'a': [[1, 2], [3, 4]]},
-                {'type': 'missing'},
-                {'type': 'None', 'a': None},
-                {'type': 'ObjectId', 'a': ObjectId()},
-                {'type': 'regex', 'a': re.compile('a')},
-                {'type': 'repeatedInt', 'a': [1, 2]},
-                {'type': 'string', 'a': 'a'},
-                {'type': 'tupleOfTuple', 'a': ((1, 2), (3, 4))},
-                {'type': 'uuid', 'a': uuid.UUID(int=3)},
-                {'type': 'DBRef', 'a': DBRef('a', 'a', 'db_name')},
-            ]
-        )
-        self.cmp.compare.find({}, sort=[('a', 1), ('type', 1)])
-
-    @skipIf(
-        version.parse('4.0') <= helpers.PYMONGO_VERSION,
-        'pymongo v4 or above do not specify uuid encoding',
-    )
-    def test__find_sort_uuid(self):
-        self.cmp.do.delete_many({})
-        self.cmp.do.insert_many(
-            [
-                {'_id': uuid.UUID(int=3), 'timestamp': 99, 'a': 1},
-                {'_id': uuid.UUID(int=1), 'timestamp': 100, 'a': 3},
-                {'_id': uuid.UUID(int=2), 'timestamp': 100, 'a': 2},
-            ]
-        )
-        self.cmp.compare.find({}, sort=[('timestamp', 1), ('_id', 1)])
 
     @skipIf(
         version.parse('4.0') > helpers.PYMONGO_VERSION,
@@ -1333,29 +1235,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             {'name': 'Array'}, projection={'name': 1, 'values': {'$slice': 1}}
         )
 
-    def test__remove(self):
-        """Test the remove method."""
-        self.cmp.do.insert_one({'value': 1})
-        self.cmp.compare_ignore_order.find()
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.remove()
-            return
-        self.cmp.do.remove()
-        self.cmp.compare.find()
-        self.cmp.do.insert_many(
-            [
-                {'name': 'bob'},
-                {'name': 'sam'},
-            ]
-        )
-        self.cmp.compare_ignore_order.find()
-        self.cmp.do.remove({'name': 'bob'})
-        self.cmp.compare_ignore_order.find()
-        self.cmp.do.remove({'name': 'notsam'})
-        self.cmp.compare.find()
-        self.cmp.do.remove({'name': 'sam'})
-        self.cmp.compare.find()
-
     def test__delete_one(self):
         self.cmp.do.insert_many([{'a': i} for i in range(10)])
         self.cmp.compare.find()
@@ -1368,23 +1247,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.find()
 
         self.cmp.do.delete_many({'a': {'$gt': 5}})
-        self.cmp.compare.find()
-
-    def test__update(self):
-        doc = {'a': 1}
-        self.cmp.do.insert_one(doc)
-        new_document = {'new_attr': 2}
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.update({'a': 1}, new_document)
-            return
-        self.cmp.do.update({'a': 1}, new_document)
-        self.cmp.compare_ignore_order.find()
-
-    @skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above dropped update')
-    def test__update_upsert_with_id(self):
-        self.cmp.do.update(
-            {'a': 1}, {'_id': ObjectId('52d669dcad547f059424f783'), 'a': 1}, upsert=True
-        )
         self.cmp.compare.find()
 
     def test__update_with_zero_id(self):
@@ -1408,13 +1270,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
     def test__update_upsert_with_matched_subdocuments(self):
         self.cmp.do.update_one({'b.c.': 1, 'b.d': 3}, {'$set': {'a': 1}}, upsert=True)
-        self.cmp.compare.find()
-
-    @skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 or above dropped update')
-    def test__update_with_empty_document_comes(self):
-        """Tests calling update_one with just '{}' for replacing whole document"""
-        self.cmp.do.insert_one({'name': 'bob', 'hat': 'wide'})
-        self.cmp.do.update({'name': 'bob'}, {})
         self.cmp.compare.find()
 
     def test__update_one(self):
@@ -2188,16 +2043,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.compare.find({})
 
-    def test__ensure_index(self):
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.ensure_index('name')
-            return
-        self.cmp.compare.ensure_index('name')
-        self.cmp.compare.ensure_index('hat', cache_for=100)
-        self.cmp.compare.ensure_index([('name', 1), ('hat', -1)])
-        self.cmp.do.insert_one({})
-        self.cmp.compare.index_information()
-
     def test__drop_index(self):
         self.cmp.do.insert_one({})
         self.cmp.compare.create_index([('name', 1), ('hat', -1)])
@@ -2281,18 +2126,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         """),
         )
 
-    @skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 dropped group method')
-    @skipIf(version.parse('3.6') > helpers.PYMONGO_VERSION, 'pymongo v3.6 broke group method')
-    def test__group_fails(self):
-        self.cmp.compare_exceptions.group(
-            ['a'],
-            {'a': {'$lt': 3}},
-            {'count': 0},
-            Code("""
-            function(cur, result) { result.count += cur.count }
-        """),
-        )
-
     def test__find_where_multiple_results(self):
         self.cmp.do.delete_many({})
         self.cmp.do.insert_many(
@@ -2336,184 +2169,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
 
 @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
-@skipIf(version.parse('4.0') <= helpers.PYMONGO_VERSION, 'pymongo v4 dropped map reduce')
-class CollectionMapReduceTest(TestCase):
-    def setUp(self):
-        self.db = mongomock.MongoClient().map_reduce_test
-        self.data = [
-            {'x': 1, 'tags': ['dog', 'cat']},
-            {'x': 2, 'tags': ['cat']},
-            {'x': 3, 'tags': ['mouse', 'cat', 'dog']},
-            {'x': 4, 'tags': []},
-        ]
-        for item in self.data:
-            self.db.things.insert_one(item)
-        self.map_func = Code("""
-                function() {
-                    this.tags.forEach(function(z) {
-                        emit(z, 1);
-                    });
-                }""")
-        self.reduce_func = Code("""
-                function(key, values) {
-                    var total = 0;
-                    for(var i = 0; i<values.length; i++) {
-                        total += values[i];
-                    }
-                    return total;
-                }""")
-        self.expected_results = [
-            {'_id': 'mouse', 'value': 1},
-            {'_id': 'dog', 'value': 2},
-            {'_id': 'cat', 'value': 3},
-        ]
-
-    def test__map_reduce(self):
-        self._check_map_reduce(self.db.things, self.expected_results)
-
-    def test__map_reduce_clean_res_colc(self):
-        # Checks that the result collection is cleaned between calls
-        self._check_map_reduce(self.db.things, self.expected_results)
-
-        more_data = [
-            {'x': 1, 'tags': []},
-            {'x': 2, 'tags': []},
-            {'x': 3, 'tags': []},
-            {'x': 4, 'tags': []},
-        ]
-        for item in more_data:
-            self.db.more_things.insert_one(item)
-        expected_results = []
-
-        self._check_map_reduce(self.db.more_things, expected_results)
-
-    def _check_map_reduce(self, colc, expected_results):
-        result = colc.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertIsInstance(result, mongomock.Collection)
-        self.assertEqual(result.name, 'myresults')
-        self.assertEqual(result.count_documents({}), len(expected_results))
-        for doc in result.find():
-            self.assertIn(doc, expected_results)
-
-    def test__map_reduce_son(self):
-        result = self.db.things.map_reduce(
-            self.map_func,
-            self.reduce_func,
-            out=SON([('replace', 'results'), ('db', 'map_reduce_son_test')]),
-        )
-        self.assertIsInstance(result, mongomock.Collection)
-        self.assertEqual(result.name, 'results')
-        self.assertEqual(result.database.name, 'map_reduce_son_test')
-        self.assertEqual(result.count_documents({}), 3)
-        for doc in result.find():
-            self.assertIn(doc, self.expected_results)
-
-    def test__map_reduce_full_response(self):
-        expected_full_response = {
-            'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3},
-            'timeMillis': 5,
-            'ok': 1.0,
-            'result': 'myresults',
-        }
-        result = self.db.things.map_reduce(
-            self.map_func, self.reduce_func, 'myresults', full_response=True
-        )
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['counts'], expected_full_response['counts'])
-        self.assertEqual(result['result'], expected_full_response['result'])
-        for doc in getattr(self.db, result['result']).find():
-            self.assertIn(doc, self.expected_results)
-
-    def test__map_reduce_with_query(self):
-        expected_results = [
-            {'_id': 'mouse', 'value': 1},
-            {'_id': 'dog', 'value': 2},
-            {'_id': 'cat', 'value': 2},
-        ]
-        result = self.db.things.map_reduce(
-            self.map_func, self.reduce_func, 'myresults', query={'tags': 'dog'}
-        )
-        self.assertIsInstance(result, mongomock.Collection)
-        self.assertEqual(result.name, 'myresults')
-        self.assertEqual(result.count_documents({}), 3)
-        for doc in result.find():
-            self.assertIn(doc, expected_results)
-
-    def test__map_reduce_with_limit(self):
-        result = self.db.things.map_reduce(self.map_func, self.reduce_func, 'myresults', limit=2)
-        self.assertIsInstance(result, mongomock.Collection)
-        self.assertEqual(result.name, 'myresults')
-        self.assertEqual(result.count_documents({}), 2)
-
-    def test__inline_map_reduce(self):
-        result = self.db.things.inline_map_reduce(self.map_func, self.reduce_func)
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 3)
-        for doc in result:
-            self.assertIn(doc, self.expected_results)
-
-    def test__inline_map_reduce_full_response(self):
-        expected_full_response = {
-            'counts': {'input': 4, 'reduce': 2, 'emit': 6, 'output': 3},
-            'timeMillis': 5,
-            'ok': 1.0,
-            'result': [
-                {'_id': 'cat', 'value': 3},
-                {'_id': 'dog', 'value': 2},
-                {'_id': 'mouse', 'value': 1},
-            ],
-        }
-        result = self.db.things.inline_map_reduce(
-            self.map_func, self.reduce_func, full_response=True
-        )
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['counts'], expected_full_response['counts'])
-        for doc in result['result']:
-            self.assertIn(doc, self.expected_results)
-
-    def test__map_reduce_with_object_id(self):
-        obj1 = ObjectId()
-        obj2 = ObjectId()
-        data = [{'x': 1, 'tags': [obj1, obj2]}, {'x': 2, 'tags': [obj1]}]
-        for item in data:
-            self.db.things_with_obj.insert_one(item)
-        expected_results = [{'_id': obj1, 'value': 2}, {'_id': obj2, 'value': 1}]
-        result = self.db.things_with_obj.map_reduce(self.map_func, self.reduce_func, 'myresults')
-        self.assertIsInstance(result, mongomock.Collection)
-        self.assertEqual(result.name, 'myresults')
-        self.assertEqual(result.count_documents({}), 2)
-        for doc in result.find():
-            self.assertIn(doc, expected_results)
-
-    def test_mongomock_map_reduce(self):
-        # Arrange
-        fake_etap = mongomock.MongoClient().db
-        fake_statuses_collection = fake_etap.create_collection('statuses')
-        fake_config_id = 'this_is_config_id'
-        test_name = 'this_is_test_name'
-        fake_statuses_objects = [
-            {'testID': test_name, 'kind': 'Test', 'duration': 8392, 'configID': fake_config_id},
-            {'testID': test_name, 'kind': 'Test', 'duration': 8393, 'configID': fake_config_id},
-            {'testID': test_name, 'kind': 'Test', 'duration': 8394, 'configID': fake_config_id},
-        ]
-        fake_statuses_collection.insert_many(fake_statuses_objects)
-
-        map_function = Code('function(){emit(this._id, this.duration);}')
-        reduce_function = Code('function() {}')
-        search_query = {'configID': fake_config_id, 'kind': 'Test', 'testID': test_name}
-
-        # Act
-        result = fake_etap.statuses.map_reduce(
-            map_function, reduce_function, 'my_collection', query=search_query
-        )
-
-        # Assert
-        self.assertEqual(result.count_documents({}), 3)
-
-
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
-@skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
-@skipIf(version.parse('3.6') <= helpers.PYMONGO_VERSION, 'pymongo v3.6 broke group')
 class GroupTest(_CollectionComparisonTest):
     def setUp(self):
         _CollectionComparisonTest.setUp(self)
@@ -5731,18 +5386,6 @@ class MongoClientSortSkipLimitTest(_CollectionComparisonTest):
     def test__skip_and_limit(self):
         self.cmp.compare(_SORT('index', 1), _SKIP(10), _LIMIT(10)).find()
 
-    @skipIf(
-        version.parse('4.0') <= helpers.PYMONGO_VERSION, 'Cursor.count was removed in pymongo 4'
-    )
-    def test__count(self):
-        self.cmp.compare(_COUNT).find()
-
-    @skipUnless(
-        version.parse('4.0') <= helpers.PYMONGO_VERSION, 'Cursor.count was removed in pymongo 4'
-    )
-    def test__count_fail(self):
-        self.cmp.compare(_COUNT_EXCEPTION_TYPE).find()
-
     def test__sort_name(self):
         self.cmp.do.delete_many({})
         for data in (
@@ -5865,14 +5508,6 @@ class InsertedDocumentTest(TestCase):
         [object] = self.collection.find({'_id': self.object_id})
         self.assertEqual(object, self.data)
 
-    @skipIf(
-        helpers.PYMONGO_VERSION and version.parse('4.0') <= helpers.PYMONGO_VERSION,
-        'remove was removed in pymongo v4',
-    )
-    def test__remove_by_id(self):
-        self.collection.remove(self.object_id)
-        self.assertEqual(0, self.collection.count_documents({}))
-
     def test__inserting_changes_argument(self):
         # Like pymongo, we should fill the _id in the inserted dict
         # (odd behavior, but we need to stick to it)
@@ -5913,13 +5548,6 @@ class MongoClientTest(_CollectionComparisonTest):
         super().setUp()
         self.cmp = MultiCollection({'fake': self.fake_conn, 'real': self.mongo_conn})
 
-    def test__database_names(self):
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.database_names()
-            return
-
-        self.cmp.do.database_names()
-
 
 class DatabaseTest(_CollectionComparisonTest):
     """Compares a fake database with the real mongo database implementation
@@ -5935,13 +5563,6 @@ class DatabaseTest(_CollectionComparisonTest):
                 'real': self.mongo_conn[self.db_name],
             }
         )
-
-    def test__database_names(self):
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            self.cmp.compare_exceptions.collection_names()
-            return
-
-        self.cmp.do.collection_names()
 
     def test__database_bool_raises_notimplementederror(self):
         fake_db = self.cmp.conns['fake']

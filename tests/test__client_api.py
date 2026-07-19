@@ -2,9 +2,6 @@ import sys
 import unittest
 from unittest import mock
 from unittest import skipIf
-from unittest import skipUnless
-
-from packaging import version
 
 import mongomock_ng as mongomock
 from mongomock_ng import helpers
@@ -90,19 +87,6 @@ class MongoClientApiTest(unittest.TestCase):
         )
 
     @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipUnless(
-        version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
-    def test__not_hashable(self):
-        with self.assertRaises(TypeError):
-            {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
-
-    @skipIf(sys.version_info < (3,), 'Older versions of Python do not handle hashing the same way')
-    @skipIf(
-        version.parse('3.12') > helpers.PYMONGO_VERSION,
-        "older versions of pymongo didn't have proper hashing",
-    )
     def test__hashable(self):
         {mongomock.MongoClient('localhost')}  # pylint: disable=expression-not-assigned
 
@@ -130,21 +114,6 @@ class MongoClientApiTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             mongomock.MongoClient('localhost:mongoport')
-
-    def test_database_names(self):
-        client = mongomock.MongoClient()
-        client.one_db.my_collec.insert_one({})
-
-        if version.parse('4.0') <= helpers.PYMONGO_VERSION:
-            with self.assertRaises(TypeError):
-                client.database_names()
-            return
-
-        with mock.patch('warnings.warn') as mock_warn:
-            self.assertEqual(['one_db'], client.database_names())
-
-        self.assertEqual(1, mock_warn.call_count)
-        self.assertIn('deprecated', mock_warn.call_args[0][0])
 
     def test_list_database_names(self):
         client = mongomock.MongoClient()

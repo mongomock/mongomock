@@ -2,11 +2,9 @@ import collections
 import copy
 import functools
 import itertools
-import json
 import math
 import re
 import threading
-import time
 import warnings
 from collections import OrderedDict
 from collections.abc import Iterable
@@ -15,12 +13,9 @@ from collections.abc import MutableMapping
 from typing import Any
 from typing import Union
 
-from packaging import version
-
 
 try:
     from bson import BSON
-    from bson import json_util
     from bson import SON
     from bson.codec_options import CodecOptions
     from bson.errors import InvalidDocument
@@ -591,10 +586,8 @@ class Collection:
             return self.database == other.database and self.name == other.name
         return NotImplemented
 
-    if version.parse('3.12') <= helpers.PYMONGO_VERSION:
-
-        def __hash__(self):
-            return hash((self.database, self.name))
+    def __hash__(self):
+        return hash((self.database, self.name))
 
     @property
     def full_name(self):
@@ -621,25 +614,26 @@ class Collection:
         return self._codec_options
 
     def initialize_unordered_bulk_op(self, bypass_document_validation=False):
+        warnings.warn(
+            'Collection.initialize_unordered_bulk_op() is deprecated. '
+            'Use Collection.bulk_write() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return BulkOperationBuilder(
             self, ordered=False, bypass_document_validation=bypass_document_validation
         )
 
     def initialize_ordered_bulk_op(self, bypass_document_validation=False):
+        warnings.warn(
+            'Collection.initialize_ordered_bulk_op() is deprecated. '
+            'Use Collection.bulk_write() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return BulkOperationBuilder(
             self, ordered=True, bypass_document_validation=bypass_document_validation
         )
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def insert(self, data, manipulate=True, check_keys=True, continue_on_error=False, **kwargs):
-            warnings.warn(
-                'insert is deprecated. Use insert_one or insert_many instead.',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            validate_write_concern_params(**kwargs)
-            return self._insert(data)
 
     def insert_one(self, document, bypass_document_validation=False, session=None, comment=None):
         if comment:
@@ -707,7 +701,7 @@ class Collection:
 
         if BSON:
             # bson validation
-            check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+            check_keys = False
             if not check_keys:
                 _validate_data_fields(data)
 
@@ -809,15 +803,6 @@ class Collection:
     def _internalize_dict(self, d):
         return {k: _clone_document(v) for k, v in d.items()}
 
-    def _has_key(self, doc, key):
-        key_parts = key.split('.')
-        sub_doc = doc
-        for part in key_parts:
-            if part not in sub_doc:
-                return False
-            sub_doc = sub_doc[part]
-        return True
-
     def options(self):
         return copy.deepcopy(self._store.options)
 
@@ -907,25 +892,6 @@ class Collection:
             ),
             acknowledged=True,
         )
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def update(
-            self,
-            spec,
-            document,
-            upsert=False,
-            manipulate=False,
-            multi=False,
-            check_keys=False,
-            **kwargs,
-        ):
-            warnings.warn(
-                'update is deprecated. Use replace_one, update_one or update_many instead.',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return self._update(spec, document, upsert, manipulate, multi, check_keys, **kwargs)
 
     def _update(
         self,
@@ -1301,7 +1267,7 @@ class Collection:
         if _id is not None:
             existing_document['_id'] = _id
         if BSON:
-            check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+            check_keys = False
             if not check_keys:
                 _validate_data_fields(document)
             _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
@@ -1605,7 +1571,7 @@ class Collection:
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or (not fields and version.parse('4.0') <= helpers.PYMONGO_VERSION):
+        if fields is None or fields == []:
             return _copy_field(doc, container)
 
         if not fields:
@@ -1843,31 +1809,6 @@ class Collection:
             filter, projection, update, upsert, sort, return_document, **kwargs
         )
 
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def find_and_modify(
-            self,
-            query=None,
-            update=None,
-            upsert=False,
-            sort=None,
-            full_response=False,
-            manipulate=False,
-            fields=None,
-            **kwargs,
-        ):
-            warnings.warn(
-                'find_and_modify is deprecated, use find_one_and_delete'
-                ', find_one_and_replace, or find_one_and_update instead',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if 'projection' in kwargs:
-                raise TypeError("find_and_modify() got an unexpected keyword argument 'projection'")
-            return self._find_and_modify(
-                query or {}, update=update, upsert=upsert, sort=sort, projection=fields, **kwargs
-            )
-
     def _find_and_modify(
         self,
         query,
@@ -1908,24 +1849,6 @@ class Collection:
         if return_document is ReturnDocument.AFTER or kwargs.get('new'):
             return self.find_one(query, projection)
         return old
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def save(self, to_save, manipulate=True, check_keys=True, **kwargs):
-            warnings.warn(
-                'save is deprecated. Use insert_one or replace_one instead',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            validate_is_mutable_mapping('to_save', to_save)
-            validate_write_concern_params(**kwargs)
-
-            if '_id' not in to_save:
-                return self.insert(to_save)
-            self._update(
-                {'_id': to_save['_id']}, to_save, True, manipulate, check_keys=True, **kwargs
-            )
-            return to_save.get('_id', None)
 
     def delete_one(self, filter, collation=None, hint=None, session=None, comment=None, let=None):
         validate_is_mapping('filter', filter)
@@ -1976,33 +1899,6 @@ class Collection:
             'err': None,
         }
 
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def remove(self, spec_or_id=None, multi=True, **kwargs):
-            warnings.warn(
-                'remove is deprecated. Use delete_one or delete_many instead.',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            validate_write_concern_params(**kwargs)
-            return self._delete(spec_or_id, multi=multi)
-
-        def count(self, filter=None, **kwargs):
-            warnings.warn(
-                'count is deprecated. Use estimated_document_count or '
-                'count_documents instead. Please note that $where must be replaced '
-                'by $expr, $near must be replaced by $geoWithin with $center, and '
-                '$nearSphere must be replaced by $geoWithin with $centerSphere',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            session = kwargs.pop('session', None)
-            _enroll_session(session, self._store)
-            if filter is None:
-                return len(self._store)
-            spec = helpers.patch_datetime_awareness_in_document(filter)
-            return len(list(self._iter_documents(spec)))
-
     def count_documents(self, filter, comment=None, **kwargs):
         if comment:
             raise_not_implemented('comment', 'comment not implemented, but accepts')
@@ -2049,8 +1945,7 @@ class Collection:
         if self.database.client.server_info()['versionArray'] < [5]:
             unknown_kwargs -= {'skip'}
 
-        if version.parse('4.2') <= helpers.PYMONGO_VERSION:
-            unknown_kwargs -= {'skip'}
+        unknown_kwargs -= {'skip'}
 
         if unknown_kwargs:
             raise OperationFailure(
@@ -2061,11 +1956,6 @@ class Collection:
     def drop(self, session=None):
         _enroll_session(session, self._store)
         self.database.drop_collection(self.name)
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def ensure_index(self, key_or_list, cache_for=300, **kwargs):
-            return self.create_index(key_or_list, cache_for, **kwargs)
 
     def create_index(self, keys, cache_for=300, session=None, **kwargs):
         _enroll_session(session, self._store)
@@ -2171,11 +2061,6 @@ class Collection:
         _enroll_session(session, self._store)
         self._store.indexes = {}
 
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def reindex(self, session=None):
-            _enroll_session(session, self._store)
-
     def _list_all_indexes(self):
         if not self._store.is_created:
             return
@@ -2198,175 +2083,9 @@ class Collection:
                     return True
         return False
 
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def map_reduce(
-            self, map_func, reduce_func, out, full_response=False, query=None, limit=0, session=None
-        ):
-            if execjs is None:
-                raise NotImplementedError(
-                    'PyExecJS is required in order to run Map-Reduce. '
-                    "Use 'pip install pyexecjs pymongo' to support Map-Reduce mock."
-                )
-            _enroll_session(session, self._store)
-            if limit == 0:
-                limit = None
-            start_time = time.perf_counter()
-            out_collection = None
-            reduced_rows = None
-            full_dict = {
-                'counts': {'input': 0, 'reduce': 0, 'emit': 0, 'output': 0},
-                'timeMillis': 0,
-                'ok': 1.0,
-                'result': None,
-            }
-            map_ctx = execjs.compile("""
-                function doMap(fnc, docList) {
-                    var mappedDict = {};
-                    function emit(key, val) {
-                        if (key['$oid']) {
-                            mapped_key = '$oid' + key['$oid'];
-                        }
-                        else {
-                            mapped_key = key;
-                        }
-                        if(!mappedDict[mapped_key]) {
-                            mappedDict[mapped_key] = [];
-                        }
-                        mappedDict[mapped_key].push(val);
-                    }
-                    mapper = eval('('+fnc+')');
-                    var mappedList = new Array();
-                    for(var i=0; i<docList.length; i++) {
-                        var thisDoc = eval('('+docList[i]+')');
-                        var mappedVal = (mapper).call(thisDoc);
-                    }
-                    return mappedDict;
-                }
-            """)
-            reduce_ctx = execjs.compile("""
-                function doReduce(fnc, docList) {
-                    var reducedList = new Array();
-                    reducer = eval('('+fnc+')');
-                    for(var key in docList) {
-                        var reducedVal = {'_id': key,
-                                'value': reducer(key, docList[key])};
-                        reducedList.push(reducedVal);
-                    }
-                    return reducedList;
-                }
-            """)
-            doc_list = [json.dumps(doc, default=json_util.default) for doc in self.find(query)]
-            mapped_rows = map_ctx.call('doMap', map_func, doc_list)
-            reduced_rows = reduce_ctx.call('doReduce', reduce_func, mapped_rows)[:limit]
-            for reduced_row in reduced_rows:
-                if reduced_row['_id'].startswith('$oid'):
-                    reduced_row['_id'] = ObjectId(reduced_row['_id'][4:])
-            reduced_rows = sorted(reduced_rows, key=lambda x: x['_id'])
-            if full_response:
-                full_dict['counts']['input'] = len(doc_list)
-                for key in mapped_rows:
-                    emit_count = len(mapped_rows[key])
-                    full_dict['counts']['emit'] += emit_count
-                    if emit_count > 1:
-                        full_dict['counts']['reduce'] += 1
-                full_dict['counts']['output'] = len(reduced_rows)
-            if isinstance(out, (str, bytes)):
-                out_collection = getattr(self.database, out)
-                out_collection.drop()
-                out_collection.insert(reduced_rows)
-                ret_val = out_collection
-                full_dict['result'] = out
-            elif isinstance(out, SON) and out.get('replace') and out.get('db'):
-                # Must be of the format SON([('replace','results'),('db','outdb')])
-                out_db = getattr(self.database._client, out['db'])
-                out_collection = getattr(out_db, out['replace'])
-                out_collection.insert(reduced_rows)
-                ret_val = out_collection
-                full_dict['result'] = {'db': out['db'], 'collection': out['replace']}
-            elif isinstance(out, dict) and out.get('inline'):
-                ret_val = reduced_rows
-                full_dict['result'] = reduced_rows
-            else:
-                raise TypeError("'out' must be an instance of string, dict or bson.SON")
-            time_millis = (time.perf_counter() - start_time) * 1000
-            full_dict['timeMillis'] = round(time_millis)
-            if full_response:
-                ret_val = full_dict
-            return ret_val
-
-        def inline_map_reduce(
-            self, map_func, reduce_func, full_response=False, query=None, limit=0, session=None
-        ):
-            return self.map_reduce(
-                map_func, reduce_func, {'inline': 1}, full_response, query, limit, session=session
-            )
-
     def distinct(self, key, filter=None, session=None, comment=None, hint=None):
         _enroll_session(session, self._store)
         return self.find(filter, comment=comment, hint=hint).distinct(key)
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def group(self, key, condition, initial, reduce, finalize=None):
-            if version.parse('3.6') <= helpers.PYMONGO_VERSION:
-                raise OperationFailure("no such command: 'group'")
-            if execjs is None:
-                raise NotImplementedError(
-                    'PyExecJS is required in order to use group. '
-                    "Use 'pip install pyexecjs pymongo' to support group mock."
-                )
-            reduce_ctx = execjs.compile("""
-                function doReduce(fnc, docList) {
-                    reducer = eval('('+fnc+')');
-                    for(var i=0, l=docList.length; i<l; i++) {
-                        try {
-                            reducedVal = reducer(docList[i-1], docList[i]);
-                        }
-                        catch (err) {
-                            continue;
-                        }
-                    }
-                return docList[docList.length - 1];
-                }
-            """)
-
-            ret_array = []
-            doc_list_copy = []
-            ret_array_copy = []
-            reduced_val = {}
-            doc_list = list(self.find(condition))
-            for doc in doc_list:
-                doc_copy = _clone_document(doc)
-                for doc_key in doc:
-                    if isinstance(doc[doc_key], ObjectId):
-                        doc_copy[doc_key] = str(doc[doc_key])
-                    if doc_key not in key and doc_key not in reduce:
-                        del doc_copy[doc_key]
-                for initial_key in initial:
-                    if initial_key in doc:
-                        pass
-                    else:
-                        doc_copy[initial_key] = initial[initial_key]
-                doc_list_copy.append(doc_copy)
-            doc_list = doc_list_copy
-            for k1 in key:
-                doc_list = sorted(doc_list, key=lambda x: filtering.resolve_key(k1, x))
-            for k2 in key:
-                if not isinstance(k2, str):
-                    raise TypeError('Keys must be a list of key names, each an instance of str')
-                for _, group in itertools.groupby(doc_list, lambda item: item[k2]):  # noqa: B023
-                    group_list = list(group)
-                    reduced_val = reduce_ctx.call('doReduce', reduce, group_list)
-                    ret_array.append(reduced_val)
-            for doc in ret_array:
-                doc_copy = _clone_document(doc)
-                for k in doc:
-                    if k not in key and k not in initial:
-                        del doc_copy[k]
-                ret_array_copy.append(doc_copy)
-            ret_array = ret_array_copy
-            return ret_array
 
     def aggregate(self, pipeline, session=None, **unused_kwargs):
         in_collection = list(self.find())
@@ -2456,6 +2175,81 @@ class Collection:
             'aggregate_raw_batches method is not implemented in mongomock-ng yet'
         )
 
+    # Deprecated methods — available with DeprecationWarning for pymongo 4.x compat.
+
+    def remove(self, filter=None, **kwargs):
+        warnings.warn(
+            'Collection.remove() is deprecated. Use delete_one() or delete_many() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if filter is None:
+            return self.delete_many({}, **kwargs)
+        return self.delete_many(filter, **kwargs)
+
+    def save(self, to_save, **kwargs):
+        warnings.warn(
+            'Collection.save() is deprecated. Use insert_one() or replace_one() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if not isinstance(to_save, dict):
+            raise TypeError(f'cannot save {type(to_save)} object')
+        if '_id' in to_save:
+            result = self.replace_one({'_id': to_save['_id']}, to_save, upsert=True, **kwargs)
+            return result.upserted_id or to_save['_id']
+        else:
+            result = self.insert_one(to_save, **kwargs)
+            return result.inserted_id
+
+    def count(self, filter=None, **kwargs):
+        warnings.warn(
+            'Collection.count() is deprecated. Use count_documents() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.count_documents(filter or {}, **kwargs)
+
+    def find_and_modify(self, query=None, update=None, upsert=False, **kwargs):
+        warnings.warn(
+            'Collection.find_and_modify() is deprecated. Use find_one_and_update() or '
+            'find_one_and_replace() or find_one_and_delete() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if update is not None:
+            return self.find_one_and_update(query or {}, update, upsert=upsert, **kwargs)
+        return self.find_one_and_replace(query or {}, upsert=upsert, **kwargs)
+
+    def update(self, filter, update, **kwargs):
+        warnings.warn(
+            'Collection.update() is deprecated. Use update_one() or update_many() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        multi = kwargs.pop('multi', True)
+        if multi:
+            return self.update_many(filter, update, **kwargs)
+        return self.update_one(filter, update, **kwargs)
+
+    def insert(self, doc_or_docs, **kwargs):
+        warnings.warn(
+            'Collection.insert() is deprecated. Use insert_one() or insert_many() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if isinstance(doc_or_docs, list):
+            return self.insert_many(doc_or_docs, **kwargs)
+        return self.insert_one(doc_or_docs, **kwargs)
+
+    def ensure_index(self, key_or_list, **kwargs):
+        warnings.warn(
+            'Collection.ensure_index() is deprecated. Use create_index() instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.create_index(key_or_list, **kwargs)
+
 
 class Cursor:
     def __init__(
@@ -2538,17 +2332,6 @@ class Cursor:
             self.collection._get_dataset, self._spec, self._sort, self._projection, dict
         )
         return self
-
-    if version.parse('4.0') > helpers.PYMONGO_VERSION:
-
-        def count(self, with_limit_and_skip=False):
-            warnings.warn(
-                'count is deprecated. Use Collection.count_documents instead.',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            results = self._compute_results(with_limit_and_skip)
-            return len(results)
 
     def skip(self, count):
         self._skip = count
@@ -2770,7 +2553,7 @@ def _set_updater(doc, field_name, value, codec_options=None):
         value = _clone_document(value)
     if BSON:
         # bson validation
-        check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+        check_keys = False
         if (not check_keys and '\0' in field_name) or field_name.startswith('$'):
             raise InvalidDocument(
                 f'Field name cannot contain the null character and top-level field name '
