@@ -334,23 +334,41 @@ def _combine_projection_spec(projection_fields_spec):
     return combined_spec
 
 
-def _project_by_spec(doc, combined_projection_spec, is_include, container):
+def _project_by_spec(doc, combined_projection_spec, is_include, container, filter=None):
     if '$' in combined_projection_spec:
-        if is_include:
+        if not is_include:
+            raise OperationFailure('Cannot exclude array elements with the positional operator')
+        if filter is None:
             raise NotImplementedError('Positional projection is not implemented in mongomock-ng')
-        raise OperationFailure('Cannot exclude array elements with the positional operator')
 
     doc_copy = container()
 
     for key, val in doc.items():
         spec = combined_projection_spec.get(key, NOTHING)
         if isinstance(spec, dict):
-            if isinstance(val, (list, tuple)):
+            if isinstance(val, (list, tuple)) and '$' in spec and is_include:
+                # Positional projection: find first array element matching filter
+                sub_spec = spec['$']
+                matched = None
+                if filter is not None:
+                    for elem in val:
+                        if filter_applies(filter, {key: elem}):
+                            matched = elem
+                            break
+                if matched is not None:
+                    if isinstance(sub_spec, dict) and sub_spec:
+                        doc_copy[key] = _project_by_spec(
+                            matched, sub_spec, is_include, container, filter
+                        )
+                    else:
+                        doc_copy[key] = _copy_field(matched, container)
+            elif isinstance(val, (list, tuple)):
                 doc_copy[key] = [
-                    _project_by_spec(sub_doc, spec, is_include, container) for sub_doc in val
+                    _project_by_spec(sub_doc, spec, is_include, container, filter)
+                    for sub_doc in val
                 ]
             elif isinstance(val, dict):
-                doc_copy[key] = _project_by_spec(val, spec, is_include, container)
+                doc_copy[key] = _project_by_spec(val, spec, is_include, container, filter)
         elif (is_include and spec is not NOTHING) or (not is_include and spec is NOTHING):
             doc_copy[key] = _copy_field(val, container)
 
@@ -419,14 +437,14 @@ class BulkOperationBuilder:
 
         self.executors.append(exec_insert)
 
-    def __aggregate_operation_result(self, total_result, key, value):
+    def __aggregate_operation_result(self, total_result, key, value, operation_index=None):
         agg_val = total_result.get(key)
         assert agg_val is not None, f'Unknow operation result {key}={value} (unrecognized key)'
         if isinstance(agg_val, int):
             total_result[key] += value
         elif isinstance(agg_val, list):
             if key == 'upserted':
-                new_element = {'index': len(agg_val), '_id': value}
+                new_element = {'index': operation_index, '_id': value}
                 agg_val.append(new_element)
             else:
                 agg_val.append(value)
@@ -475,7 +493,7 @@ class BulkOperationBuilder:
                     break
                 continue
             for key, value in op_result.items():
-                self.__aggregate_operation_result(result, key, value)
+                self.__aggregate_operation_result(result, key, value, operation_index=index)
             if exec_name == 'exec_update':
                 has_update = True
                 if 'nModified' not in op_result:
@@ -716,7 +734,11 @@ class Collection:
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._store:
-            raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+            raise DuplicateKeyError(
+                'E11000 Duplicate Key Error',
+                11000,
+                {'keyPattern': {'_id': 1}, 'keyValue': {'_id': data['_id']}},
+            )
 
         data = helpers.patch_datetime_awareness_in_document(data)
 
@@ -755,7 +777,16 @@ class Collection:
                 if doc_entries is None:
                     continue
                 if self._entries_overlap(new_entries, doc_entries):
-                    raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
+                    raise DuplicateKeyError(
+                        'E11000 Duplicate Key Error',
+                        11000,
+                        {
+                            'keyPattern': dict(unique),
+                            'keyValue': {
+                                k: helpers.get_value_by_dot(new_data, k) for k, _ in unique
+                            },
+                        },
+                    )
 
     @staticmethod
     def _compute_index_entries(doc, unique, is_sparse):
@@ -786,17 +817,21 @@ class Collection:
             return any(e in b for e in a)
 
     @staticmethod
-    def _raise_if_duplicate_index(index, indexed, indexed_list, documents_gen):
+    def _raise_if_duplicate_index(index, indexed, indexed_list, documents_gen, details=None):
         try:
             if index in indexed:
                 documents_gen.throw(
-                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000, details),
+                    None,
+                    None,
                 )
             indexed.add(index)
         except TypeError:
             if index in indexed_list:
                 documents_gen.throw(
-                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000, details),
+                    None,
+                    None,
                 )
             indexed_list.append(index)
 
@@ -1486,12 +1521,14 @@ class Collection:
                     )
                 )
         for document in dataset:
-            yield self._copy_only_fields(document, fields, as_class)
+            result = self._copy_only_fields(document, fields, as_class, filter=spec)
+            if result is not None:
+                yield result
 
     def _extract_projection_operators(self, fields):
         """Removes and returns fields with projection operators."""
         result = {}
-        allowed_projection_operators = {'$elemMatch', '$slice'}
+        allowed_projection_operators = {'$elemMatch', '$slice', '$size'}
         for key, value in fields.items():
             if isinstance(value, dict):
                 for op in value:
@@ -1505,7 +1542,12 @@ class Collection:
         return result
 
     def _apply_projection_operators(self, ops, doc, doc_copy, container):
-        """Applies projection operators to copied document."""
+        """Applies projection operators to copied document.
+
+        Returns True if the document should be excluded from results entirely
+        (e.g. when $size does not match).
+        """
+        exclude_doc = False
         for field, op in ops.items():
             if field not in doc_copy:
                 if field in doc:
@@ -1569,7 +1611,16 @@ class Collection:
                     # remove the field since there is nothing to iterate
                     del doc_copy[field]
 
-    def _copy_only_fields(self, doc, fields, container):
+            if '$size' in op:
+                if isinstance(doc_copy[field], list):
+                    if len(doc_copy[field]) != op['$size']:
+                        exclude_doc = True
+                else:
+                    exclude_doc = True
+
+        return exclude_doc
+
+    def _copy_only_fields(self, doc, fields, container, filter=None):
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
@@ -1614,6 +1665,7 @@ class Collection:
                     _combine_projection_spec(remaining_fields),
                     is_include=next(iter(remaining_fields.values())),
                     container=container,
+                    filter=filter,
                 )
                 doc_copy.update(projected)
         elif not fields:
@@ -1628,6 +1680,7 @@ class Collection:
                 _combine_projection_spec(fields),
                 is_include=next(iter(fields.values())),
                 container=container,
+                filter=filter,
             )
 
         # set the _id value if we requested it, otherwise remove it
@@ -1639,9 +1692,13 @@ class Collection:
         fields['_id'] = id_value  # put _id back in fields
 
         # time to apply the projection operators and put back their fields
-        self._apply_projection_operators(projection_operators, doc, doc_copy, container)
+        exclude_doc = self._apply_projection_operators(
+            projection_operators, doc, doc_copy, container
+        )
         for field, op in projection_operators.items():
             fields[field] = op
+        if exclude_doc:
+            return None
         return doc_copy
 
     def _update_document_fields(self, doc, fields, updater):
@@ -2046,10 +2103,24 @@ class Collection:
                     expanded = [list(v) if isinstance(v, (list, tuple)) else [v] for v in values]
                     for combo in itertools.product(*expanded):
                         index = tuple(combo)
-                        self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
+                        _dup_details = {
+                            'keyPattern': dict(index_list),
+                            'keyValue': {
+                                k: helpers.get_value_by_dot(doc, k) for k, _ in index_list
+                            },
+                        }
+                        self._raise_if_duplicate_index(
+                            index, indexed, indexed_list, documents_gen, details=_dup_details
+                        )
                 else:
                     index = tuple(values)
-                    self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
+                    _dup_details = {
+                        'keyPattern': dict(index_list),
+                        'keyValue': {k: helpers.get_value_by_dot(doc, k) for k, _ in index_list},
+                    }
+                    self._raise_if_duplicate_index(
+                        index, indexed, indexed_list, documents_gen, details=_dup_details
+                    )
 
         self._store.create_index(index_name, config)
 
