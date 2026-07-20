@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.9.0]
+### Fixed
+- `$group`: missing properties in subdocument no longer nullify the entire object (#66)
+- `$group`: falsey `_id` values (`0`, `""`, `false`) handled correctly (#103)
+- `$toLong`/`$toInt`: datetime conversion to epoch milliseconds (#49)
+- `$add`: datetime + timedelta arithmetic support (#108)
+- `$count`: accumulator alias for `$sum:1` in `$group` stage (#42)
+- `$map` + `$sum` nesting: array flattening in `$sum`, expression parse fix (#76)
+- `$multiply`/`$add`: Decimal128 support in arithmetic operators (#36)
+- `find()` projection: computed field references (`$dotted.path`) resolved correctly (#31)
+- `$project`: nested object inclusion specs return actual values, not literal 1s (#835)
+- `$slice` projection-only: no longer drops other fields from result (#81)
+- `$slice` projection: deep copy prevents database mutation (#30)
+
+
 ## [7.8.0]
 ### Added
 - `QueryProfiler` — query capture and index coverage analyzer (docs/profiler.md)
