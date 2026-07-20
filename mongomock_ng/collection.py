@@ -419,14 +419,14 @@ class BulkOperationBuilder:
 
         self.executors.append(exec_insert)
 
-    def __aggregate_operation_result(self, total_result, key, value, operation_index=None):
+    def __aggregate_operation_result(self, total_result, key, value):
         agg_val = total_result.get(key)
         assert agg_val is not None, f'Unknow operation result {key}={value} (unrecognized key)'
         if isinstance(agg_val, int):
             total_result[key] += value
         elif isinstance(agg_val, list):
             if key == 'upserted':
-                new_element = {'index': operation_index, '_id': value}
+                new_element = {'index': len(agg_val), '_id': value}
                 agg_val.append(new_element)
             else:
                 agg_val.append(value)
@@ -475,7 +475,7 @@ class BulkOperationBuilder:
                     break
                 continue
             for key, value in op_result.items():
-                self.__aggregate_operation_result(result, key, value, operation_index=index)
+                self.__aggregate_operation_result(result, key, value)
             if exec_name == 'exec_update':
                 has_update = True
                 if 'nModified' not in op_result:
@@ -716,11 +716,7 @@ class Collection:
         if isinstance(object_id, dict):
             object_id = helpers.hashdict(object_id)
         if object_id in self._store:
-            raise DuplicateKeyError(
-                'E11000 Duplicate Key Error',
-                11000,
-                {'keyPattern': {'_id': 1}, 'keyValue': {'_id': data['_id']}},
-            )
+            raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
         data = helpers.patch_datetime_awareness_in_document(data)
 
@@ -759,16 +755,7 @@ class Collection:
                 if doc_entries is None:
                     continue
                 if self._entries_overlap(new_entries, doc_entries):
-                    raise DuplicateKeyError(
-                        'E11000 Duplicate Key Error',
-                        11000,
-                        {
-                            'keyPattern': dict(unique),
-                            'keyValue': {
-                                k: helpers.get_value_by_dot(new_data, k) for k, _ in unique
-                            },
-                        },
-                    )
+                    raise DuplicateKeyError('E11000 Duplicate Key Error', 11000)
 
     @staticmethod
     def _compute_index_entries(doc, unique, is_sparse):
@@ -799,17 +786,17 @@ class Collection:
             return any(e in b for e in a)
 
     @staticmethod
-    def _raise_if_duplicate_index(index, indexed, indexed_list, documents_gen, details=None):
+    def _raise_if_duplicate_index(index, indexed, indexed_list, documents_gen):
         try:
             if index in indexed:
                 documents_gen.throw(
-                    DuplicateKeyError('E11000 Duplicate Key Error', 11000, details), None, None
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
                 )
             indexed.add(index)
         except TypeError:
             if index in indexed_list:
                 documents_gen.throw(
-                    DuplicateKeyError('E11000 Duplicate Key Error', 11000, details), None, None
+                    DuplicateKeyError('E11000 Duplicate Key Error', 11000), None, None
                 )
             indexed_list.append(index)
 
@@ -2055,22 +2042,14 @@ class Collection:
                     continue
                 if is_sparse and all(v is None for v in values):
                     continue
-                _dup_details = {
-                    'keyPattern': dict(index_list),
-                    'keyValue': {k: helpers.get_value_by_dot(doc, k) for k, _ in index_list},
-                }
                 if has_array:
                     expanded = [list(v) if isinstance(v, (list, tuple)) else [v] for v in values]
                     for combo in itertools.product(*expanded):
                         index = tuple(combo)
-                        self._raise_if_duplicate_index(
-                            index, indexed, indexed_list, documents_gen, details=_dup_details
-                        )
+                        self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
                 else:
                     index = tuple(values)
-                    self._raise_if_duplicate_index(
-                        index, indexed, indexed_list, documents_gen, details=_dup_details
-                    )
+                    self._raise_if_duplicate_index(index, indexed, indexed_list, documents_gen)
 
         self._store.create_index(index_name, config)
 
