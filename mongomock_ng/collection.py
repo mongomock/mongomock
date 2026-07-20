@@ -1517,13 +1517,13 @@ class Collection:
 
         return result
 
-    def _apply_projection_operators(self, ops, doc, doc_copy):
+    def _apply_projection_operators(self, ops, doc, doc_copy, container):
         """Applies projection operators to copied document."""
         for field, op in ops.items():
             if field not in doc_copy:
                 if field in doc:
                     # field was not copied yet (since we are in include mode)
-                    doc_copy[field] = doc[field]
+                    doc_copy[field] = _copy_field(doc[field], container)
                 else:
                     # field doesn't exist in original document, no work to do
                     continue
@@ -1556,7 +1556,9 @@ class Collection:
                     slice_ = slice(start, end)
 
                 if slice_:
-                    doc_copy[field] = doc_copy[field][slice_]
+                    doc_copy[field] = [
+                        _copy_field(item, container) for item in doc_copy[field][slice_]
+                    ]
                 else:
                     raise OperationFailure(
                         f'Unsupported slice value {op_value} for slicing operation: {op}'
@@ -1599,15 +1601,40 @@ class Collection:
         # filter out fields with projection operators, we will take care of them later
         projection_operators = self._extract_projection_operators(fields)
 
+        # Detect computed field references ($dotted.path in projection values)
+        computed_fields = {}
+        remaining_fields = {}
+        for field, value in fields.items():
+            if isinstance(value, str) and value.startswith('$'):
+                computed_fields[field] = value
+            else:
+                remaining_fields[field] = value
+
         # other than the _id field, all fields must be either includes or
         # excludes, this can evaluate to 0
-        if len(set(fields.values())) > 1:
+        if remaining_fields and len(set(remaining_fields.values())) > 1:
             raise ValueError('You cannot currently mix including and excluding fields.')
 
-        # if we have novalues passed in, make a doc_copy based on the
-        # id_value
-        if not fields:
-            doc_copy = container() if id_value == 1 else _copy_field(doc, container)
+        if computed_fields:
+            doc_copy = container()
+            for field, ref in computed_fields.items():
+                resolved = helpers.get_value_by_dot(doc, ref[1:])
+                if resolved is not NOTHING:
+                    doc_copy[field] = resolved
+            if remaining_fields:
+                projected = _project_by_spec(
+                    doc,
+                    _combine_projection_spec(remaining_fields),
+                    is_include=next(iter(remaining_fields.values())),
+                    container=container,
+                )
+                doc_copy.update(projected)
+        elif not fields:
+            if projection_operators:
+                has_elemmatch = any('$elemMatch' in op for op in projection_operators.values())
+                doc_copy = container() if has_elemmatch else _copy_field(doc, container)
+            else:
+                doc_copy = container() if id_value == 1 else _copy_field(doc, container)
         else:
             doc_copy = _project_by_spec(
                 doc,
@@ -1625,7 +1652,7 @@ class Collection:
         fields['_id'] = id_value  # put _id back in fields
 
         # time to apply the projection operators and put back their fields
-        self._apply_projection_operators(projection_operators, doc, doc_copy)
+        self._apply_projection_operators(projection_operators, doc, doc_copy, container)
         for field, op in projection_operators.items():
             fields[field] = op
         return doc_copy

@@ -11448,3 +11448,100 @@ class CollectionAPITest(TestCase):
         details = ctx.exception.details
         self.assertEqual(details['keyPattern'], {'a': 1, 'b': -1})
         self.assertEqual(details['keyValue'], {'a': 1, 'b': 2})
+
+
+class TestAggregationBugfixesMock(TestCase):
+    def setUp(self):
+        self.client = mongomock.MongoClient()
+        self.db = self.client.testdb
+        self.collection = self.db.collection
+
+    def test__group_last_all_missing(self):
+        self.collection.insert_one({'item': 'apple', 'quantity': 8})
+        result = list(
+            self.collection.aggregate(
+                [
+                    {
+                        '$group': {
+                            '_id': '$item',
+                            'data': {
+                                '$last': {'quantity': '$quantity', 'description': '$description'}
+                            },
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(result[0]['data'], {'quantity': 8})
+
+    def test__group_id_null_groups_all(self):
+        self.collection.insert_many([{'x': 1}, {'x': 2}, {'x': 3}])
+        result = list(self.collection.aggregate([{'$group': {'_id': None, 'count': {'$sum': 1}}}]))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['_id'], None)
+        self.assertEqual(result[0]['count'], 3)
+
+    def test__toLong_tz_aware(self):
+        from datetime import datetime
+        from datetime import timezone
+
+        self.collection.insert_one({'ts': datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)})
+        result = list(self.collection.aggregate([{'$project': {'ts_long': {'$toLong': '$ts'}}}]))
+        self.assertIsInstance(result[0]['ts_long'], int)
+        self.assertGreater(result[0]['ts_long'], 0)
+
+    def test__find_projection_computed_field(self):
+        self.collection.insert_one({'a': 'test_a', 'embedded': {'embedded_key': 'test_embedded'}})
+        result = self.collection.find_one({}, projection={'embedded': '$embedded.embedded_key'})
+        self.assertEqual(result['embedded'], 'test_embedded')
+
+    def test__slice_only_keeps_other_fields(self):
+        self.collection.insert_one({'test': [1, 2, 3], 'value': 42})
+        doc = self.collection.find_one({}, projection={'test': {'$slice': 1}})
+        self.assertEqual(doc['test'], [1])
+        self.assertEqual(doc['value'], 42)
+
+    def test__slice_no_mutation(self):
+        self.collection.insert_one({'n': 1, 'elements': [{'x': 1}]})
+        doc = self.collection.find_one({'n': 1}, {'elements': {'$slice': 1}})
+        doc['elements'][0]['x'] += 1
+        doc2 = self.collection.find_one({'n': 1})
+        self.assertEqual(doc2['elements'][0]['x'], 1)
+
+    def test__project_deeply_nested(self):
+        self.collection.insert_one({'a': 1, 'b': {'c': 10, 'd': 20}})
+        result = list(self.collection.aggregate([{'$project': {'_id': 0, 'b': {'c': 1}}}]))
+        self.assertEqual(result[0], {'b': {'c': 10}})
+
+    def test__add_datetime_multiply(self):
+        from datetime import datetime
+
+        self.collection.insert_one({'date': datetime(2024, 1, 1), 'ms': 3600000})
+        result = list(self.collection.aggregate([{'$set': {'result': {'$add': ['$date', '$ms']}}}]))
+        self.assertEqual(result[0]['result'], datetime(2024, 1, 1, 1, 0, 0))
+
+    def test__count_empty_group(self):
+        self.collection.insert_one({'x': 1})
+        result = list(self.collection.aggregate([{'$group': {'_id': '$x', 'cnt': {'$count': {}}}}]))
+        self.assertEqual(result[0]['cnt'], 1)
+
+    def test__sum_flattens_arrays(self):
+        self.collection.insert_one({'arr': [1, 2, 3]})
+        result = list(self.collection.aggregate([{'$project': {'total': {'$sum': '$arr'}}}]))
+        self.assertEqual(result[0]['total'], 6)
+
+    def test__multiply_decimal128(self):
+        from decimal import Decimal
+
+        from bson import Decimal128
+
+        self.collection.insert_one({'val': Decimal128('5')})
+        result = list(
+            self.collection.aggregate([{'$project': {'result': {'$multiply': ['$val', 2]}}}])
+        )
+        self.assertEqual(result[0]['result'], Decimal('10'))
+
+    def test__project_boolean_not_nested_projection(self):
+        self.collection.insert_one({'items': [1, 2, 3]})
+        result = list(self.collection.aggregate([{'$project': {'_id': 0, 'items': {'$not': []}}}]))
+        self.assertIsInstance(result[0]['items'], bool)

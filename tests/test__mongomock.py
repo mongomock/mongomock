@@ -5742,3 +5742,73 @@ class DocumentValidationTest(_CollectionComparisonTest):
         cmp.do.insert_one({'a': 1})
         cmp.do.find_one_and_replace({'a': 1}, {'a': 2})
         cmp.compare.find()
+
+
+class TestAggregationBugfixes(_CollectionComparisonTest):
+    def setUp(self):
+        super().setUp()
+
+    def test__group_missing_field_in_subdoc(self):
+        self.cmp.do.insert_one({'item': 'apple', 'quantity': 8})
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$group': {
+                        '_id': '$item',
+                        'data': {
+                            '$first': {'quantity': '$quantity', 'description': '$description'}
+                        },
+                    }
+                }
+            ]
+        )
+
+    def test__group_falsey_id_zero(self):
+        self.cmp.do.insert_many([{'x': 0, 'v': 1}, {'x': 0, 'v': 2}])
+        self.cmp.compare.aggregate([{'$group': {'_id': '$x', 'count': {'$sum': 1}}}])
+
+    def test__group_falsey_id_empty_string(self):
+        self.cmp.do.insert_many([{'x': '', 'v': 1}, {'x': '', 'v': 2}])
+        self.cmp.compare.aggregate([{'$group': {'_id': '$x', 'count': {'$sum': 1}}}])
+
+    def test__toLong_datetime(self):
+        from datetime import datetime
+
+        self.cmp.do.insert_one({'ts': datetime(2024, 1, 1, 12, 0, 0)})
+        self.cmp.compare.aggregate([{'$project': {'ts_long': {'$toLong': '$ts'}}}])
+
+    def test__project_sum_map(self):
+        self.cmp.do.insert_one({'arr': [{'value': 1}, {'value': 2}, {'value': 3}]})
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        'sum': {
+                            '$sum': {'$map': {'input': '$arr', 'as': 'item', 'in': '$$item.value'}}
+                        }
+                    }
+                }
+            ]
+        )
+
+    def test__project_nested_inclusion(self):
+        self.cmp.do.insert_one({'info': {'last_access': 'today', 'is_first_access': False}})
+        self.cmp.compare.aggregate(
+            [{'$project': {'_id': 0, 'info': {'last_access': 1, 'is_first_access': 1}}}]
+        )
+
+    def test__count_accumulator_in_group(self):
+        self.cmp.do.insert_many(
+            [{'state': 'NY', 'pop': 100}, {'state': 'NY', 'pop': 200}, {'state': 'CA', 'pop': 300}]
+        )
+        self.cmp.compare_ignore_order.aggregate(
+            [{'$group': {'_id': '$state', 'cnt': {'$count': {}}}}]
+        )
+
+    def test__add_datetime_ms(self):
+        from datetime import datetime
+
+        self.cmp.do.insert_one({'date': datetime(2024, 1, 1, 0, 0, 0), 'hour': 2})
+        self.cmp.compare.aggregate(
+            [{'$set': {'result': {'$add': ['$date', {'$multiply': ['$hour', 3600000]}]}}}]
+        )

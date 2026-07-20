@@ -5,10 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.9.0]
+### Fixed
+- `$group`: missing properties in subdocument no longer nullify the entire object (#66)
+- `$group`: falsey `_id` values (`0`, `""`, `false`) handled correctly (#103)
+- `$toLong`/`$toInt`: datetime conversion to epoch milliseconds (#49)
+- `$add`: datetime + timedelta arithmetic support (#108)
+- `$count`: accumulator alias for `$sum:1` in `$group` stage (#42)
+- `$map` + `$sum` nesting: array flattening in `$sum`, expression parse fix (#76)
+- `$multiply`/`$add`: Decimal128 support in arithmetic operators (#36)
+- `find()` projection: computed field references (`$dotted.path`) resolved correctly (#31)
+- `$project`: nested object inclusion specs return actual values, not literal 1s (#835)
+- `$slice` projection-only: no longer drops other fields from result (#81)
+- `$slice` projection: deep copy prevents database mutation (#30)
+
 ## [7.8.1] - 2026-07-20
 ### Fixed
 - `bulk_write`: `upserted_ids` keys now use real operation index instead of sequential count (#60)
 - `DuplicateKeyError`: now includes `details` dict with `keyPattern` and `keyValue` matching pymongo format (#88)
+
 
 ## [7.8.0]
 ### Added
@@ -324,6 +339,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove support for deprecated Python versions (everything prior to 3.8)
 
 
+[7.9.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/7.8.1...7.9.0
 [7.8.1]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/7.8.0...7.8.1
 [7.0.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...7.0.0
 [4.4.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...4.4.0

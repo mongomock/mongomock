@@ -469,15 +469,21 @@ def _group_operation(values, operator):
 
 
 def _sum_operation(values):
+    flat_values = []
+    for v in values:
+        if isinstance(v, list):
+            flat_values.extend(v)
+        else:
+            flat_values.append(v)
     values_list = []
     if decimal_support:
-        for v in values:
+        for v in flat_values:
             if isinstance(v, numbers.Number):
                 values_list.append(v)
             elif isinstance(v, decimal128.Decimal128):
                 values_list.append(v.to_decimal())
     else:
-        values_list = [v for v in values if isinstance(v, numbers.Number)]
+        values_list = [v for v in flat_values if isinstance(v, numbers.Number)]
     sum_value = sum(values_list)
     return decimal128.Decimal128(sum_value) if isinstance(sum_value, decimal.Decimal) else sum_value
 
@@ -689,10 +695,26 @@ class _Parser:
 
         parsed_values = list(self.parse_many(values))
         assert parsed_values, f'{operator} must have at least one parameter'
+        if operator == '$add':
+            has_datetime = any(isinstance(v, datetime.datetime) for v in parsed_values)
+            if has_datetime:
+                result = parsed_values[0]
+                for v in parsed_values[1:]:
+                    if isinstance(v, datetime.timedelta):
+                        result += v
+                    elif isinstance(v, (int, float)):
+                        result += datetime.timedelta(milliseconds=v)
+                return result
         for value in parsed_values:
             if value is None or value is NOTHING:
                 return None
+            if decimal_support and isinstance(value, decimal128.Decimal128):
+                continue
             assert isinstance(value, numbers.Number), f'{operator} only uses numbers'
+        if decimal_support:
+            parsed_values = [
+                v.to_decimal() if isinstance(v, decimal128.Decimal128) else v for v in parsed_values
+            ]
         if operator == '$add':
             return sum(parsed_values)
         if operator == '$multiply':
@@ -803,7 +825,16 @@ class _Parser:
 
     def _handle_project_operator(self, operator, values):
         if operator in _GROUPING_OPERATOR_MAP:
-            values = self.parse(values) if isinstance(values, str) else self.parse_many(values)
+            if isinstance(values, dict):
+                values = self.parse(values)
+            else:
+                values = (
+                    self.parse(values)
+                    if isinstance(values, str)
+                    else self.parse_many(values)
+                    if values is not NOTHING
+                    else values
+                )
             return _GROUPING_OPERATOR_MAP[operator](values) if values is not NOTHING else None
         if operator == '$arrayElemAt':
             key, value = values
@@ -1328,21 +1359,19 @@ class _Parser:
             if isinstance(parsed, decimal128.Decimal128):
                 return int(parsed.to_decimal())
             return int(parsed)
-        raise NotImplementedError(
-            'You need to import the pymongo library to support decimal128 type.'
-        )
+        return int(parsed)
 
     def _handle_type_convertion_to_long(self, values):
         parsed = self.parse(values)
         if parsed is NOTHING:
             return None
+        if isinstance(parsed, datetime.datetime):
+            return int(parsed.timestamp() * 1000)
         if decimal_support:
             if isinstance(parsed, decimal128.Decimal128):
                 return int(parsed.to_decimal())
             return int(parsed)
-        raise NotImplementedError(
-            'You need to import the pymongo library to support decimal128 type.'
-        )
+        return int(parsed)
 
     def _handle_type_convertion_to_decimal(self, values):
         # Document: https://docs.mongodb.com/manual/reference/operator/aggregation/toDecimal/
@@ -1909,6 +1938,8 @@ def _accumulate_group(output_fields, group_list, user_vars):
                     values.append(parsed)
             if operator in _GROUPING_OPERATOR_MAP:
                 doc_dict[field] = _GROUPING_OPERATOR_MAP[operator](values)
+            elif operator == '$count':
+                doc_dict[field] = len(group_list)
             elif operator == '$addToSet':
                 value = []
                 # Don't use set in case elt in not hashable (like dicts).
@@ -2228,7 +2259,7 @@ def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
 def _handle_group_stage(in_collection, unused_database, options, user_vars):
     grouped_collection = []
     _id = options['_id']
-    if _id:
+    if _id is not None:
 
         def _key_getter(doc):
             key = _parse_expression(_id, doc, user_vars=user_vars)
@@ -2615,6 +2646,20 @@ def _handle_project_stage(in_collection, unused_database, options, user_vars):
         if value in (0, 1, True, False):
             if field != '_id':
                 filter_list.append(field)
+            continue
+        elif (
+            isinstance(value, dict)
+            and all(v in (0, 1) for v in value.values())
+            and not any(isinstance(k, str) and k.startswith('$') for k in value)
+        ):
+            if not new_fields_collection:
+                new_fields_collection = [{} for unused_doc in in_collection]
+            for in_doc, out_doc in zip(in_collection, new_fields_collection, strict=False):
+                subdoc = _parse_expression(f'${field}', in_doc, user_vars=user_vars)
+                if subdoc is not NOTHING and isinstance(subdoc, dict):
+                    out_doc[field] = _project_by_spec(subdoc, value, is_include=True)
+                elif subdoc is not NOTHING:
+                    out_doc[field] = subdoc
             continue
         if not new_fields_collection:
             new_fields_collection = [{} for unused_doc in in_collection]
