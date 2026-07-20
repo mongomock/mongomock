@@ -384,3 +384,36 @@ class BulkOperationsWithSortTest(TestCase):
         self.assertEqual(len(updated_docs), 1)
         self.assertEqual(updated_docs[0]['name'], 'Eve')
         self.assertEqual(updated_docs[0]['priority'], 1)
+
+
+@skipIf(pymongo is None, 'pymongo not installed')
+class BulkWriteUpsertedIdsTest(TestCase):
+    def setUp(self):
+        self.client = mongomock.MongoClient()
+        self.db = self.client.testdb
+        self.collection = self.db.collection
+
+    def test__bulk_write_upserted_ids_index(self):
+        self.collection.create_index('meter_id', unique=True)
+        self.collection.insert_many(
+            [
+                {'meter_id': 'AAA', 'value': 1},
+                {'meter_id': 'BBB', 'value': 2},
+            ]
+        )
+
+        result = self.collection.bulk_write(
+            [
+                pymongo.UpdateOne({'meter_id': 'AAA'}, {'$set': {'value': 10}}),
+                pymongo.UpdateOne({'meter_id': 'BBB'}, {'$set': {'value': 20}}),
+                pymongo.UpdateOne({'meter_id': 'CCC'}, {'$set': {'value': 30}}, upsert=True),
+                pymongo.UpdateOne({'meter_id': 'DDD'}, {'$set': {'value': 40}}, upsert=True),
+            ],
+            ordered=False,
+        )
+
+        self.assertEqual(result.upserted_count, 2)
+        self.assertIn(2, result.upserted_ids)
+        self.assertIn(3, result.upserted_ids)
+        self.assertNotIn(0, result.upserted_ids)
+        self.assertNotIn(1, result.upserted_ids)
