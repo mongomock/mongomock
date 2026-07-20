@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.8.1] - 2026-07-20
+### Fixed
+- `bulk_write`: `upserted_ids` keys now use real operation index instead of sequential count (#60)
+- `DuplicateKeyError`: now includes `details` dict with `keyPattern` and `keyValue` matching pymongo format (#88)
+
 ## [7.8.0]
 ### Added
 - `QueryProfiler` — query capture and index coverage analyzer (docs/profiler.md)
@@ -319,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove support for deprecated Python versions (everything prior to 3.8)
 
 
+[7.8.1]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/7.8.0...7.8.1
 [7.0.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...7.0.0
 [4.4.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...4.4.0
 [4.3.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.2.0...4.3.0
