@@ -19,11 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `$slice` projection-only: no longer drops other fields from result (#81)
 - `$slice` projection: deep copy prevents database mutation (#30)
 
-## [7.8.1] - 2026-07-20
-### Fixed
-- `bulk_write`: `upserted_ids` keys now use real operation index instead of sequential count (#60)
-- `DuplicateKeyError`: now includes `details` dict with `keyPattern` and `keyValue` matching pymongo format (#88)
-
 
 ## [7.8.0]
 ### Added
@@ -339,8 +334,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove support for deprecated Python versions (everything prior to 3.8)
 
 
-[7.9.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/7.8.1...7.9.0
-[7.8.1]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/7.8.0...7.8.1
 [7.0.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...7.0.0
 [4.4.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.3.0...4.4.0
 [4.3.0]: https://github.com/engFelipeMonteiro/mongomock-ng/compare/4.2.0...4.3.0

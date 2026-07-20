@@ -11420,35 +11420,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.ensure_index('x')
         self.assertIn('x_1', self.db.collection.index_information())
 
-    def test__duplicate_key_error_details_id(self):
-        """DuplicateKeyError on _id includes keyPattern and keyValue."""
-        self.db.collection.insert_one({'_id': 'dup', 'value': 1})
-        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
-            self.db.collection.insert_one({'_id': 'dup', 'value': 2})
-        details = ctx.exception.details
-        self.assertEqual(details['keyPattern'], {'_id': 1})
-        self.assertEqual(details['keyValue'], {'_id': 'dup'})
-
-    def test__duplicate_key_error_details_unique_index(self):
-        """DuplicateKeyError on unique index includes keyPattern and keyValue."""
-        self.db.collection.create_index('email', unique=True)
-        self.db.collection.insert_one({'email': 'a@b.com', 'name': 'A'})
-        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
-            self.db.collection.insert_one({'email': 'a@b.com', 'name': 'B'})
-        details = ctx.exception.details
-        self.assertEqual(details['keyPattern'], {'email': 1})
-        self.assertEqual(details['keyValue'], {'email': 'a@b.com'})
-
-    def test__duplicate_key_error_details_compound_index(self):
-        """DuplicateKeyError on compound unique index includes keyPattern and keyValue."""
-        self.db.collection.create_index([('a', 1), ('b', -1)], unique=True)
-        self.db.collection.insert_one({'a': 1, 'b': 2})
-        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
-            self.db.collection.insert_one({'a': 1, 'b': 2})
-        details = ctx.exception.details
-        self.assertEqual(details['keyPattern'], {'a': 1, 'b': -1})
-        self.assertEqual(details['keyValue'], {'a': 1, 'b': 2})
-
 
 class TestAggregationBugfixesMock(TestCase):
     def setUp(self):
