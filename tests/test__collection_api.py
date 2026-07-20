@@ -11420,6 +11420,29 @@ class CollectionAPITest(TestCase):
             self.db.collection.ensure_index('x')
         self.assertIn('x_1', self.db.collection.index_information())
 
+    def test__duplicate_key_error_details_id(self):
+        self.db.collection.insert_one({'_id': 'dup', 'x': 1})
+        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
+            self.db.collection.insert_one({'_id': 'dup', 'x': 2})
+        self.assertEqual(ctx.exception.details['keyPattern'], {'_id': 1})
+        self.assertEqual(ctx.exception.details['keyValue'], {'_id': 'dup'})
+
+    def test__duplicate_key_error_details_unique_index(self):
+        self.db.collection.create_index('email', unique=True)
+        self.db.collection.insert_one({'email': 'a@b.com'})
+        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
+            self.db.collection.insert_one({'email': 'a@b.com'})
+        self.assertEqual(ctx.exception.details['keyPattern'], {'email': 1})
+        self.assertEqual(ctx.exception.details['keyValue'], {'email': 'a@b.com'})
+
+    def test__duplicate_key_error_details_compound_index(self):
+        self.db.collection.create_index([('a', 1), ('b', -1)], unique=True)
+        self.db.collection.insert_one({'a': 1, 'b': 2})
+        with self.assertRaises(mongomock.DuplicateKeyError) as ctx:
+            self.db.collection.insert_one({'a': 1, 'b': 2})
+        self.assertEqual(ctx.exception.details['keyPattern'], {'a': 1, 'b': -1})
+        self.assertEqual(ctx.exception.details['keyValue'], {'a': 1, 'b': 2})
+
 
 class TestAggregationBugfixesMock(TestCase):
     def setUp(self):
