@@ -2419,8 +2419,41 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 0})
 
-        with self.assertRaises(NotImplementedError):
-            self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 1})
+        # Positional $ returns the first matching array element
+        result = self.db.collection.find_one({'a.b': {'$exists': True}}, projection={'a.$.b': 1})
+        self.assertEqual({'_id': 1, 'a': {'b': 1}}, result)
+
+    def test__find_and_project_positional_match_value(self):
+        self.db.collection.insert_one({'_id': 1, 'scores': [10, 50, 90]})
+
+        result = self.db.collection.find_one({'scores': 90}, projection={'scores.$': 1})
+        self.assertEqual({'_id': 1, 'scores': 90}, result)
+
+    def test__find_and_project_positional_no_match(self):
+        # Filter matches doc via 'c' but no element in 'a' has matching field
+        self.db.collection.insert_one({'_id': 1, 'a': [{'b': 1}, {'b': 2}], 'c': 1})
+
+        result = self.db.collection.find_one({'c': 1}, projection={'a.$.b': 1})
+        # 'c' not in projection, 'a' omitted because no element matched positional $
+        self.assertEqual({'_id': 1}, result)
+
+    def test__find_and_project_positional_multiple_docs(self):
+        self.db.collection.insert_many(
+            [
+                {'_id': 1, 'a': [{'b': 1}, {'b': 2}]},
+                {'_id': 2, 'a': [{'b': 3}, {'b': 4}]},
+                {'_id': 3, 'a': [{'b': 5}, {'b': 6}]},
+            ]
+        )
+
+        results = list(self.db.collection.find({'a.b': {'$gte': 3}}, projection={'a.$.b': 1}))
+        self.assertEqual(
+            [
+                {'_id': 2, 'a': {'b': 3}},
+                {'_id': 3, 'a': {'b': 5}},
+            ],
+            results,
+        )
 
     def test__find_dict_in_nested_list(self):
         self.db.collection.insert_one({'a': {'b': [{'c': 1}]}})
@@ -5352,6 +5385,48 @@ class CollectionAPITest(TestCase):
             ]
         )
         self.assertEqual([{'rename_dot': 2}], list(actual))
+
+    def test__aggregate_project_nested_field_extraction(self):
+        """Dot notation in $project extracts nested fields."""
+        self.db.collection.insert_one({'_id': 1, 'nested': {'field': 'value'}})
+        result = list(self.db.collection.aggregate([{'$project': {'out': '$nested.field'}}]))
+        self.assertEqual(result[0]['out'], 'value')
+
+    def test__aggregate_project_dot_notation_inclusion(self):
+        """Dot notation inclusion in $project."""
+        self.db.collection.insert_one({'_id': 1, 'a': {'b': 1, 'c': 2}})
+        result = list(self.db.collection.aggregate([{'$project': {'a.b': 1}}]))
+        self.assertEqual(result[0], {'_id': 1, 'a': {'b': 1}})
+
+    def test__aggregate_addfields_dot_notation_output(self):
+        """Dot notation in $addFields output field name creates nested doc."""
+        self.db.collection.insert_one({'_id': 1, 'x': 10})
+        result = list(self.db.collection.aggregate([{'$addFields': {'nested.value': '$x'}}]))
+        self.assertEqual(result[0]['nested']['value'], 10)
+
+    def test__aggregate_project_deep_nested_path(self):
+        """Deep nested dot path in $project expression."""
+        self.db.collection.insert_one({'_id': 1, 'a': {'b': {'c': 'deep'}}})
+        result = list(self.db.collection.aggregate([{'$project': {'result': '$a.b.c'}}]))
+        self.assertEqual(result[0]['result'], 'deep')
+
+    def test__aggregate_addfields_nested_input_path(self):
+        """$addFields reading from nested path."""
+        self.db.collection.insert_one({'_id': 1, 'info': {'name': 'test', 'value': 42}})
+        result = list(
+            self.db.collection.aggregate(
+                [
+                    {
+                        '$addFields': {
+                            'fullName': '$info.name',
+                            'doubled': {'$multiply': ['$info.value', 2]},
+                        }
+                    }
+                ]
+            )
+        )
+        self.assertEqual(result[0]['fullName'], 'test')
+        self.assertEqual(result[0]['doubled'], 84)
 
     def test__aggregate_project_id(self):
         self.db.collection.insert_many(
@@ -11362,6 +11437,51 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({'_id': 1, 'items': [{'x': 1, 'y': 2}, {'x': 3, 'y': 4}]})
         result = list(self.db.collection.find({}, {'items': {'$elemMatch': {'x': {'$gte': 2}}}}))
         self.assertEqual([{'x': 3, 'y': 4}], result[0]['items'])
+
+    def test__find_projection_size_match(self):
+        """Issue #78: $size projection keeps array when length matches exactly."""
+        self.db.collection.insert_many(
+            [
+                {'_id': 1, 'tags': ['a', 'b']},
+                {'_id': 2, 'tags': ['a', 'b', 'c']},
+                {'_id': 3, 'tags': ['a']},
+            ]
+        )
+        results = list(self.db.collection.find({}, {'_id': 0, 'tags': {'$size': 2}}))
+        self.assertEqual(1, len(results))
+        self.assertEqual(['a', 'b'], results[0]['tags'])
+
+    def test__find_projection_size_no_match(self):
+        """Issue #78: $size projection excludes document when array length != N."""
+        self.db.collection.insert_one({'_id': 1, 'tags': ['a', 'b', 'c']})
+        results = list(self.db.collection.find({}, {'tags': {'$size': 2}}))
+        self.assertEqual(0, len(results))
+
+    def test__find_projection_size_non_array(self):
+        """Issue #78: $size projection excludes document when value is not an array."""
+        self.db.collection.insert_one({'_id': 1, 'tags': 'not_an_array'})
+        results = list(self.db.collection.find({}, {'tags': {'$size': 2}}))
+        self.assertEqual(0, len(results))
+
+    def test__find_projection_size_missing_field(self):
+        """Issue #78: $size projection handles missing field gracefully."""
+        self.db.collection.insert_one({'_id': 1, 'other': 'value'})
+        results = list(self.db.collection.find({}, {'tags': {'$size': 2}}))
+        self.assertEqual(1, len(results))
+        self.assertNotIn('tags', results[0])
+
+    def test__find_projection_size_with_id_zero(self):
+        """Issue #78: $size projection works with _id: 0."""
+        self.db.collection.insert_many(
+            [
+                {'_id': 1, 'tags': ['a', 'b']},
+                {'_id': 2, 'tags': ['a', 'b', 'c']},
+            ]
+        )
+        results = list(self.db.collection.find({}, {'_id': 0, 'tags': {'$size': 2}}))
+        self.assertEqual(1, len(results))
+        self.assertEqual(['a', 'b'], results[0]['tags'])
+        self.assertNotIn('_id', results[0])
 
     def test__find_non_mapping_filter(self):
         """Gap 9: filtering.py non-Mapping filter -> TypeError"""
