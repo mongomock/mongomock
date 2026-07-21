@@ -21,3 +21,6 @@ mongomock_ng/*,cover
 
 # Container engine override
 .container-engine
+
+# MkDocs build output
+site/

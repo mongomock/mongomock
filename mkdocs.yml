@@ -1,0 +1,53 @@
+site_name: mongomock-ng
+site_description: In-memory MongoDB mock for Python testing
+site_url: https://engFelipeMonteiro.github.io/mongomock-ng
+repo_url: https://github.com/engFelipeMonteiro/mongomock-ng
+repo_name: engFelipeMonteiro/mongomock-ng
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started: installation.md
+  - API Reference: API.md
+  - Aggregation Pipeline: AGGREGATION.md
+  - Geospatial Support: geospatial.md
+  - Sessions & Transactions: sessions.md
+  - Query Profiler: profiler.md
+  - Limitations: LIMITATIONS.md
+  - Changelog: CHANGELOG.md
+  - Contributing: contributing.md
