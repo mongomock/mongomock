@@ -19,7 +19,11 @@ env: .env/.up-to-date
 	.env/bin/pip install pytest pytest-cov PyExecJS pymongo
 	touch .env/.up-to-date
 
-.PHONY: doc build fmt hatch-test docker-build docker-run docker-hatch-test delete-tag
+clean-coverage:
+	rm -f .coverage .coverage.*
+	find . -name "*,cover" | xargs rm -f
+
+.PHONY: doc build fmt hatch-test docker-build docker-run docker-hatch-test delete-tag clean-coverage
 
 # Run the Hatch formatter (README: `hatch fmt`)
 fmt:

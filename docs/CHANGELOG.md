@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.8.3] - 2026-07-21
+### Added
+- MkDocs documentation site with Material theme (docs, dark mode, search, code copy)
+- GitHub Pages auto-deploy via GitHub Actions on push to develop
+- `make clean-coverage` target to remove `.coverage` and `*,cover` files
+
+### Changed
+- Documentation migrated from flat markdown files to structured MkDocs site
+- New pages: `docs/index.md`, `docs/installation.md`, `docs/contributing.md`
+
 ## [7.8.2] - 2026-07-20
 ### Added
 - `find()` positional projection `$`: returns first matching array element (#114)
