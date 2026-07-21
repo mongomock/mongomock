@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [7.8.3] - 2026-07-21
+## [7.9.1] - 2026-07-21
 ### Added
 - MkDocs documentation site with Material theme (docs, dark mode, search, code copy)
 - GitHub Pages auto-deploy via GitHub Actions on push to develop
