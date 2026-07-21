@@ -2064,14 +2064,13 @@ class CollectionAPITest(TestCase):
         'find_and_modify was removed in pymongo v4',
     )
     def test__find_and_modify_with_sort(self):
-        self.db.collection.insert_one({'time_check': float(time.time())})
-        self.db.collection.insert_one({'time_check': float(time.time())})
-        self.db.collection.insert_one({'time_check': float(time.time())})
+        for time_check in (1.0, 2.0, 3.0):
+            self.db.collection.insert_one({'time_check': time_check})
 
-        start_check_time = float(time.time())
+        start_check_time = 4.0
         self.db.collection.find_and_modify(
             {'time_check': {'$lt': start_check_time}},
-            {'$set': {'time_check': float(time.time()), 'checked': True}},
+            {'$set': {'time_check': 5.0, 'checked': True}},
             sort=[('time_check', pymongo.ASCENDING)],
         )
         sorted_records = sorted(self.db.collection.find(), key=lambda x: x['time_check'])
@@ -2079,13 +2078,13 @@ class CollectionAPITest(TestCase):
 
         self.db.collection.find_and_modify(
             {'time_check': {'$lt': start_check_time}},
-            {'$set': {'time_check': float(time.time()), 'checked': True}},
+            {'$set': {'time_check': 6.0, 'checked': True}},
             sort=[('time_check', pymongo.ASCENDING)],
         )
 
         self.db.collection.find_and_modify(
             {'time_check': {'$lt': start_check_time}},
-            {'$set': {'time_check': float(time.time()), 'checked': True}},
+            {'$set': {'time_check': 7.0, 'checked': True}},
             sort=[('time_check', pymongo.ASCENDING)],
         )
 
