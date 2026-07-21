@@ -45,7 +45,7 @@ pymongo = ["pymongo"]
 
 [project.urls]
 Homepage = "https://github.com/engFelipeMonteiro/mongomock-ng"
-Changelog = "https://github.com/engFelipeMonteiro/mongomock-ng/blob/develop/CHANGELOG.md"
+Changelog = "https://engFelipeMonteiro.github.io/mongomock-ng/CHANGELOG/"
 
 [tool.hatch.version]
 path = "mongomock_ng/__version__.py"
