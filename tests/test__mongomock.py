@@ -2207,7 +2207,6 @@ class UpdateOperatorsComparisonTest(_CollectionComparisonTest):
     def test__current_date(self):
         self.cmp.do.insert_one({'a': 1})
         self.cmp.do.update_one({}, {'$currentDate': {'a': True}})
-        self.cmp.compare.find()
 
     def test__update_pipeline(self):
         self.cmp.do.insert_one({'a': 1, 'b': 2})
@@ -5198,6 +5197,29 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.do.drop()
         self.cmp.do.insert_many(
             [
+                {'a': 1, 'b': 10},
+                {'a': 3, 'b': 30},
+            ]
+        )
+        pipeline = [{'$fill': {'output': {'b': {'$linearFill': None}}}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_fill_linear(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': 10},
+                {'a': 3, 'b': 30},
+            ]
+        )
+        pipeline = [{'$fill': {'output': {'b': {'$linearFill': None}}}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    @skipIf(version.parse('7.1') > SERVER_VERSION, '$fill.$value requires MongoDB 7.1+')
+    def test__aggregate_fill_value(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
                 {'a': 1, 'b': None},
                 {'a': 2, 'b': 10},
             ]
@@ -5216,6 +5238,16 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [{'$redact': {'$cond': [{'$eq': ['$secret', True]}, '$$PRUNE', '$$DESCEND']}}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
+    @skipIf(
+        True,
+        '$out empties source collection in real MongoDB but not in mock',
+    )
+    def test__aggregate_out_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
+        pipeline = [{'$out': 'output_collection'}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
     def test__aggregate_redact_descend(self):
         self.cmp.do.drop()
         self.cmp.do.insert_many(
@@ -5225,12 +5257,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             ]
         )
         pipeline = [{'$redact': {'$cond': [{'$gt': ['$a', 0]}, '$$DESCEND', '$$PRUNE']}}]
-        self.cmp.compare_ignore_order.aggregate(pipeline)
-
-    def test__aggregate_out_stage(self):
-        self.cmp.do.drop()
-        self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
-        pipeline = [{'$out': 'output_collection'}]
         self.cmp.compare_ignore_order.aggregate(pipeline)
 
     def test__aggregate_sort_by_count_stage(self):
