@@ -2158,6 +2158,87 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$project': {'error_type': '$$ROOT.errors.error_type'}}])
 
 
+class UpdateOperatorsComparisonTest(_CollectionComparisonTest):
+    def test__pull_all(self):
+        self.cmp.do.insert_one({'a': [1, 2, 3, 2]})
+        self.cmp.do.update_one({}, {'$pullAll': {'a': [2]}})
+        self.cmp.compare.find()
+
+    def test__pull_all_nested(self):
+        self.cmp.do.insert_one({'a': {'b': [1, 2, 3, 2]}})
+        self.cmp.do.update_one({}, {'$pullAll': {'a.b': [2]}})
+        self.cmp.compare.find()
+
+    def test__push_position(self):
+        self.cmp.do.insert_one({'a': [1, 3]})
+        self.cmp.do.update_one({}, {'$push': {'a': {'$each': [2], '$position': 1}}})
+        self.cmp.compare.find()
+
+    def test__push_sort(self):
+        self.cmp.do.insert_one({'a': [3, 1]})
+        self.cmp.do.update_one({}, {'$push': {'a': {'$each': [2], '$sort': 1}}})
+        self.cmp.compare.find()
+
+    def test__rename(self):
+        self.cmp.do.insert_one({'old': 1})
+        self.cmp.do.update_one({}, {'$rename': {'old': 'new'}})
+        self.cmp.compare.find()
+
+    def test__pop_list(self):
+        self.cmp.do.insert_one({'a': [1, 2, 3]})
+        self.cmp.do.update_one({}, {'$pop': {'a': 1}})
+        self.cmp.compare.find()
+
+    def test__bit_xor(self):
+        self.cmp.do.insert_one({'a': 5})
+        self.cmp.do.update_one({}, {'$bit': {'a': {'xor': 3}}})
+        self.cmp.compare.find()
+
+    def test__max(self):
+        self.cmp.do.insert_one({'a': 5})
+        self.cmp.do.update_one({}, {'$max': {'a': 10}})
+        self.cmp.compare.find()
+
+    def test__min(self):
+        self.cmp.do.insert_one({'a': 5})
+        self.cmp.do.update_one({}, {'$min': {'a': 3}})
+        self.cmp.compare.find()
+
+    def test__current_date(self):
+        self.cmp.do.insert_one({'a': 1})
+        self.cmp.do.update_one({}, {'$currentDate': {'a': True}})
+        self.cmp.compare.find()
+
+    def test__update_pipeline(self):
+        self.cmp.do.insert_one({'a': 1, 'b': 2})
+        self.cmp.do.update_one({}, [{'$set': {'sum': {'$add': ['$a', '$b']}}}])
+        self.cmp.compare.find()
+
+    def test__all_positional(self):
+        self.cmp.do.insert_one({'a': [{'x': 1}, {'x': 2}]})
+        self.cmp.do.update_one({}, {'$set': {'a.$[].x': 10}})
+        self.cmp.compare.find()
+
+    def test__array_filters(self):
+        self.cmp.do.insert_one({'a': [{'x': 1}, {'x': 2}]})
+        self.cmp.do.update_one(
+            {},
+            {'$set': {'a.$[elem].x': 10}},
+            array_filters=[{'elem.x': 1}],
+        )
+        self.cmp.compare.find()
+
+    def test__add_to_set(self):
+        self.cmp.do.insert_one({'a': [1, 2]})
+        self.cmp.do.update_one({}, {'$addToSet': {'a': 3}})
+        self.cmp.compare.find()
+
+    def test__add_to_set_no_op(self):
+        self.cmp.do.insert_one({'a': [1, 2]})
+        self.cmp.do.update_one({}, {'$addToSet': {'a': 1}})
+        self.cmp.compare.find()
+
+
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class GroupTest(_CollectionComparisonTest):
     def setUp(self):
@@ -5112,6 +5193,114 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
             },
         ]
         self.cmp.compare.aggregate(pipeline)
+
+    def test__aggregate_fill(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': None},
+                {'a': 2, 'b': 10},
+            ]
+        )
+        pipeline = [{'$fill': {'output': {'b': {'$value': 0}}}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_redact_prune(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'secret': True},
+                {'a': 2, 'secret': False},
+            ]
+        )
+        pipeline = [{'$redact': {'$cond': [{'$eq': ['$secret', True]}, '$$PRUNE', '$$DESCEND']}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_redact_descend(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': {'c': 10}},
+                {'a': 2, 'b': {'c': 20}},
+            ]
+        )
+        pipeline = [{'$redact': {'$cond': [{'$gt': ['$a', 0]}, '$$DESCEND', '$$PRUNE']}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_out_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many([{'a': 1}, {'a': 2}])
+        pipeline = [{'$out': 'output_collection'}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_sort_by_count_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 'x'},
+                {'a': 'x'},
+                {'a': 'y'},
+            ]
+        )
+        pipeline = [{'$sortByCount': '$a'}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_unwind_preserve_null(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': [1, 2]},
+                {'a': None},
+            ]
+        )
+        pipeline = [{'$unwind': {'path': '$a', 'preserveNullAndEmptyArrays': True}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_unwind_include_array_index(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({'a': [10, 20, 30]})
+        pipeline = [{'$unwind': {'path': '$a', 'includeArrayIndex': 'idx'}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_regex_match_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 'hello'},
+                {'a': 'world'},
+                {'a': 'help'},
+            ]
+        )
+        pipeline = [{'$match': {'$expr': {'$regexMatch': {'input': '$a', 'regex': 'he.*'}}}}]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_facet_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_many(
+            [
+                {'a': 1, 'b': 'x'},
+                {'a': 2, 'b': 'y'},
+                {'a': 3, 'b': 'x'},
+            ]
+        )
+        pipeline = [
+            {
+                '$facet': {
+                    'by_b': [{'$group': {'_id': '$b', 'count': {'$sum': 1}}}],
+                    'total': [{'$count': 'count'}],
+                }
+            }
+        ]
+        self.cmp.compare_ignore_order.aggregate(pipeline)
+
+    def test__aggregate_union_with_stage(self):
+        self.cmp.do.drop()
+        self.cmp.do.insert_one({'a': 1})
+        self.cmp.compare_ignore_order.aggregate(
+            [
+                {'$unionWith': 'other_collection'},
+            ]
+        )
 
 
 class MongoClientGraphLookupTest(_CollectionComparisonTest):

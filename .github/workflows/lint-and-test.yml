@@ -33,8 +33,46 @@ jobs:
       - name: Lint typing
         run: hatch run types:check
 
-  test:
+  test-mock:
     runs-on: ubuntu-latest
+    name: "Test (mock-only) py${{ matrix.python-version }}"
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Set up NodeJS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 18
+
+      - name: Install hatch
+        uses: pypa/hatch@install
+
+      - name: Run tests (mock-only)
+        run: hatch test -py=${{ matrix.python-version }} --cover
+        env:
+          NO_LOCAL_MONGO: "1"
+
+      - name: Disambiguate coverage filename
+        run: mv .coverage ".coverage.mock.${{ matrix.os }}.${{ matrix.python-version }}"
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v7
+        with:
+          include-hidden-files: true
+          name: coverage-mock-${{ matrix.os }}-${{ matrix.python-version }}
+          path: .coverage*
+
+  test-mongodb:
+    runs-on: ubuntu-latest
+    name: "Test (mongodb) py${{ matrix.python-version }}"
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -66,44 +104,85 @@ jobs:
       - name: Install hatch
         uses: pypa/hatch@install
 
-      - name: Run tests
+      - name: Run tests (with MongoDB)
         run: hatch test -py=${{ matrix.python-version }} --cover
 
       - name: Disambiguate coverage filename
-        run: mv .coverage ".coverage.${{ matrix.os }}.${{ matrix.python-version }}"
+        run: mv .coverage ".coverage.mongodb.${{ matrix.os }}.${{ matrix.python-version }}"
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v7
         with:
           include-hidden-files: true
-          name: coverage-${{ matrix.os }}-${{ matrix.python-version }}
+          name: coverage-mongodb-${{ matrix.os }}-${{ matrix.python-version }}
           path: .coverage*
 
   coverage:
     runs-on: ubuntu-latest
     name: Report coverage
     needs:
-      - test
+      - test-mock
+      - test-mongodb
     steps:
       - uses: actions/checkout@v6
       - name: Install Hatch
         uses: pypa/hatch@install
 
-      - name: Download coverage data
+      - name: Download mock coverage
         uses: actions/download-artifact@v8
         with:
-          pattern: coverage-*
+          pattern: coverage-mock-*
+          path: /tmp/cov-mock
           merge-multiple: true
 
-      - name: Combine coverage data
-        run: hatch run coverage:combine
+      - name: Download mongodb coverage
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-mongodb-*
+          path: /tmp/cov-mongodb
+          merge-multiple: true
 
-      - name: Export coverage reports
-        run: hatch run coverage:xml
+      - name: Combine mock-only report
+        run: |
+          cd /tmp/cov-mock
+          coverage combine .coverage.* 2>/dev/null || true
+          coverage xml -o /tmp/coverage-mock.xml 2>/dev/null || true
 
-      - uses: codecov/codecov-action@v6
+      - name: Combine mongodb report
+        run: |
+          cd /tmp/cov-mongodb
+          coverage combine .coverage.* 2>/dev/null || true
+          coverage xml -o /tmp/coverage-mongodb.xml 2>/dev/null || true
+
+      - name: Combine total report
+        run: |
+          cp /tmp/cov-mock/.coverage* . 2>/dev/null || true
+          cp /tmp/cov-mongodb/.coverage* . 2>/dev/null || true
+          hatch run coverage:combine
+          hatch run coverage:xml
+
+      - name: Upload coverage (total)
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: total
+          fail_ci_if_error: false
+
+      - name: Upload coverage (mock-only)
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: mock-only
+          files: /tmp/coverage-mock.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage (mongodb)
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: mongodb
+          files: /tmp/coverage-mongodb.xml
+          fail_ci_if_error: false
 
   check-version:
     name: Check version tag

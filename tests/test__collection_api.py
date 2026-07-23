@@ -11519,6 +11519,156 @@ class CollectionAPITest(TestCase):
         self.assertEqual(ctx.exception.details['keyPattern'], {'a': 1, 'b': -1})
         self.assertEqual(ctx.exception.details['keyValue'], {'a': 1, 'b': 2})
 
+    def test__pull_all_nested_path(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {'b': [1, 2, 3, 2]}})
+        coll.update_one({}, {'$pullAll': {'a.b': [2]}})
+        self.assertEqual(coll.find_one()['a']['b'], [1, 3])
+
+    def test__pull_all_nested_path_nonexistent(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {'b': [1, 2]}})
+        coll.update_one({}, {'$pullAll': {'a.c': [1]}})
+        self.assertEqual(coll.find_one()['a']['b'], [1, 2])
+
+    def test__pull_all_nonexistent_field(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': [1, 2]})
+        coll.update_one({}, {'$pullAll': {'b': [1]}})
+        self.assertEqual(coll.find_one()['a'], [1, 2])
+
+    def test__add_to_set_nested_path(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {'b': [1, 2]}})
+        coll.update_one({}, {'$addToSet': {'a.b': 3}})
+        self.assertEqual(coll.find_one()['a']['b'], [1, 2, 3])
+
+    def test__add_to_set_nested_path_no_op(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {'b': [1, 2]}})
+        coll.update_one({}, {'$addToSet': {'a.b': 1}})
+        self.assertEqual(coll.find_one()['a']['b'], [1, 2])
+
+    def test__add_to_set_nested_path_new_field(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {}})
+        coll.update_one({}, {'$addToSet': {'a.b': 1}})
+        self.assertEqual(coll.find_one()['a']['b'], [1])
+
+    def test__add_to_set_nested_with_each(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': {'b': [1]}})
+        coll.update_one({}, {'$addToSet': {'a.b': {'$each': [2, 3]}}})
+        self.assertEqual(sorted(coll.find_one()['a']['b']), [1, 2, 3])
+
+    def test__pull_dict_filter(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': [{'x': 1, 'y': 2}, {'x': 3, 'y': 4}]})
+        coll.update_one({}, {'$pull': {'a': {'x': 1}}})
+        self.assertEqual(coll.find_one()['a'], [{'x': 3, 'y': 4}])
+
+    def test__pull_dict_filter_no_match(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': [{'x': 1}]})
+        coll.update_one({}, {'$pull': {'a': {'x': 99}}})
+        self.assertEqual(coll.find_one()['a'], [{'x': 1}])
+
+    def test__pull_dict_filter_non_dict_elements(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': [1, 2, 3]})
+        coll.update_one({}, {'$pull': {'a': {'x': 1}}})
+        self.assertEqual(coll.find_one()['a'], [1, 2, 3])
+
+    def test__projection_elem_match_no_match(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': [{'x': 1}, {'x': 2}]})
+        doc = coll.find_one({}, {'a': {'$elemMatch': {'x': {'$gt': 100}}}})
+        self.assertNotIn('a', doc)
+
+    def test__projection_elem_match_empty_array(self):
+        coll = self.db.create_collection('t')
+        coll.insert_one({'a': []})
+        doc = coll.find_one({}, {'a': {'$elemMatch': {'x': {'$gt': 0}}}})
+        self.assertNotIn('a', doc)
+
+    def test__unique_index_on_update(self):
+        coll = self.db.create_collection('t')
+        coll.create_index('a', unique=True)
+        coll.insert_one({'a': 1})
+        coll.insert_one({'a': 2})
+        with self.assertRaises(mongomock.DuplicateKeyError):
+            coll.update_one({'a': 2}, {'$set': {'a': 1}})
+
+    def test__unique_index_on_update_no_change(self):
+        coll = self.db.create_collection('t')
+        coll.create_index('a', unique=True)
+        coll.insert_one({'a': 1})
+        coll.update_one({'a': 1}, {'$set': {'b': 2}})
+        self.assertEqual(coll.find_one()['a'], 1)
+
+    def test__codec_options_defaults(self):
+        from mongomock_ng.codec_options import CodecOptions
+
+        co = CodecOptions()
+        self.assertFalse(co.tz_aware)
+        self.assertEqual(co.uuid_representation, 0)
+        self.assertEqual(co.unicode_decode_error_handler, 'strict')
+
+    def test__codec_options_tz_aware(self):
+        from mongomock_ng.codec_options import CodecOptions
+
+        co = CodecOptions(tz_aware=True)
+        self.assertTrue(co.tz_aware)
+
+    def test__codec_options_invalid_tz_aware(self):
+        from mongomock_ng.codec_options import CodecOptions
+
+        with self.assertRaises(TypeError):
+            CodecOptions(tz_aware='yes')
+
+    def test__codec_options_with_options(self):
+        from mongomock_ng.codec_options import CodecOptions
+
+        co = CodecOptions()
+        co2 = co.with_options(tz_aware=True)
+        self.assertTrue(co2.tz_aware)
+        self.assertFalse(co.tz_aware)
+
+    def test__codec_options_to_pymongo(self):
+        from mongomock_ng.codec_options import CodecOptions
+
+        co = CodecOptions()
+        pymongo_co = co.to_pymongo()
+        self.assertIsNotNone(pymongo_co)
+
+    def test__write_concern_api(self):
+        from mongomock_ng.write_concern import WriteConcern
+
+        wc = WriteConcern(w=2, wtimeout=1000, j=True)
+        self.assertEqual(wc.document['w'], 2)
+        self.assertEqual(wc.document['wtimeout'], 1000)
+        self.assertTrue(wc.document['j'])
+        self.assertTrue(wc.acknowledged)
+
+    def test__write_concern_defaults_api(self):
+        from mongomock_ng.write_concern import WriteConcern
+
+        wc = WriteConcern()
+        self.assertTrue(wc.is_server_default)
+        self.assertEqual(wc.document, {})
+
+    def test__read_concern(self):
+        from mongomock_ng.read_concern import ReadConcern
+
+        rc = ReadConcern(level='majority')
+        self.assertEqual(rc.level, 'majority')
+
+    def test__read_concern_default(self):
+        from mongomock_ng.read_concern import ReadConcern
+
+        rc = ReadConcern()
+        self.assertIsNone(rc.level)
+
 
 class TestAggregationBugfixesMock(TestCase):
     def setUp(self):
