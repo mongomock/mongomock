@@ -128,49 +128,38 @@ jobs:
       - name: Install Hatch
         uses: pypa/hatch@install
 
-      - name: Download mock coverage
+      - name: Download all coverage data
         uses: actions/download-artifact@v8
         with:
-          pattern: coverage-mock-*
-          path: .coverage-mock
+          pattern: coverage-*
+          path: /tmp/cov-all
           merge-multiple: true
 
-      - name: Download mongodb coverage
-        uses: actions/download-artifact@v8
-        with:
-          pattern: coverage-mongodb-*
-          path: .coverage-mongodb
-          merge-multiple: true
+      - name: List coverage files
+        run: ls -la /tmp/cov-all/
 
-      - name: Combine mock-only report
+      - name: Combine total coverage
         run: |
-          cd .coverage-mock
+          cp /tmp/cov-all/.coverage* .
           ls -la .coverage*
-          coverage combine --rcfile ../pyproject.toml .coverage.* || true
-          coverage xml --rcfile ../pyproject.toml -o ../coverage-mock.xml || true
-
-      - name: Combine mongodb report
-        run: |
-          cd .coverage-mongodb
-          ls -la .coverage*
-          coverage combine --rcfile ../pyproject.toml .coverage.* || true
-          coverage xml --rcfile ../pyproject.toml -o ../coverage-mongodb.xml || true
-
-      - name: Combine total report
-        run: |
-          cp .coverage-mock/.coverage* . 2>/dev/null || true
-          cp .coverage-mongodb/.coverage* . 2>/dev/null || true
           hatch run coverage:combine
           hatch run coverage:xml
 
-      - name: Verify coverage files
+      - name: Combine mock-only coverage
         run: |
-          echo "=== Total ==="
-          ls -la coverage.xml 2>/dev/null || echo "MISSING"
-          echo "=== Mock-only ==="
-          ls -la coverage-mock.xml 2>/dev/null || echo "MISSING"
-          echo "=== MongoDB ==="
-          ls -la coverage-mongodb.xml 2>/dev/null || echo "MISSING"
+          rm -f .coverage .coverage.* 2>/dev/null || true
+          cp /tmp/cov-all/.coverage.mock* .
+          coverage combine --data-file=.coverage.mock .coverage.mock.* 2>/dev/null || true
+          coverage xml --data-file=.coverage.mock -o coverage-mock.xml 2>/dev/null || true
+          ls -la coverage-mock.xml 2>/dev/null || echo "mock XML not generated"
+
+      - name: Combine mongodb coverage
+        run: |
+          rm -f .coverage .coverage.* 2>/dev/null || true
+          cp /tmp/cov-all/.coverage.mongodb* .
+          coverage combine --data-file=.coverage.mongodb .coverage.mongodb.* 2>/dev/null || true
+          coverage xml --data-file=.coverage.mongodb -o coverage-mongodb.xml 2>/dev/null || true
+          ls -la coverage-mongodb.xml 2>/dev/null || echo "mongodb XML not generated"
 
       - name: Upload coverage (total)
         uses: codecov/codecov-action@v6
@@ -178,6 +167,22 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: total
           file: coverage.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage (mock-only)
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: mock-only
+          file: coverage-mock.xml
+          fail_ci_if_error: false
+
+      - name: Upload coverage (mongodb)
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: mongodb
+          file: coverage-mongodb.xml
           fail_ci_if_error: false
 
       - name: Upload coverage (mock-only)
