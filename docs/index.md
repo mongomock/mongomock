@@ -78,6 +78,6 @@ def test_increase_votes_endpoint():
 ## Acknowledgements
 
 Originally developed by [Rotem Yaari](https://github.com/vmalloc/),
-then by [Martin Domke](https://github.com/mdomke).
-Currently maintained by [Pascal Corpet](https://github.com/pcorpet).
+then by [Martin Domke](https://github.com/mdomke), then [Pascal Corpet](https://github.com/pcorpet).
+Currently maintained by [Pascal Corpet](https://github.com/pcorpet), [Felipe Monteiro Jácome](https://github.com/engFelipeMonteiro).
 Fork maintained by [Felipe Monteiro Jácome](https://github.com/engFelipeMonteiro).

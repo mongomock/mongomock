@@ -6,7 +6,6 @@ from unittest import TestCase
 from uuid import uuid4
 
 import mongomock_ng as mongomock
-from mongomock_ng import helpers
 from mongomock_ng import read_concern
 from mongomock_ng.command_cursor import CommandCursor
 
@@ -99,7 +98,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.database.get_collection('a', read_preference='nearest')
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_read_preference(self):
         database = mongomock.MongoClient().get_database(
             'somedb', read_preference=ReadPreference.NEAREST
@@ -110,17 +108,14 @@ class DatabaseAPITest(TestCase):
         col = database.get_collection('col', read_preference=ReadPreference.PRIMARY)
         self.assertEqual('Primary', col.read_preference.name)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_collection_different_codec_options(self):
         database = mongomock.MongoClient().somedb
         a = database.get_collection('a', codec_options=codec_options.CodecOptions(tz_aware=True))
         self.assertTrue(a.codec_options.tz_aware)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.database.codec_options)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__read_concern(self):
         self.assertEqual(read_concern.ReadConcern(), self.database.read_concern)
 
@@ -128,7 +123,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(write_concern=3)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_pymongo(self):
         other = self.database.with_options(read_preference=self.database.NEAREST)
         self.assertFalse(other is self.database)
@@ -167,10 +161,6 @@ class DatabaseAPITest(TestCase):
         with self.assertRaises(NotImplementedError):
             self.database.with_options(custom_tzinfo)
 
-    @skipIf(
-        not helpers.HAVE_PYMONGO,
-        'pymongo not installed',
-    )
     def test__with_options_type_registry(self):
         class _CustomTypeCodec(codec_options.TypeCodec):
             @property

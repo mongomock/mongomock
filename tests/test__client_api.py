@@ -4,7 +4,6 @@ from unittest import mock
 from unittest import skipIf
 
 import mongomock_ng as mongomock
-from mongomock_ng import helpers
 
 
 try:
@@ -27,13 +26,11 @@ class MongoClientApiTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             mongomock.MongoClient(read_preference=0)
 
-    @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__different_read_preference(self):
         client = mongomock.MongoClient(read_preference=ReadPreference.NEAREST)
         self.assertEqual(ReadPreference.NEAREST, client.db.read_preference)
         self.assertEqual(ReadPreference.NEAREST, client.db.coll.read_preference)
 
-    @unittest.skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options_with_pymongo(self):
         client = mongomock.MongoClient()
         self.assertEqual(codec_options.CodecOptions(), client.codec_options)

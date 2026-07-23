@@ -719,11 +719,8 @@ class Collection:
 
         if BSON:
             # bson validation
-            check_keys = False
-            if not check_keys:
-                _validate_data_fields(data)
-
-            _bson_encode(data, check_keys=check_keys, codec_options=self._codec_options)
+            _validate_data_fields(data)
+            _bson_encode(data, check_keys=False, codec_options=self._codec_options)
 
         # Like pymongo, we should fill the _id in the inserted dict (odd behavior,
         # but we need to stick to it), so we must patch in-place the data dict
@@ -855,6 +852,8 @@ class Collection:
         sort=None,
         comment=None,
     ):
+        if comment:
+            helpers.warn_noop('comment', 'update_one')
         if not bypass_document_validation:
             validate_ok_for_update(update)
         return UpdateResult(
@@ -1302,10 +1301,8 @@ class Collection:
         if _id is not None:
             existing_document['_id'] = _id
         if BSON:
-            check_keys = False
-            if not check_keys:
-                _validate_data_fields(document)
-            _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
+            _validate_data_fields(document)
+            _bson_encode(document, check_keys=False, codec_options=self.codec_options)
         existing_document.update(self._internalize_dict(document))
         if existing_document['_id'] != _id:
             raise OperationFailure(
@@ -1441,6 +1438,10 @@ class Collection:
         hint=None,
         **kwargs,
     ):
+        if comment:
+            helpers.warn_noop('comment', 'find')
+        if allow_disk_use:
+            helpers.warn_noop('allow_disk_use', 'find')
         spec = filter
         if spec is None:
             spec = {}
@@ -1624,11 +1625,8 @@ class Collection:
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or fields == []:
-            return _copy_field(doc, container)
-
         if not fields:
-            fields = {'_id': 1}
+            return _copy_field(doc, container)
         if not isinstance(fields, dict):
             fields = helpers.fields_list_to_dict(fields)
 
@@ -1935,6 +1933,8 @@ class Collection:
         return old
 
     def delete_one(self, filter, collation=None, hint=None, session=None, comment=None, let=None):
+        if comment:
+            helpers.warn_noop('comment', 'delete_one')
         validate_is_mapping('filter', filter)
         return DeleteResult(
             self._delete(filter, collation=collation, hint=hint, session=session), True
@@ -2186,6 +2186,9 @@ class Collection:
         return self.find(filter, comment=comment, hint=hint).distinct(key)
 
     def aggregate(self, pipeline, session=None, **unused_kwargs):
+        if unused_kwargs:
+            for param in unused_kwargs:
+                helpers.warn_noop(param, 'aggregate')
         in_collection = list(self.find())
         return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
@@ -2440,6 +2443,7 @@ class Cursor:
         return self
 
     def batch_size(self, count):
+        helpers.warn_noop('batch_size', 'Cursor')
         return self
 
     def close(self):
@@ -2534,6 +2538,8 @@ class Cursor:
     def allow_disk_use(self, allow_disk_use=False):
         if allow_disk_use is not None and not isinstance(allow_disk_use, bool):
             raise TypeError('allow_disk_use must be a bool')
+        if allow_disk_use:
+            helpers.warn_noop('allow_disk_use', 'Cursor')
         return self
 
     def explain(self):
@@ -2651,13 +2657,12 @@ def _set_updater(doc, field_name, value, codec_options=None):
         value = _clone_document(value)
     if BSON:
         # bson validation
-        check_keys = False
-        if (not check_keys and '\0' in field_name) or field_name.startswith('$'):
+        if '\0' in field_name or field_name.startswith('$'):
             raise InvalidDocument(
                 f'Field name cannot contain the null character and top-level field name '
                 f'cannot start with "$" (found: {field_name})'
             )
-        _bson_encode({field_name: value}, check_keys=check_keys, codec_options=codec_options)
+        _bson_encode({field_name: value}, check_keys=False, codec_options=codec_options)
     if isinstance(doc, MutableMapping):
         doc[field_name] = value
     if isinstance(doc, list):

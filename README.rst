@@ -117,16 +117,26 @@ used to validate production code, it is unacceptable to behave differently than 
 implementation. In such cases it is better to throw ``NotImplementedError`` than implement a modified
 version of the original behavior.
 
-Upgrading to Pymongo v4
------------------------
+Compatibility
+-------------
 
-The major version 4 of Pymongo changed the API quite a bit. The Mongomock-ng library has evolved to
-help you ease the migration:
+mongomock-ng supports:
 
-1. Upgrade to Mongomock-ng v4 or above: if your tests are running with Pymongo installed, Mongomock-ng
-   will adapt its own API to the version of Pymongo installed.
-2. Upgrade to Pymongo v4 or above: your tests using Mongomock-ng will fail exactly where your code
-   would fail in production, so that you can fix it before releasing.
+- **Python**: 3.10, 3.11, 3.12, 3.13, 3.14 (CPython) and PyPy 3.10, 3.11
+- **pymongo**: >= 4.0 (optional dependency)
+- **MongoDB**: 7.0+ server behavior (emulated)
+
+.. code-block:: console
+
+   pip install mongomock-ng[pymongo]
+
+For pandas support (CPython only):
+
+.. code-block:: console
+
+   pip install mongomock-ng[pandas]
+
+See `Compatibility Matrix <docs/compatibility.md>`_ for full test coverage details.
 
 Quick Start
 -----------
@@ -285,7 +295,7 @@ Acknowledgements
 
 Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by
 `Martin Domke <https://github.com/mdomke>`_. It is currently being developed and maintained by
-`Pascal Corpet <https://github.com/pcorpet>`_ .
+`Pascal Corpet <https://github.com/pcorpet>`_ and `Felipe Monteiro Jácome <https://github.com/engFelipeMonteiro/>`_.
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing
 bugs:

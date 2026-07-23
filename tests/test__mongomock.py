@@ -13,7 +13,6 @@ from packaging import version
 import mongomock_ng as mongomock
 from mongomock_ng import ConfigurationError
 from mongomock_ng import Database
-from mongomock_ng import helpers
 from mongomock_ng import InvalidURI
 from mongomock_ng import OperationFailure
 
@@ -91,7 +90,6 @@ class DatabaseGettingTest(TestCase):
         super().setUp()
         self.client = mongomock.MongoClient()
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__get_database_read_concern(self):
         db = self.client.get_database('a', read_concern=read_concern.ReadConcern('majority'))
         self.assertEqual('majority', db.read_concern.level)
@@ -237,7 +235,6 @@ class DatabaseGettingTest(TestCase):
         self.assertIs(c.get_default_database('foo'), c['bar'])
         self.assertIs(c.get_default_database(default='foo'), c['bar'])
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__getting_default_database_preserves_options(self):
         client = mongomock.MongoClient('mongodb://host1/foo')
         db = client.get_database(read_preference=ReadPreference.NEAREST)
@@ -261,7 +258,6 @@ class UTCPlus2(datetime.tzinfo):
         return datetime.timedelta()
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class _CollectionComparisonTest(TestCase):
     """Compares a fake collection with the real mongo collection implementation
@@ -1079,10 +1075,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         for type_name in supported_types:
             self.cmp.compare.find({'a': {'$type': type_name}})
 
-    @skipIf(
-        version.parse('4.0') > helpers.PYMONGO_VERSION,
-        'old version of pymongo accepts to encode uuid',
-    )
     def test__fail_at_uuid_encoding(self):
         self.cmp.compare_exceptions.insert_one({'_id': uuid.UUID(int=2)})
 
@@ -2113,7 +2105,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
             ]
         )
 
-    @skipIf(version.parse('4.0') > helpers.PYMONGO_VERSION, 'pymongo v4 dropped map reduce methods')
     def test__map_reduce_fails(self):
         self.cmp.compare_exceptions.map_reduce(Code(''), Code(''), 'myresults')
         self.cmp.compare_exceptions.inline_map_reduce(Code(''), Code(''))
@@ -2167,7 +2158,6 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate([{'$project': {'error_type': '$$ROOT.errors.error_type'}}])
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(not _HAVE_MAP_REDUCE, 'execjs not installed')
 class GroupTest(_CollectionComparisonTest):
     def setUp(self):
@@ -2218,7 +2208,6 @@ class GroupTest(_CollectionComparisonTest):
         )
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientAggregateTest(_CollectionComparisonTest):
     def setUp(self):
         super().setUp()
@@ -5125,7 +5114,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         self.cmp.compare.aggregate(pipeline)
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 class MongoClientGraphLookupTest(_CollectionComparisonTest):
     def setUp(self):
         super().setUp()
@@ -5577,7 +5565,6 @@ class DatabaseTest(_CollectionComparisonTest):
             self.assertIn('compare with None instead', str(ctx.exception))
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class DocumentValidationTest(_CollectionComparisonTest):
     def test__validate_on_insert(self):

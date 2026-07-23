@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [7.9.2] - 2026-07-23
+### Removed
+- pymongo <4 compatibility guards from source code (collection.py, codec_options.py)
+- ~74 `@skipIf(not helpers.HAVE_PYMONGO)` decorators from tests (pymongo no longer optional)
+- pymongo 4+ skip decorators and version-gated test methods (dead code)
+- Simplified always-true version guards (check_keys, try/except fallbacks)
+- Bumped minimum pymongo fallback version to 4.11
+
+
 ## [7.9.1] - 2026-07-21
 ### Added
 - MkDocs documentation site with Material theme (docs, dark mode, search, code copy)

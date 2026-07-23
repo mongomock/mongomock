@@ -59,7 +59,7 @@ except ImportError:
     Timestamp = None
     DBRef = None  # type: ignore[assignment]
     # Default Pymongo version if not present.
-    PYMONGO_VERSION = version.parse('4.0')
+    PYMONGO_VERSION = version.parse('4.11')
     HAVE_PYMONGO = False
 try:
     from bson.decimal128 import Decimal128 as _Decimal128
@@ -134,6 +134,20 @@ def print_deprecation_warning(old_param_name, new_param_name):
         'kept for backward compatibility purposes.',
         DeprecationWarning,
         stacklevel=2,
+    )
+
+
+def warn_noop(param_name: str, method_name: str) -> None:
+    """Warn that a pymongo parameter is accepted but not implemented (no-op).
+
+    Used for compatibility: callers can pass the same kwargs as real pymongo
+    without errors, but the parameter has no effect in mongomock-ng.
+    """
+    warnings.warn(
+        f"'{param_name}' is accepted by {method_name} for pymongo compatibility "
+        f'but is a no-op in mongomock-ng (in-memory mock, no disk/network).',
+        UserWarning,
+        stacklevel=3,
     )
 
 
