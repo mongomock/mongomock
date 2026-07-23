@@ -6,8 +6,6 @@ from unittest import skipIf
 from unittest import skipUnless
 from unittest import TestCase
 
-from packaging import version
-
 import mongomock_ng as mongomock
 import mongomock_ng.gridfs
 from mongomock_ng import helpers
@@ -164,10 +162,6 @@ class GridFsTest(TestCase):
             self.fake_gridfs.put(GenFile(2, 3), _id='12345')
 
     def assertSameFile(self, real, fake, max_delta_seconds=1):
-        # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#disable-md5-parameter-is-removed
-        if version.parse('4.0') > helpers.PYMONGO_VERSION:
-            self.assertEqual(real['md5'], fake['md5'])
-
         self.assertEqual(real['length'], fake['length'])
         self.assertEqual(real['chunkSize'], fake['chunkSize'])
         self.assertLessEqual(

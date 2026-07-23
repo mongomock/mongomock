@@ -488,7 +488,6 @@ class CollectionAPITest(TestCase):
         self.assertNotIsInstance(collection.find(), list)
         self.assertNotIsInstance(collection.find(), tuple)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__find_with_collation(self):
         collection = self.db.collection
         collation = Collation('fr')
@@ -1622,7 +1621,6 @@ class CollectionAPITest(TestCase):
             expected = {'_id': val}
             self.assertEqual(in_db_val, expected)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_uniq_idxs_with_ascending_ordering(self):
         self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
 
@@ -1632,7 +1630,6 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_uniq_idxs_with_descending_ordering(self):
         self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
 
@@ -1772,7 +1769,6 @@ class CollectionAPITest(TestCase):
         self.db.collection.drop_index('value_1')
         self.assertEqual(self.db.collection.count_documents({}), 0)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_with_expireAfterSeconds(self):
         indexes = [
             pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], expireAfterSeconds=5),
@@ -1802,7 +1798,6 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             self.db.collection.create_indexes(indexes)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_uniq_idxs(self):
         indexes = [
             pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], unique=True),
@@ -1820,7 +1815,6 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_with_partial_filter_expression(self):
         self.db.collection.insert_one({'status': 'draft', 'value': 1})
         self.db.collection.insert_one({'status': 'draft', 'value': 1})
@@ -1834,7 +1828,6 @@ class CollectionAPITest(TestCase):
         index_names = self.db.collection.create_indexes(indexes)
         self.assertEqual(1, len(index_names))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_indexes_names(self):
         indexes = [
             pymongo.operations.IndexModel([('value', pymongo.ASCENDING)], name='index_name'),
@@ -1843,7 +1836,6 @@ class CollectionAPITest(TestCase):
         index_names = self.db.collection.create_indexes(indexes)
         self.assertEqual(['index_name', 'name_1'], index_names)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__ensure_uniq_idxs_with_ascending_ordering(self):
         self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
 
@@ -1853,7 +1845,6 @@ class CollectionAPITest(TestCase):
 
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__ensure_uniq_idxs_with_descending_ordering(self):
         self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
 
@@ -2100,7 +2091,6 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.DuplicateKeyError):
             self.db.collection.insert_one({'_id': 2, 'value': {'nested': 1}})
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_index_with_name(self):
         name = self.db.collection.create_index([('value', 1)], name='index_name')
         self.assertEqual('index_name', name)
@@ -2154,7 +2144,6 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.drop_index('unknownIndex')
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_unique_idx_information_with_ascending_ordering(self):
         index = self.db.collection.create_index([('value', pymongo.ASCENDING)], unique=True)
 
@@ -2169,7 +2158,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.index_information()[index],
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__create_unique_idx_information_with_descending_ordering(self):
         index = self.db.collection.create_index([('value', pymongo.DESCENDING)], unique=True)
 
@@ -2530,7 +2518,6 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.read_concern, col2.read_concern)
         self.assertEqual({'level': 'majority'}, col2.read_concern.document)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__with_options_different_read_preference(self):
         self.db.collection.insert_one({'name': 'col1'})
         col2 = self.db.collection.with_options(read_preference=ReadPreference.NEAREST)
@@ -2545,7 +2532,6 @@ class CollectionAPITest(TestCase):
         self.assertNotEqual(self.db.collection.read_preference, col2.read_preference)
         self.assertEqual('nearest', col2.read_preference.mongos_mode)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__codec_options(self):
         self.assertEqual(codec_options.CodecOptions(), self.db.collection.codec_options)
         self.db.collection.with_options(codec_options.CodecOptions())
@@ -2699,7 +2685,6 @@ class CollectionAPITest(TestCase):
                 upsert=True,
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__current_date_timestamp(self):
         before = datetime.now(tz_util.utc) - timedelta(seconds=1)
         self.db.collection.update_one(
@@ -2722,7 +2707,6 @@ class CollectionAPITest(TestCase):
         self.assertLessEqual(before, doc['updated_at'].as_datetime())
         self.assertLessEqual(doc['updated_at'].as_datetime(), after)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__insert_zero_timestamp(self):
         self.db.collection.drop()
         before = datetime.now(tz_util.utc) - timedelta(seconds=1)
@@ -2849,7 +2833,6 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(TypeError):
             col.find().max_time_ms(3.4)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_insert_one(self):
         operations = [pymongo.InsertOne({'a': 1, 'b': 2})]
         result = self.db.collection.bulk_write(operations)
@@ -2872,7 +2855,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_update_one(self):
         # Upsert == False
         self.db.collection.insert_one({'a': 1})
@@ -2917,7 +2899,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_update_many(self):
         # Upsert == False
         self.db.collection.insert_one({'a': 1, 'b': 1})
@@ -2963,7 +2944,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_replace_one(self):
         # Upsert == False
         self.db.collection.insert_one({'a': 1, 'b': 0})
@@ -3010,7 +2990,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_delete_one(self):
         self.db.collection.insert_one({'a': 1})
         operations = [pymongo.DeleteOne({'a': 1})]
@@ -3033,7 +3012,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_delete_many(self):
         self.db.collection.insert_one({'a': 1})
         self.db.collection.insert_one({'a': 1})
@@ -3057,7 +3035,6 @@ class CollectionAPITest(TestCase):
             },
         )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_matched_count_no_changes(self):
         self.db.collection.insert_one({'name': 'luke'})
         result = self.db.collection.bulk_write(
@@ -3068,7 +3045,6 @@ class CollectionAPITest(TestCase):
         self.assertEqual(1, result.matched_count)
         self.assertEqual(0, result.modified_count)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_matched_count_replace_multiple_objects(self):
         self.db.collection.insert_one({'name': 'luke'})
         self.db.collection.insert_one({'name': 'anna'})
@@ -5959,7 +5935,6 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([{'$project': {'sub': {'$substr': ['$a', 1]}}}])
         self.assertEqual('substr must have 3 items', str(err.exception))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_tostr_operation_objectid(self):
         self.db.collection.insert_one({'a': ObjectId('5abcfad1fbc93d00080cfe66')})
         actual = self.db.collection.aggregate(
@@ -6624,7 +6599,6 @@ class CollectionAPITest(TestCase):
         query = {'counts': {'$gt': {'circles': re.compile('3')}}}
         self.assertFalse(list(collection.find(query)))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__filter_bson_regex(self):
         self.db.collection.insert_many(
             [
@@ -6726,7 +6700,6 @@ class CollectionAPITest(TestCase):
             collection.insert_many([{'_id': 1}, {'_id': 1}])
         self.assertIn('batch op errors occurred', str(cm.exception))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_many_bulk_write_error_details(self):
         collection = self.db.collection
         with self.assertRaises(mongomock.BulkWriteError) as cm:
@@ -6735,14 +6708,12 @@ class CollectionAPITest(TestCase):
         write_errors = cm.exception.details['writeErrors']
         self.assertEqual([11000], [error.get('code') for error in write_errors])
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_bson_validation(self):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert_one({'a': {'b'}})
         self.assertIn("cannot encode object: {'b'}, of type: <class 'set'>", str(cm.exception))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_bson_invalid_encode_type(self):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
@@ -6754,13 +6725,11 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(InvalidDocument):
             collection.insert_one({'foo': {'foo\0bar': 'bar'}})
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_update_bson_invalid_encode_type(self):
         self.db.collection.insert_one({'a': 1})
         with self.assertRaises(InvalidDocument):
             self.db.collection.update_one(filter={'a': 1}, update={'$set': {'$a': 2}})
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test_insert_bson_special_characters(self):
         collection = self.db.collection
         collection.insert_one({'foo.bar.zoo': {'foo.bar': '$zoo'}, 'foo.$bar': 'zoo'})
@@ -6768,14 +6737,12 @@ class CollectionAPITest(TestCase):
         assert actual['foo.bar.zoo'] == {'foo.bar': '$zoo'}
         assert actual['foo.$bar'] == 'zoo'
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__update_invalid_encode_type(self):
         self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
 
         with self.assertRaises(InvalidDocument):
             self.db.collection.update_one({}, {'$set': {'foo': {'bar'}}})
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__replace_invalid_encode_type(self):
         self.db.collection.insert_one({'_id': 1, 'foo': 'bar'})
 
@@ -7356,7 +7323,6 @@ class CollectionAPITest(TestCase):
         )
         self.assertCountEqual([{'_id': {'a': 1, 'b': 1}}, {'_id': {'a': 2, 'b': 3}}], list(actual))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_group_dbref_key(self):
         collection = self.db.collection
         collection.insert_many(
@@ -7417,7 +7383,6 @@ class CollectionAPITest(TestCase):
         ]
         self.assertEqual(expect, list(actual))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_group_sum_for_decimal(self):
         collection = self.db.collection
         collection.drop()
@@ -8378,12 +8343,10 @@ class CollectionAPITest(TestCase):
         collection = self.db.get_collection('a', read_preference=self.db.collection.read_preference)
         self.assertEqual('primary', collection.read_preference.mongos_mode)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__read_preference(self):
         collection = self.db.get_collection('a', read_preference=ReadPreference.NEAREST)
         self.assertEqual('nearest', collection.read_preference.mongos_mode)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_unordered_with_bulk_write(self):
         with self.assertRaises(mongomock.BulkWriteError) as err_context:
             self.db.collection.bulk_write(
@@ -8401,7 +8364,6 @@ class CollectionAPITest(TestCase):
         self.assertEqual(3, err_context.exception.details['nInserted'])
         self.assertEqual([2, 4], [e['index'] for e in err_context.exception.details['writeErrors']])
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__bulk_write_ordered_with_bulk_write(self):
         with self.assertRaises(mongomock.BulkWriteError) as err_context:
             self.db.collection.bulk_write(
@@ -8809,7 +8771,6 @@ class CollectionAPITest(TestCase):
         self.assertIsNot(cloned['x'], obj)
         self.assertEqual(cloned['x'].v, 42)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__clone_document_objectid(self):
         from bson import ObjectId as BsonObjectId
 
@@ -8818,7 +8779,6 @@ class CollectionAPITest(TestCase):
         cloned = helpers._clone_document(doc)
         self.assertEqual(cloned['_id'], oid)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__clone_document_decimal128(self):
         from bson.decimal128 import Decimal128
 
@@ -8827,7 +8787,6 @@ class CollectionAPITest(TestCase):
         cloned = helpers._clone_document(doc)
         self.assertEqual(cloned['price'], val)
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_string(self):
         collection = self.db.collection
         collection.insert_one(
@@ -8866,7 +8825,6 @@ class CollectionAPITest(TestCase):
         ]
         self.assertEqual(expect, list(actual))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_decimal(self):
         collection = self.db.collection
         collection.insert_one(
@@ -8954,7 +8912,6 @@ class CollectionAPITest(TestCase):
                 ]
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_int(self):
         collection = self.db.collection
         collection.insert_one(
@@ -8993,7 +8950,6 @@ class CollectionAPITest(TestCase):
         ]
         self.assertEqual(expect, list(actual))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_to_long(self):
         collection = self.db.collection
         collection.insert_one(
@@ -9134,7 +9090,6 @@ class CollectionAPITest(TestCase):
             list(collection.aggregate([{'$addFields': {'converted': {'$toObjectId': '$number'}}}]))
         self.assertIn('requires a string, ObjectId, or null input', str(context.exception))
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_to_string(self):
         collection = self.db.collection
         collection.insert_one(
@@ -9239,7 +9194,6 @@ class CollectionAPITest(TestCase):
         with self.assertRaises(mongomock.OperationFailure):
             self.db.collection.aggregate([{'$project': {'a': {'$dateToString': '10'}}}])
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     @skipIf(version.parse('5.0') > SERVER_VERSION, '$dateAdd is not supported prior to MongoDB 5.0')
     def test__aggregate_date_add_and_subtract(self):
         collection = self.db.collection
@@ -9391,7 +9345,6 @@ class CollectionAPITest(TestCase):
                 )
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     @skipIf(
         version.parse('5.0') > SERVER_VERSION,
         '$dateDiff is not supported prior to MongoDB 5.0',
@@ -9569,7 +9522,6 @@ class CollectionAPITest(TestCase):
                 )
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     @skipIf(
         version.parse('5.0') > SERVER_VERSION,
         '$dateTrunc is not supported prior to MongoDB 5.0',
@@ -9711,7 +9663,6 @@ class CollectionAPITest(TestCase):
                 )
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_from_string(self):
         collection = self.db.collection
         collection.insert_one({})
@@ -9825,7 +9776,6 @@ class CollectionAPITest(TestCase):
                 )
             )
 
-    @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
     def test__aggregate_date_from_parts(self):
         collection = self.db.collection
         collection.insert_one(

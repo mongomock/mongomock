@@ -183,7 +183,6 @@ class BulkOperationsTest(TestCase):
         self.__check_number_of_elements(2)
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class BulkOperationsWithPymongoTest(TestCase):
     def setUp(self):
@@ -251,7 +250,6 @@ class BulkOperationsWithPymongoTest(TestCase):
         self.cmp.compare.find(sort=[('a', 1)])
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(os.getenv('NO_LOCAL_MONGO'), 'No local Mongo server running')
 class CollectionComparisonTest(TestCase):
     def setUp(self):
@@ -295,7 +293,6 @@ class CollectionComparisonTest(TestCase):
         self.cmp.compare.find(sort=[('a', 1)])
 
 
-@skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
 @skipIf(version.parse('4.11') > helpers.PYMONGO_VERSION, 'pymongo v4.11 or above required')
 class BulkOperationsWithSortTest(TestCase):
     def setUp(self):

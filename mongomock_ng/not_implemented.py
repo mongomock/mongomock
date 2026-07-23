@@ -1,5 +1,8 @@
 """Module to handle features that are not implemented yet."""
 
+import warnings
+
+
 _IGNORED_FEATURES = {
     'array_filters': False,
     'collation': False,
@@ -33,5 +36,11 @@ def warn_on_feature(feature):
 def raise_for_feature(feature, reason):
     _ensure_ignorable_feature(feature)
     if _IGNORED_FEATURES[feature]:
+        warnings.warn(
+            f"'{feature}' is accepted for pymongo compatibility but is a no-op "
+            f'in mongomock-ng: {reason}',
+            UserWarning,
+            stacklevel=3,
+        )
         return False
     raise NotImplementedError(reason)

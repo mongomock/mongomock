@@ -6,6 +6,39 @@
 pip install mongomock-ng
 ```
 
+### With pymongo support
+
+```bash
+pip install mongomock-ng[pymongo]
+```
+
+### With pandas support (CPython only)
+
+```bash
+pip install mongomock-ng[pandas]
+```
+
+### All extras
+
+```bash
+pip install mongomock-ng[all]
+```
+
+## Compatibility
+
+| Component | Supported |
+|-----------|-----------|
+| Python | 3.10, 3.11, 3.12, 3.13, 3.14 |
+| PyPy | 3.10, 3.11 |
+| pymongo | >= 4.0 |
+| MongoDB | 7.0+ (emulated) |
+
+See [Compatibility Matrix](compatibility.md) for full test coverage details.
+
+!!! note "PyPy + pandas"
+    pandas does not support PyPy. Install without the `pandas` extra on PyPy.
+    Tests using pandas are automatically skipped.
+
 ## Basic Usage
 
 ```python
