@@ -5193,17 +5193,6 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         ]
         self.cmp.compare.aggregate(pipeline)
 
-    def test__aggregate_fill(self):
-        self.cmp.do.drop()
-        self.cmp.do.insert_many(
-            [
-                {'a': 1, 'b': 10},
-                {'a': 3, 'b': 30},
-            ]
-        )
-        pipeline = [{'$fill': {'output': {'b': {'$linearFill': None}}}}]
-        self.cmp.compare_ignore_order.aggregate(pipeline)
-
     @skipIf(version.parse('7.1') > SERVER_VERSION, '$fill requires MongoDB 7.1+')
     def test__aggregate_fill_linear(self):
         self.cmp.do.drop()
@@ -5314,7 +5303,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
         pipeline = [
             {
                 '$facet': {
-                    'by_b': [{'$group': {'_id': '$b', 'count': {'$sum': 1}}}],
+                    'by_b': [
+                        {'$group': {'_id': '$b', 'count': {'$sum': 1}}},
+                        {'$sort': {'_id': 1}},
+                    ],
                     'total': [{'$count': 'count'}],
                 }
             }
