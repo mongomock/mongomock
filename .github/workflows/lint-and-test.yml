@@ -132,40 +132,52 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-mock-*
-          path: /tmp/cov-mock
+          path: .coverage-mock
           merge-multiple: true
 
       - name: Download mongodb coverage
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-mongodb-*
-          path: /tmp/cov-mongodb
+          path: .coverage-mongodb
           merge-multiple: true
 
       - name: Combine mock-only report
         run: |
-          cd /tmp/cov-mock
-          coverage combine .coverage.* 2>/dev/null || true
-          coverage xml -o /tmp/coverage-mock.xml 2>/dev/null || true
+          cd .coverage-mock
+          ls -la .coverage*
+          coverage combine --rcfile ../pyproject.toml .coverage.* || true
+          coverage xml --rcfile ../pyproject.toml -o ../coverage-mock.xml || true
 
       - name: Combine mongodb report
         run: |
-          cd /tmp/cov-mongodb
-          coverage combine .coverage.* 2>/dev/null || true
-          coverage xml -o /tmp/coverage-mongodb.xml 2>/dev/null || true
+          cd .coverage-mongodb
+          ls -la .coverage*
+          coverage combine --rcfile ../pyproject.toml .coverage.* || true
+          coverage xml --rcfile ../pyproject.toml -o ../coverage-mongodb.xml || true
 
       - name: Combine total report
         run: |
-          cp /tmp/cov-mock/.coverage* . 2>/dev/null || true
-          cp /tmp/cov-mongodb/.coverage* . 2>/dev/null || true
+          cp .coverage-mock/.coverage* . 2>/dev/null || true
+          cp .coverage-mongodb/.coverage* . 2>/dev/null || true
           hatch run coverage:combine
           hatch run coverage:xml
+
+      - name: Verify coverage files
+        run: |
+          echo "=== Total ==="
+          ls -la coverage.xml 2>/dev/null || echo "MISSING"
+          echo "=== Mock-only ==="
+          ls -la coverage-mock.xml 2>/dev/null || echo "MISSING"
+          echo "=== MongoDB ==="
+          ls -la coverage-mongodb.xml 2>/dev/null || echo "MISSING"
 
       - name: Upload coverage (total)
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: total
+          file: coverage.xml
           fail_ci_if_error: false
 
       - name: Upload coverage (mock-only)
@@ -173,7 +185,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mock-only
-          files: /tmp/coverage-mock.xml
+          file: coverage-mock.xml
           fail_ci_if_error: false
 
       - name: Upload coverage (mongodb)
@@ -181,7 +193,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mongodb
-          files: /tmp/coverage-mongodb.xml
+          file: coverage-mongodb.xml
           fail_ci_if_error: false
 
   check-version:
