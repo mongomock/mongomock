@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install hatch
-        uses: pypa/hatch@install
+        run: pip install hatch
       - name: Lint style
         run: hatch fmt --check
 
@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install hatch
-        uses: pypa/hatch@install
+        run: pip install hatch
       - name: Lint typing
         run: hatch run types:check
 
@@ -53,7 +53,7 @@ jobs:
           node-version: 18
 
       - name: Install hatch
-        uses: pypa/hatch@install
+        run: pip install hatch
 
       - name: Run tests (mock-only)
         run: hatch test -py=${{ matrix.python-version }} --cover
@@ -102,7 +102,7 @@ jobs:
           sleep 5
 
       - name: Install hatch
-        uses: pypa/hatch@install
+        run: pip install hatch
 
       - name: Run tests (with MongoDB)
         run: hatch test -py=${{ matrix.python-version }} --cover
@@ -126,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install Hatch
-        uses: pypa/hatch@install
+        run: pip install hatch
 
       - name: Download all coverage data
         uses: actions/download-artifact@v8
