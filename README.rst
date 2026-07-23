@@ -295,7 +295,7 @@ Acknowledgements
 
 Mongomock has originally been developed by `Rotem Yaari <https://github.com/vmalloc/>`_, then by
 `Martin Domke <https://github.com/mdomke>`_. It is currently being developed and maintained by
-`Pascal Corpet <https://github.com/pcorpet>`_  and `Felipe Monteiro Jácome (https://github.com/engFelipeMonteiro/>`_.
+`Pascal Corpet <https://github.com/pcorpet>`_ and `Felipe Monteiro Jácome <https://github.com/engFelipeMonteiro/>`_.
 
 Also, many thanks go to the following people for helping out, contributing pull requests and fixing
 bugs:

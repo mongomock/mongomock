@@ -1,5 +1,6 @@
 import collections
 import copy
+import importlib.util
 import platform
 import random
 import re
@@ -21,6 +22,9 @@ from mongomock_ng import BulkWriteError
 from mongomock_ng import helpers
 from mongomock_ng import WriteError
 from tests.diff import diff
+
+
+HAVE_PANDAS = importlib.util.find_spec('pandas') is not None
 
 
 try:
@@ -10718,6 +10722,7 @@ class CollectionAPITest(TestCase):
         result = list(self.db.collection.aggregate([{'$project': {'dt': {'$toDate': '$s'}}}]))
         self.assertIsInstance(result[0]['dt'], datetime)
 
+    @skipIf(not HAVE_PANDAS, 'pandas not installed')
     @skipIf(platform.python_implementation() == 'PyPy', 'pandas not supported on PyPy')
     def test__find_nat_comparison(self):
         import pandas as pd
@@ -10730,6 +10735,7 @@ class CollectionAPITest(TestCase):
         docs = list(collection.find({'dt': pd.NaT}))
         self.assertEqual(len(docs), 2)
 
+    @skipIf(not HAVE_PANDAS, 'pandas not installed')
     @skipIf(platform.python_implementation() == 'PyPy', 'pandas not supported on PyPy')
     def test__find_nat_sort(self):
         import pandas as pd
