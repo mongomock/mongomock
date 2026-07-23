@@ -60,6 +60,11 @@ jobs:
         env:
           NO_LOCAL_MONGO: "1"
 
+      - name: Generate mock-only XML
+        run: |
+          coverage xml -o coverage-mock.xml || true
+          ls -la coverage-mock.xml || echo "mock XML not generated"
+
       - name: Disambiguate coverage filename
         run: mv .coverage ".coverage.mock.${{ matrix.os }}.${{ matrix.python-version }}"
 
@@ -68,7 +73,9 @@ jobs:
         with:
           include-hidden-files: true
           name: coverage-mock-${{ matrix.os }}-${{ matrix.python-version }}
-          path: .coverage*
+          path: |
+            .coverage*
+            coverage-mock.xml
 
   test-mongodb:
     runs-on: ubuntu-latest
@@ -107,6 +114,11 @@ jobs:
       - name: Run tests (with MongoDB)
         run: hatch test -py=${{ matrix.python-version }} --cover
 
+      - name: Generate mongodb XML
+        run: |
+          coverage xml -o coverage-mongodb.xml || true
+          ls -la coverage-mongodb.xml || echo "mongodb XML not generated"
+
       - name: Disambiguate coverage filename
         run: mv .coverage ".coverage.mongodb.${{ matrix.os }}.${{ matrix.python-version }}"
 
@@ -115,7 +127,9 @@ jobs:
         with:
           include-hidden-files: true
           name: coverage-mongodb-${{ matrix.os }}-${{ matrix.python-version }}
-          path: .coverage*
+          path: |
+            .coverage*
+            coverage-mongodb.xml
 
   coverage:
     runs-on: ubuntu-latest
@@ -125,56 +139,23 @@ jobs:
       - test-mongodb
     steps:
       - uses: actions/checkout@v6
-      - name: Install Hatch
-        run: pip install hatch
 
-      - name: Download all coverage data
+      - name: Download all coverage artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: /tmp/cov-all
           merge-multiple: true
 
-      - name: List coverage files
-        run: ls -la /tmp/cov-all/
-
-      - name: Combine total coverage
-        run: |
-          cp /tmp/cov-all/.coverage* .
-          ls -la .coverage*
-          hatch run coverage:combine
-          hatch run coverage:xml
-
-      - name: Combine mock-only coverage
-        run: |
-          rm -f .coverage .coverage.* 2>/dev/null || true
-          cp /tmp/cov-all/.coverage.mock* .
-          coverage combine --data-file=.coverage.mock .coverage.mock.* 2>/dev/null || true
-          coverage xml --data-file=.coverage.mock -o coverage-mock.xml 2>/dev/null || true
-          ls -la coverage-mock.xml 2>/dev/null || echo "mock XML not generated"
-
-      - name: Combine mongodb coverage
-        run: |
-          rm -f .coverage .coverage.* 2>/dev/null || true
-          cp /tmp/cov-all/.coverage.mongodb* .
-          coverage combine --data-file=.coverage.mongodb .coverage.mongodb.* 2>/dev/null || true
-          coverage xml --data-file=.coverage.mongodb -o coverage-mongodb.xml 2>/dev/null || true
-          ls -la coverage-mongodb.xml 2>/dev/null || echo "mongodb XML not generated"
-
-      - name: Upload coverage (total)
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: total
-          file: coverage.xml
-          fail_ci_if_error: false
+      - name: List downloaded files
+        run: find /tmp/cov-all -type f -name "*.xml" -o -name ".coverage*"
 
       - name: Upload coverage (mock-only)
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mock-only
-          file: coverage-mock.xml
+          file: /tmp/cov-all/coverage-mock.xml
           fail_ci_if_error: false
 
       - name: Upload coverage (mongodb)
@@ -182,23 +163,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mongodb
-          file: coverage-mongodb.xml
-          fail_ci_if_error: false
-
-      - name: Upload coverage (mock-only)
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: mock-only
-          file: coverage-mock.xml
-          fail_ci_if_error: false
-
-      - name: Upload coverage (mongodb)
-        uses: codecov/codecov-action@v6
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: mongodb
-          file: coverage-mongodb.xml
+          file: /tmp/cov-all/coverage-mongodb.xml
           fail_ci_if_error: false
 
   check-version:
