@@ -27,17 +27,11 @@ _fields_list: list[str] = [
     'tzinfo',
 ]
 
-try:
-    _DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
-    _fields_list.append('type_registry')
-except (AttributeError, TypeError):
-    _DEFAULT_TYPE_REGISTRY = TypeRegistry()
+_DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
+_fields_list.append('type_registry')
 
-try:
-    _DEFAULT_DATETIME_CONVERSION = codec_options.DatetimeConversion.DATETIME
-    _fields_list.append('datetime_conversion')
-except (AttributeError, TypeError):
-    _DEFAULT_DATETIME_CONVERSION = 1
+_DEFAULT_DATETIME_CONVERSION = codec_options.DatetimeConversion.DATETIME
+_fields_list.append('datetime_conversion')
 
 # New default in Pymongo v4:
 # https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified

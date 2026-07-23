@@ -30,7 +30,7 @@ pip install mongomock-ng[all]
 |-----------|-----------|
 | Python | 3.10, 3.11, 3.12, 3.13, 3.14 |
 | PyPy | 3.10, 3.11 |
-| pymongo | >= 4.0 |
+| pymongo | >= 4.11 |
 | MongoDB | 7.0+ (emulated) |
 
 See [Compatibility Matrix](compatibility.md) for full test coverage details.
@@ -119,7 +119,7 @@ If your tests pass with mongomock-ng, they will work with real MongoDB.
 
 - mongomock-ng targets MongoDB 7.0.34 server behavior
 - `SERVER_VERSION` defaults to `7.0.34` (configurable via `MONGODB` env var)
-- Requires Python >= 3.10, pymongo >= 4.0
+- Requires Python >= 3.10, pymongo >= 4.11
 
 ## Code Formatting
 

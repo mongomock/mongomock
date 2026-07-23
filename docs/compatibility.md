@@ -18,14 +18,14 @@ mongomock-ng supports multiple Python implementations, pymongo versions, and Mon
 |-----------|-----------|-------|
 | **Python** | 3.10, 3.11, 3.12, 3.13, 3.14 | CPython |
 | **PyPy** | 3.10, 3.11 | CPython-compatible |
-| **pymongo** | >= 4.0 | Optional dependency |
+| **pymongo** | >= 4.11 | Optional dependency |
 | **MongoDB** | 7.0+ | Server version emulated |
 
 ## Test Matrix
 
 The CI test matrix covers:
 
-| Implementation | Version | pymongo 4.0 | pymongo 4.12 | pymongo 4.14 | pymongo latest |
+| Implementation | Version | pymongo 4.11 | pymongo 4.12 | pymongo 4.14 | pymongo latest |
 |----------------|---------|:-----------:|:------------:|:------------:|:--------------:|
 | CPython | 3.10 | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | CPython | 3.11 | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
@@ -74,7 +74,7 @@ MONGODB=7.0.34 python -m pytest tests/
 | Package | Constraint | Reason |
 |---------|-----------|--------|
 | Python | >= 3.10 | Type hints (`X \| Y`), `match`/`case` |
-| pymongo | >= 4.0 | API alignment, codec options |
+| pymongo | >= 4.11 | API alignment, codec options |
 | packaging | any | Version parsing |
 | pytz | any | Timezone support |
 | sentinels | any | NOTHING sentinel |
