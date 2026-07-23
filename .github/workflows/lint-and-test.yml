@@ -155,7 +155,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mock-only
-          file: /tmp/cov-all/coverage-mock.xml
+          files: /tmp/cov-all/coverage-mock.xml
           fail_ci_if_error: false
 
       - name: Upload coverage (mongodb)
@@ -163,7 +163,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: mongodb
-          file: /tmp/cov-all/coverage-mongodb.xml
+          files: /tmp/cov-all/coverage-mongodb.xml
           fail_ci_if_error: false
 
   check-version:
