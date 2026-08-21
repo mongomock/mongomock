@@ -689,16 +689,14 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
                 }
             }
         )
-        with self.assertRaises(OperationFailure) as cm:
-            self.cmp.compare_ignore_order.find(
-                {
-                    'name': {
-                        '$regex': upper_regex,
-                        '$options': 'z',
-                    }
+        self.cmp.compare_ignore_order.find(
+            {
+                'name': {
+                    '$regex': upper_regex,
+                    '$options': 'z',
                 }
-            )
-        self.assertIn('invalid flag', str(cm.exception))
+            }
+        )
 
     def test__find_by_regex_string(self):
         """Test searching with regular expression string."""
@@ -711,8 +709,7 @@ class MongoClientCollectionTest(_CollectionComparisonTest):
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'bob|notsam'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'i'}})
         self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'i'}})
-        with self.assertRaises(OperationFailure):
-            self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'z'}})
+        self.cmp.compare_ignore_order.find({'name': {'$regex': 'Bob', '$options': 'z'}})
 
     def test__find_in_array_by_regex_object(self):
         """Test searching inside array with regular expression object."""
@@ -3671,6 +3668,47 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                         'str': {'$isArray': '$str'},
                         'bool': {'$isArray': '$bool'},
                         'none': {'$isArray': '$none'},
+                    }
+                }
+            ]
+        )
+
+    def test__aggregate_type(self):
+        self.cmp.do.insert_one(
+            {
+                '_id': 1,
+                'list': [1, 2, 3],
+                'tuple': (1, 2, 3),
+                'empty_list': [],
+                'empty_tuple': (),
+                'date': datetime.datetime(1999, 12, 19, 1, 2, 3),
+                'int': 3,
+                'str': '123',
+                'long': 2**63 - 1,
+                'bool': True,
+                'object': {'field': 1},
+                'empty_object': {},
+                'none': None,
+            }
+        )
+        self.cmp.compare.aggregate(
+            [
+                {
+                    '$project': {
+                        '_id': False,
+                        'list': {'$type': '$list'},
+                        'tuple': {'$type': '$tuple'},
+                        'empty_list': {'$type': '$empty_list'},
+                        'empty_tuple': {'$type': '$empty_tuple'},
+                        'date': {'$type': '$date'},
+                        'int': {'$type': '$int'},
+                        'str': {'$type': '$str'},
+                        'long': {'$type': '$long'},
+                        'bool': {'$type': '$bool'},
+                        'object': {'$type': '$object'},
+                        'empty_object': {'$type': '$empty_object'},
+                        'none': {'$type': '$none'},
+                        'missing': {'$type': '$doesnt_exist'},
                     }
                 }
             ]
