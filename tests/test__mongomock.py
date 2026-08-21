@@ -3684,7 +3684,10 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                 'date': datetime.datetime(1999, 12, 19, 1, 2, 3),
                 'int': 3,
                 'str': '123',
+                'long': 2**63 - 1,
                 'bool': True,
+                'object': {'field': 1},
+                'empty_object': {},
                 'none': None,
             }
         )
@@ -3695,14 +3698,17 @@ class MongoClientAggregateTest(_CollectionComparisonTest):
                         '_id': False,
                         'list': {'$type': '$list'},
                         'tuple': {'$type': '$tuple'},
-                        'string': {'$type': '$string'},
+                        'empty_list': {'$type': '$empty_list'},
+                        'empty_tuple': {'$type': '$empty_tuple'},
                         'date': {'$type': '$date'},
                         'int': {'$type': '$int'},
+                        'str': {'$type': '$str'},
                         'long': {'$type': '$long'},
                         'bool': {'$type': '$bool'},
                         'object': {'$type': '$object'},
-                        'null': {'$type': '$null'},
-                        'missing': {'$type': '$object.doesnt_exist'},
+                        'empty_object': {'$type': '$empty_object'},
+                        'none': {'$type': '$none'},
+                        'missing': {'$type': '$doesnt_exist'},
                     }
                 }
             ]
