@@ -6051,7 +6051,7 @@ class CollectionAPITest(TestCase):
             collection.insert_one({'$foo': 'bar'})
         self.assertEqual(
             str(cm.exception),
-            'Top-level field names cannot start with the "$"' ' sign (found: $foo)',
+            'Top-level field names cannot start with the "$" sign (found: $foo)',
         )
         with self.assertRaises(InvalidDocument):
             collection.insert_one({'foo': {'foo\0bar': 'bar'}})
@@ -7235,8 +7235,7 @@ class CollectionAPITest(TestCase):
         self.assertEqual(
             datetime(2000, 1, 1, 10, 30, 30, 12000),
             stored_document['date'],
-            msg='The stored document holds a date as timezone naive UTC and without '
-            'microseconds',
+            msg='The stored document holds a date as timezone naive UTC and without microseconds',
         )
 
         # The objects are not linked: modifying the inserted document or the fetched one will
@@ -8282,3 +8281,31 @@ class CollectionAPITest(TestCase):
         col.find()
         with self.assertRaises(TypeError):
             col.find(allow_disk_use=1)
+
+    def test__projection_slice_does_not_mutate_store(self):
+        self.db.collection.insert_one({'n': 1, 'elements': [{'x': 1}, {'x': 2}]})
+
+        for projection in (
+            {'elements': {'$slice': 1}},
+            {'n': 1, 'elements': {'$slice': 1}},
+            {'_id': 0, 'elements': {'$slice': 1}},
+        ):
+            doc = self.db.collection.find_one({'n': 1}, projection)
+            doc['elements'][0]['x'] += 1
+            doc['elements'].append({'x': 99})
+
+        stored = self.db.collection.find_one({'n': 1})
+        self.assertEqual(stored['elements'], [{'x': 1}, {'x': 2}])
+
+    def test__projection_elem_match_does_not_mutate_store(self):
+        self.db.collection.insert_one({'_id': {'k': 1}, 'n': 1, 'elements': [{'x': 1}, {'x': 2}]})
+        doc = self.db.collection.find_one(
+            {'n': 1},
+            {'elements': {'$elemMatch': {'x': 2}}},
+        )
+        doc['_id']['k'] += 10
+        doc['elements'][0]['x'] += 10
+
+        stored = self.db.collection.find_one({'n': 1})
+        self.assertEqual(stored['_id'], {'k': 1})
+        self.assertEqual(stored['elements'], [{'x': 1}, {'x': 2}])

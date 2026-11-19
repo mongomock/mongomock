@@ -1336,13 +1336,13 @@ class Collection:
 
         return result
 
-    def _apply_projection_operators(self, ops, doc, doc_copy):
+    def _apply_projection_operators(self, ops, doc, doc_copy, container):
         """Applies projection operators to copied document."""
         for field, op in ops.items():
             if field not in doc_copy:
                 if field in doc:
                     # field was not copied yet (since we are in include mode)
-                    doc_copy[field] = doc[field]
+                    doc_copy[field] = _copy_field(doc[field], container)
                 else:
                     # field doesn't exist in original document, no work to do
                     continue
@@ -1439,12 +1439,12 @@ class Collection:
         if id_value == 0:
             doc_copy.pop('_id', None)
         elif '_id' in doc:
-            doc_copy['_id'] = doc['_id']
+            doc_copy['_id'] = _copy_field(doc['_id'], container)
 
         fields['_id'] = id_value  # put _id back in fields
 
         # time to apply the projection operators and put back their fields
-        self._apply_projection_operators(projection_operators, doc, doc_copy)
+        self._apply_projection_operators(projection_operators, doc, doc_copy, container)
         for field, op in projection_operators.items():
             fields[field] = op
         return doc_copy
