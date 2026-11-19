@@ -1637,11 +1637,16 @@ class Collection:
             raise ValueError("Can't do both update and remove")
 
         old = self.find_one(query, projection=projection, sort=sort)
-        if not old and not upsert:
-            return
+        if old is None and not upsert:
+            return None
 
-        if old and '_id' in old:
-            query = {'_id': old['_id']}
+        if old is not None:
+            if '_id' in old:
+                query = {'_id': old['_id']}
+            else:
+                target = self.find_one(query, projection={'_id': 1}, sort=sort)
+                if target is not None:
+                    query = {'_id': target['_id']}
 
         if remove:
             self.delete_one(query)

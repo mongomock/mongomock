@@ -669,6 +669,59 @@ class CollectionAPITest(TestCase):
         doc.pop('_id')
         self.assertDictEqual(doc, update)
 
+    def test__find_one_and_update_sort_excluding_id(self):
+        self.db.collection.insert_many(
+            [
+                {'_id': 1, 'field1': 'mydata', 'field2': 10},
+                {'_id': 2, 'field1': 'mydata', 'field2': 20},
+            ]
+        )
+
+        found = self.db.collection.find_one_and_update(
+            {'field1': 'mydata'},
+            {'$set': {'field1': 'mynewdata'}},
+            projection={'_id': False},
+            sort=[('field2', -1)],
+        )
+        self.assertEqual(found, {'field1': 'mydata', 'field2': 20})
+        self.assertEqual(self.db.collection.find_one({'_id': 2})['field1'], 'mynewdata')
+        self.assertEqual(self.db.collection.find_one({'_id': 1})['field1'], 'mydata')
+
+        after = self.db.collection.find_one_and_update(
+            {'field1': 'mydata'},
+            {'$set': {'field1': 'updated_after'}},
+            projection={'_id': False},
+            sort=[('field2', 1)],
+            return_document=ReturnDocument.AFTER,
+        )
+        self.assertEqual(after, {'field1': 'updated_after', 'field2': 10})
+
+    def test__find_one_and_modify_empty_projection_and_delete(self):
+        self.db.collection.insert_many(
+            [
+                {'_id': 1, 'k': 'v', 'rank': 1},
+                {'_id': 2, 'k': 'v', 'rank': 2},
+            ]
+        )
+        before = self.db.collection.find_one_and_replace(
+            {'k': 'v'},
+            {'k': 'replaced', 'rank': 2},
+            projection={'_id': 0, 'missing': 1},
+            sort=[('rank', -1)],
+        )
+        self.assertEqual(before, {})
+        self.assertEqual(self.db.collection.find_one({'_id': 2})['k'], 'replaced')
+        self.assertEqual(self.db.collection.find_one({'_id': 1})['k'], 'v')
+
+        deleted = self.db.collection.find_one_and_delete(
+            {'rank': {'$gte': 1}},
+            projection={'_id': False},
+            sort=[('rank', -1)],
+        )
+        self.assertEqual(deleted, {'k': 'replaced', 'rank': 2})
+        self.assertIsNone(self.db.collection.find_one({'_id': 2}))
+        self.assertIsNotNone(self.db.collection.find_one({'_id': 1}))
+
     def test__find_in_empty_collection(self):
         self.db.collection.drop()
 
