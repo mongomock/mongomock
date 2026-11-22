@@ -1,6 +1,7 @@
 """Module to handle the operations within the aggregate pipeline."""
 
 import bisect
+import calendar
 import collections
 import contextlib
 import copy
@@ -97,7 +98,9 @@ projection_operators = [
     '$literal',
 ]
 date_operators = [
+    '$dateAdd',
     '$dateFromString',
+    '$dateSubtract',
     '$dateToString',
     '$dateFromParts',
     '$dayOfMonth',
@@ -115,6 +118,27 @@ date_operators = [
     '$year',
 ]
 conditional_operators = ['$cond', '$ifNull']
+
+_DATE_ADD_FIXED_UNITS = {
+    'week': datetime.timedelta(weeks=1),
+    'day': datetime.timedelta(days=1),
+    'hour': datetime.timedelta(hours=1),
+    'minute': datetime.timedelta(minutes=1),
+    'second': datetime.timedelta(seconds=1),
+    'millisecond': datetime.timedelta(milliseconds=1),
+}
+_DATE_ADD_MONTH_UNITS = {'year': 12, 'quarter': 3, 'month': 1}
+
+
+def _add_months(date, months):
+    """Add calendar months, clamping the day to the end of the target month like MongoDB."""
+    month_index = date.year * 12 + date.month - 1 + months
+    year, month = divmod(month_index, 12)
+    month += 1
+    day = min(date.day, calendar.monthrange(year, month)[1])
+    return date.replace(year=year, month=month, day=day)
+
+
 array_operators = [
     '$concatArrays',
     '$filter',
@@ -609,6 +633,8 @@ class _Parser:
         )
 
     def _handle_date_operator(self, operator, values):
+        if operator in ('$dateAdd', '$dateSubtract'):
+            return self._handle_date_add_operator(operator, values)
         if isinstance(values, dict) and values.keys() == {'date', 'timezone'}:
             value = self.parse(values['date'])
             target_tz = pytz.timezone(values['timezone'])
@@ -708,6 +734,57 @@ class _Parser:
             f'aggregation pipeline, it is currently not implemented '
             f' in Mongomock.'
         )
+
+    def _handle_date_add_operator(self, operator, values):
+        if not isinstance(values, dict):
+            raise OperationFailure(f'{operator} only supports an object as its argument')
+        for field in ('startDate', 'unit', 'amount'):
+            if field not in values:
+                raise OperationFailure(f"Missing '{field}' parameter to {operator}")
+        for field in values:
+            if field not in ('startDate', 'unit', 'amount', 'timezone'):
+                raise OperationFailure(f'Unrecognized argument to {operator}: {field}')
+        if 'timezone' in values:
+            raise NotImplementedError(
+                'Although timezone is a valid field for the '
+                f'{operator} operator, it is currently not implemented '
+                'in Mongomock.'
+            )
+
+        def _parse_or_none(expression):
+            try:
+                return self.parse(expression)
+            except KeyError:
+                return None
+
+        start_date = _parse_or_none(values['startDate'])
+        unit = _parse_or_none(values['unit'])
+        amount = _parse_or_none(values['amount'])
+        if start_date is None or unit is None or amount is None:
+            return None
+
+        if not isinstance(start_date, datetime.datetime):
+            raise OperationFailure(
+                f'{operator} requires startDate to be convertible to a date, '
+                f'found: {type(start_date).__name__}'
+            )
+        if isinstance(amount, bool) or not isinstance(amount, (int, float, decimal.Decimal)):
+            raise OperationFailure(
+                f'{operator} expects integer amount of time units, found: {type(amount).__name__}'
+            )
+        if amount != int(amount):
+            raise OperationFailure(
+                f'{operator} expects integer amount of time units, found: {amount}'
+            )
+        amount = int(amount)
+        if operator == '$dateSubtract':
+            amount = -amount
+
+        if unit in _DATE_ADD_FIXED_UNITS:
+            return start_date + _DATE_ADD_FIXED_UNITS[unit] * amount
+        if unit in _DATE_ADD_MONTH_UNITS:
+            return _add_months(start_date, amount * _DATE_ADD_MONTH_UNITS[unit])
+        raise OperationFailure(f'unknown time unit value: {unit}')
 
     def _handle_array_operator(self, operator, value):
         if operator == '$concatArrays':

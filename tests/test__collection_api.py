@@ -7593,6 +7593,75 @@ class CollectionAPITest(TestCase):
             self.db.collection.aggregate([{'$project': {'a': {'$dateToString': '10'}}}])
 
     @skipIf(not helpers.HAVE_PYMONGO, 'pymongo not installed')
+    def test__aggregate_date_add_and_subtract(self):
+        start = datetime(2024, 1, 31, 10, 30, 15, 250000)
+        self.db.collection.insert_one({'start': start, 'n': 2})
+        cases = [
+            ('$dateAdd', 'millisecond', 500, datetime(2024, 1, 31, 10, 30, 15, 750000)),
+            ('$dateAdd', 'second', 45, datetime(2024, 1, 31, 10, 31, 0, 250000)),
+            ('$dateAdd', 'minute', 30, datetime(2024, 1, 31, 11, 0, 15, 250000)),
+            ('$dateAdd', 'hour', 14, datetime(2024, 2, 1, 0, 30, 15, 250000)),
+            ('$dateAdd', 'day', '$n', datetime(2024, 2, 2, 10, 30, 15, 250000)),
+            ('$dateAdd', 'week', 1, datetime(2024, 2, 7, 10, 30, 15, 250000)),
+            # Month arithmetic clamps to the last day of the target month.
+            ('$dateAdd', 'month', 1, datetime(2024, 2, 29, 10, 30, 15, 250000)),
+            ('$dateAdd', 'quarter', 1, datetime(2024, 4, 30, 10, 30, 15, 250000)),
+            ('$dateAdd', 'year', 1, datetime(2025, 1, 31, 10, 30, 15, 250000)),
+            ('$dateAdd', 'month', -2, datetime(2023, 11, 30, 10, 30, 15, 250000)),
+            ('$dateSubtract', 'day', 31, datetime(2023, 12, 31, 10, 30, 15, 250000)),
+            ('$dateSubtract', 'month', 11, datetime(2023, 2, 28, 10, 30, 15, 250000)),
+            ('$dateSubtract', 'year', 1, datetime(2023, 1, 31, 10, 30, 15, 250000)),
+            ('$dateSubtract', 'hour', -2, datetime(2024, 1, 31, 12, 30, 15, 250000)),
+        ]
+        for operator, unit, amount, expected in cases:
+            with self.subTest(operator=operator, unit=unit, amount=amount):
+                actual = self.db.collection.aggregate(
+                    [
+                        {
+                            '$project': {
+                                '_id': 0,
+                                'result': {
+                                    operator: {
+                                        'startDate': '$start',
+                                        'unit': unit,
+                                        'amount': amount,
+                                    }
+                                },
+                            }
+                        }
+                    ]
+                )
+                self.assertEqual([{'result': expected}], list(actual))
+
+    def test__aggregate_date_add_null_arguments(self):
+        self.db.collection.insert_one({'start': datetime(2024, 1, 1)})
+        for args in (
+            {'startDate': '$missing', 'unit': 'day', 'amount': 1},
+            {'startDate': None, 'unit': 'day', 'amount': 1},
+            {'startDate': '$start', 'unit': None, 'amount': 1},
+            {'startDate': '$start', 'unit': 'day', 'amount': '$missing'},
+        ):
+            with self.subTest(args=args):
+                actual = self.db.collection.aggregate(
+                    [{'$project': {'_id': 0, 'result': {'$dateAdd': args}}}]
+                )
+                self.assertEqual([{'result': None}], list(actual))
+
+    def test__aggregate_date_add_invalid_arguments(self):
+        self.db.collection.insert_one({'start': datetime(2024, 1, 1)})
+        for args in (
+            {'startDate': '$start', 'unit': 'day'},
+            {'startDate': '$start', 'unit': 'day', 'amount': 1, 'extra': 1},
+            {'startDate': '$start', 'unit': 'fortnight', 'amount': 1},
+            {'startDate': '$start', 'unit': 'day', 'amount': 1.5},
+            {'startDate': '$start', 'unit': 'day', 'amount': 'one'},
+            {'startDate': 'not a date', 'unit': 'day', 'amount': 1},
+        ):
+            with self.subTest(args=args), self.assertRaises(mongomock.OperationFailure):
+                self.db.collection.aggregate(
+                    [{'$project': {'_id': 0, 'result': {'$dateSubtract': args}}}]
+                )
+
     def test__aggregate_date_from_parts(self):
         collection = self.db.collection
         collection.insert_one(
