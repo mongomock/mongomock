@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import re
 import time
 import warnings
@@ -435,3 +436,15 @@ def mongodb_to_bool(value):
     """Converts any value to bool the way MongoDB does it"""
 
     return value not in [False, None, 0]
+
+
+def cursor_to_list(cursor, length=None):
+    """Read the remaining documents of a cursor into a list, like pymongo's ``to_list``.
+
+    At most ``length`` documents are read when it is given.
+    """
+    if isinstance(length, int) and length < 1:
+        raise ValueError('to_list() length must be greater than 0')
+    if length is None:
+        return list(cursor)
+    return list(itertools.islice(cursor, length))

@@ -2251,6 +2251,9 @@ class Cursor:
 
     next = __next__
 
+    def to_list(self, length=None):
+        return helpers.cursor_to_list(self, length)
+
     def rewind(self):
         self._emitted = 0
 
