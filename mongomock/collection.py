@@ -2355,7 +2355,7 @@ class Cursor:
 
     @property
     def alive(self):
-        return self._emitted != len(self._compute_results(with_limit_and_skip=False))
+        return self._emitted < len(self._compute_results(with_limit_and_skip=True))
 
     @property
     def collation(self):
