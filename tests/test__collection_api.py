@@ -109,6 +109,34 @@ class CollectionAPITest(TestCase):
         next(cursor)
         self.assertFalse(cursor.alive)
 
+    def test__cursor_to_list(self):
+        self.db.collection.insert_many([{'a': i} for i in range(5)])
+        self.assertEqual(
+            [doc['a'] for doc in self.db.collection.find().sort('a').to_list()], [0, 1, 2, 3, 4]
+        )
+
+    def test__cursor_to_list_with_length(self):
+        self.db.collection.insert_many([{'a': i} for i in range(5)])
+        cursor = self.db.collection.find().sort('a')
+        self.assertEqual([doc['a'] for doc in cursor.to_list(2)], [0, 1])
+        self.assertEqual([doc['a'] for doc in cursor.to_list(10)], [2, 3, 4])
+        self.assertEqual(cursor.to_list(), [])
+
+    def test__cursor_to_list_invalid_length(self):
+        cursor = self.db.collection.find()
+        with self.assertRaises(ValueError):
+            cursor.to_list(0)
+        with self.assertRaises(ValueError):
+            cursor.to_list(-1)
+
+    def test__aggregate_to_list(self):
+        self.db.collection.insert_many([{'a': i} for i in range(5)])
+        cursor = self.db.collection.aggregate([{'$sort': {'a': 1}}])
+        self.assertEqual([doc['a'] for doc in cursor.to_list(3)], [0, 1, 2])
+        self.assertEqual([doc['a'] for doc in cursor.to_list()], [3, 4])
+        with self.assertRaises(ValueError):
+            cursor.to_list(0)
+
     def test__cursor_collation(self):
         self.db.collection.insert_one({'foo': 'bar'})
         cursor = self.db.collection.find(collation='fr')

@@ -1,3 +1,6 @@
+from mongomock import helpers
+
+
 class CommandCursor:
     def __init__(self, collection, curser_info=None, address=None, retrieved=0):
         self._collection = iter(collection)
@@ -29,6 +32,9 @@ class CommandCursor:
         return next(self._collection)
 
     __next__ = next
+
+    def to_list(self, length=None):
+        return helpers.cursor_to_list(self, length)
 
     def __enter__(self):
         return self
