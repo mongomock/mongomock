@@ -24,7 +24,7 @@ If I miss to include a feature in the below list, Please feel free to add to the
   * `$sortByCount <https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/>`_
   * `$unset <https://docs.mongodb.com/manual/reference/operator/aggregation/unset/>` _
 * Operators within the aggregate pipeline:
-  * Arithmetic operations on dates:
+  * Arithmetic operations on dates (except $dateAdd and $dateSubtract):
     * `$add <https://docs.mongodb.com/manual/reference/operator/aggregation/add/>`_
   * Some date operators ($isoDayOfWeek, $isoWeekYear, …)
   * Some set operators ($setIntersection, $setDifference, …)
