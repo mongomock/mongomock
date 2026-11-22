@@ -109,6 +109,23 @@ class CollectionAPITest(TestCase):
         next(cursor)
         self.assertFalse(cursor.alive)
 
+    def test__cursor_alive_with_limit(self):
+        self.db.collection.insert_many([{'a': i} for i in range(5)])
+        cursor = self.db.collection.find().limit(2)
+        self.assertTrue(cursor.alive)
+        next(cursor)
+        self.assertTrue(cursor.alive)
+        next(cursor)
+        self.assertFalse(cursor.alive)
+
+    def test__cursor_alive_with_skip(self):
+        self.db.collection.insert_many([{'a': i} for i in range(5)])
+        cursor = self.db.collection.find().skip(3)
+        next(cursor)
+        self.assertTrue(cursor.alive)
+        next(cursor)
+        self.assertFalse(cursor.alive)
+
     def test__cursor_collation(self):
         self.db.collection.insert_one({'foo': 'bar'})
         cursor = self.db.collection.find(collation='fr')
